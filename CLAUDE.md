@@ -15,5 +15,5 @@ Maquette d'un module d'ERP interne : **saisie et validation d'un CRA → génér
 - **Un arbitrage structurant → un ADR**, écrit **au moment** de l'arbitrage (`docs/adr/`, gabarit `0000-template.md`). Chaque ADR nomme l'**option écartée** et le **seuil auquel on changerait d'avis**.
 - **Ne pas élargir le périmètre.** Toute idée hors chaîne CRA → facture va dans la section « Ce que je ne construis pas » du README, pas dans le code.
 - **Pas de test qui ne prouve rien.** Priorité : invariants du domaine, franchissement de la frontière, autorisation par rôle **et** par périmètre.
-- **Les messages de commit comptent** : l'historique fait partie du livrable. Un commit = un pas défendable à voix haute.
+- **Les messages de commit comptent** : l'historique fait partie du livrable. Un commit = un pas défendable à voix haute. **Aucun co-auteur autre que Clement Vallois** — pas de trailer `Co-Authored-By`, quelle que soit la façon dont le code a été produit.
 - **Ne rien ajouter au README qui ne soit pas encore vrai** (ni stack ni archi tant que l'ADR n'est pas écrit).
