@@ -1,5 +1,10 @@
 # CLAUDE.md — rules for this repository
 
+> 🔴 **Before writing code, read [`docs/BUILD-RULES.md`](docs/BUILD-RULES.md), at every step.** It is
+> the operative form of every decision taken — what may and may not be written, and the order in
+> which the remaining work is built. This file states the intent; that one states the rules. A rule
+> there is not relaxed for convenience: it is either right, or it needs a new ADR.
+
 ## What this is
 
 A working mockup of an internal ERP module for a **cybersecurity consulting firm (~300 consultants, 5 practices, 4 offices)**. It covers one end-to-end chain: **a consultant submits a timesheet (CRA), a manager validates it, and that validation triggers the generation of a draft invoice (time-and-materials billing).**
@@ -15,7 +20,7 @@ This mockup takes that single chain and proves, in code, that it can be built wi
    - a validated CRA is **immutable**;
    - monetary amounts use **exact arithmetic — never a floating-point number**;
    - invoice numbering is **sequential and gapless**;
-   - VAT is computed **per line**, not on the total.
+   - VAT is rounded **per rate** — never per line, never on the total (ADR-0010).
 3. **Authorization tested by role _and_ by scope:** a manager in one office cannot read the margin of a mission in another office, and a test proves it.
 4. **A CI security gate:** SAST, dependency scan, secret scan — the repo of a cybersecurity firm's internal tool must demonstrate on itself what the firm sells.
 5. **Architectural decisions recorded when they are made** — `docs/adr/`. Each ADR names the rejected option and the threshold at which we'd change our mind.

@@ -20,6 +20,7 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0002](./0002-money-as-integer-cents.md)                      | Money is an integer number of cents, with no wrapper type                  | accepted |
 | [0003](./0003-authorization-at-the-repository.md)             | Authorization lives in the repository, not in Postgres RLS                 | accepted |
 | [0004](./0004-working-calendar-with-a-fixed-holiday-table.md) | The working calendar is a domain component with a fixed 2026 holiday table | accepted |
+| [0010](./0010-vat-rounded-per-rate.md)                        | VAT is rounded per rate, and the rate is resolved from territoriality      | accepted |
 
 ## Identified, not yet decided
 
@@ -30,5 +31,12 @@ Numbers are reserved so that what is **known and unsettled** is visible rather t
 | 0005 | Cra lifecycle: draft → submitted → refused/validated, and where immutability binds                   | to be written with the timesheet domain    |
 | 0006 | Separation of duties: whoever records a Cra does not validate it, whoever validates does not invoice | to be written with the validation use case |
 | 0007 | Gapless invoice numbering under concurrency                                                          | to be written with persistence             |
-| 0008 | Server framework and HTTP error shape (RFC 9457)                                                     | to be written with the API                 |
-| 0009 | Front-end framework and how it consumes the API                                                      | to be written with the web client          |
+| 0008 | Server framework and HTTP error shape (RFC 9457) — Fastify, chosen in `CHOIX.md` §30 on 17/08        | to be written with the API                 |
+| 0009 | Application shape: server-rendered HTML, no client framework — chosen in `CHOIX.md` §30 on 17/08     | to be written with the web client          |
+| 0011 | Data access: `pg` with hand-written SQL and numbered migrations, no ORM                              | to be written with persistence             |
+| 0012 | Half-day as the single storage unit for recorded time                                                | to be written with the timesheet domain    |
+| 0013 | Polymorphic invoice line: it carries its origin even though only `Regie` exists                      | to be written with the billing domain      |
+
+0010 sits above the reserved numbers because numbering follows the order in which ADRs were
+**written**, never the order they are read in. It settled a contradiction between the README and the
+fiscal rule, so it could not wait for the domain code the reserved numbers are attached to.
