@@ -9,29 +9,28 @@ naming the option rejected and the threshold for changing our mind. If a rule an
 ADR wins and this file is wrong; fix it. Nothing here may be relaxed for convenience — a rule that
 blocks you is either right, or it needs a new ADR.
 
-## The four-day plan (code freeze 21/08, ship 24/08)
+## Build order
 
-Tiers 1–4 are ranked by what `CLAUDE.md` names as a deliverable, **not** by breadth of domain
-coverage. **The cut line is after tier 4**: tier 5 is dropped whole and named in the README as
-dropped. Shipping tiers 1–4 finished beats shipping everything half-built.
+Ranked by dependency, not by calendar. **Scope is not cut to fit a date** — the date moves, the scope
+does not. Every retained decision gets built; this list only says what has to exist before what.
 
 1. **The chain.** `Cra` aggregate → submit → validate → `TimesheetValidated` → draft invoice → issue
    with a gapless number. Domain first, tested without a database.
 2. **The proof.** Authorization by role _and_ by `Office` scope; the immutability refusal; the
-   invariant tests; migrations; the deterministic seed in the shape `CLAUDE.md` fixes.
-3. **The screen that gives it meaning.** The pré-facturier: what is billable, and for the rest the
-   explicit blocking reason. Plus the refusal page and the empty state — all three are named
-   deliverables in `CLAUDE.md`, and the RFC 9457 motive is what they display.
-4. **The reader.** README sections, `docs/demo.md`, the cold-reader path, one VAT rate resolved from
-   territoriality with the mandatory invoice mentions.
-5. **Breadth, if the days are there** — dropped as a block, in this order: the four territoriality
-   regimes and DOM rates · EU autoliquidation · the reform's four new fields · `CreditNote` ·
-   payment-term cap validation · `Cjm`/`Grade`/margin · `domain_events` · `Idempotency-Key` ·
-   printable Cra · the Cra entry grid.
+   invariant tests; per-module schemas; migrations; the deterministic seed in the shape `CLAUDE.md`
+   fixes.
+3. **The invoice, in full.** VAT resolved from territoriality and frozen onto the line, the four
+   regimes, every mandatory legal mention, the reform's four new fields, payment-term caps,
+   `CreditNote` with a typed reason, the document coherence check.
+4. **The screens.** Cra entry grid, pré-facturier with explicit blocking reasons, the invoice, the
+   refusal page, the empty and error states, the printable Cra.
+5. **The surrounding proof.** `domain_events`, `Idempotency-Key`, structured logging with redaction,
+   health and readiness, graceful shutdown, mutation testing on `domain/` in nightly, Renovate, the
+   CI job replaying `setup`, migrations replayed twice, branch protection.
+6. **The reader.** README sections, `docs/demo.md`, the cold-reader path, the demo script.
 
-This tiering is the authority on build order and on what gets cut. Whatever is dropped is recorded in
-the README's "Ce que je ne construis pas" — a subject silently missing is the failure mode; a subject
-named as cut is a decision.
+Nothing here is optional. If something turns out to be genuinely wrong rather than merely unfinished,
+it becomes an ADR and moves to the README's "Ce que je ne construis pas" — never a silent omission.
 
 ## Money — non-negotiable
 
