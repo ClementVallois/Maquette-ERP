@@ -60,6 +60,13 @@ jobs:
       - run: pnpm run format:check
       - run: pnpm run typecheck
 
+      # `.env` is gitignored, so `env:init` copies the template first. That makes the
+      # template-vs-`.env` half of the check trivially true here — the half this job exists for is
+      # the other one: a `${VAR:?}` added to compose.yml with no line in `.env.example`. Without
+      # this step that drift merges green and breaks the next `docker compose up`.
+      - name: Environment template has not drifted from compose.yml
+        run: pnpm run env:init && pnpm run env:check
+
   test:
     name: Tests
     runs-on: ubuntu-latest
