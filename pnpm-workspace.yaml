@@ -1,0 +1,11 @@
+packages:
+  - 'packages/*'
+
+# In pnpm 11 this key is not read from .npmrc. Without it, `pnpm add` reintroduces `^` ranges.
+saveExact: true
+
+# Allowlist for `ignore-scripts=true` (.npmrc). Each entry needs a reason.
+allowBuilds:
+  esbuild: true # vitest bundler
+  lefthook: true # downloads its own binary
+  unrs-resolver: true # native binding of the ESLint TypeScript resolver

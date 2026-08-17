@@ -2,11 +2,18 @@ node_modules/
 dist/
 build/
 coverage/
+.next/
 .env
 .env.*
 !.env.example
 *.log
 .DS_Store
 .idea/
-.vscode/
+
+# Editor settings ARE versioned (see .vscode/settings.json): without eslint.workingDirectories
+# and the workspace TypeScript, the guards do not behave the same for every reader.
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
 draft.md
