@@ -89,3 +89,13 @@ Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-
 ### Domain docs
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Subagents (`.claude/agents/`)
+
+Two read-only reviewers, both run in a clean context on purpose — dispatch them, do not replay
+their checklists inline:
+
+- **`rules-auditor`** — blind audit of a diff against `docs/BUILD-RULES.md`. Before every merge to
+  `main` and at every phase checkpoint.
+- **`cold-reader`** — walks the repo as the no-brief reader. Before merging README/docs changes to
+  `main`, and before the repo link goes out.

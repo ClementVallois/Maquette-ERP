@@ -16,4 +16,9 @@ coverage/
 !.vscode/settings.json
 !.vscode/extensions.json
 
+# Agent definitions ARE versioned: a reviewer that only one machine can run reviews nothing.
+# Everything else Claude Code writes here is session state (RESUME.md and its checkpoint ref).
+.claude/*
+!.claude/agents/
+
 draft.md
