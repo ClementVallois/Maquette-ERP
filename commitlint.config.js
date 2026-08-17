@@ -23,6 +23,14 @@ export default {
         'contracts',
         'timesheet',
         'billing',
+        // Extended once, in task 0.2 of docs/BUILD-PLAN.md, for the scopes phases 4-8 will need.
+        // Adding them ahead of the code is the point: the alternative is a `--no-verify` on the
+        // first commit of every one of those phases, which turns the closed list into a formality.
+        'api',
+        'web',
+        'seed',
+        'deploy',
+        'security',
       ],
     ],
     'body-max-line-length': [2, 'always', 100],
