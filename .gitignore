@@ -21,4 +21,7 @@ coverage/
 .claude/*
 !.claude/agents/
 
+# The working documents. Purged from history by ADR-0014 and archived in the private
+# Maquette-ERP-notes repository; ignored here so a stray `git add .` cannot bring them back.
+CHOIX.md
 draft.md

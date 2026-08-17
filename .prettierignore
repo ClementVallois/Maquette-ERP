@@ -4,6 +4,3 @@ build
 coverage
 pnpm-lock.yaml
 .next
-
-# Internal working document, deliberately kept out of the formatted surface.
-CHOIX.md

@@ -91,4 +91,25 @@ _(à écrire — il doit ressembler à la réalité d'un cabinet : plusieurs pô
 
 ## Tests et portes de CI
 
-_(à écrire — lister les portes et ce que chacune empêche de merger.)_
+Une porte qui ne bloque pas un merge est un avertissement, pas une porte. Les cinq suivantes sont
+**exigées** par la protection de branche sur `main` : tant que l'une est rouge, le bouton de merge
+est désactivé.
+
+| Porte (job CI)          | Commande                                            | Ce qu'elle empêche de merger                                                                                                                                                               |
+| ----------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Module boundary**     | `pnpm run boundaries` + le test négatif             | Un import qui franchit la frontière `timesheet`/`billing`, une flèche jamais déclarée — et une règle **morte** : le test rejoue une violation délibérée et exige qu'elle soit refusée      |
+| **Lint, format, types** | `lint` · `format:check` · `typecheck` · `env:check` | Du code hors des règles ESLint (dont les invariants du domaine rendus mécaniques), un formatage divergent, une erreur de type — et une variable de `compose.yml` absente de `.env.example` |
+| **Secret scan**         | gitleaks sur l'historique                           | Un secret commité, y compris dans un commit ancien de la branche                                                                                                                           |
+| **Dependency scan**     | `pnpm audit` + osv-scanner                          | Une dépendance portant une vulnérabilité connue de niveau haut ou critique                                                                                                                 |
+| **SAST**                | Semgrep OSS                                         | Les motifs de vulnérabilité applicative détectables statiquement                                                                                                                           |
+
+> ⚠️ **La porte `Tests` existe mais n'est volontairement pas encore exigée.** `test:cov` mesure la
+> couverture du **domaine** contre un seuil de 90 %, et le domaine se réduit aujourd'hui à deux
+> fichiers de constantes : le job est rouge, et le rendre vert demanderait soit d'abaisser le seuil,
+> soit d'écrire un test qui ne prouve rien. Il devient exigé quand la phase 1 livre le domaine et ses
+> tests. C'est écrit ici plutôt que contourné en silence — voir `docs/open-questions.md`.
+
+Les hooks locaux (lefthook) doublent une partie de ces portes **avant** le commit et le push :
+gitleaks sur ce qui est indexé — le seul des deux qui empêche réellement la fuite, la CI ne scannant
+qu'une fois le secret poussé — puis `typecheck`, `boundaries` et les tests unitaires avant le push.
+Les tests d'intégration en sont délibérément absents : un `git push` ne doit pas exiger Docker.

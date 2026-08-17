@@ -3,8 +3,10 @@ name: CI
 on:
   push:
     branches: ['**']
+  # `main` alone: `develop` was merged and deleted in Phase 0, and a trigger naming a branch that
+  # cannot exist is a rule nobody will notice has stopped applying.
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 
 permissions: {}
 
