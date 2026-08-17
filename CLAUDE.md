@@ -1,8 +1,9 @@
 # CLAUDE.md — rules for this repository
 
 > 🔴 **Before writing code, read [`docs/BUILD-RULES.md`](docs/BUILD-RULES.md), at every step.** It is
-> the operative form of every decision taken — what may and may not be written, and the order in
-> which the remaining work is built. This file states the intent; that one states the rules. A rule
+> the operative form of every decision taken — what may and may not be written. This file states the
+> intent; that one states the rules; [`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md) states the order,
+> the branches, and the calendar. A rule
 > there is not relaxed for convenience: it is either right, or it needs a new ADR.
 
 ## What this is
@@ -64,8 +65,16 @@ The seed data must look like the reality of a consulting firm:
 
 ## Schedule constraint
 
-- **Code freeze: 21/08.** The last days go to the README, ADRs, dataset, and states (empty/error/denied).
-- **Ship: 24/08.** The repo must explain itself to a reader who has no brief and no context.
+- **`docs/BUILD-PLAN.md` is the authority on order and dates** (decision of 17/08/2026). Sized
+  honestly, the full build runs to early September 2026 — **the date moves, the scope does not.**
+  The "code freeze 21/08 / ship 24/08" pair this section used to state described a smaller scope
+  and is superseded.
+- **24/08 is a conversation date, not a finish line.** What goes out that day is defined in the
+  plan's Calendar section: the hosted chain at `https://erp.clementvallois.fr` if Phase 8 has
+  landed, otherwise the repository link with a README that states plainly which phases are merged
+  and that the hosted instance follows.
+- The repo must explain itself to a reader who has no brief and no context — that requirement has
+  no date; it holds at every merge to `main`.
 
 ## Agent skills
 
