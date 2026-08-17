@@ -18,14 +18,17 @@ Périmètre volontairement étroit : deux modules, et **une seule flèche qui fr
    - les montants sont des **entiers en centimes** — jamais de flottant sur une valeur monétaire ;
    - la numérotation des factures est **séquentielle et sans trou** ;
    - la TVA est arrondie **par taux** — ni par ligne, ni sur le total. C'est la règle fiscale
-     française, et c'est ce que le récapitulatif obligatoire en pied de facture publie.
+     française, et c'est ce que le récapitulatif obligatoire en pied de facture publie
+     (**ADR-0010**). ⚠️ Les taux, seuils et mentions obligatoires retenus sont ceux connus au
+     **17/08/2026** et **n'ont pas été validés par un expert-comptable** : cette maquette n'émet
+     rien à un vrai client, et rien ici ne doit être repris en production sans cette validation.
 3. **L'autorisation est testée**, par rôle _et_ par périmètre : un manager d'une implantation ne lit pas les marges d'une mission qui n'est pas la sienne, et c'est un test qui le prouve.
 4. **Des arbitrages écrits au moment où ils sont pris** → `docs/adr/`. Chaque ADR nomme l'option écartée et le seuil auquel on changerait d'avis.
 
 ## Ce que je ne construis pas
 
 Un ERP de cabinet de conseil contient quelques centaines de sujets. Ils ont **tous** été inventoriés
-et tranchés avant d'écrire une ligne de domaine — 478 arbitrages, dont **246 écartés ou renvoyés à
+et tranchés avant d'écrire une ligne de domaine — 478 arbitrages, dont **242 écartés ou renvoyés à
 l'ERP cible**. Cette section est la partie publique de ce tri : elle dit ce qui manque
 **volontairement**, et pourquoi. Un sujet absent d'ici est un oubli ; un sujet listé ici est une
 décision.

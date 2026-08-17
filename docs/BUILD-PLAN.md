@@ -177,8 +177,9 @@ the first commit of later phases — the commit-msg hook rejects `feat(api)` tod
   repository** (`Maquette-ERP-notes`), together with **`scripts/extract-triage.ts`, written in
   this task**: the script that counts the triage's verdict markers row by row. The coverage
   appendix of this plan and Phase 9's closing verification both key to its output, so it lives
-  with the document it measures — it does not exist yet, and referencing it without writing it
-  would be the plan's own guard that guards nothing.
+  with the document it measures — referencing it without writing it would be the plan's own guard
+  that guards nothing. ✅ **Written 17/08/2026** and run: its output is in the appendix, and it
+  found the README's discarded-rows figure to be one commit stale.
 - `draft.md` has **no history to purge**: it is gitignored and `git log --all -- draft.md` returns
   nothing (verified 17/08/2026). It is archived because a **verbatim third-party post** without
   attribution has no place near a public repo — but the rewrite below concerns `CHOIX.md` only.
@@ -769,11 +770,22 @@ Tag the release, verify the deployed digest matches the tag, check the live inst
 ## Appendix — coverage of the triage
 
 The source is the triage document, held in the private `Maquette-ERP-notes` repository after Phase
-0, measured by `scripts/extract-triage.ts` (written in task 0.1, archived alongside it). A manual
-recount on 17/08/2026 gives **~479 rows — 88 "retained, to be built", 51 permanent rules, 243
-discarded or deferred** — not the 478/89/52/246 this plan first quoted; the script's output
-supersedes both counts, which is exactly why it exists. Rows are keyed here by **subject**, not by
-section number, because the section numbers point at a document a public reader cannot open.
+0, measured by `scripts/extract-triage.ts` (written in task 0.1, archived alongside it).
+
+**Measured 17/08/2026, and these are the figures that stand**: **478 rows — 64 already in the
+repository, 88 "retained, to be built", 51 permanent rules, 33 already recorded elsewhere, 168
+deferred to the target ERP, 74 discarded**, so **242 discarded or deferred**. They supersede both
+earlier counts — this plan's first quote of 478/89/52/246 and the manual recount of ~479/88/51/243 —
+which is exactly why the script exists. The manual recount had the two middle figures right and both
+ends off by one. Sections 32 and 41 are excluded: they are source-coverage tables, not verdicts.
+
+The README carried 246 until this measurement. The four rows are identified: the commit that
+re-ranked the build order by dependency moved mutation testing, Renovate, progressive disclosure and
+the dated manager attachment from discarded/deferred to "to be built", and the README figure did not
+follow. Corrected there; recorded under Settled in `docs/open-questions.md`.
+
+Rows are keyed here by **subject**, not by section number, because the section numbers point at a
+document a public reader cannot open.
 
 Every "to be built" row maps to a phase below. The **rules** are permanent and already live in
 `BUILD-RULES.md`; they are enforced by every phase rather than built by one. The discarded and
