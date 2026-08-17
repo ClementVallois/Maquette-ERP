@@ -12,6 +12,16 @@ Two record-keeping rules, because the point of this log is that it was not retou
 2. An ADR is **not rewritten**. A decision that changes produces a **new** ADR that supersedes the
    previous one; the old one stays in place with its status updated.
 
+   One exception, narrow on purpose: an ADR may be **corrected for a factual error, before the
+   branch that introduced it merges to `main`**, and only where the decision, the rejected option
+   and the threshold are untouched — a stated fact that was already false when it was written, not
+   a position that has since become inconvenient. The correcting commit says what was wrong and
+   why it is a correction rather than a change of mind, so the log still shows the edit rather than
+   hiding it. Once an ADR is on `main` it is read by people who did not watch it being written, and
+   this exception is closed: a wrong fact then gets a superseding ADR like anything else.
+
+   Used once so far, on ADR-0014 — see the commit `docs(adr): cite commits by what they did`.
+
 ## Accepted
 
 | No.                                                           | Decision                                                                   | Status   |
