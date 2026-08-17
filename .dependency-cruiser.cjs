@@ -56,6 +56,23 @@ module.exports = {
       to: { circular: true },
     },
   ],
+
+  // The whitelist. Everything above names a specific arrow so the failure reads well; this is
+  // what makes an UNDECLARED arrow fail too. Without it the rules are a blacklist, and a module
+  // added tomorrow reaches into any other one with a green gate. See docs/adr/0001.
+  allowedSeverity: 'error',
+  allowed: [
+    // Inside one package. `$1` is the capture group from `from.path`.
+    { from: { path: '^packages/([^/]+)/' }, to: { path: '^packages/$1/' } },
+    // The two modules may use the shared kernel, and only through its public entry point.
+    {
+      from: { path: '^packages/(timesheet|billing)/' },
+      to: { path: '^packages/platform/src/index\\.ts$' },
+    },
+    // Third-party code. The domain is held to nothing at all by a separate forbidden rule.
+    { from: {}, to: { dependencyTypes: ['npm', 'npm-dev', 'npm-optional', 'npm-peer', 'core'] } },
+  ],
+
   options: {
     doNotFollow: { path: 'node_modules' },
     // pnpm links workspace deps into each package's node_modules, so a glob otherwise collects
