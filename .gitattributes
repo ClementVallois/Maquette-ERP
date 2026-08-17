@@ -1,0 +1,4 @@
+# Prettier's `endOfLine` only covers files it formats. Real normalisation happens here.
+* text=auto eol=lf
+
+pnpm-lock.yaml linguist-generated=true -diff

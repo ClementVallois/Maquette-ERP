@@ -2,11 +2,26 @@ node_modules/
 dist/
 build/
 coverage/
+.next/
 .env
 .env.*
 !.env.example
 *.log
 .DS_Store
 .idea/
-.vscode/
+
+# Editor settings ARE versioned (see .vscode/settings.json): without eslint.workingDirectories
+# and the workspace TypeScript, the guards do not behave the same for every reader.
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Agent definitions ARE versioned: a reviewer that only one machine can run reviews nothing.
+# Everything else Claude Code writes here is session state (RESUME.md and its checkpoint ref).
+.claude/*
+!.claude/agents/
+
+# The working documents. Purged from history by ADR-0014 and archived in the private
+# Maquette-ERP-notes repository; ignored here so a stray `git add .` cannot bring them back.
+CHOIX.md
 draft.md

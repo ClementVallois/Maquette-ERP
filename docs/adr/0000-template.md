@@ -1,24 +1,27 @@
-# ADR-0000 — Titre de la décision
+# ADR-0000 — Decision title
 
-- **Date** : AAAA-MM-JJ
-- **Statut** : proposé | accepté | remplacé par ADR-XXXX
+- **Date**: YYYY-MM-DD
+- **Status**: proposed | accepted | superseded by ADR-XXXX
 
-## Contexte
+## Context
 
-Quel problème concret se pose, ici, maintenant. Les contraintes réelles (périmètre, temps, compétences disponibles, ce que le reste du code impose déjà).
+The concrete problem, here and now. The real constraints (scope, time, available skills, what the
+rest of the code already imposes).
 
-## Décision
+## Decision
 
-Ce qui est décidé, à l'affirmative et en une phrase si possible.
+What is decided, affirmatively, in one sentence where possible.
 
-## Option écartée
+## Rejected option
 
-L'alternative sérieuse — celle qu'un lecteur aurait proposée — et **pourquoi** elle perd *dans ce contexte*. Une option écartée sans raison contextuelle est un homme de paille.
+The serious alternative — the one a reader would have proposed — and **why** it loses _in this
+context_. A rejected option without a contextual reason is a straw man.
 
-## Seuil de réexamen
+## Reconsideration threshold
 
-À quel signal mesurable cette décision devient mauvaise et doit être rouverte (volume, latence, taille d'équipe, nouveau besoin métier…).
+The measurable signal at which this decision becomes wrong and must be reopened (volume, latency,
+team size, a new business need…).
 
-## Conséquences
+## Consequences
 
-Ce que cette décision rend facile, et ce qu'elle rend coûteux.
+What this makes easy, and what it makes expensive.

@@ -1,0 +1,16 @@
+{
+  "name": "@erp/billing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Billing module: reacts to a validated timesheet, drafts an invoice",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@erp/platform": "workspace:*"
+  }
+}

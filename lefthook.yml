@@ -1,0 +1,37 @@
+pre-commit:
+  parallel: true
+  jobs:
+    - name: prettier
+      glob: '*.{ts,tsx,js,mjs,cjs,json,jsonc,md,yml,yaml}'
+      run: pnpm exec prettier --write {staged_files}
+      stage_fixed: true
+
+    - name: eslint
+      glob: '*.{ts,tsx,js,mjs,cjs}'
+      run: pnpm exec eslint --fix --no-warn-ignored {staged_files}
+      stage_fixed: true
+
+    # CI scans history: by then a leaked secret is already pushed and must be revoked.
+    # This is the only one of the two that prevents the leak.
+    - name: gitleaks
+      run: gitleaks protect --staged --redact --no-banner
+
+commit-msg:
+  jobs:
+    - name: commitlint
+      run: pnpm exec commitlint --edit {1}
+
+    - name: no-co-author
+      run: scripts/check-no-co-author.sh {1}
+
+pre-push:
+  jobs:
+    - name: typecheck
+      run: pnpm run typecheck
+
+    - name: boundaries
+      run: pnpm run boundaries
+
+    # Integration tests are deliberately absent: a push must not require Docker.
+    - name: test-unit
+      run: pnpm run test
