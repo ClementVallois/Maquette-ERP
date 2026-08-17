@@ -23,8 +23,6 @@ export default {
         'contracts',
         'timesheet',
         'billing',
-        'api',
-        'web',
       ],
     ],
     'body-max-line-length': [2, 'always', 100],

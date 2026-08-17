@@ -20,7 +20,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc -p tsconfig.json --noEmit && pnpm --recursive --parallel run typecheck",
-    "boundaries": "depcruise \"packages/*/src/**/*.ts\" --config .dependency-cruiser.cjs",
+    "boundaries": "node scripts/boundaries.ts",
     "boundaries:graph": "depcruise \"packages/*/src/**/*.ts\" --config .dependency-cruiser.cjs --output-type dot",
     "test": "vitest run --project unit",
     "test:int": "vitest run --project integration",

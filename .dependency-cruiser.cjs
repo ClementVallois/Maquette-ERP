@@ -50,26 +50,10 @@ module.exports = {
       to: { path: '^packages/[^/]+/src/infrastructure/' },
     },
     {
-      name: 'web-talks-http-only',
-      severity: 'error',
-      comment:
-        'The web client reaches the API over HTTP. It may import @erp/contracts and nothing ' +
-        'else from this repository. See docs/adr/0001.',
-      from: { path: '^apps/web/' },
-      to: { path: '^(packages/(platform|timesheet|billing)|apps/api)/' },
-    },
-    {
       name: 'no-circular',
       severity: 'error',
       from: {},
       to: { circular: true },
-    },
-    {
-      name: 'no-module-internals',
-      severity: 'error',
-      comment: 'A module is entered through its index.ts, never through a file inside it.',
-      from: { path: '^apps/' },
-      to: { path: '^packages/[^/]+/src/.+', pathNot: '^packages/[^/]+/src/index\\.ts$' },
     },
   ],
   options: {
