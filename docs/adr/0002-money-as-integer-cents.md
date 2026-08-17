@@ -57,3 +57,8 @@ runtime, zero cost, and enough for the type checker to reject mixing units).
 
 Rounding remains a domain decision regardless: VAT is computed and rounded **per line**, to the
 cent, never on the total.
+
+> **Corrected by [ADR-0010](./0010-vat-rounded-per-rate.md) (2026-08-17).** The sentence above is
+> wrong: rounding is **per rate**, not per line. It is left in place rather than edited, because an
+> ADR records what was decided at the time — see the record-keeping rules in the index. Nothing else
+> in this ADR is affected; the representation decision stands.
