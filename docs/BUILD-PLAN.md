@@ -28,7 +28,7 @@ pointer to it (task 0.6). If this plan and an ADR disagree, the ADR wins and thi
 
 ## Calendar
 
-Ten phases, sequenced by dependency. Sized honestly, this is **10–14 working days**, not 4. The
+Eleven phases, 0 through 10, sequenced by dependency. Sized honestly, this is **10–14 working days**, not 4. The
 implied finish is therefore **early September 2026**, not 21/08.
 
 What that means for the 24/08 conversation: phases 0–6 plus 8 constitute a **demonstrable chain in
@@ -110,20 +110,32 @@ At the end of **every sub-task (commit), every task, and every phase**, two ques
 1. **Where and what am I least confident in, in what I just produced?**
 2. **In three months, what breaks if I leave it as it is?**
 
-Every point raised resolves to exactly **one** of three outcomes — never a silent pass:
+Every point raised resolves to exactly **one** of four outcomes — never a silent pass:
 
 - **fix now** — it is a defect, corrected in the same task before moving on;
 - **new ADR** — it is a decision that was made implicitly and must be written down with its rejected
   option and its reconsideration threshold;
 - **a row in the README's "Ce que je ne construis pas"** — it is out of scope, and the omission
-  becomes deliberate and public.
+  becomes deliberate and public;
+- **a row in `docs/open-questions.md`** — it is real, it is not yet decidable, and the phase that
+  will decide it is named with a date. This one carries an obligation the other three do not: an
+  open row with no named phase is a deferral pretending to be a record.
+
+The fourth was written in after the Phase 0 checkpoint, which produced two points that were none of
+the first three — a measured discrepancy needing a decision, and a guard that cannot be built until
+Phase 5 fixes the shape it would verify. The list said "three" while the paragraph below already
+sent phase checkpoints to `open-questions.md`; the list was wrong, not the paragraph.
 
 Phase-level checkpoints are **written down** in `docs/open-questions.md` (absolute dates, impact,
 status; answered questions move to "Settled" with their answer). That file already exists for exactly
 this and it puts the checkpoint in git history, which this repo treats as a deliverable. Commit-level
 checkpoints are resolved in place and leave their trace in the commit itself.
 
-Stop condition: a checkpoint ends when every point raised has one of the three outcomes recorded.
+A phase checkpoint also states, explicitly, **which tasks of the phase did not run and why** — an
+unexecuted task that appears nowhere is the silent omission the build order forbids, and the
+checkpoint is the last place it can be caught before the phase is called done.
+
+Stop condition: a checkpoint ends when every point raised has one of the four outcomes recorded.
 "Iterate until perfect" without that rule is unbounded; with it, it terminates.
 
 ### ADR numbering
@@ -186,10 +198,19 @@ the first commit of later phases — the commit-msg hook rejects `feat(api)` tod
 - **Prerequisites**, verified 17/08/2026: `git filter-repo` is not installed
   (`pipx install git-filter-repo`), and it refuses to run on anything but a fresh clone — work
   from a fresh clone, or pass `--force` knowingly.
-- Delete the local checkpoint ref **before** the rewrite: `.claude/RESUME.md` names
-  `refs/claude/checkpoint-72ced4ec`, which carries in-progress files and would keep purged blobs
-  reachable. `git update-ref -d refs/claude/checkpoint-72ced4ec`, then delete the stale
-  `RESUME.md` itself (local tooling, not a deliverable).
+- Delete every local ref that carries the file **before** the rewrite, or it keeps purged blobs
+  reachable and `git log --all` keeps finding them. `.claude/RESUME.md` names
+  `refs/claude/checkpoint-72ced4ec`, and naming only that one was wrong: checked 17/08/2026, the
+  file is in the tree of **`refs/claude/checkpoint-72ced4ec`, `refs/claude/checkpoint-4bd86d32`
+  and `stash@{0}`** — the stash being a `WIP on main` from before the branch even existed. Enumerate
+  rather than trust this list, since the tooling writes new checkpoint refs as it goes:
+  ```sh
+  for r in $(git for-each-ref --format='%(refname)' refs/claude refs/stash); do
+    git ls-tree -r --name-only "$r" | grep -q '^CHOIX.md$' && echo "$r"
+  done
+  git stash list   # drop any that carry it
+  ```
+  Then delete the stale `RESUME.md` itself (local tooling, not a deliverable).
 - `git filter-repo --path CHOIX.md --invert-paths` across `main`, `develop`,
   `feature/ci-pipeline`; then `git reflog expire --expire=now --all && git gc --prune=now`;
   verify with `git log --all -p -- CHOIX.md` returning nothing.
