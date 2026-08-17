@@ -16,7 +16,7 @@ This mockup takes that single chain and proves, in code, that it can be built wi
    - monetary amounts use **exact arithmetic — never a floating-point number**;
    - invoice numbering is **sequential and gapless**;
    - VAT is computed **per line**, not on the total.
-3. **Authorization tested by role *and* by scope:** a manager in one office cannot read the margin of a mission in another office, and a test proves it.
+3. **Authorization tested by role _and_ by scope:** a manager in one office cannot read the margin of a mission in another office, and a test proves it.
 4. **A CI security gate:** SAST, dependency scan, secret scan — the repo of a cybersecurity firm's internal tool must demonstrate on itself what the firm sells.
 5. **Architectural decisions recorded when they are made** — `docs/adr/`. Each ADR names the rejected option and the threshold at which we'd change our mind.
 
@@ -39,15 +39,18 @@ The README's "What I'm not building" section is the source of truth. Everything 
 - **One structural decision = one ADR**, written **at the time** of the decision (`docs/adr/`, template `0000-template.md`). Each ADR names the **rejected option** and the **threshold at which we'd change our mind**.
 - **Do not expand scope.** Any idea outside the CRA-to-invoice chain goes in the "What I'm not building" section of the README, not in the code.
 - **No test that proves nothing.** Priority: domain invariants, boundary crossing, authorization by role **and** by scope.
-- **Everything in English.** Code, comments, commit messages, ADRs, documentation — all in English. `README.md` stays in French (it addresses a French-speaking reader who will open this repo cold, without a brief).
+- **Everything in English**, with one deliberate exception. Code, comments, commit messages, ADRs, documentation — all in English. `README.md` stays in French (it addresses a French-speaking reader who will open this repo cold, without a brief).
+- **French business terms stay French when translating them loses contractual or legal meaning** — `Cra`, `Regie`, `Forfait`, `Tjm`, `Intercontrat`, `Habilitation`, `Passi`. This is the firm's ubiquitous language, not sloppiness. Everything structural is English, and terms that translate without loss are translated (`pôle → Practice`, `implantation → Office`, `avoir → CreditNote`). `CONTEXT.md` is the authority: a term is not used in code until it is in there.
 - **Commit messages matter**: the history is part of the deliverable. One commit = one step defensible out loud. **No co-author other than Clement Vallois** — no `Co-Authored-By` trailer, regardless of how the code was produced.
 - **Do not add anything to the README that isn't true yet** (no stack, no architecture diagram until the ADR is written).
-- **Clement codes the core.** The point is ownership he can defend, not a green repo. The agent assists, reviews, scaffolds infrastructure — the domain logic and the architectural decisions are Clement's.
+- **Clement owns the decisions; the agent writes the code.** Every architectural arbitration is Clement's and is recorded in an ADR at the time it is made. Because the code itself is delegated, `docs/adr/` and `CONTEXT.md` are not documentation _about_ the deliverable — they **are** the part of the deliverable he authored, and they are held to that standard.
+- **Do not comment everything.** The reasoning lives in `docs/adr/` and `CONTEXT.md`; a comment that restates a decision duplicates it and rots. Write a comment only for a non-obvious _mechanical_ fact — a trap, a footgun, a setting that silently does nothing if written differently. If a comment explains _why we chose this_, it belongs in an ADR and the code should link to it instead.
 - **Empty states, error states, and permission-denied states are part of the deliverable** — they are not polish, they are proof that the authorization model works.
 
 ## Dataset shape
 
 The seed data must look like the reality of a consulting firm:
+
 - **5 practices** (audit, SOC, GRC, IAM, offensive security)
 - **4 offices** (Paris, Lyon, Rennes, Bordeaux)
 - Time-and-materials **and** fixed-price missions (only T&M is invoiced by this mockup)
@@ -58,3 +61,17 @@ The seed data must look like the reality of a consulting firm:
 
 - **Code freeze: 21/08.** The last days go to the README, ADRs, dataset, and states (empty/error/denied).
 - **Ship: 24/08.** The repo must explain itself to a reader who has no brief and no context.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub issues on `ClementVallois/Maquette-ERP`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
