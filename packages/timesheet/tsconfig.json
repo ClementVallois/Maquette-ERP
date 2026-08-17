@@ -5,5 +5,7 @@
     "rootDir": "src",
     "outDir": "dist"
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  // The fixture violates the boundary on purpose; only dependency-cruiser reads it.
+  "exclude": ["node_modules", "dist", "coverage", "src/__boundary-fixture__"]
 }

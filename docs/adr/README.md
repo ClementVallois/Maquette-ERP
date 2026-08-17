@@ -24,11 +24,16 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0009](./0009-server-rendered-html-no-client-framework.md)    | Server-rendered HTML, with no client framework                             | accepted |
 | [0010](./0010-vat-rounded-per-rate.md)                        | VAT is rounded per rate, and the rate is resolved from territoriality      | accepted |
 | [0011](./0011-hand-written-sql-no-orm.md)                     | Hand-written SQL over `pg`, and no ORM                                     | accepted |
+| [0015](./0015-apps-tier-separate-from-packages.md)            | The application shell lives in `apps/`, a tier above `packages/`           | accepted |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
 to close the gap is exactly the retouching that rule 1 above forbids. The gap is the record: it shows
 which decisions were known before they were made.
+
+0014 onwards were reserved the same day by `docs/BUILD-PLAN.md`, which assigns each remaining number
+to the phase that consumes it. A number there is a commitment that the decision will be written when
+it is taken, not a placeholder to be shuffled.
 
 ## Identified, not yet decided
 

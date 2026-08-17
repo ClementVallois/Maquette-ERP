@@ -4,9 +4,14 @@ import { describe, expect, it } from 'vitest';
 
 const DEPCRUISE = 'node_modules/.bin/depcruise';
 
-const SHIPPED = ['packages/*/src/**/*.ts'];
+const SHIPPED = ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts'];
 const DECLARED_ARROW_FIXTURE = ['packages/billing/src/__boundary-fixture__/**/*.ts'];
 const UNDECLARED_MODULE_FIXTURE = ['packages/__boundary-fixture__/**/*.ts'];
+const APP_FIXTURE = ['apps/__boundary-fixture__/src/**/*.ts'];
+const MODULE_TO_APP_FIXTURE = ['packages/timesheet/src/__boundary-fixture__/**/*.ts'];
+
+const APP_ALLOWED = 'apps/__boundary-fixture__/src/allowed-public-import.ts';
+const APP_DEEP = 'apps/__boundary-fixture__/src/forbidden-deep-import.ts';
 
 interface CruiseResult {
   summary: {
@@ -42,6 +47,37 @@ describe('the module boundary rule', () => {
     const { summary } = cruise(UNDECLARED_MODULE_FIXTURE, '.dependency-cruiser.fixture.cjs');
 
     expect(summary.violations.map((violation) => violation.rule.name)).toContain('not-in-allowed');
+  });
+
+  it('lets an app import a module through its public entry point', () => {
+    // The only positive case in this suite, and it earns its place: the two rules below both pass
+    // if `apps/` is forbidden everything, which would be a boundary that seals the wrong thing.
+    const { summary } = cruise(APP_FIXTURE, '.dependency-cruiser.fixture.cjs');
+
+    expect(summary.totalCruised).toBeGreaterThan(0);
+    expect(summary.violations.filter((violation) => violation.from === APP_ALLOWED)).toStrictEqual(
+      [],
+    );
+  });
+
+  it('rejects an app reaching past a module entry point', () => {
+    const { summary } = cruise(APP_FIXTURE, '.dependency-cruiser.fixture.cjs');
+
+    const rules = summary.violations
+      .filter((violation) => violation.from === APP_DEEP)
+      .map((violation) => violation.rule.name);
+
+    expect(rules).toContain('not-in-allowed');
+  });
+
+  it('rejects a module importing an app', () => {
+    const { summary } = cruise(MODULE_TO_APP_FIXTURE, '.dependency-cruiser.fixture.cjs');
+
+    // By name, not by count: the same import also trips the whitelist, and a test that only
+    // asserted "something was reported" would survive the deletion of the named rule.
+    expect(summary.violations.map((violation) => violation.rule.name)).toContain(
+      'no-module-to-app',
+    );
   });
 
   it('accepts the code that is actually shipped', () => {

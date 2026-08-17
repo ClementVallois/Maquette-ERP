@@ -1,5 +1,8 @@
 packages:
   - 'packages/*'
+  # What is deployed, as opposed to what is composed. Declared before it is populated because
+  # vitest.config.ts and .dependency-cruiser.cjs already name `apps/**`. See docs/adr/0015.
+  - 'apps/*'
 
 # In pnpm 11 this key is not read from .npmrc. Without it, `pnpm add` reintroduces `^` ranges.
 saveExact: true

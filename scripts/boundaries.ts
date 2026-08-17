@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 
-const GLOBS = ['packages/*/src/**/*.ts'];
+const GLOBS = ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts'];
 const CONFIG = '.dependency-cruiser.cjs';
 
 interface CruiseResult {

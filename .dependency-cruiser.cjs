@@ -50,6 +50,15 @@ module.exports = {
       to: { path: '^packages/[^/]+/src/infrastructure/' },
     },
     {
+      name: 'no-module-to-app',
+      severity: 'error',
+      comment:
+        'An app composes modules; a module does not know it is deployed, or by what. The reverse ' +
+        'arrow is what lets a domain rule end up depending on a screen. See docs/adr/0015.',
+      from: { path: '^packages/' },
+      to: { path: '^apps/' },
+    },
+    {
       name: 'no-circular',
       severity: 'error',
       from: {},
@@ -69,6 +78,12 @@ module.exports = {
       from: { path: '^packages/(timesheet|billing)/' },
       to: { path: '^packages/platform/src/index\\.ts$' },
     },
+    // Inside one app.
+    { from: { path: '^apps/([^/]+)/' }, to: { path: '^apps/$1/' } },
+    // An app composes modules through their public entry point, and reaches nothing behind it.
+    // This is the only granted arrow between the two tiers; `no-module-to-app` names the reverse
+    // one so its failure reads well, and this entry is what refuses everything else.
+    { from: { path: '^apps/' }, to: { path: '^packages/[^/]+/src/index\\.ts$' } },
     // Third-party code. The domain is held to nothing at all by a separate forbidden rule.
     { from: {}, to: { dependencyTypes: ['npm', 'npm-dev', 'npm-optional', 'npm-peer', 'core'] } },
   ],
