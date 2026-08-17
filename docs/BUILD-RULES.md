@@ -4,30 +4,50 @@
 it is the checkable form of decisions already made. `CLAUDE.md` states the intent, `docs/adr/` holds
 the reasoning, `CONTEXT.md` fixes the vocabulary — this file states what you may and may not write.
 
-Every rule here traces back to a `✅` verdict in `CHOIX.md` (a working document, not shipped). If a
-rule and a decision disagree, the ADR wins and this file is wrong; fix it. Nothing here may be
-relaxed for convenience — a rule that blocks you is either right, or it needs a new ADR.
+Every rule here comes from a decision that was made deliberately, and the structural ones have an ADR
+naming the option rejected and the threshold for changing our mind. If a rule and an ADR disagree, the
+ADR wins and this file is wrong; fix it. Nothing here may be relaxed for convenience — a rule that
+blocks you is either right, or it needs a new ADR.
 
 ## The four-day plan (code freeze 21/08, ship 24/08)
 
-Build in this order. **The cut line is after tier 2**: if time runs out, tier 3 is dropped whole and
-named in the README as dropped. Shipping tiers 1–2 finished beats shipping four tiers half-built.
+Tiers 1–4 are ranked by what `CLAUDE.md` names as a deliverable, **not** by breadth of domain
+coverage. **The cut line is after tier 4**: tier 5 is dropped whole and named in the README as
+dropped. Shipping tiers 1–4 finished beats shipping everything half-built.
 
-1. **The chain.** `Cra` aggregate → submit → validate → `TimesheetValidated` → draft invoice →
-   issue with a gapless number. Domain first, tested without a database.
+1. **The chain.** `Cra` aggregate → submit → validate → `TimesheetValidated` → draft invoice → issue
+   with a gapless number. Domain first, tested without a database.
 2. **The proof.** Authorization by role _and_ by `Office` scope; the immutability refusal; the
    invariant tests; migrations; the deterministic seed in the shape `CLAUDE.md` fixes.
-3. **The screens.** Cra grid, pré-facturier, invoice, permission-denied — server-rendered.
-4. **The reader.** README sections, `docs/demo.md`, `docs/open-questions.md`, printable Cra.
+3. **The screen that gives it meaning.** The pré-facturier: what is billable, and for the rest the
+   explicit blocking reason. Plus the refusal page and the empty state — all three are named
+   deliverables in `CLAUDE.md`, and the RFC 9457 motive is what they display.
+4. **The reader.** README sections, `docs/demo.md`, the cold-reader path, one VAT rate resolved from
+   territoriality with the mandatory invoice mentions.
+5. **Breadth, if the days are there** — dropped as a block, in this order: the four territoriality
+   regimes and DOM rates · EU autoliquidation · the reform's four new fields · `CreditNote` ·
+   payment-term cap validation · `Cjm`/`Grade`/margin · `domain_events` · `Idempotency-Key` ·
+   printable Cra · the Cra entry grid.
+
+This tiering is the authority on build order and on what gets cut. Whatever is dropped is recorded in
+the README's "Ce que je ne construis pas" — a subject silently missing is the failure mode; a subject
+named as cut is a decision.
 
 ## Money — non-negotiable
 
 - A monetary value is an **integer number of cents**. In the domain, in the database, on the wire.
   No decimal library, no `Money` wrapper type (**ADR-0002**).
-- **Never a float on a monetary value.** No non-integer division on cents, ever. If a computation
-  needs one, stop: it means a decision changed and ADR-0002's threshold is reached.
-- A `Tjm` is a whole number of euros. Quantity is stored as an **integer count of half-days**.
-  Line amount is `halfDays × (tjmCents / 2)` — exact, because `tjmCents` is a multiple of 100.
+- **Never a float on a monetary value.** Every intermediate result stays an integer. If a computation
+  cannot, stop: it means a decision changed and ADR-0002's threshold is reached.
+- A `Tjm` is a whole number of euros, so `tjmCents` is a multiple of 100. Quantity is stored as an
+  **integer count of half-days**.
+- Line amount is `(halfDays * tjmCents) / 2` — **multiply first, divide last**. Exact because
+  `tjmCents` is even, and the guard is an assertion that it is (`tjmCents % 2 === 0`), not a ban on
+  `/`. Writing it as `halfDays * (tjmCents / 2)` is also exact today but inverts the safe order, so
+  the rule is the one above.
+- The lint rule therefore forbids **float-producing arithmetic on money** — no `parseFloat`, no
+  `Number()` on a decimal string, no `Math.round` used to recover from one — and the division above is
+  the single allowed one, at the single call site that asserts its precondition.
 - **VAT rounds per rate, never per line and never on the total** (**ADR-0010**). Group lines by
   rate, compute and round once per rate, sum the rounded results.
 - Rounding is **half-up**, named explicitly at the call site. Never a library default.

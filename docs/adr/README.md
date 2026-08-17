@@ -20,7 +20,15 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0002](./0002-money-as-integer-cents.md)                      | Money is an integer number of cents, with no wrapper type                  | accepted |
 | [0003](./0003-authorization-at-the-repository.md)             | Authorization lives in the repository, not in Postgres RLS                 | accepted |
 | [0004](./0004-working-calendar-with-a-fixed-holiday-table.md) | The working calendar is a domain component with a fixed 2026 holiday table | accepted |
+| [0008](./0008-fastify-not-nestjs.md)                          | Fastify, not NestJS                                                        | accepted |
+| [0009](./0009-server-rendered-html-no-client-framework.md)    | Server-rendered HTML, with no client framework                             | accepted |
 | [0010](./0010-vat-rounded-per-rate.md)                        | VAT is rounded per rate, and the rate is resolved from territoriality      | accepted |
+| [0011](./0011-hand-written-sql-no-orm.md)                     | Hand-written SQL over `pg`, and no ORM                                     | accepted |
+
+0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
+**reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
+to close the gap is exactly the retouching that rule 1 above forbids. The gap is the record: it shows
+which decisions were known before they were made.
 
 ## Identified, not yet decided
 
@@ -28,15 +36,8 @@ Numbers are reserved so that what is **known and unsettled** is visible rather t
 
 | No.  | Decision                                                                                             | Blocked on                                 |
 | ---- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| 0005 | Cra lifecycle: draft → submitted → refused/validated, and where immutability binds                   | to be written with the timesheet domain    |
+| 0005 | Cra lifecycle: the statuses in `CONTEXT.md`, and where immutability binds                            | to be written with the timesheet domain    |
 | 0006 | Separation of duties: whoever records a Cra does not validate it, whoever validates does not invoice | to be written with the validation use case |
 | 0007 | Gapless invoice numbering under concurrency                                                          | to be written with persistence             |
-| 0008 | Server framework and HTTP error shape (RFC 9457) — Fastify, chosen in `CHOIX.md` §30 on 17/08        | to be written with the API                 |
-| 0009 | Application shape: server-rendered HTML, no client framework — chosen in `CHOIX.md` §30 on 17/08     | to be written with the web client          |
-| 0011 | Data access: `pg` with hand-written SQL and numbered migrations, no ORM                              | to be written with persistence             |
 | 0012 | Half-day as the single storage unit for recorded time                                                | to be written with the timesheet domain    |
 | 0013 | Polymorphic invoice line: it carries its origin even though only `Regie` exists                      | to be written with the billing domain      |
-
-0010 sits above the reserved numbers because numbering follows the order in which ADRs were
-**written**, never the order they are read in. It settled a contradiction between the README and the
-fiscal rule, so it could not wait for the domain code the reserved numbers are attached to.

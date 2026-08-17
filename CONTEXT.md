@@ -59,7 +59,7 @@ Fixed-price billing: an agreed amount for an agreed deliverable, independent of 
 _Avoid_: FixedPrice, Package, Fixed
 
 **Tjm** (🇫🇷 kept):
-_Taux journalier moyen_ — the daily rate agreed with the client for a consultant on a mission. Kept in French: it is the term written into the contract and opposable to the client.
+_Taux journalier moyen_ — the daily rate agreed with the client for a consultant on a mission. Kept in French: it is the term written into the contract and opposable to the client. Always a **whole number of euros**, and dated: work done in June bills at June's `Tjm`. The whole-euro premise is what keeps half-day billing exact in integer cents (ADR-0002, ADR-0010).
 _Avoid_: DailyRate, Rate, Price
 
 ## People and reach
