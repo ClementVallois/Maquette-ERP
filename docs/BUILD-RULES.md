@@ -11,26 +11,16 @@ blocks you is either right, or it needs a new ADR.
 
 ## Build order
 
-Ranked by dependency, not by calendar. **Scope is not cut to fit a date** — the date moves, the scope
-does not. Every retained decision gets built; this list only says what has to exist before what.
+**[`docs/BUILD-PLAN.md`](./BUILD-PLAN.md) holds the order, and holds it alone.** It names the phases,
+the branch each one runs on, the ADR each step owes, and the dates. This section used to rank the same
+work into six dependency buckets; two documents describing one ordering is one document too many, and
+the coarser of the two is the one that goes (task 0.6 of the plan).
 
-1. **The chain.** `Cra` aggregate → submit → validate → `TimesheetValidated` → draft invoice → issue
-   with a gapless number. Domain first, tested without a database.
-2. **The proof.** Authorization by role _and_ by `Office` scope; the immutability refusal; the
-   invariant tests; per-module schemas; migrations; the deterministic seed in the shape `CLAUDE.md`
-   fixes.
-3. **The invoice, in full.** VAT resolved from territoriality and frozen onto the line, the four
-   regimes, every mandatory legal mention, the reform's four new fields, payment-term caps,
-   `CreditNote` with a typed reason, the document coherence check.
-4. **The screens.** Cra entry grid, pré-facturier with explicit blocking reasons, the invoice, the
-   refusal page, the empty and error states, the printable Cra.
-5. **The surrounding proof.** `domain_events`, `Idempotency-Key`, structured logging with redaction,
-   health and readiness, graceful shutdown, mutation testing on `domain/` in nightly, Renovate, the
-   CI job replaying `setup`, migrations replayed twice, branch protection.
-6. **The reader.** README sections, `docs/demo.md`, the cold-reader path, the demo script.
+What stays here is the rule the ordering obeys, because it is a rule and not a schedule:
 
-Nothing here is optional. If something turns out to be genuinely wrong rather than merely unfinished,
-it becomes an ADR and moves to the README's "Ce que je ne construis pas" — never a silent omission.
+**Scope is not cut to fit a date** — the date moves, the scope does not. Nothing in the plan is
+optional. If something turns out to be genuinely wrong rather than merely unfinished, it becomes an
+ADR and moves to the README's "Ce que je ne construis pas" — never a silent omission.
 
 ## Money — non-negotiable
 

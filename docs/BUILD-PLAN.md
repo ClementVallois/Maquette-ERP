@@ -77,9 +77,10 @@ Conventional commits, scope from the closed enum in `commitlint.config.js` (exte
 
 ### TDD — the policy, and where it is stricter than `BUILD-RULES.md` says
 
-The instruction is TDD on **every** development, not only the domain. `BUILD-RULES.md` line 138
-currently limits it to domain invariants. That line is superseded in Phase 3 by **ADR-0019**, and
-the resolution is asymmetric because the two halves are not the same exercise:
+The instruction is TDD on **every** development, not only the domain. The "Working discipline"
+section of `BUILD-RULES.md` currently limits it to domain invariants — "TDD on domain invariants
+only … not on infrastructure". That rule is superseded in Phase 3 by **ADR-0019**, and the
+resolution is asymmetric because the two halves are not the same exercise:
 
 | Layer                          | Test written first                                                             | Runs in                       |
 | ------------------------------ | ------------------------------------------------------------------------------ | ----------------------------- |
