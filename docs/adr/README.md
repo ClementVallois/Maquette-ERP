@@ -24,6 +24,7 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0009](./0009-server-rendered-html-no-client-framework.md)    | Server-rendered HTML, with no client framework                             | accepted |
 | [0010](./0010-vat-rounded-per-rate.md)                        | VAT is rounded per rate, and the rate is resolved from territoriality      | accepted |
 | [0011](./0011-hand-written-sql-no-orm.md)                     | Hand-written SQL over `pg`, and no ORM                                     | accepted |
+| [0014](./0014-triage-leaves-the-public-history.md)            | The working triage leaves the public history                               | accepted |
 | [0015](./0015-apps-tier-separate-from-packages.md)            | The application shell lives in `apps/`, a tier above `packages/`           | accepted |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
