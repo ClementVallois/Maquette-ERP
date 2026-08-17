@@ -1,0 +1,50 @@
+{
+  "name": "maquette-erp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CRA to invoice: a mockup of an internal ERP module for a consulting firm",
+  "author": "Clément Vallois",
+  "license": "MIT",
+  "packageManager": "pnpm@11.4.0",
+  "engines": {
+    "node": ">=24.13.1",
+    "pnpm": ">=11.4.0"
+  },
+  "scripts": {
+    "setup": "pnpm run env:init && docker compose up -d --wait && pnpm run migrate && pnpm run seed",
+    "env:init": "node scripts/ensure-env.ts",
+    "check": "pnpm run lint && pnpm run boundaries && pnpm run format:check && pnpm run typecheck && pnpm run test",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit && pnpm --recursive --parallel run typecheck",
+    "boundaries": "depcruise \"packages/*/src/**/*.ts\" --config .dependency-cruiser.cjs",
+    "boundaries:graph": "depcruise \"packages/*/src/**/*.ts\" --config .dependency-cruiser.cjs --output-type dot",
+    "test": "vitest run --project unit",
+    "test:int": "vitest run --project integration",
+    "test:cov": "vitest run --project unit --coverage",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && pnpm run db:up && pnpm run migrate && pnpm run seed"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "21.2.1",
+    "@commitlint/config-conventional": "21.2.0",
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.13.3",
+    "@vitest/coverage-v8": "4.1.10",
+    "dependency-cruiser": "17.0.1",
+    "eslint": "10.8.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-import-resolver-typescript": "4.4.5",
+    "eslint-plugin-import-x": "4.17.1",
+    "globals": "17.8.0",
+    "lefthook": "2.1.10",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.65.0",
+    "vitest": "4.1.10"
+  }
+}

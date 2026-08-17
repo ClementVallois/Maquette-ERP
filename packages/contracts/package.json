@@ -1,0 +1,14 @@
+{
+  "name": "@erp/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "REST contracts shared by the API and the web client",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {}
+}
