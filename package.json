@@ -12,9 +12,10 @@
     "pnpm": ">=11.4.0"
   },
   "scripts": {
-    "setup": "pnpm run env:init && docker compose up -d --wait && pnpm run migrate && pnpm run seed",
+    "setup": "pnpm run env:init && pnpm run env:check && docker compose up -d --wait && pnpm run migrate && pnpm run seed",
     "env:init": "node scripts/ensure-env.ts",
-    "check": "pnpm run lint && pnpm run boundaries && pnpm run format:check && pnpm run typecheck && pnpm run test",
+    "env:check": "node scripts/check-env.ts",
+    "check": "pnpm run env:check && pnpm run lint && pnpm run boundaries && pnpm run format:check && pnpm run typecheck && pnpm run test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
