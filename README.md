@@ -18,7 +18,7 @@ Périmètre volontairement étroit : deux modules, et **une seule flèche qui fr
    - les montants sont des **entiers en centimes** — jamais de flottant sur une valeur monétaire ;
    - la numérotation des factures est **séquentielle et sans trou** ;
    - la TVA se calcule **par ligne**, pas sur le total.
-3. **L'autorisation est testée**, par rôle *et* par périmètre : un manager d'une implantation ne lit pas les marges d'une mission qui n'est pas la sienne, et c'est un test qui le prouve.
+3. **L'autorisation est testée**, par rôle _et_ par périmètre : un manager d'une implantation ne lit pas les marges d'une mission qui n'est pas la sienne, et c'est un test qui le prouve.
 4. **Des arbitrages écrits au moment où ils sont pris** → `docs/adr/`. Chaque ADR nomme l'option écartée et le seuil auquel on changerait d'avis.
 
 ## Ce que je ne construis pas

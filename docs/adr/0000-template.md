@@ -13,7 +13,7 @@ Ce qui est décidé, à l'affirmative et en une phrase si possible.
 
 ## Option écartée
 
-L'alternative sérieuse — celle qu'un lecteur aurait proposée — et **pourquoi** elle perd *dans ce contexte*. Une option écartée sans raison contextuelle est un homme de paille.
+L'alternative sérieuse — celle qu'un lecteur aurait proposée — et **pourquoi** elle perd _dans ce contexte_. Une option écartée sans raison contextuelle est un homme de paille.
 
 ## Seuil de réexamen
 
