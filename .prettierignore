@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+coverage
+pnpm-lock.yaml
+drizzle
+.next
+
+# Internal working document, deliberately kept out of the formatted surface.
+CHOIX.md
