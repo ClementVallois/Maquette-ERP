@@ -53,7 +53,8 @@ needed.
 
 A rule that has never rejected anything is indistinguishable from a rule that does not work, and
 this repository already refuses that ambiguity everywhere else — every boundary rule owns a fixture,
-and commit `34a845f` removed the rules that matched nothing. Declaring `apps/` before any app exists
+and the commit that made the gate fail when a rule matches nothing dropped the dead rules in the same
+breath. Declaring `apps/` before any app exists
 would have reintroduced exactly that defect, so the tier ships with its own fixtures:
 
 - `apps/__boundary-fixture__/src/` — the granted arrow (module public index, **accepted**) and the

@@ -59,8 +59,14 @@ backup left to chance. If the document is worth keeping, it is worth keeping som
 
 Nothing public may cite `CHOIX.md` by section number: a cold reader cannot open it. `BUILD-PLAN.md`
 names decisions by subject and by ADR instead, and its coverage appendix keys to row titles with the
-private repository named as their source. Verified before running the rewrite: no surviving doc, ADR
-or README cites a commit SHA, so the purge breaks no internal reference.
+private repository named as their source.
+
+The same applies to commit SHAs, and it is sharper than it looks: **the rewrite changes every SHA
+after the first purged commit**, so a document citing one is a reference that survives the file it
+points at. Checked across every tracked document — the only SHAs left are in this plan's own
+description of the purge, naming the seven commits that disappear with the file and the checkpoint
+ref deleted before it runs. Those are a record of what was removed, not a pointer to something
+expected to still be there. Everything else cites commits by what they did.
 
 The purge is only complete while two facts hold, and both must stay true until it lands: the
 repository is **still private**, and **no pull request has ever been opened** — GitHub keeps
