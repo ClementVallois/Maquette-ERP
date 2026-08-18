@@ -162,3 +162,26 @@ export class SelfValidationForbiddenError extends BusinessError {
     super(`${consultantId} recorded ${craId} and cannot validate it`, { craId, consultantId });
   }
 }
+
+/**
+ * Someone other than the consultant's manager for that month asked to validate. Resolved against
+ * the close of the period, not against today: March's Cra is March's manager's to accept
+ * (ADR-0034).
+ */
+export class NotTheManagerError extends BusinessError {
+  readonly problemType = '/problems/not-the-manager';
+
+  constructor(input: {
+    craId: string;
+    consultantId: string;
+    period: string;
+    attempted: string;
+    manager: string | null;
+  }) {
+    super(
+      `${input.attempted} is not the manager of ${input.consultantId} for ${input.period}` +
+        (input.manager === null ? ' (nobody was)' : ''),
+      { ...input },
+    );
+  }
+}

@@ -48,10 +48,12 @@ which decisions were known before they were made.
 to the phase that consumes it. A number there is a commitment that the decision will be written when
 it is taken, not a placeholder to be shuffled.
 
-0033 is the first number **not** reserved by that table: the plan's last reserved number is 0032, and
-Phase 1 hit a structural question the plan had not identified — where a value object both modules
-speak lives, given that the cruiser forbids the import that would otherwise settle it. Written when
-it was taken, numbered after the reservations, and recorded in the Phase 1 checkpoint.
+0033 and 0034 are the first numbers **not** reserved by that table: the plan's last reserved number is 0032, and
+Phase 1 hit two structural questions the plan had not identified — where a value object both
+modules speak lives, given that the cruiser forbids the import that would otherwise settle it
+(0033), and how a dated reference resolves for a whole month rather than a day (0034). Both were
+written when they were taken, numbered after the reservations, and recorded in the Phase 1
+checkpoint.
 
 ## Identified, not yet decided
 

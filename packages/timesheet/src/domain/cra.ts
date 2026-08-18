@@ -17,10 +17,12 @@ import {
   CraTransitionError,
   DayOutsidePeriodError,
   DayOverbookedError,
+  NotTheManagerError,
   RefusalReasonRequiredError,
   SelfValidationForbiddenError,
   ValidatedCraIsImmutableError,
 } from './errors.ts';
+import type { Hierarchy } from './hierarchy.ts';
 import type { ConsultantId, CraId, MissionId, OfficeId } from './ids.ts';
 import type { TimesheetReference } from './reference.ts';
 import { type CraFlag, runSubmissionChecks } from './submission-checks.ts';
@@ -194,13 +196,28 @@ export class Cra {
    * Returning the payload rather than publishing it keeps the domain free of the bus: the
    * aggregate states the fact, the use case is what tells anyone about it.
    */
-  validate(input: { by: ConsultantId; clock: Clock }): TimesheetValidatedPayload {
+  validate(input: {
+    by: ConsultantId;
+    clock: Clock;
+    hierarchy: Hierarchy;
+  }): TimesheetValidatedPayload {
     this.#assertNotValidated('validate');
     if (this.#status !== 'submitted') {
       throw new CraTransitionError(this.#id, this.#status, 'validated');
     }
     if (input.by === this.#consultantId) {
       throw new SelfValidationForbiddenError(this.#id, this.#consultantId);
+    }
+
+    const manager = input.hierarchy.managerOf(this.#consultantId, this.#period);
+    if (input.by !== manager) {
+      throw new NotTheManagerError({
+        craId: this.#id,
+        consultantId: this.#consultantId,
+        period: periodToIso(this.#period),
+        attempted: input.by,
+        manager,
+      });
     }
 
     this.#status = 'validated';

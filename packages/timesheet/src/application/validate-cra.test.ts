@@ -8,6 +8,7 @@ import {
   emptyCra,
   fixedClock,
   MANAGER,
+  managers,
   MISSION,
   OFFICE,
   submittedCra,
@@ -42,7 +43,7 @@ describe('validating a Cra', () => {
 
     const event = await validateCra(
       { clock, events: bus },
-      { cra, validatedBy: MANAGER, correlationId: 'req-42' },
+      { cra, validatedBy: MANAGER, hierarchy: managers, correlationId: 'req-42' },
     );
 
     expect(published).toStrictEqual([event]);
@@ -89,7 +90,7 @@ describe('validating a Cra', () => {
 
     await validateCra(
       { clock, events: bus },
-      { cra, validatedBy: MANAGER, correlationId: 'req-7' },
+      { cra, validatedBy: MANAGER, hierarchy: managers, correlationId: 'req-7' },
     );
 
     expect(published[0]?.payload).toMatchObject({
@@ -105,7 +106,13 @@ describe('validating a Cra', () => {
 
     const event = await validateCra(
       { clock, events: bus },
-      { cra: submittedCra(), validatedBy: MANAGER, correlationId: 'req-9', causationId: 'evt-1' },
+      {
+        cra: submittedCra(),
+        validatedBy: MANAGER,
+        hierarchy: managers,
+        correlationId: 'req-9',
+        causationId: 'evt-1',
+      },
     );
 
     expect(event.causationId).toBe('evt-1');
@@ -118,7 +125,10 @@ describe('validating a Cra', () => {
     const cra = submittedCra();
 
     await expect(
-      validateCra({ clock, events: bus }, { cra, validatedBy: CONSULTANT, correlationId: 'req-1' }),
+      validateCra(
+        { clock, events: bus },
+        { cra, validatedBy: CONSULTANT, hierarchy: managers, correlationId: 'req-1' },
+      ),
     ).rejects.toThrow(SelfValidationForbiddenError);
 
     expect(published).toStrictEqual([]);
@@ -132,7 +142,7 @@ describe('validating a Cra', () => {
     await expect(
       validateCra(
         { clock, events: bus },
-        { cra: emptyCra(), validatedBy: MANAGER, correlationId: 'req-2' },
+        { cra: emptyCra(), validatedBy: MANAGER, hierarchy: managers, correlationId: 'req-2' },
       ),
     ).rejects.toThrow();
 

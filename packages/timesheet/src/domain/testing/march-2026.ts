@@ -1,6 +1,7 @@
 import { type Clock, period } from '@erp/platform';
 
 import { Cra } from '../cra.ts';
+import { type Hierarchy, hierarchy } from '../hierarchy.ts';
 import { type TimesheetReference, timesheetReference } from '../reference.ts';
 import { type WorkingCalendar, workingCalendar } from '../working-calendar.ts';
 
@@ -31,6 +32,10 @@ export const reference: TimesheetReference = timesheetReference({
   assignments: [{ consultantId: CONSULTANT, missionId: MISSION, from: '2026-01-05', to: null }],
 });
 
+export const managers: Hierarchy = hierarchy([
+  { consultantId: CONSULTANT, managerId: MANAGER, from: '2025-01-01', to: null },
+]);
+
 export function emptyCra(id = 'cra-1'): Cra {
   return Cra.open({ id, consultantId: CONSULTANT, officeId: OFFICE, period: MARCH });
 }
@@ -55,7 +60,7 @@ export function submittedCra(id = 'cra-1'): Cra {
 
 export function validatedCra(id = 'cra-1'): Cra {
   const cra = submittedCra(id);
-  cra.validate({ by: MANAGER, clock: fixedClock('2026-04-03T10:00:00.000Z') });
+  cra.validate({ by: MANAGER, clock: fixedClock('2026-04-03T10:00:00.000Z'), hierarchy: managers });
 
   return cra;
 }

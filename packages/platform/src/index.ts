@@ -1,4 +1,5 @@
 export type { Clock } from './clock.ts';
+export { type Effective, type Timeline, timeline } from './dated.ts';
 export { BusinessError, InvalidValueError, TechnicalFailure, isBusinessError } from './errors.ts';
 export type { DomainEvent, EventHandler, EventBus } from './events.ts';
 export {

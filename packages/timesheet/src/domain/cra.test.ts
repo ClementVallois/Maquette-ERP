@@ -7,15 +7,19 @@ import {
   DayOverbookedError,
   MissionOnNonWorkedDayError,
   MissionRequiredError,
+  NotTheManagerError,
   RefusalReasonRequiredError,
   ValidatedCraIsImmutableError,
 } from './errors.ts';
+import { hierarchy } from './hierarchy.ts';
 import {
   calendar,
+  CONSULTANT,
   completeCra,
   emptyCra,
   fixedClock,
   MANAGER,
+  managers,
   MISSION,
   reference,
   submittedCra,
@@ -120,7 +124,11 @@ describe('the Cra lifecycle', () => {
     expect(cra.status).toBe('submitted');
     expect(cra.submittedAt).toStrictEqual(new Date('2026-04-02T09:00:00.000Z'));
 
-    cra.validate({ by: MANAGER, clock: fixedClock('2026-04-03T10:00:00.000Z') });
+    cra.validate({
+      by: MANAGER,
+      clock: fixedClock('2026-04-03T10:00:00.000Z'),
+      hierarchy: managers,
+    });
     expect(cra.status).toBe('validated');
     expect(cra.validatedBy).toBe(MANAGER);
     expect(cra.validatedAt).toStrictEqual(new Date('2026-04-03T10:00:00.000Z'));
@@ -178,7 +186,7 @@ describe('the Cra lifecycle', () => {
     const cra = emptyCra();
 
     expect(() => {
-      cra.validate({ by: MANAGER, clock: fixedClock() });
+      cra.validate({ by: MANAGER, clock: fixedClock(), hierarchy: managers });
     }).toThrow(CraTransitionError);
   });
 
@@ -211,7 +219,7 @@ describe('a validated Cra', () => {
         cra.refuse({ by: MANAGER, reason: 'changed my mind', clock: fixedClock() });
       },
       () => {
-        cra.validate({ by: MANAGER, clock: fixedClock() });
+        cra.validate({ by: MANAGER, clock: fixedClock(), hierarchy: managers });
       },
     ]) {
       expect(attempt).toThrow(ValidatedCraIsImmutableError);
@@ -234,5 +242,39 @@ describe('a validated Cra', () => {
       });
       expect((error as ValidatedCraIsImmutableError).message).toContain('record of working time');
     }
+  });
+});
+
+describe('who may validate', () => {
+  it('refuses a manager who was not the manager of that month', () => {
+    // Nadia moved to Salima's team in June. Salima validating March is refused, and the error
+    // names who the manager actually was.
+    const cra = submittedCra();
+    const movedInJune = hierarchy([
+      { consultantId: CONSULTANT, managerId: MANAGER, from: '2025-01-01', to: '2026-05-31' },
+      { consultantId: CONSULTANT, managerId: 'salima', from: '2026-06-01', to: null },
+    ]);
+
+    try {
+      cra.validate({ by: 'salima', clock: fixedClock(), hierarchy: movedInJune });
+      expect.unreachable('a manager of another month should have been refused');
+    } catch (error) {
+      expect(error).toBeInstanceOf(NotTheManagerError);
+      expect((error as NotTheManagerError).details).toMatchObject({
+        period: '2026-03',
+        attempted: 'salima',
+        manager: MANAGER,
+      });
+    }
+
+    expect(cra.status).toBe('submitted');
+  });
+
+  it('refuses anyone at all when the consultant was attached to nobody', () => {
+    const cra = submittedCra();
+
+    expect(() =>
+      cra.validate({ by: MANAGER, clock: fixedClock(), hierarchy: hierarchy([]) }),
+    ).toThrow(NotTheManagerError);
   });
 });

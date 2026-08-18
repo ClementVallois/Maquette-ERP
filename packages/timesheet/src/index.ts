@@ -22,12 +22,14 @@ export {
   MissionOnNonWorkedDayError,
   MissionRequiredError,
   NotAssignedError,
+  NotTheManagerError,
   RefusalReasonRequiredError,
   SelfValidationForbiddenError,
   UnknownMissionError,
   UnknownCalendarYearError,
   ValidatedCraIsImmutableError,
 } from './domain/errors.ts';
+export { type Hierarchy, hierarchy, type ManagerAttachment } from './domain/hierarchy.ts';
 export type { ConsultantId, CraId, MissionId, OfficeId } from './domain/ids.ts';
 export {
   type Assignment,

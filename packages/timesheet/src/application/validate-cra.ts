@@ -7,6 +7,7 @@ import {
 } from '@erp/platform';
 
 import type { Cra } from '../domain/cra.ts';
+import type { Hierarchy } from '../domain/hierarchy.ts';
 import type { ConsultantId } from '../domain/ids.ts';
 
 export interface ValidateCraDependencies {
@@ -17,6 +18,8 @@ export interface ValidateCraDependencies {
 export interface ValidateCraCommand {
   readonly cra: Cra;
   readonly validatedBy: ConsultantId;
+  /** Dated: the Cra of a month is accepted by the manager of that month (ADR-0034). */
+  readonly hierarchy: Hierarchy;
   /** The chain this validation belongs to. Generated at the edge, from the incoming request. */
   readonly correlationId: string;
   readonly causationId?: string | null;
@@ -38,6 +41,7 @@ export async function validateCra(
   const payload = command.cra.validate({
     by: command.validatedBy,
     clock: dependencies.clock,
+    hierarchy: command.hierarchy,
   });
 
   const event: TimesheetValidated = {
