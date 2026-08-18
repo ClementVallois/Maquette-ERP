@@ -7,7 +7,12 @@ export {
   TERRITORIALITIES,
   type Territoriality,
 } from './domain/client.ts';
-export { NoVatRateError } from './domain/errors.ts';
+export {
+  EmptyInvoiceError,
+  LineOutsideInvoicePeriodError,
+  NoVatRateError,
+  PaymentTermsTooLongError,
+} from './domain/errors.ts';
 export type {
   ClientId,
   ConsultantId,
@@ -41,3 +46,27 @@ export {
   vatGroupKey,
   type VatTreatment,
 } from './domain/vat.ts';
+export {
+  type BilledParty,
+  billedParty,
+  Invoice,
+  type InvoiceTotals,
+  type VatGroup,
+} from './domain/invoice.ts';
+export {
+  type EarlyPaymentDiscount,
+  type LegalMentions,
+  legalMentions,
+  MINIMUM_LATE_PAYMENT_BASIS_POINTS,
+  OPERATION_CATEGORIES,
+  type OperationCategory,
+  RECOVERY_INDEMNITY_CENTS,
+} from './domain/mentions.ts';
+export {
+  dueDate,
+  MAX_END_OF_MONTH_DAYS,
+  MAX_NET_DAYS,
+  type PaymentTerms,
+  paymentTerms,
+} from './domain/payment-terms.ts';
+export { type LegalEntity, legalEntity } from './domain/seller.ts';

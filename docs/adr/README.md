@@ -41,6 +41,7 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0014](./0014-triage-leaves-the-public-history.md)                     | The working triage leaves the public history                                    | accepted |
 | [0015](./0015-apps-tier-separate-from-packages.md)                     | The application shell lives in `apps/`, a tier above `packages/`                | accepted |
 | [0016](./0016-typed-errors-business-versus-technical.md)               | Typed errors: business versus technical, and how they reach the wire            | accepted |
+| [0017](./0017-legal-mentions-modelled-not-templated.md)                | Mandatory legal mentions are modelled on the document, not templated            | accepted |
 | [0031](./0031-reference-data-per-module-projections.md)                | Reference data: per-module projections, the seed as single writer               | accepted |
 | [0033](./0033-shared-kernel-holds-the-transported-vocabulary.md)       | The shared kernel holds the vocabulary the boundary transports                  | accepted |
 | [0034](./0034-dated-references-resolved-at-the-close-of-the-period.md) | One dated-reference mechanism, resolved at the close of the period              | accepted |

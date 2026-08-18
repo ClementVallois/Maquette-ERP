@@ -1,7 +1,10 @@
 import { period } from '@erp/platform';
 
 import { type Client, client, type PostalAddress } from '../client.ts';
+import { type LegalMentions, legalMentions, RECOVERY_INDEMNITY_CENTS } from '../mentions.ts';
+import { type PaymentTerms, paymentTerms } from '../payment-terms.ts';
 import { billingReference, type BillingReference, commercialMission } from '../reference.ts';
+import { type LegalEntity, legalEntity } from '../seller.ts';
 
 /**
  * The month every test of this module works in, and the two clients that make the fiscal rules
@@ -67,4 +70,27 @@ export const reference: BillingReference = billingReference({
       tjmCents: [{ from: '2025-01-01', to: null, value: 58_000 }],
     }),
   ],
+});
+
+/** The firm this ERP belongs to, as the invoice must print it. */
+export const SELLER: LegalEntity = legalEntity({
+  id: 'entity-fr',
+  name: 'Sécurité & Conseil',
+  legalForm: 'SAS',
+  shareCapitalCents: 15_000_000,
+  siren: '493296529',
+  intraCommunityVatNumber: 'FR23493296529',
+  rcsRegistration: 'RCS Paris 493 296 529',
+  address: address,
+  numberPrefix: 'SEC',
+});
+
+export const TERMS: PaymentTerms = paymentTerms({ kind: 'net', days: 30 });
+
+export const MENTIONS: LegalMentions = legalMentions({
+  latePaymentBasisPoints: 3000,
+  recoveryIndemnityCents: RECOVERY_INDEMNITY_CENTS,
+  earlyPaymentDiscount: { kind: 'none' },
+  operationCategory: 'services',
+  vatOnDebitsOption: true,
 });
