@@ -91,7 +91,7 @@ _(à écrire — il doit ressembler à la réalité d'un cabinet : plusieurs pô
 
 ## Tests et portes de CI
 
-Une porte qui ne bloque pas un merge est un avertissement, pas une porte. Les cinq suivantes sont
+Une porte qui ne bloque pas un merge est un avertissement, pas une porte. Les six suivantes sont
 **exigées** par la protection de branche sur `main` : tant que l'une est rouge, le bouton de merge
 est désactivé.
 
@@ -102,12 +102,15 @@ est désactivé.
 | **Secret scan**         | gitleaks sur l'historique                           | Un secret commité, y compris dans un commit ancien de la branche                                                                                                                           |
 | **Dependency scan**     | `pnpm audit` + osv-scanner                          | Une dépendance portant une vulnérabilité connue de niveau haut ou critique                                                                                                                 |
 | **SAST**                | Semgrep OSS                                         | Les motifs de vulnérabilité applicative détectables statiquement                                                                                                                           |
+| **Tests**               | `pnpm run test:cov`                                 | Un invariant du domaine cassé, et une couverture du **domaine** sous 90 % (branches : 85 %) — le seuil ne porte que sur `domain/` et sur le noyau partagé, pas sur le dépôt entier         |
 
-> ⚠️ **La porte `Tests` existe mais n'est volontairement pas encore exigée.** `test:cov` mesure la
-> couverture du **domaine** contre un seuil de 90 %, et le domaine se réduit aujourd'hui à deux
-> fichiers de constantes : le job est rouge, et le rendre vert demanderait soit d'abaisser le seuil,
-> soit d'écrire un test qui ne prouve rien. Il devient exigé quand la phase 1 livre le domaine et ses
-> tests. C'est écrit ici plutôt que contourné en silence — voir `docs/open-questions.md`.
+> ✅ **La porte `Tests` est verte depuis la phase 1** (18/08/2026) et rejoint les portes exigées.
+> Elle était rouge depuis l'ajout des seuils de couverture, faute de domaine à mesurer : le rendre
+> vert plus tôt aurait demandé soit d'abaisser le seuil, soit d'écrire un test qui ne prouve rien.
+> La phase 1 livre le domaine `timesheet` et ses tests — 99 % des lignes, 100 % des branches — et
+> la porte devient une contrainte réelle. ⚠️ **Étape humaine restante** : l'ajouter à la liste des
+> _required checks_ dans la protection de branche GitHub, comme les cinq autres (même geste que la
+> tâche 0.5). Historique → `docs/open-questions.md`.
 
 Les hooks locaux (lefthook) doublent une partie de ces portes **avant** le commit et le push :
 gitleaks sur ce qui est indexé — le seul des deux qui empêche réellement la fuite, la CI ne scannant
