@@ -3,13 +3,17 @@ import { describe, expect, it } from 'vitest';
 
 import {
   EmptyInvoiceError,
+  InvalidSequenceError,
+  InvoiceTransitionError,
   LineOutsideInvoicePeriodError,
   PaymentTermsTooLongError,
+  ValidatorCannotIssueError,
 } from './errors.ts';
 import { type InvoiceLine, regieLine } from './invoice-line.ts';
 import { billedParty, Invoice } from './invoice.ts';
 import { legalMentions, RECOVERY_INDEMNITY_CENTS } from './mentions.ts';
 import { applyRate } from './money.ts';
+import { documentNumber, sameSeries, seriesKeyOf } from './numbering.ts';
 import { dueDate, MAX_END_OF_MONTH_DAYS, MAX_NET_DAYS, paymentTerms } from './payment-terms.ts';
 import { legalEntity } from './seller.ts';
 import {
@@ -264,4 +268,105 @@ it('bills a client of La Réunion at its own rate, end to end', () => {
 
   expect(invoice.totals.totalExcludingVatCents).toBe(1_218_000);
   expect(invoice.totals.vatTotalCents).toBe(103_530);
+});
+
+describe('issuing an invoice', () => {
+  it('gives it a number from the series, a date, and frozen totals', () => {
+    const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
+    invoice.issue({ by: 'claire', sequence: 42, issueDate: '2026-04-02' });
+
+    expect(invoice.status).toBe('issued');
+    expect(invoice.number).toBe('SEC-2026-000042');
+    expect(invoice.issueDate).toBe('2026-04-02');
+    expect(invoice.series).toStrictEqual({ entityId: 'entity-fr', fiscalYear: 2026 });
+    expect(invoice.totals.totalIncludingVatCents).toBe(78_000);
+  });
+
+  it('refuses the person who validated the days it bills', () => {
+    // The second rule of separation of duties (ADR-0006), and the reason validatedBy travels in
+    // the event payload: billing holds a rule about someone else's act without ever asking
+    // timesheet who performed it.
+    const invoice = invoiceOf([lineOf(65_000, STANDARD)], ['bruno']);
+
+    expect(() => {
+      invoice.issue({ by: 'bruno', sequence: 1, issueDate: '2026-04-02' });
+    }).toThrow(ValidatorCannotIssueError);
+    expect(invoice.status).toBe('draft');
+    expect(invoice.number).toBeNull();
+  });
+
+  it('refuses to be issued twice', () => {
+    const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
+    invoice.issue({ by: 'claire', sequence: 1, issueDate: '2026-04-02' });
+
+    expect(() => {
+      invoice.issue({ by: 'claire', sequence: 2, issueDate: '2026-04-03' });
+    }).toThrow(InvoiceTransitionError);
+    expect(invoice.number).toBe('SEC-2026-000001');
+  });
+
+  it('keeps the totals it was issued with, whatever is asked of it afterwards', () => {
+    const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
+    invoice.issue({ by: 'claire', sequence: 1, issueDate: '2026-04-02' });
+
+    // The documentary freeze at the level of the document. In Phase 3 these totals are columns,
+    // and this getter is what guarantees the printed page reads them rather than recomputing.
+    expect(invoice.totals).toStrictEqual({
+      totalExcludingVatCents: 65_000,
+      vatTotalCents: 13_000,
+      totalIncludingVatCents: 78_000,
+    });
+  });
+
+  it('is cancelled only from issued, and keeps everything it printed', () => {
+    const draft = invoiceOf([lineOf(65_000, STANDARD)]);
+
+    expect(() => {
+      draft.cancelByCreditNote();
+    }).toThrow(InvoiceTransitionError);
+
+    draft.issue({ by: 'claire', sequence: 7, issueDate: '2026-04-02' });
+    draft.cancelByCreditNote();
+
+    expect(draft.status).toBe('cancelledByCreditNote');
+    expect(draft.number).toBe('SEC-2026-000007');
+    expect(draft.totals.totalExcludingVatCents).toBe(65_000);
+    expect(() => {
+      draft.cancelByCreditNote();
+    }).toThrow(InvoiceTransitionError);
+  });
+});
+
+describe('the number series', () => {
+  it('is keyed on the entity and the fiscal year', () => {
+    // The entity is in the key although only one exists: a second one added to a series keyed on
+    // the year alone renumbers the whole history.
+    expect(seriesKeyOf(SELLER, '2026-04-02')).toStrictEqual({
+      entityId: 'entity-fr',
+      fiscalYear: 2026,
+    });
+    expect(sameSeries(seriesKeyOf(SELLER, '2026-01-01'), seriesKeyOf(SELLER, '2026-12-31'))).toBe(
+      true,
+    );
+    expect(sameSeries(seriesKeyOf(SELLER, '2026-12-31'), seriesKeyOf(SELLER, '2027-01-01'))).toBe(
+      false,
+    );
+  });
+
+  it('numbers a document without saying which kind it is', () => {
+    // One series for invoices and credit notes together (ADR-0018). A `FA-`/`AV-` prefix pair
+    // would be two counters wearing one name, and chronological continuity would be a claim.
+    const key = seriesKeyOf(SELLER, '2026-04-02');
+
+    expect(documentNumber(SELLER, key, 1)).toBe('SEC-2026-000001');
+    expect(documentNumber(SELLER, key, 999_999)).toBe('SEC-2026-999999');
+  });
+
+  it('refuses a sequence outside the range, because a counter that wraps is not gapless', () => {
+    const key = seriesKeyOf(SELLER, '2026-04-02');
+
+    expect(() => documentNumber(SELLER, key, 0)).toThrow(InvalidSequenceError);
+    expect(() => documentNumber(SELLER, key, 1_000_000)).toThrow(InvalidSequenceError);
+    expect(() => documentNumber(SELLER, key, 1.5)).toThrow(InvalidSequenceError);
+  });
 });

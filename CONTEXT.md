@@ -147,5 +147,17 @@ The reverse charge: on a service sold to a VAT-registered business in another EU
 _Avoid_: ReverseCharge, SelfAssessment
 
 **InvoiceNumber**:
-The legal, per-year, sequential and gapless identifier of an issued `Invoice`. Distinct from its internal id.
+The legal, sequential and gapless identifier of an issued `Invoice` or `CreditNote`, allocated from one series keyed on the issuing entity and the fiscal year (ADR-0018). Written `SEC-2026-000042`. Distinct from the document's internal id, and carrying no mark of which of the two kinds of document it numbers — the kind is the document's, and the number's job is chronological continuity.
 _Avoid_: Reference, Id, Sequence
+
+**InvoiceStatus**:
+Where an `Invoice` sits: `draft` while it is being assembled, `issued` once it has a number and a date and has left, `cancelledByCreditNote` once a `CreditNote` has reversed it. Three, and only three. There is no `paid`, no `sent` and no `overdue`: this mockup issues nothing and collects nothing, and a status a screen would set but no rule would read is a lie in an enum.
+_Avoid_: State, InvoiceState, Stage
+
+**Issued**:
+An `Invoice` that has left: it has a number from the series, a date, and frozen totals. Immutable from that moment — the only correction is a `CreditNote`.
+_Avoid_: Sent, Final, Validated, Emitted
+
+**CancelledByCreditNote**:
+An `Invoice` a `CreditNote` has reversed in full. The invoice itself is untouched — it keeps its number, its lines and its totals, because an issued invoice is never modified; the status records that another document now cancels it.
+_Avoid_: Credited, Cancelled, Voided, Reversed

@@ -1,12 +1,18 @@
 import { type IsoDate, periodToIso, type Period } from '@erp/platform';
 
 import type { Client, PostalAddress } from './client.ts';
-import { EmptyInvoiceError, LineOutsideInvoicePeriodError } from './errors.ts';
+import {
+  EmptyInvoiceError,
+  InvoiceTransitionError,
+  LineOutsideInvoicePeriodError,
+  ValidatorCannotIssueError,
+} from './errors.ts';
 import type { ConsultantId, ClientId, InvoiceId } from './ids.ts';
 import type { InvoiceLine } from './invoice-line.ts';
 import type { InvoiceStatus } from './invoice-status.ts';
 import type { LegalMentions } from './mentions.ts';
 import { applyRate } from './money.ts';
+import { documentNumber, type SeriesKey, seriesKeyOf } from './numbering.ts';
 import { type PaymentTerms, dueDate } from './payment-terms.ts';
 import type { LegalEntity } from './seller.ts';
 import { NOT_CHARGED_MENTIONS, type VatTreatment, vatGroupKey } from './vat.ts';
@@ -80,6 +86,11 @@ export class Invoice {
   readonly #validatedBy: readonly ConsultantId[];
 
   #status: InvoiceStatus = 'draft';
+  #number: string | null = null;
+  #issueDate: IsoDate | null = null;
+  #series: SeriesKey | null = null;
+  /** Computed at drafting, frozen at issuance. What is printed is what was checked. */
+  #totals: InvoiceTotals | null = null;
 
   private constructor(input: {
     id: InvoiceId;
@@ -198,7 +209,16 @@ export class Invoice {
       .sort((left, right) => left.key.localeCompare(right.key));
   }
 
+  /**
+   * The totals as they stand. Once the invoice is issued this returns the **frozen** copy rather
+   * than a fresh computation: what is printed on a legal document is what was checked when it was
+   * issued, and a total that recomputes is a total that can change.
+   */
   get totals(): InvoiceTotals {
+    return this.#totals ?? this.#computeTotals();
+  }
+
+  #computeTotals(): InvoiceTotals {
     const totalExcludingVatCents = this.#lines.reduce((sum, line) => sum + line.amountCents, 0);
     const vatTotalCents = this.vatBreakdown.reduce((sum, group) => sum + (group.vatCents ?? 0), 0);
 
@@ -207,5 +227,55 @@ export class Invoice {
       vatTotalCents,
       totalIncludingVatCents: totalExcludingVatCents + vatTotalCents,
     };
+  }
+
+  get number(): string | null {
+    return this.#number;
+  }
+
+  get issueDate(): IsoDate | null {
+    return this.#issueDate;
+  }
+
+  get series(): SeriesKey | null {
+    return this.#series;
+  }
+
+  /**
+   * The invoice leaves. This is the transition after which nothing changes — the number, the date
+   * and the totals are fixed here and the only correction from now on is a `CreditNote`.
+   *
+   * `by` is checked against whoever validated the days: the second rule of separation of duties
+   * (ADR-0006), held inside `billing` because the validator's identity travelled in the event
+   * payload rather than being asked of `timesheet`.
+   */
+  issue(input: { by: ConsultantId; sequence: number; issueDate: IsoDate }): void {
+    if (this.#status !== 'draft') {
+      throw new InvoiceTransitionError(this.#id, this.#status, 'issued');
+    }
+    if (this.#validatedBy.includes(input.by)) {
+      throw new ValidatorCannotIssueError(this.#id, input.by);
+    }
+
+    const series = seriesKeyOf(this.#seller, input.issueDate);
+
+    this.#number = documentNumber(this.#seller, series, input.sequence);
+    this.#series = series;
+    this.#issueDate = input.issueDate;
+    this.#totals = this.#computeTotals();
+    this.#status = 'issued';
+  }
+
+  /**
+   * A `CreditNote` has reversed this invoice in full. The invoice itself is untouched — it keeps
+   * its number, its lines and its totals, because an issued invoice is never modified. Only the
+   * status records that another document now cancels it.
+   */
+  cancelByCreditNote(): void {
+    if (this.#status !== 'issued') {
+      throw new InvoiceTransitionError(this.#id, this.#status, 'cancelled by a credit note');
+    }
+
+    this.#status = 'cancelledByCreditNote';
   }
 }

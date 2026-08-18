@@ -50,3 +50,47 @@ export class LineOutsideInvoicePeriodError extends BusinessError {
     });
   }
 }
+
+/** A sequence number outside the series' range. A gapless counter that wraps is not gapless. */
+export class InvalidSequenceError extends BusinessError {
+  readonly problemType = '/problems/invalid-sequence';
+
+  constructor(sequence: number, max: number) {
+    super(
+      `a document number is between 1 and ${String(max)}, and ${String(sequence)} was asked for`,
+      {
+        sequence,
+        max,
+      },
+    );
+  }
+}
+
+/** The transition asked for is not one the invoice lifecycle has. */
+export class InvoiceTransitionError extends BusinessError {
+  readonly problemType = '/problems/invoice-transition-not-allowed';
+
+  constructor(invoiceId: string, from: string, attempted: string) {
+    super(`a ${from} invoice cannot be ${attempted} (${invoiceId})`, {
+      invoiceId,
+      from,
+      attempted,
+    });
+  }
+}
+
+/**
+ * The second rule of separation of duties (ADR-0006): whoever validated the Cra does not issue the
+ * invoice drafted from it. Held here without importing `timesheet`, because the identity of the
+ * validator travels in the event payload and is carried onto the document.
+ */
+export class ValidatorCannotIssueError extends BusinessError {
+  readonly problemType = '/problems/validator-cannot-issue';
+
+  constructor(invoiceId: string, issuer: string) {
+    super(`${issuer} validated the days ${invoiceId} bills and cannot issue it`, {
+      invoiceId,
+      issuer,
+    });
+  }
+}

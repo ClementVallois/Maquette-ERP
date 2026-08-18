@@ -9,9 +9,12 @@ export {
 } from './domain/client.ts';
 export {
   EmptyInvoiceError,
+  InvalidSequenceError,
+  InvoiceTransitionError,
   LineOutsideInvoicePeriodError,
   NoVatRateError,
   PaymentTermsTooLongError,
+  ValidatorCannotIssueError,
 } from './domain/errors.ts';
 export type {
   ClientId,
@@ -70,3 +73,4 @@ export {
   paymentTerms,
 } from './domain/payment-terms.ts';
 export { type LegalEntity, legalEntity } from './domain/seller.ts';
+export { documentNumber, sameSeries, type SeriesKey, seriesKeyOf } from './domain/numbering.ts';
