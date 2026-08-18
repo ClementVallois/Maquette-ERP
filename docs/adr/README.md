@@ -37,6 +37,7 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0010](./0010-vat-rounded-per-rate.md)                                 | VAT is rounded per rate, and the rate is resolved from territoriality           | accepted |
 | [0011](./0011-hand-written-sql-no-orm.md)                              | Hand-written SQL over `pg`, and no ORM                                          | accepted |
 | [0012](./0012-half-day-as-the-storage-unit.md)                         | The half-day is the single storage unit for recorded time                       | accepted |
+| [0013](./0013-invoice-line-carries-its-origin.md)                      | The invoice line carries its origin, though only `Regie` exists                 | accepted |
 | [0014](./0014-triage-leaves-the-public-history.md)                     | The working triage leaves the public history                                    | accepted |
 | [0015](./0015-apps-tier-separate-from-packages.md)                     | The application shell lives in `apps/`, a tier above `packages/`                | accepted |
 | [0016](./0016-typed-errors-business-versus-technical.md)               | Typed errors: business versus technical, and how they reach the wire            | accepted |
@@ -70,7 +71,6 @@ to that phase, and a decision taken early takes the next free number instead of 
 
 Numbers are reserved so that what is **known and unsettled** is visible rather than implied.
 
-| No.  | Decision                                                                        | Blocked on                            |
-| ---- | ------------------------------------------------------------------------------- | ------------------------------------- |
-| 0007 | Gapless invoice numbering under concurrency                                     | to be written with persistence        |
-| 0013 | Polymorphic invoice line: it carries its origin even though only `Regie` exists | to be written with the billing domain |
+| No.  | Decision                                    | Blocked on                     |
+| ---- | ------------------------------------------- | ------------------------------ |
+| 0007 | Gapless invoice numbering under concurrency | to be written with persistence |

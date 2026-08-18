@@ -9,6 +9,8 @@
  */
 export type InvoiceId = string;
 export type ClientId = string;
+/** The record a line of régie came from. Written by `timesheet`, read here off the event. */
+export type CraId = string;
 export type MissionId = string;
 export type ConsultantId = string;
 export type OfficeId = string;

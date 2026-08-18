@@ -8,7 +8,20 @@ export {
   type Territoriality,
 } from './domain/client.ts';
 export { NoVatRateError } from './domain/errors.ts';
-export type { ClientId, ConsultantId, InvoiceId, MissionId, OfficeId } from './domain/ids.ts';
+export type {
+  ClientId,
+  ConsultantId,
+  CraId,
+  InvoiceId,
+  MissionId,
+  OfficeId,
+} from './domain/ids.ts';
+export {
+  type InvoiceLine,
+  type LineOrigin,
+  regieLine,
+  type RegieDaysOrigin,
+} from './domain/invoice-line.ts';
 export { INVOICE_STATUSES, type InvoiceStatus } from './domain/invoice-status.ts';
 export {
   BILLING_MODELS,

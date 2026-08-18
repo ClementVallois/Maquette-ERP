@@ -126,6 +126,14 @@ _Avoid_: SecurityAuditQualification
 A demand for payment issued to a client, derived from validated `Cra` days on a `Regie` mission. Translates without loss. Once issued it is immutable.
 _Avoid_: Bill, Facture
 
+**InvoiceLine**:
+One line of an `Invoice`, frozen at the moment it is drafted. Carries its quantity in `HalfDays` and its unit price per half-day — so no quantity is ever a decimal — the daily rate that applied, **copied** rather than referenced, its `VatTreatment`, and its origin.
+_Avoid_: LineItem, Item, Ligne
+
+**RegieDays**:
+The origin of an `InvoiceLine` that came from validated `Cra` days on a `Regie` mission: the mission, the `Cra`, the month worked, the count of `HalfDays` and the `Tjm` in force then. The only origin this mockup produces, and a tagged one from the first line written (ADR-0013) — a second origin is a variant, not a migration over documents that are legally immutable. It is also what makes the CRA → line → invoice chain checkable rather than claimed.
+_Avoid_: Source, Reference, Provenance
+
 **CreditNote** (🇬🇧 translated from _avoir_):
 The document that corrects an issued `Invoice`, since an issued invoice is never modified. Standard accounting term, exact translation.
 _Avoid_: Avoir, Refund, Reversal, Credit
