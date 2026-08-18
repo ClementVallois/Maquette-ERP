@@ -137,7 +137,9 @@ export default tseslint.config(
   },
 
   {
-    files: ['packages/*/src/domain/**/*.ts'],
+    // The kernel is in this list for the reason ADR-0033 gives: it holds domain-grade code and
+    // has no `domain/` directory to be matched by the first glob.
+    files: ['packages/*/src/domain/**/*.ts', 'packages/platform/src/**/*.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',

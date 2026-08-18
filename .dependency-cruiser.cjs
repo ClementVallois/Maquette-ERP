@@ -32,9 +32,16 @@ module.exports = {
       comment:
         'The domain is plain TypeScript: no framework, no ORM, no network, no disk — not even a ' +
         'Node builtin. A legitimate need gets declared here explicitly. CLAUDE.md rule 3.',
+      // `platform/**` is in scope and not by accident: ADR-0033 moved the value objects, the
+      // typed errors and the dated resolution into the kernel, which has no `domain/` directory.
+      // A rule scoped to `domain/` alone would hold the code that stayed and exempt the code
+      // that moved.
       // A colocated test is not shipped domain code, and it imports the test runner. Exempting
       // it is what lets the rule stay absolute for everything that IS shipped.
-      from: { path: '^packages/[^/]+/src/domain/', pathNot: '\\.test\\.ts$' },
+      from: {
+        path: '^packages/(?:[^/]+/src/domain|platform/src)/',
+        pathNot: '\\.test\\.ts$',
+      },
       to: { dependencyTypes: ['npm', 'npm-dev', 'npm-optional', 'npm-peer', 'core'] },
     },
     {

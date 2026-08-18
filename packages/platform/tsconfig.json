@@ -5,5 +5,7 @@
     "rootDir": "src",
     "outDir": "dist"
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  // The fixtures violate the kernel's own rules on purpose; only the guards' tests read them.
+  "exclude": ["node_modules", "dist", "coverage", "src/**/__boundary-fixture__"]
 }
