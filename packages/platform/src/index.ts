@@ -26,3 +26,4 @@ export {
   periodOf,
   periodToIso,
 } from './period.ts';
+export { CENTS_PER_EURO, tjmCentsFromEuros } from './tjm.ts';
