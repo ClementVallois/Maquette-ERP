@@ -79,6 +79,13 @@ nonsense for a month that does not exist.
 structural questions the plan had not identified. `docs/adr/README.md` says why they keep late
 numbers.
 
+**The line drawn in `CONTEXT.md`**: the vocabulary file gains the terms of the business —
+`Period`, `HalfDays`, `Refused`, `Assignment`, `CraFlag`, `ManagerAttachment` — and the `CraLine`
+and `Mission` entries were rewritten to say what the code now holds. Structural plumbing stays out:
+`Timeline` and `Effective` (a mechanism, ADR-0034), `TimesheetReference` (a snapshot shape) and
+`Hierarchy` (the lookup over `ManagerAttachment`, described in that entry). The test is whether a
+consultant of the firm would recognise the word as one of theirs.
+
 **Considered and left alone**: branding `IsoDate` and `Tjm` as nominal types. It would catch a
 `Period` string passed where a day is expected, and ADR-0002 already records the same mitigation
 as deliberately not taken for cents. Taking it here and not there would be an inconsistency

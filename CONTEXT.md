@@ -48,6 +48,10 @@ _Avoid_: Rejected, Denied, Returned
 What a calendar day counts as for a consultant: worked, absence, public holiday, weekend. Only worked days reach an invoice.
 _Avoid_: Category, Kind
 
+**CraFlag**:
+A day of a `Cra` that carries an entry although the `WorkingCalendar` says it is not workable — a worked Saturday, a worked public holiday. Computed at submission and carried to the manager, who decides. It is not a refusal: weekend work happens in this business, and refusing it only teaches consultants to record it on the Monday.
+_Avoid_: Warning, Anomaly, Exception, Alert
+
 **WorkingCalendar**:
 The authority on which dates are workable in France (Europe/Paris, weekends, public holidays). Not a utility: it decides what may be billed.
 _Avoid_: Holidays, DateUtils
@@ -91,6 +95,10 @@ _Avoid_: Pole, Department, Team, BusinessUnit
 **Office** (🇬🇧 translated from _implantation_):
 A geographic site of the firm: Paris, Lyon, Rennes, Bordeaux. Translates without loss. Carries authorization scope — a manager reads their own office, not another's.
 _Avoid_: Site, Location, Branch, Agency
+
+**ManagerAttachment**:
+Who a `Consultant` reported to, between which dates. Dated, and read against the month rather than against today: the `Cra` of March is accepted by the manager of March, even when it is validated in July and the consultant has since changed team (ADR-0034). A month resolves at its close — the manager in place when it ended.
+_Avoid_: Reporting line, Team, Supervisor
 
 **Intercontrat** (🇫🇷 kept):
 A consultant currently staffed on no mission. Kept in French: "bench" describes a different employment reality and has no French-law equivalent.
