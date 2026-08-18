@@ -76,6 +76,30 @@ The seed data must look like the reality of a consulting firm:
 - The repo must explain itself to a reader who has no brief and no context — that requirement has
   no date; it holds at every merge to `main`.
 
+## The double checkpoint
+
+At the end of **every sub-task (commit), every task, and every phase**, two questions, in order:
+
+1. **Where and what am I least confident in, in what I just produced?**
+2. **In three months, what breaks if I leave it as it is?**
+
+Every point raised resolves to exactly **one** of four outcomes — never a silent pass: **fix now**
+(it is a defect, corrected in the same task); **new ADR** (a decision made implicitly, to be written
+down with its rejected option and its reconsideration threshold); **a row in the README's "What I'm
+not building"** (out of scope, and the omission becomes deliberate and public); **a row in
+`docs/open-questions.md`** (real, not yet decidable). The fourth carries an obligation the others do
+not: the phase that will decide it is named, with a date — an open row with no named phase is a
+deferral pretending to be a record.
+
+Phase checkpoints are **written down** in `docs/open-questions.md`, which puts them in git history;
+they also state explicitly **which tasks of the phase did not run and why**. Commit-level checkpoints
+are resolved in place and leave their trace in the commit itself.
+
+**Stop condition:** a checkpoint ends when every point raised has one of the four outcomes recorded.
+
+> Full statement, with the history of how the fourth outcome was added:
+> [`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md), § "The double checkpoint".
+
 ## Agent skills
 
 ### Issue tracker

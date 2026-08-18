@@ -13,11 +13,11 @@ The monthly record of a consultant's worked days. Kept in French: "timesheet" dr
 _Avoid_: Timesheet, TimeSheet, ActivityReport
 
 **CraLine**:
-One day of a `Cra`, carrying a `DayType` and, when billable, the `Mission` it was worked on.
+Part of one day of a `Cra`: a count of `HalfDays`, the day type the consultant recorded — `worked` or `absence`, never `weekend` or `publicHoliday`, which the `WorkingCalendar` already knows — and, when worked, the `Mission` it was worked on. A day carries several lines when it is split between two missions, which is why the mission sits on the line and not on the day.
 _Avoid_: Entry, TimeEntry
 
 **CraStatus**:
-Where a `Cra` sits between the consultant's keyboard and the invoice. Only `Validated` is immutable — that distinction is the whole point of having states.
+Where a `Cra` sits between the consultant's keyboard and the invoice: `Draft`, `Submitted`, `Validated`, `Refused` — the four entries that follow, and the only four (ADR-0005). Only `Validated` is immutable, and that distinction is the whole point of having states.
 _Avoid_: State, Stage, Step
 
 **Draft**:
@@ -32,9 +32,25 @@ _Avoid_: Pending, AwaitingApproval, Sent
 A `Cra` the manager has accepted. Immutable, and the only status that produces an invoice.
 _Avoid_: Approved, Accepted, Closed, Locked
 
+**Refused**:
+A `Cra` the manager has sent back, with a reason the consultant can act on. Editable again, and resubmittable; the refusal is dropped when it is resubmitted, so no `Cra` awaiting validation carries a stale one. The one non-terminal answer a manager can give (ADR-0005).
+_Avoid_: Rejected, Denied, Returned
+
+**Period**:
+The month a `Cra` covers, written `YYYY-MM`. Every dated rule of the chain resolves against a day inside the period — the manager who validates March's `Cra` is March's manager, the `Tjm` applied is the one in force in March — never against the day the screen was opened.
+_Avoid_: Month, Range, Interval
+
+**HalfDays**:
+A count of half-days: the single unit in which worked time is recorded, stored and transported (ADR-0012). Never hours, never a fraction of a day. A full day is two half-days, which is what keeps `Tjm ÷ 2` exact in integer cents.
+_Avoid_: Days, Duration, Hours, Workload
+
 **DayType**:
 What a calendar day counts as for a consultant: worked, absence, public holiday, weekend. Only worked days reach an invoice.
 _Avoid_: Category, Kind
+
+**CraFlag**:
+A day of a `Cra` that carries an entry although the `WorkingCalendar` says it is not workable — a worked Saturday, a worked public holiday. Computed at submission and carried to the manager, who decides. It is not a refusal: weekend work happens in this business, and refusing it only teaches consultants to record it on the Monday.
+_Avoid_: Warning, Anomaly, Exception, Alert
 
 **WorkingCalendar**:
 The authority on which dates are workable in France (Europe/Paris, weekends, public holidays). Not a utility: it decides what may be billed.
@@ -43,8 +59,12 @@ _Avoid_: Holidays, DateUtils
 ## Commercial shape
 
 **Mission** (🇫🇷/🇬🇧 identical):
-A body of work sold to a client, staffed with consultants and billed under one `BillingModel`.
+A body of work sold to a client, staffed with consultants and billed under one `BillingModel`. Each module holds only the projection its own rules read (ADR-0031): in `timesheet` a `Mission` is staffing dates and nothing else, in `billing` it is commercial terms and nothing else. Same identifier, same word, two types — a mission as staffing and a mission as a commercial object are not the same object.
 _Avoid_: Project, Engagement, Contract
+
+**Assignment** (🇬🇧 translated from _affectation_):
+The dated staffing of a `Consultant` on a `Mission`: from when, until when. Translates without loss. Dated because a consultant moves mid-month — what may be recorded on the 3rd is not what may be recorded on the 25th — and both bounds are inclusive, so a mission worked on its last day is recorded on its last day.
+_Avoid_: Staffing, Allocation, Booking
 
 **BillingModel**:
 How a `Mission` converts work into revenue. Two values, both kept French.
@@ -75,6 +95,10 @@ _Avoid_: Pole, Department, Team, BusinessUnit
 **Office** (🇬🇧 translated from _implantation_):
 A geographic site of the firm: Paris, Lyon, Rennes, Bordeaux. Translates without loss. Carries authorization scope — a manager reads their own office, not another's.
 _Avoid_: Site, Location, Branch, Agency
+
+**ManagerAttachment**:
+Who a `Consultant` reported to, between which dates. Dated, and read against the month rather than against today: the `Cra` of March is accepted by the manager of March, even when it is validated in July and the consultant has since changed team (ADR-0034). A month resolves at its close — the manager in place when it ended.
+_Avoid_: Reporting line, Team, Supervisor
 
 **Intercontrat** (🇫🇷 kept):
 A consultant currently staffed on no mission. Kept in French: "bench" describes a different employment reality and has no French-law equivalent.

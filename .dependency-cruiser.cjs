@@ -32,7 +32,16 @@ module.exports = {
       comment:
         'The domain is plain TypeScript: no framework, no ORM, no network, no disk — not even a ' +
         'Node builtin. A legitimate need gets declared here explicitly. CLAUDE.md rule 3.',
-      from: { path: '^packages/[^/]+/src/domain/' },
+      // `platform/**` is in scope and not by accident: ADR-0033 moved the value objects, the
+      // typed errors and the dated resolution into the kernel, which has no `domain/` directory.
+      // A rule scoped to `domain/` alone would hold the code that stayed and exempt the code
+      // that moved.
+      // A colocated test is not shipped domain code, and it imports the test runner. Exempting
+      // it is what lets the rule stay absolute for everything that IS shipped.
+      from: {
+        path: '^packages/(?:[^/]+/src/domain|platform/src)/',
+        pathNot: '\\.test\\.ts$',
+      },
       to: { dependencyTypes: ['npm', 'npm-dev', 'npm-optional', 'npm-peer', 'core'] },
     },
     {
@@ -92,9 +101,12 @@ module.exports = {
     doNotFollow: { path: 'node_modules' },
     // pnpm links workspace deps into each package's node_modules, so a glob otherwise collects
     // packages/billing/node_modules/@erp/platform/** and attributes platform's files to billing.
-    // The fixture is a deliberate violation, kept alive to test the rule itself:
+    // Only THOSE copies are excluded: excluding node_modules wholesale also erased every npm
+    // package from the graph, and with it every violation of `domain-has-no-external-dependency`
+    // — the rule reported clean on a domain importing an ORM. See the fixtures below.
+    // The fixtures are deliberate violations, kept alive to test the rules themselves:
     // see packages/billing/src/__boundary-fixture__/README.md
-    exclude: { path: '(^|/)node_modules/|__boundary-fixture__' },
+    exclude: { path: '(^|/)packages/[^/]+/node_modules/|__boundary-fixture__' },
     tsConfig: { fileName: 'tsconfig.base.json' },
     enhancedResolveOptions: {
       exportsFields: ['exports'],

@@ -11,6 +11,21 @@ import tseslint from 'typescript-eslint';
 // list. Hence the constant, re-injected on both sides.
 const NATIVE_ERROR_CTORS =
   '/^(Error|TypeError|RangeError|SyntaxError|ReferenceError|EvalError|URIError|AggregateError)$/';
+// The wall clock, not the `Date` constructor. Domain code may not read time at all (the block
+// below forbids both forms); a TEST may build a fixed instant — that is what a fake clock is —
+// but reading `new Date()` or `Date.now()` in one makes the assertion depend on the day it runs.
+const NO_WALL_CLOCK = [
+  {
+    selector: 'NewExpression[callee.name="Date"][arguments.length=0]',
+    message:
+      'No `new Date()` without an argument: a test that reads the wall clock passes today and fails on 29 February. Build a fixed instant.',
+  },
+  {
+    selector: 'MemberExpression[object.name="Date"][property.name="now"]',
+    message: 'No `Date.now()` in a test: build a fixed instant instead.',
+  },
+];
+
 const NO_BARE_ERROR = [
   {
     selector: `ThrowStatement > :matches(NewExpression, CallExpression)[callee.name=${NATIVE_ERROR_CTORS}]`,
@@ -122,7 +137,9 @@ export default tseslint.config(
   },
 
   {
-    files: ['packages/*/src/domain/**/*.ts'],
+    // The kernel is in this list for the reason ADR-0033 gives: it holds domain-grade code and
+    // has no `domain/` directory to be matched by the first glob.
+    files: ['packages/*/src/domain/**/*.ts', 'packages/platform/src/**/*.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -149,6 +166,10 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
+      // Replaces the domain block's list for test files — `no-restricted-syntax` does not merge.
+      // A fake clock is built from a literal instant, so the absolute ban on `new Date(...)` is
+      // narrowed here to the wall clock, and the ban on bare errors is re-injected unchanged.
+      'no-restricted-syntax': ['error', ...NO_BARE_ERROR, ...NO_WALL_CLOCK],
       // No `packageDir`: each test is judged against the package.json of ITS OWN package, so a
       // domain test importing an ORM fails here.
       'import-x/no-extraneous-dependencies': ['error', { devDependencies: true }],

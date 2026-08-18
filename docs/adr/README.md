@@ -24,18 +24,25 @@ Two record-keeping rules, because the point of this log is that it was not retou
 
 ## Accepted
 
-| No.                                                           | Decision                                                                   | Status   |
-| ------------------------------------------------------------- | -------------------------------------------------------------------------- | -------- |
-| [0001](./0001-sealed-modules-and-in-process-domain-event.md)  | Two sealed modules, one arrow, verified mechanically                       | accepted |
-| [0002](./0002-money-as-integer-cents.md)                      | Money is an integer number of cents, with no wrapper type                  | accepted |
-| [0003](./0003-authorization-at-the-repository.md)             | Authorization lives in the repository, not in Postgres RLS                 | accepted |
-| [0004](./0004-working-calendar-with-a-fixed-holiday-table.md) | The working calendar is a domain component with a fixed 2026 holiday table | accepted |
-| [0008](./0008-fastify-not-nestjs.md)                          | Fastify, not NestJS                                                        | accepted |
-| [0009](./0009-server-rendered-html-no-client-framework.md)    | Server-rendered HTML, with no client framework                             | accepted |
-| [0010](./0010-vat-rounded-per-rate.md)                        | VAT is rounded per rate, and the rate is resolved from territoriality      | accepted |
-| [0011](./0011-hand-written-sql-no-orm.md)                     | Hand-written SQL over `pg`, and no ORM                                     | accepted |
-| [0014](./0014-triage-leaves-the-public-history.md)            | The working triage leaves the public history                               | accepted |
-| [0015](./0015-apps-tier-separate-from-packages.md)            | The application shell lives in `apps/`, a tier above `packages/`           | accepted |
+| No.                                                                    | Decision                                                                   | Status   |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------- |
+| [0001](./0001-sealed-modules-and-in-process-domain-event.md)           | Two sealed modules, one arrow, verified mechanically                       | accepted |
+| [0002](./0002-money-as-integer-cents.md)                               | Money is an integer number of cents, with no wrapper type                  | accepted |
+| [0003](./0003-authorization-at-the-repository.md)                      | Authorization lives in the repository, not in Postgres RLS                 | accepted |
+| [0004](./0004-working-calendar-with-a-fixed-holiday-table.md)          | The working calendar is a domain component with a fixed 2026 holiday table | accepted |
+| [0005](./0005-cra-lifecycle-and-immutability.md)                       | The Cra lifecycle, and where immutability binds                            | accepted |
+| [0006](./0006-separation-of-duties.md)                                 | Separation of duties: two rules, and where they are enforced               | accepted |
+| [0008](./0008-fastify-not-nestjs.md)                                   | Fastify, not NestJS                                                        | accepted |
+| [0009](./0009-server-rendered-html-no-client-framework.md)             | Server-rendered HTML, with no client framework                             | accepted |
+| [0010](./0010-vat-rounded-per-rate.md)                                 | VAT is rounded per rate, and the rate is resolved from territoriality      | accepted |
+| [0011](./0011-hand-written-sql-no-orm.md)                              | Hand-written SQL over `pg`, and no ORM                                     | accepted |
+| [0012](./0012-half-day-as-the-storage-unit.md)                         | The half-day is the single storage unit for recorded time                  | accepted |
+| [0014](./0014-triage-leaves-the-public-history.md)                     | The working triage leaves the public history                               | accepted |
+| [0015](./0015-apps-tier-separate-from-packages.md)                     | The application shell lives in `apps/`, a tier above `packages/`           | accepted |
+| [0016](./0016-typed-errors-business-versus-technical.md)               | Typed errors: business versus technical, and how they reach the wire       | accepted |
+| [0031](./0031-reference-data-per-module-projections.md)                | Reference data: per-module projections, the seed as single writer          | accepted |
+| [0033](./0033-shared-kernel-holds-the-transported-vocabulary.md)       | The shared kernel holds the vocabulary the boundary transports             | accepted |
+| [0034](./0034-dated-references-resolved-at-the-close-of-the-period.md) | One dated-reference mechanism, resolved at the close of the period         | accepted |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
@@ -46,14 +53,18 @@ which decisions were known before they were made.
 to the phase that consumes it. A number there is a commitment that the decision will be written when
 it is taken, not a placeholder to be shuffled.
 
+0033 and 0034 are the first numbers **not** reserved by that table: the plan's last reserved number is 0032, and
+Phase 1 hit two structural questions the plan had not identified — where a value object both
+modules speak lives, given that the cruiser forbids the import that would otherwise settle it
+(0033), and how a dated reference resolves for a whole month rather than a day (0034). Both were
+written when they were taken, numbered after the reservations, and recorded in the Phase 1
+checkpoint.
+
 ## Identified, not yet decided
 
 Numbers are reserved so that what is **known and unsettled** is visible rather than implied.
 
-| No.  | Decision                                                                                             | Blocked on                                 |
-| ---- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| 0005 | Cra lifecycle: the statuses in `CONTEXT.md`, and where immutability binds                            | to be written with the timesheet domain    |
-| 0006 | Separation of duties: whoever records a Cra does not validate it, whoever validates does not invoice | to be written with the validation use case |
-| 0007 | Gapless invoice numbering under concurrency                                                          | to be written with persistence             |
-| 0012 | Half-day as the single storage unit for recorded time                                                | to be written with the timesheet domain    |
-| 0013 | Polymorphic invoice line: it carries its origin even though only `Regie` exists                      | to be written with the billing domain      |
+| No.  | Decision                                                                        | Blocked on                            |
+| ---- | ------------------------------------------------------------------------------- | ------------------------------------- |
+| 0007 | Gapless invoice numbering under concurrency                                     | to be written with persistence        |
+| 0013 | Polymorphic invoice line: it carries its origin even though only `Regie` exists | to be written with the billing domain |

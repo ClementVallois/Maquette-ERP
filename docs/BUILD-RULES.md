@@ -51,18 +51,29 @@ ADR and moves to the README's "Ce que je ne construis pas" — never a silent om
   subscribes to `timesheet.TimesheetValidated`, whose contract lives in `@erp/platform`
   (**ADR-0001**).
 - The domain imports **nothing external** — no framework, no ORM, no network, no disk, not even a
-  Node builtin. Enforced by dependency-cruiser, not by discipline.
+  Node builtin. Enforced by dependency-cruiser, not by discipline. "The domain" means each module's
+  `domain/` **and `@erp/platform` whole**: ADR-0033 puts domain-grade code in a package that has no
+  `domain/` directory, and a rule scoped to the directory would hold the code that stayed while
+  exempting the code that moved. A colocated `*.test.ts` is exempt — it is not shipped, and it
+  imports the test runner — and that exemption is what lets the rule stay absolute everywhere else.
 - One `index.ts` per package is the only public surface.
 - Layers per module: `domain` → `application` → `infrastructure`. Dependencies point inward only.
 - A port is introduced only at the **second real implementation**. Three exist:
   `Clock`, `CraRepository`, `InvoiceRepository`. There is no email, storage or LLM port.
-- Time in the domain comes from the injected `Clock`. `new Date()` and `Date.now()` are lint errors
-  there — the fake clock is what makes dated invariants deterministic.
+- Time in the domain comes from the injected `Clock`. Building a `Date` at all is a lint error
+  there — literal argument or not, and in `@erp/platform` as well as in each `domain/` — because
+  the fake clock is what makes dated invariants deterministic. In a **test** the ban narrows to the
+  wall clock, `new Date()` and `Date.now()`: a fake clock is built from a literal instant, while a
+  test that reads the system clock passes today and fails on 29 February.
 - No public setter: an object must not be able to exist in an invalid state.
 - Never a bare `new Error()`. An error is **business** (expected, part of the contract) or
   **technical** (retryable).
 - Every guard gets a **negative test** — a test that proves the rule _rejects_. A green gate that
-  stopped looking is the one failure this repository exists to rule out.
+  stopped looking is the one failure this repository exists to rule out, and it has happened here
+  twice: the no-external-dependency rule could not see an npm import for a whole phase, and the
+  kernel was exempt from both domain guards for the phase that filled it. The negative tests live
+  in `tests/boundary-rule.test.ts` (dependency-cruiser) and `tests/lint-rules.test.ts` (ESLint),
+  against fixtures under `__boundary-fixture__` that hold deliberate violations.
 
 ## Domain invariants
 
