@@ -130,6 +130,14 @@ _Avoid_: Bill, Facture
 The document that corrects an issued `Invoice`, since an issued invoice is never modified. Standard accounting term, exact translation.
 _Avoid_: Avoir, Refund, Reversal, Credit
 
+**VatTreatment**:
+How VAT applies to one `InvoiceLine`, resolved from the operation and then frozen onto the line (ADR-0010). Either a rate — an integer number of basis points, so 8,5 % is 850 and never 0.085 (ADR-0035) — or the statement that no French VAT is charged, with the reason why. The two are different shapes and not different numbers: a rate of 0 % and an operation outside the scope of the tax print different mandatory mentions and are declared differently.
+_Avoid_: TaxRate, Vat, TvaRate
+
+**Autoliquidation** (🇫🇷 kept):
+The reverse charge: on a service sold to a VAT-registered business in another EU member state, the customer accounts for the tax and the invoice carries no French VAT. Kept in French because it is the word the invoice is legally required to print (art. 283-2 du CGI).
+_Avoid_: ReverseCharge, SelfAssessment
+
 **InvoiceNumber**:
 The legal, per-year, sequential and gapless identifier of an issued `Invoice`. Distinct from its internal id.
 _Avoid_: Reference, Id, Sequence

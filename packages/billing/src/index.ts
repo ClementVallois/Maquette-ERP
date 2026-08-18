@@ -7,6 +7,7 @@ export {
   TERRITORIALITIES,
   type Territoriality,
 } from './domain/client.ts';
+export { NoVatRateError } from './domain/errors.ts';
 export type { ClientId, ConsultantId, InvoiceId, MissionId, OfficeId } from './domain/ids.ts';
 export { INVOICE_STATUSES, type InvoiceStatus } from './domain/invoice-status.ts';
 export {
@@ -17,3 +18,13 @@ export {
   type CommercialMission,
   commercialMission,
 } from './domain/reference.ts';
+export {
+  NOT_CHARGED_MENTIONS,
+  NOT_CHARGED_REASONS,
+  type NotChargedReason,
+  resolveVat,
+  SERVICE_NATURES,
+  type ServiceNature,
+  vatGroupKey,
+  type VatTreatment,
+} from './domain/vat.ts';
