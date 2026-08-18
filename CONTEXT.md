@@ -78,6 +78,14 @@ _Avoid_: TimeAndMaterials, TAndM, Hourly
 Fixed-price billing: an agreed amount for an agreed deliverable, independent of days worked. Present in the dataset, never invoiced here. Kept in French for the same reason as `Regie`.
 _Avoid_: FixedPrice, Package, Fixed
 
+**Client** (🇫🇷/🇬🇧 identical):
+The party an `Invoice` is addressed to, reduced to what issuing one requires: who to address, where, its SIREN, its intra-EU VAT number and its `Territoriality`. No contacts, no pipeline, no account manager — an ERP holds all of that and none of it decides a rate or a mandatory mention. The SIREN carries a Luhn check digit, so a client with a nine-digit number that is not a SIREN is refused rather than printed on a legal document.
+_Avoid_: Customer, Account, Company, Party
+
+**Territoriality** (🇬🇧 translated from _territorialité_):
+Where a `Client` is established, and the only client attribute the fiscal rules read: metropolitan France, an overseas department where VAT applies (Guadeloupe, Martinique, La Réunion), an overseas department outside the scope of VAT (Guyane, Mayotte, art. 294-1 CGI), or another European Union country. Four values because each carries a different mandatory mention, not because each carries a different number (ADR-0010).
+_Avoid_: Region, Country, Zone, TaxRegion
+
 **Tjm** (🇫🇷 kept):
 _Taux journalier moyen_ — the daily rate agreed with the client for a consultant on a mission. Kept in French: it is the term written into the contract and opposable to the client. Always a **whole number of euros**, and dated: work done in June bills at June's `Tjm`. The whole-euro premise is what keeps half-day billing exact in integer cents (ADR-0002, ADR-0010).
 _Avoid_: DailyRate, Rate, Price
