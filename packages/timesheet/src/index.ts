@@ -1,3 +1,8 @@
+export {
+  type ValidateCraCommand,
+  type ValidateCraDependencies,
+  validateCra,
+} from './application/validate-cra.ts';
 export { Cra, type CraRefusal, type RecordDayInput } from './domain/cra.ts';
 export { type CraLine } from './domain/cra-line.ts';
 export { CRA_STATUSES, type CraStatus } from './domain/cra-status.ts';
@@ -18,6 +23,7 @@ export {
   MissionRequiredError,
   NotAssignedError,
   RefusalReasonRequiredError,
+  SelfValidationForbiddenError,
   UnknownMissionError,
   UnknownCalendarYearError,
   ValidatedCraIsImmutableError,

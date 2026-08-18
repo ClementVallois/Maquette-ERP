@@ -1,7 +1,13 @@
 export type { Clock } from './clock.ts';
 export { BusinessError, InvalidValueError, TechnicalFailure, isBusinessError } from './errors.ts';
 export type { DomainEvent, EventHandler, EventBus } from './events.ts';
-export { TIMESHEET_VALIDATED, type TimesheetValidated } from './events.ts';
+export {
+  type MissionHalfDays,
+  TIMESHEET_VALIDATED,
+  TIMESHEET_VALIDATED_VERSION,
+  type TimesheetValidated,
+  type TimesheetValidatedPayload,
+} from './events.ts';
 export { HALF_DAYS_PER_DAY, halfDays, type HalfDays } from './half-days.ts';
 export {
   MONDAY,

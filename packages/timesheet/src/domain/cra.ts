@@ -4,8 +4,10 @@ import {
   HALF_DAYS_PER_DAY,
   type IsoDate,
   isoDate,
+  type MissionHalfDays,
   type Period,
   periodToIso,
+  type TimesheetValidatedPayload,
 } from '@erp/platform';
 
 import { type CraLine, craLine } from './cra-line.ts';
@@ -16,6 +18,7 @@ import {
   DayOutsidePeriodError,
   DayOverbookedError,
   RefusalReasonRequiredError,
+  SelfValidationForbiddenError,
   ValidatedCraIsImmutableError,
 } from './errors.ts';
 import type { ConsultantId, CraId, MissionId, OfficeId } from './ids.ts';
@@ -185,19 +188,47 @@ export class Cra {
   }
 
   /**
-   * Accepts the record. This is the transition after which nothing changes — every other method
-   * refuses from here on. Who is allowed to call it, and the event it publishes, are added by
-   * the validation use case (ADR-0006).
+   * Accepts the record, and returns what the month is worth per mission. This is the transition
+   * after which nothing changes — every other method refuses from here on.
+   *
+   * Returning the payload rather than publishing it keeps the domain free of the bus: the
+   * aggregate states the fact, the use case is what tells anyone about it.
    */
-  validate(input: { by: ConsultantId; clock: Clock }): void {
+  validate(input: { by: ConsultantId; clock: Clock }): TimesheetValidatedPayload {
     this.#assertNotValidated('validate');
     if (this.#status !== 'submitted') {
       throw new CraTransitionError(this.#id, this.#status, 'validated');
+    }
+    if (input.by === this.#consultantId) {
+      throw new SelfValidationForbiddenError(this.#id, this.#consultantId);
     }
 
     this.#status = 'validated';
     this.#validatedBy = input.by;
     this.#validatedAt = input.clock.now();
+
+    return {
+      craId: this.#id,
+      consultantId: this.#consultantId,
+      officeId: this.#officeId,
+      period: periodToIso(this.#period),
+      validatedBy: input.by,
+      missions: this.#billableHalfDaysByMission(),
+    };
+  }
+
+  /** Worked days only, grouped by mission, in a stable order so two runs produce the same event. */
+  #billableHalfDaysByMission(): MissionHalfDays[] {
+    const perMission = new Map<MissionId, number>();
+
+    for (const line of this.#lines) {
+      if (line.dayType !== 'worked' || line.missionId === null) continue;
+      perMission.set(line.missionId, (perMission.get(line.missionId) ?? 0) + line.halfDays);
+    }
+
+    return [...perMission]
+      .map(([missionId, halfDays]) => ({ missionId, halfDays }))
+      .sort((left, right) => left.missionId.localeCompare(right.missionId));
   }
 
   refuse(input: { by: ConsultantId; reason: string; clock: Clock }): void {

@@ -57,8 +57,7 @@ it was taken, numbered after the reservations, and recorded in the Phase 1 check
 
 Numbers are reserved so that what is **known and unsettled** is visible rather than implied.
 
-| No.  | Decision                                                                                             | Blocked on                                 |
-| ---- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| 0006 | Separation of duties: whoever records a Cra does not validate it, whoever validates does not invoice | to be written with the validation use case |
-| 0007 | Gapless invoice numbering under concurrency                                                          | to be written with persistence             |
-| 0013 | Polymorphic invoice line: it carries its origin even though only `Regie` exists                      | to be written with the billing domain      |
+| No.  | Decision                                                                        | Blocked on                            |
+| ---- | ------------------------------------------------------------------------------- | ------------------------------------- |
+| 0007 | Gapless invoice numbering under concurrency                                     | to be written with persistence        |
+| 0013 | Polymorphic invoice line: it carries its origin even though only `Regie` exists | to be written with the billing domain |

@@ -149,3 +149,16 @@ export class IncompleteCraError extends BusinessError {
     );
   }
 }
+
+/**
+ * The consultant who recorded the month asked to validate it. Separation of duties, first of the
+ * two rules of ADR-0006: recording and accepting are different acts, and one person doing both
+ * removes the only control between a keyboard and an invoice.
+ */
+export class SelfValidationForbiddenError extends BusinessError {
+  readonly problemType = '/problems/self-validation-forbidden';
+
+  constructor(craId: string, consultantId: string) {
+    super(`${consultantId} recorded ${craId} and cannot validate it`, { craId, consultantId });
+  }
+}
