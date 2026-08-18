@@ -116,3 +116,89 @@ describing the older, narrower guards and now describes the ones that exist.
 `Period` string passed where a day is expected, and ADR-0002 already records the same mitigation
 as deliberately not taken for cents. Taking it here and not there would be an inconsistency
 decided by whoever wrote the file last.
+
+### Phase 2 — `feat/billing-domain`, 18/08/2026
+
+**Every task of the phase ran**: 2.1 line arithmetic, 2.2 the origin on the line, 2.3 VAT
+resolution and the dated rate table, 2.4 the invoice document, 2.5 numbering and the state machine,
+2.6 the coherence check and `CreditNote`, 2.7 the minimal `Client`. Three departures from the
+plan's order, all deliberate:
+
+- **The lint rule ran before the arithmetic it guards.** `BUILD-RULES.md` § Money has claimed, in
+  the present tense since Phase 0, a rule forbidding float-producing arithmetic on money. It did
+  not exist. Writing the rounding helper first would have meant reaching for `Math.round` and then
+  retrofitting the helper around a rule written afterwards — the same reason 1.7 ran first in
+  Phase 1. ADR-0035 records what it bans and what replaces each ban.
+- **2.7 ran early**, and 2.3 ran before 2.2. The client and the commercial projection are what
+  every later task reads, and a line freezes a VAT treatment onto itself, so the treatment has to
+  exist before the line does.
+- **The invoice's arithmetic moved out of the aggregate in 2.6**, into `document.ts`, once
+  `CreditNote` needed the same recapitulative. A credit note that summed differently from the
+  invoice it reverses is the discrepancy the module exists to prevent, so this is the DRY face
+  `BUILD-PLAN.md` calls required rather than the one it calls forbidden.
+
+**Three debts Phase 1's checkpoint assigned to Phase 2, and what happened to them:**
+
+- **Rule 2 of separation of duties is now enforced.** `Invoice.issue()` refuses whoever validated
+  the days it bills, with a negative test. `billing` holds a rule about an act performed in
+  `timesheet` without importing it, which is what `validatedBy` in the payload was for (ADR-0006).
+- **The event contract has its first real reader, and the payload is sufficient.** The verdict
+  Phase 1 asked for: nothing was missing. `period` gives both dated resolutions their date,
+  `craId` gives every line its audit trail, `validatedBy` gives rule 2 its subject, and the
+  per-mission breakdown is what lets one Cra produce several lines. The one thing the payload does
+  **not** carry — the billing model — is correct: it is a commercial term, `billing`'s to know
+  (ADR-0031), and a payload carrying it would make `timesheet` responsible for it.
+- **The boundary held under a real consumer.** No file of `packages/billing`, tests included,
+  imports `timesheet`; the test builds the event from the contract in `@erp/platform` and mocks
+  nothing, because the dependency rule would have refused the alternative.
+
+**Raised and fixed inside the phase**, so they leave no row: the first per-rate rounding test was
+written on two lines of 1 010 cents, which answers 172 whether VAT is rounded per line or per rate —
+it proved nothing, and was replaced by two lines of 1 005, where the two orders give 170 and 171.
+The replacement was checked by rounding per line on purpose and watching it fail. `billing`'s
+`tsconfig.json` excluded `src/__boundary-fixture__` only, so the new fixture one directory down
+would have been compiled; it now matches `timesheet`'s `src/**/` form. `vitest` was missing from
+`billing`'s manifest, which `import-x` judges each test against.
+
+**Five ADR numbers were taken.** Three were reserved by the plan and are consumed here — **0013**
+(the line carries its origin), **0017** (legal mentions modelled, not templated), **0018** (one
+series for invoices and credit notes). Two are new and continue the 0033/0034 sequence: **0035**
+(exact money arithmetic, half-up on integers and rates in basis points) and **0036** (a credit note
+carries positive amounts), both forced by writing `roundHalfUp` — whether a rate can be a decimal
+fraction, and whether an amount can be negative. **0037** was forced by the first real consumption
+of the event: what happens to days that are not billable here.
+
+**Two decisions inside ADR-0017 that could have been side effects and are not**: "45 jours fin de
+mois" is computed by adding the days and then moving to the end of that month, with the other
+accepted reading named; and the `Tjm` and the VAT rate **both** resolve at the close of the period
+the work covers. The alternative — the VAT at the invoice date, which the debits option would
+suggest — splits the document across two resolution dates for a distinction (_fait générateur_
+versus _exigibilité_) this build cannot settle. The residual doubt belongs to the row above
+recording that none of these fiscal rules has been validated by an accountant, and that row now
+covers ADR-0017 as well as ADR-0010.
+
+**Deferred, named rather than dropped:**
+
+- **The gapless allocation of a number is not built.** This phase holds the **shape** of the series
+  and of the number (ADR-0018); the locked row that makes the sequence gapless under concurrency is
+  **ADR-0007, Phase 3**. The split is the reason the shape could be tested without a database.
+- **`assertDocumentAddsUp` is tautological today.** It compares totals against the lines they were
+  just computed from. It is written for **Phase 3**, where the totals are columns and the lines are
+  another table and the two can disagree; the four negative tests write the disagreement by hand
+  because that is the only way to reach it now.
+- **`InvoiceRepository` is not built**, for the reason `CraRepository` was not: a port with zero
+  implementations proves nothing in a phase with no database. **Phase 3.**
+- **`Forfait` is modelled and not billed**, by decision (ADR-0037) rather than by omission.
+
+**Something Phase 3 inherits and must not read narrowly**: the reserved subject of ADR-0021 is
+"validating twice does not produce two invoices". One validated Cra can span missions sold to
+several clients, so it drafts **several** invoices. The idempotency ADR-0021 owes is over the
+**set**, not over a single document.
+
+**The line drawn in `CONTEXT.md`**: the vocabulary gains `Client`, `Territoriality`, `VatTreatment`,
+`Autoliquidation`, `InvoiceLine`, `RegieDays`, `InvoiceStatus`, `Issued`, `CancelledByCreditNote`,
+and the `CreditNote` and `InvoiceNumber` entries were rewritten to say what the code now holds.
+`CancelledByCreditNote` went into the vocabulary file **before** `invoice-status.ts` dropped
+`credited` — the enum follows the vocabulary, never the other way round. Structural plumbing stays
+out, on the Phase 1 criterion: `SeriesKey`, `AccountableDocument`, `BillingReference`, `LegalEntity`
+and `LegalMentions` are mechanisms, and a consultant of the firm would not call them theirs.
