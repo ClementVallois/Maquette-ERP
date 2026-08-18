@@ -135,7 +135,7 @@ The origin of an `InvoiceLine` that came from validated `Cra` days on a `Regie` 
 _Avoid_: Source, Reference, Provenance
 
 **CreditNote** (🇬🇧 translated from _avoir_):
-The document that corrects an issued `Invoice`, since an issued invoice is never modified. Standard accounting term, exact translation.
+The document that corrects an issued `Invoice`, since an issued invoice is never modified. Standard accounting term, exact translation. It reverses the invoice **in full** — a partial one is not built here — carries **positive** amounts with its own type carrying the direction (ADR-0036), takes its number from the same series as the invoice (ADR-0018), and says why in a typed `CreditNoteReason`: an entry error, a commercial gesture, a scope dispute, or a cancellation. It has no lifecycle: it is issued in one act and never changes.
 _Avoid_: Avoir, Refund, Reversal, Credit
 
 **VatTreatment**:

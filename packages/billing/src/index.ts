@@ -8,11 +8,27 @@ export {
   type Territoriality,
 } from './domain/client.ts';
 export {
+  CREDIT_NOTE_REASONS,
+  type CreditNote,
+  creditNote,
+  type CreditNoteReason,
+} from './domain/credit-note.ts';
+export {
+  type AccountableDocument,
+  assertDocumentAddsUp,
+  type DocumentTotals,
+  type VatGroup,
+  totalsOf,
+  vatBreakdownOf,
+} from './domain/document.ts';
+export {
+  DocumentDoesNotAddUpError,
   EmptyInvoiceError,
   InvalidSequenceError,
   InvoiceTransitionError,
   LineOutsideInvoicePeriodError,
   NoVatRateError,
+  NotAnIssuedInvoiceError,
   PaymentTermsTooLongError,
   ValidatorCannotIssueError,
 } from './domain/errors.ts';
@@ -49,13 +65,7 @@ export {
   vatGroupKey,
   type VatTreatment,
 } from './domain/vat.ts';
-export {
-  type BilledParty,
-  billedParty,
-  Invoice,
-  type InvoiceTotals,
-  type VatGroup,
-} from './domain/invoice.ts';
+export { type BilledParty, billedParty, Invoice } from './domain/invoice.ts';
 export {
   type EarlyPaymentDiscount,
   type LegalMentions,

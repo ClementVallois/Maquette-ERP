@@ -2,6 +2,13 @@ import { type IsoDate, periodToIso, type Period } from '@erp/platform';
 
 import type { Client, PostalAddress } from './client.ts';
 import {
+  assertDocumentAddsUp,
+  type DocumentTotals,
+  type VatGroup,
+  totalsOf,
+  vatBreakdownOf,
+} from './document.ts';
+import {
   EmptyInvoiceError,
   InvoiceTransitionError,
   LineOutsideInvoicePeriodError,
@@ -11,11 +18,9 @@ import type { ConsultantId, ClientId, InvoiceId } from './ids.ts';
 import type { InvoiceLine } from './invoice-line.ts';
 import type { InvoiceStatus } from './invoice-status.ts';
 import type { LegalMentions } from './mentions.ts';
-import { applyRate } from './money.ts';
 import { documentNumber, type SeriesKey, seriesKeyOf } from './numbering.ts';
 import { type PaymentTerms, dueDate } from './payment-terms.ts';
 import type { LegalEntity } from './seller.ts';
-import { NOT_CHARGED_MENTIONS, type VatTreatment, vatGroupKey } from './vat.ts';
 
 /**
  * The client as the document states it, copied at drafting. An invoice is a statement of what was
@@ -41,25 +46,6 @@ export function billedParty(source: Client): BilledParty {
     billingAddress: source.billingAddress,
     deliveryAddress: source.deliveryAddress ?? source.billingAddress,
   };
-}
-
-/**
- * One row of the recapitulative the invoice is legally required to print: a rate, the base taxed
- * at it, and the tax. A group that carries no French VAT has **no** tax amount — `null`, not zero
- * — and carries the mention that says why instead (ADR-0010).
- */
-export interface VatGroup {
-  readonly key: string;
-  readonly treatment: VatTreatment;
-  readonly baseCents: number;
-  readonly vatCents: number | null;
-  readonly mention: string | null;
-}
-
-export interface InvoiceTotals {
-  readonly totalExcludingVatCents: number;
-  readonly vatTotalCents: number;
-  readonly totalIncludingVatCents: number;
 }
 
 /**
@@ -90,7 +76,7 @@ export class Invoice {
   #issueDate: IsoDate | null = null;
   #series: SeriesKey | null = null;
   /** Computed at drafting, frozen at issuance. What is printed is what was checked. */
-  #totals: InvoiceTotals | null = null;
+  #totals: DocumentTotals | null = null;
 
   private constructor(input: {
     id: InvoiceId;
@@ -176,37 +162,8 @@ export class Invoice {
     return dueDate(this.#terms, issueDate);
   }
 
-  /**
-   * The recapitulative, and the one place VAT is computed. Lines are grouped by rate, the base is
-   * summed over the group, and the rate is applied **once** to that sum — which is what "rounded
-   * per rate" means (ADR-0010). Rounding each line and adding the results is a different number,
-   * and it is the one-cent discrepancy accounting reports.
-   */
   get vatBreakdown(): readonly VatGroup[] {
-    const groups = new Map<string, { treatment: VatTreatment; baseCents: number }>();
-
-    for (const line of this.#lines) {
-      const key = vatGroupKey(line.vat);
-      const group = groups.get(key) ?? { treatment: line.vat, baseCents: 0 };
-      groups.set(key, {
-        treatment: group.treatment,
-        baseCents: group.baseCents + line.amountCents,
-      });
-    }
-
-    return [...groups]
-      .map(([key, group]) => ({
-        key,
-        treatment: group.treatment,
-        baseCents: group.baseCents,
-        vatCents:
-          group.treatment.kind === 'taxable'
-            ? applyRate(group.baseCents, group.treatment.basisPoints)
-            : null,
-        mention:
-          group.treatment.kind === 'taxable' ? null : NOT_CHARGED_MENTIONS[group.treatment.reason],
-      }))
-      .sort((left, right) => left.key.localeCompare(right.key));
+    return vatBreakdownOf(this.#lines);
   }
 
   /**
@@ -214,19 +171,8 @@ export class Invoice {
    * than a fresh computation: what is printed on a legal document is what was checked when it was
    * issued, and a total that recomputes is a total that can change.
    */
-  get totals(): InvoiceTotals {
-    return this.#totals ?? this.#computeTotals();
-  }
-
-  #computeTotals(): InvoiceTotals {
-    const totalExcludingVatCents = this.#lines.reduce((sum, line) => sum + line.amountCents, 0);
-    const vatTotalCents = this.vatBreakdown.reduce((sum, group) => sum + (group.vatCents ?? 0), 0);
-
-    return {
-      totalExcludingVatCents,
-      vatTotalCents,
-      totalIncludingVatCents: totalExcludingVatCents + vatTotalCents,
-    };
+  get totals(): DocumentTotals {
+    return this.#totals ?? totalsOf(this.#lines);
   }
 
   get number(): string | null {
@@ -262,7 +208,18 @@ export class Invoice {
     this.#number = documentNumber(this.#seller, series, input.sequence);
     this.#series = series;
     this.#issueDate = input.issueDate;
-    this.#totals = this.#computeTotals();
+    this.#totals = totalsOf(this.#lines);
+
+    // The gate BUILD-RULES puts before a document leaves. Tautological here and not written for
+    // here — Phase 3 reconstructs a document from stored rows, where the totals are columns and
+    // the lines are another table, and the two can disagree.
+    assertDocumentAddsUp({
+      id: this.#id,
+      lines: this.#lines,
+      vatBreakdown: this.vatBreakdown,
+      totals: this.#totals,
+    });
+
     this.#status = 'issued';
   }
 

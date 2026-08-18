@@ -94,3 +94,31 @@ export class ValidatorCannotIssueError extends BusinessError {
     });
   }
 }
+
+/**
+ * A document whose stated totals do not agree with its own lines. Typed and loud: the whole
+ * argument of this module is exact arithmetic, and a page that publishes a total its lines do not
+ * sum to is that argument failing in the one place a reader would check.
+ */
+export class DocumentDoesNotAddUpError extends BusinessError {
+  readonly problemType = '/problems/document-does-not-add-up';
+
+  constructor(documentId: string, field: string, stated: number, computed: number) {
+    super(
+      `${documentId} states ${field} of ${String(stated)} and its lines sum to ${String(computed)}`,
+      { documentId, field, stated, computed },
+    );
+  }
+}
+
+/** A credit note corrects an issued invoice. There is nothing else to correct. */
+export class NotAnIssuedInvoiceError extends BusinessError {
+  readonly problemType = '/problems/not-an-issued-invoice';
+
+  constructor(invoiceId: string, status: string) {
+    super(`a credit note corrects an issued invoice, and ${invoiceId} is ${status}`, {
+      invoiceId,
+      status,
+    });
+  }
+}
