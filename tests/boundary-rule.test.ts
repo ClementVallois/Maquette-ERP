@@ -9,6 +9,7 @@ const DECLARED_ARROW_FIXTURE = ['packages/billing/src/__boundary-fixture__/**/*.
 const UNDECLARED_MODULE_FIXTURE = ['packages/__boundary-fixture__/**/*.ts'];
 const APP_FIXTURE = ['apps/__boundary-fixture__/src/**/*.ts'];
 const MODULE_TO_APP_FIXTURE = ['packages/timesheet/src/__boundary-fixture__/**/*.ts'];
+const DOMAIN_NPM_FIXTURE = ['packages/timesheet/src/domain/__boundary-fixture__/**/*.ts'];
 
 const APP_ALLOWED = 'apps/__boundary-fixture__/src/allowed-public-import.ts';
 const APP_DEEP = 'apps/__boundary-fixture__/src/forbidden-deep-import.ts';
@@ -77,6 +78,17 @@ describe('the module boundary rule', () => {
     // asserted "something was reported" would survive the deletion of the named rule.
     expect(summary.violations.map((violation) => violation.rule.name)).toContain(
       'no-module-to-app',
+    );
+  });
+
+  it('rejects an npm import from inside the domain', () => {
+    // The rule that was dead: excluding node_modules from the cruise erased every npm package
+    // from the graph, so only a `node:` builtin could trip it and a domain importing an ORM
+    // reported clean. This fixture imports the test runner from a domain file.
+    const { summary } = cruise(DOMAIN_NPM_FIXTURE, '.dependency-cruiser.fixture.cjs');
+
+    expect(summary.violations.map((violation) => violation.rule.name)).toContain(
+      'domain-has-no-external-dependency',
     );
   });
 

@@ -26,6 +26,9 @@ export default defineConfig({
       // because it holds domain-grade code that belongs to no module — typed errors, dated
       // resolution, the Tjm — and it has no `domain/` directory to match the first glob.
       include: ['packages/*/src/domain/**/*.ts', 'packages/platform/src/**/*.ts'],
+      // Deliberate violations, never imported by anything shipped. They are code the boundary
+      // tests cruise, not code the domain runs.
+      exclude: ['**/__boundary-fixture__/**'],
       thresholds: { lines: 90, functions: 90, branches: 85, statements: 90 },
     },
   },
