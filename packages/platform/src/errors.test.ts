@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { BusinessError, isBusinessError, TechnicalFailure } from './errors.ts';
+import { BusinessError, InvalidValueError, isBusinessError, TechnicalFailure } from './errors.ts';
 
 class RuleRefused extends BusinessError {
   readonly problemType = '/problems/rule-refused';
@@ -9,6 +9,29 @@ class RuleRefused extends BusinessError {
 class ConnectionLost extends TechnicalFailure {
   readonly retryable = true;
 }
+
+describe('a refused value', () => {
+  it('says what it saw, including when what it saw is an object', () => {
+    // `String({})` is `[object Object]`, and the dated timeline refuses objects. The message is
+    // the half a human reads; `details.value` is the half the wire reads.
+    expect(
+      new InvalidValueError('timeline.entry', { from: '2026-06-01' }, 'a period').message,
+    ).toBe('timeline.entry must be a period, got {"from":"2026-06-01"}');
+    expect(new InvalidValueError('date', '2026-02-30', 'a real day').message).toBe(
+      'date must be a real day, got "2026-02-30"',
+    );
+    expect(new InvalidValueError('halfDays', Number.NaN, 'a whole number').message).toBe(
+      'halfDays must be a whole number, got NaN',
+    );
+  });
+
+  it('gives up on an unprintable value rather than throwing while refusing one', () => {
+    const cyclic: Record<string, unknown> = {};
+    cyclic['self'] = cyclic;
+
+    expect(new InvalidValueError('x', cyclic, 'anything').message).toContain('[unprintable]');
+  });
+});
 
 describe('typed errors', () => {
   it('carries the problem type and the business fields of the refusal', () => {

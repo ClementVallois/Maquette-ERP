@@ -15,7 +15,7 @@ const ISO_MONTH = /^(\d{4})-(\d{2})$/;
 
 export function period(year: number, month: number): Period {
   if (!Number.isInteger(year) || year < 2000 || year > 2999) {
-    throw new InvalidValueError('period.year', year, 'a four-digit year');
+    throw new InvalidValueError('period.year', year, 'a year between 2000 and 2999');
   }
   if (!Number.isInteger(month) || month < 1 || month > 12) {
     throw new InvalidValueError('period.month', month, 'a month between 1 and 12');

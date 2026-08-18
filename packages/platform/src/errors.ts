@@ -49,7 +49,23 @@ export class InvalidValueError extends BusinessError {
   readonly problemType = '/problems/invalid-value';
 
   constructor(field: string, value: unknown, expected: string) {
-    super(`${field} must be ${expected}, got ${String(value)}`, { field, value, expected });
+    super(`${field} must be ${expected}, got ${readable(value)}`, { field, value, expected });
+  }
+}
+
+/**
+ * `String({})` is `[object Object]`, and half the values a factory refuses are objects — a dated
+ * entry, a pair of overlapping periods. The refusal has to name what it saw.
+ */
+function readable(value: unknown): string {
+  if (typeof value === 'string') return `"${value}"`;
+  if (typeof value !== 'object' || value === null) return String(value);
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    // A cycle, or a BigInt. The details carry the real value; the message gives up rather than throws.
+    return '[unprintable]';
   }
 }
 

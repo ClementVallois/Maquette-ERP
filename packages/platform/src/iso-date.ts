@@ -4,7 +4,8 @@ import { InvalidValueError } from './errors.ts';
  * A civil date — a day on a calendar, with no time and no zone: `YYYY-MM-DD`.
  *
  * Lexicographic order is chronological order for this format, so the domain compares two dates
- * with `<` and never builds a `Date`. That is not a micro-optimisation: `new Date('2026-03-01')`
+ * with `<` and never builds a `Date` — the rule is in `docs/BUILD-RULES.md`, § Boundary and
+ * layering, and the ESLint block that enforces it is the mechanical half. That is not a micro-optimisation: `new Date('2026-03-01')`
  * is an instant, it is read back through a zone, and a Cra day would shift by one over a
  * midnight boundary. The ESLint rule that forbids `new Date()` in the domain is the mechanical
  * half of the same decision.
