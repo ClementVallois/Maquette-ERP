@@ -1,3 +1,5 @@
+import type { HalfDays } from './half-days.ts';
+
 /**
  * A fact that has already happened, published in-process (ADR-0001). The emitter does not know
  * who listens, and a subscriber runs inside the emitter's transaction — which is why a subscriber
@@ -37,7 +39,7 @@ export const TIMESHEET_VALIDATED = 'timesheet.TimesheetValidated';
  */
 export interface MissionHalfDays {
   readonly missionId: string;
-  readonly halfDays: number;
+  readonly halfDays: HalfDays;
 }
 
 export interface TimesheetValidatedPayload {
