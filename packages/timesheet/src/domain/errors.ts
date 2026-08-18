@@ -92,3 +92,60 @@ export class RefusalReasonRequiredError extends BusinessError {
     super(`refusing a Cra says why (${craId})`, { craId });
   }
 }
+
+/** A day recorded on a mission the firm does not have. Usually a stale identifier on a form. */
+export class UnknownMissionError extends BusinessError {
+  readonly problemType = '/problems/unknown-mission';
+
+  constructor(day: string, missionId: string) {
+    super(`no mission ${missionId} to record ${day} on`, { day, missionId });
+  }
+}
+
+/** A day recorded on a mission that had not started, or had already ended, on that day. */
+export class MissionNotRunningError extends BusinessError {
+  readonly problemType = '/problems/mission-not-running';
+
+  constructor(day: string, missionId: string, startDate: string, endDate: string | null) {
+    super(`mission ${missionId} does not run on ${day} (${startDate} to ${endDate ?? 'open'})`, {
+      day,
+      missionId,
+      startDate,
+      endDate,
+    });
+  }
+}
+
+/** A day recorded on a mission the consultant was not staffed on that day. */
+export class NotAssignedError extends BusinessError {
+  readonly problemType = '/problems/not-assigned';
+
+  constructor(day: string, consultantId: string, missionId: string) {
+    super(`${consultantId} is not assigned to ${missionId} on ${day}`, {
+      day,
+      consultantId,
+      missionId,
+    });
+  }
+}
+
+/**
+ * The month does not add up against the working calendar. Every workable day is accounted for —
+ * worked or absent — or the Cra is not a record of the month, and the days nobody can explain are
+ * the ones that quietly never get billed.
+ */
+export class IncompleteCraError extends BusinessError {
+  readonly problemType = '/problems/cra-incomplete';
+
+  constructor(input: {
+    craId: string;
+    missingDays: readonly string[];
+    recordedHalfDays: number;
+    expectedHalfDays: number;
+  }) {
+    super(
+      `${input.craId} accounts for ${String(input.recordedHalfDays)} of ${String(input.expectedHalfDays)} half-days; ${String(input.missingDays.length)} workable days are not accounted for`,
+      { ...input },
+    );
+  }
+}

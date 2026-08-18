@@ -19,6 +19,9 @@ import {
   ValidatedCraIsImmutableError,
 } from './errors.ts';
 import type { ConsultantId, CraId, MissionId, OfficeId } from './ids.ts';
+import type { TimesheetReference } from './reference.ts';
+import { type CraFlag, runSubmissionChecks } from './submission-checks.ts';
+import type { WorkingCalendar } from './working-calendar.ts';
 
 export interface CraRefusal {
   readonly by: ConsultantId;
@@ -49,6 +52,7 @@ export class Cra {
   readonly #lines: CraLine[] = [];
 
   #status: CraStatus = 'draft';
+  #flags: CraFlag[] = [];
   #submittedAt: Date | null = null;
   #validatedBy: ConsultantId | null = null;
   #validatedAt: Date | null = null;
@@ -92,6 +96,11 @@ export class Cra {
 
   get lines(): readonly CraLine[] {
     return [...this.#lines];
+  }
+
+  /** Days the calendar says are not workable and that carry an entry anyway. Computed at submission. */
+  get flags(): readonly CraFlag[] {
+    return [...this.#flags];
   }
 
   get submittedAt(): Date | null {
@@ -149,14 +158,29 @@ export class Cra {
     }
   }
 
-  submit(clock: Clock): void {
+  /**
+   * Hands the month to the manager, once it passes the submission checks. The checks are the
+   * reason this takes a calendar and a reference snapshot: what may be billed is decided against
+   * the working calendar, and a day is only recordable on a mission the consultant was staffed on
+   * that day.
+   */
+  submit(input: { clock: Clock; calendar: WorkingCalendar; reference: TimesheetReference }): void {
     this.#assertNotValidated('submit');
     if (this.#status === 'submitted') {
       throw new CraTransitionError(this.#id, this.#status, 'submitted');
     }
 
+    this.#flags = runSubmissionChecks({
+      craId: this.#id,
+      consultantId: this.#consultantId,
+      period: this.#period,
+      lines: this.#lines,
+      calendar: input.calendar,
+      reference: input.reference,
+    });
+
     this.#status = 'submitted';
-    this.#submittedAt = clock.now();
+    this.#submittedAt = input.clock.now();
     this.#refusal = null;
   }
 

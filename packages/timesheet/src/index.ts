@@ -12,9 +12,13 @@ export {
   CraTransitionError,
   DayOutsidePeriodError,
   DayOverbookedError,
+  IncompleteCraError,
+  MissionNotRunningError,
   MissionOnNonWorkedDayError,
   MissionRequiredError,
+  NotAssignedError,
   RefusalReasonRequiredError,
+  UnknownMissionError,
   UnknownCalendarYearError,
   ValidatedCraIsImmutableError,
 } from './domain/errors.ts';
@@ -25,6 +29,7 @@ export {
   type TimesheetReference,
   timesheetReference,
 } from './domain/reference.ts';
+export { type CraFlag } from './domain/submission-checks.ts';
 export {
   PUBLIC_HOLIDAYS_2026,
   type WorkingCalendar,
