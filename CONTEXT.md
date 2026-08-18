@@ -17,7 +17,7 @@ Part of one day of a `Cra`: a count of `HalfDays`, the day type the consultant r
 _Avoid_: Entry, TimeEntry
 
 **CraStatus**:
-Where a `Cra` sits between the consultant's keyboard and the invoice. Only `Validated` is immutable — that distinction is the whole point of having states.
+Where a `Cra` sits between the consultant's keyboard and the invoice: `Draft`, `Submitted`, `Validated`, `Refused` — the four entries that follow, and the only four (ADR-0005). Only `Validated` is immutable, and that distinction is the whole point of having states.
 _Avoid_: State, Stage, Step
 
 **Draft**:
@@ -32,6 +32,10 @@ _Avoid_: Pending, AwaitingApproval, Sent
 A `Cra` the manager has accepted. Immutable, and the only status that produces an invoice.
 _Avoid_: Approved, Accepted, Closed, Locked
 
+**Refused**:
+A `Cra` the manager has sent back, with a reason the consultant can act on. Editable again, and resubmittable; the refusal is dropped when it is resubmitted, so no `Cra` awaiting validation carries a stale one. The one non-terminal answer a manager can give (ADR-0005).
+_Avoid_: Rejected, Denied, Returned
+
 **Period**:
 The month a `Cra` covers, written `YYYY-MM`. Every dated rule of the chain resolves against a day inside the period — the manager who validates March's `Cra` is March's manager, the `Tjm` applied is the one in force in March — never against the day the screen was opened.
 _Avoid_: Month, Range, Interval
@@ -39,10 +43,6 @@ _Avoid_: Month, Range, Interval
 **HalfDays**:
 A count of half-days: the single unit in which worked time is recorded, stored and transported (ADR-0012). Never hours, never a fraction of a day. A full day is two half-days, which is what keeps `Tjm ÷ 2` exact in integer cents.
 _Avoid_: Days, Duration, Hours, Workload
-
-**Refused**:
-A `Cra` the manager has sent back, with a reason the consultant can act on. Editable again, and resubmittable; the refusal is dropped when it is resubmitted, so no `Cra` awaiting validation carries a stale one. The one non-terminal answer a manager can give (ADR-0005).
-_Avoid_: Rejected, Denied, Returned
 
 **DayType**:
 What a calendar day counts as for a consultant: worked, absence, public holiday, weekend. Only worked days reach an invoice.

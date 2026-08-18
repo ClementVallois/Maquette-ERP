@@ -24,20 +24,25 @@ Two record-keeping rules, because the point of this log is that it was not retou
 
 ## Accepted
 
-| No.                                                              | Decision                                                                   | Status   |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------- | -------- |
-| [0001](./0001-sealed-modules-and-in-process-domain-event.md)     | Two sealed modules, one arrow, verified mechanically                       | accepted |
-| [0002](./0002-money-as-integer-cents.md)                         | Money is an integer number of cents, with no wrapper type                  | accepted |
-| [0003](./0003-authorization-at-the-repository.md)                | Authorization lives in the repository, not in Postgres RLS                 | accepted |
-| [0004](./0004-working-calendar-with-a-fixed-holiday-table.md)    | The working calendar is a domain component with a fixed 2026 holiday table | accepted |
-| [0008](./0008-fastify-not-nestjs.md)                             | Fastify, not NestJS                                                        | accepted |
-| [0009](./0009-server-rendered-html-no-client-framework.md)       | Server-rendered HTML, with no client framework                             | accepted |
-| [0010](./0010-vat-rounded-per-rate.md)                           | VAT is rounded per rate, and the rate is resolved from territoriality      | accepted |
-| [0011](./0011-hand-written-sql-no-orm.md)                        | Hand-written SQL over `pg`, and no ORM                                     | accepted |
-| [0014](./0014-triage-leaves-the-public-history.md)               | The working triage leaves the public history                               | accepted |
-| [0015](./0015-apps-tier-separate-from-packages.md)               | The application shell lives in `apps/`, a tier above `packages/`           | accepted |
-| [0016](./0016-typed-errors-business-versus-technical.md)         | Typed errors: business versus technical, and how they reach the wire       | accepted |
-| [0033](./0033-shared-kernel-holds-the-transported-vocabulary.md) | The shared kernel holds the vocabulary the boundary transports             | accepted |
+| No.                                                                    | Decision                                                                   | Status   |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------- |
+| [0001](./0001-sealed-modules-and-in-process-domain-event.md)           | Two sealed modules, one arrow, verified mechanically                       | accepted |
+| [0002](./0002-money-as-integer-cents.md)                               | Money is an integer number of cents, with no wrapper type                  | accepted |
+| [0003](./0003-authorization-at-the-repository.md)                      | Authorization lives in the repository, not in Postgres RLS                 | accepted |
+| [0004](./0004-working-calendar-with-a-fixed-holiday-table.md)          | The working calendar is a domain component with a fixed 2026 holiday table | accepted |
+| [0005](./0005-cra-lifecycle-and-immutability.md)                       | The Cra lifecycle, and where immutability binds                            | accepted |
+| [0006](./0006-separation-of-duties.md)                                 | Separation of duties: two rules, and where they are enforced               | accepted |
+| [0008](./0008-fastify-not-nestjs.md)                                   | Fastify, not NestJS                                                        | accepted |
+| [0009](./0009-server-rendered-html-no-client-framework.md)             | Server-rendered HTML, with no client framework                             | accepted |
+| [0010](./0010-vat-rounded-per-rate.md)                                 | VAT is rounded per rate, and the rate is resolved from territoriality      | accepted |
+| [0011](./0011-hand-written-sql-no-orm.md)                              | Hand-written SQL over `pg`, and no ORM                                     | accepted |
+| [0012](./0012-half-day-as-the-storage-unit.md)                         | The half-day is the single storage unit for recorded time                  | accepted |
+| [0014](./0014-triage-leaves-the-public-history.md)                     | The working triage leaves the public history                               | accepted |
+| [0015](./0015-apps-tier-separate-from-packages.md)                     | The application shell lives in `apps/`, a tier above `packages/`           | accepted |
+| [0016](./0016-typed-errors-business-versus-technical.md)               | Typed errors: business versus technical, and how they reach the wire       | accepted |
+| [0031](./0031-reference-data-per-module-projections.md)                | Reference data: per-module projections, the seed as single writer          | accepted |
+| [0033](./0033-shared-kernel-holds-the-transported-vocabulary.md)       | The shared kernel holds the vocabulary the boundary transports             | accepted |
+| [0034](./0034-dated-references-resolved-at-the-close-of-the-period.md) | One dated-reference mechanism, resolved at the close of the period         | accepted |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering

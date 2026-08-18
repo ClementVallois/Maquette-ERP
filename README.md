@@ -2,6 +2,32 @@
 
 > ⚠️ Coquille initialisée le 07/08/2026. Le contenu de ce README se remplit **au fil de la construction**, pas à la fin. Les sections marquées _(à écrire)_ sont volontairement vides.
 
+## Où en est cette maquette
+
+**Phase 1 terminée le 18/08/2026** sur 10 (le plan complet, l'ordre et les dates :
+[`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md)). Ce qui existe aujourd'hui : le **domaine `timesheet`**
+en TypeScript pur — CRA, cycle de vie, calendrier ouvré, règles de soumission, validation et
+événement de domaine — avec 113 tests, et la frontière de modules déjà vérifiée mécaniquement.
+Ce qui n'existe **pas encore** : la base de données (phase 3), l'API (phase 5), les écrans
+(phase 6), l'instance hébergée (phase 8). Le module `billing` se réduit pour l'instant à ses
+statuts : il est construit en phase 2.
+
+Trois fichiers répondent aux questions qu'on se pose en arrivant :
+[`CONTEXT.md`](CONTEXT.md) définit le vocabulaire métier (`Tjm`, `régie`, `intercontrat`, `avoir`,
+`PASSI`…), [`docs/adr/`](docs/adr/README.md) contient les arbitrages avec l'option écartée, et
+[`docs/open-questions.md`](docs/open-questions.md) dit ce qui n'est **pas** tranché.
+
+Pour vérifier soi-même plutôt que me croire — Node ≥ 24.13 et pnpm 11 :
+
+```sh
+pnpm install --frozen-lockfile
+pnpm run check      # env, lint, frontière, format, types, tests + couverture
+pnpm run boundaries # la frontière de modules seule
+```
+
+La section « Démarrer » plus bas (base de données, migrations, seed) s'écrit avec les phases qui
+la rendent vraie.
+
 ## Le problème métier
 
 Dans une société de conseil, le **compte rendu d'activité** (CRA) est le pivot : le même relevé de jours alimente le suivi d'avancement d'une mission, le staffing, et la facturation du client. Tant qu'il vit dans un tableur ou dans trois outils qui ne se parlent pas, chaque fin de mois est une ressaisie — et chaque ressaisie est une source d'écart entre ce qui a été produit et ce qui est facturé.
@@ -12,7 +38,7 @@ Périmètre volontairement étroit : deux modules, et **une seule flèche qui fr
 
 ## Ce que la maquette cherche à démontrer
 
-1. **Une frontière de module réelle, et vérifiée par la CI** — pas une convention de nommage. Le module `facturation` ne peut pas importer l'intérieur du module `temps` ; il réagit à un événement publié par celui-ci. Casser la frontière doit faire **échouer la CI**, pas produire un warning.
+1. **Une frontière de module réelle, et vérifiée par la CI** — pas une convention de nommage. Le module de facturation (`packages/billing`) ne peut pas importer l'intérieur du module de saisie des temps (`packages/timesheet`) ; il réagit à un événement publié par celui-ci, dont le contrat vit dans un noyau partagé (`packages/platform`). Casser la frontière doit faire **échouer la CI**, pas produire un warning.
 2. **Des invariants métier tenus par le code, pas par la discipline**
    - un CRA validé est **immuable** ;
    - les montants sont des **entiers en centimes** — jamais de flottant sur une valeur monétaire ;
@@ -91,9 +117,10 @@ _(à écrire — il doit ressembler à la réalité d'un cabinet : plusieurs pô
 
 ## Tests et portes de CI
 
-Une porte qui ne bloque pas un merge est un avertissement, pas une porte. Les six suivantes sont
-**exigées** par la protection de branche sur `main` : tant que l'une est rouge, le bouton de merge
-est désactivé.
+Une porte qui ne bloque pas un merge est un avertissement, pas une porte. Les six suivantes tournent
+sur chaque push ; **cinq sont exigées** par la protection de branche sur `main` — tant que l'une est
+rouge, le bouton de merge est désactivé. La sixième, `Tests`, est verte depuis la phase 1 et il
+reste à la cocher : voir la note sous le tableau.
 
 | Porte (job CI)          | Commande                                            | Ce qu'elle empêche de merger                                                                                                                                                               |
 | ----------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -104,8 +131,8 @@ est désactivé.
 | **SAST**                | Semgrep OSS                                         | Les motifs de vulnérabilité applicative détectables statiquement                                                                                                                           |
 | **Tests**               | `pnpm run test:cov`                                 | Un invariant du domaine cassé, et une couverture du **domaine** sous 90 % (branches : 85 %) — le seuil ne porte que sur `domain/` et sur le noyau partagé, pas sur le dépôt entier         |
 
-> ✅ **La porte `Tests` est verte depuis la phase 1** (18/08/2026) et rejoint les portes exigées.
-> Elle était rouge depuis l'ajout des seuils de couverture, faute de domaine à mesurer : le rendre
+> ✅ **La porte `Tests` est verte depuis la phase 1** (18/08/2026), et pas encore exigée.
+> Elle était rouge depuis l'ajout des seuils de couverture, faute de domaine à mesurer : la rendre
 > vert plus tôt aurait demandé soit d'abaisser le seuil, soit d'écrire un test qui ne prouve rien.
 > La phase 1 livre le domaine `timesheet` et ses tests — 99 % des lignes, 100 % des branches — et
 > la porte devient une contrainte réelle. ⚠️ **Étape humaine restante** : l'ajouter à la liste des
