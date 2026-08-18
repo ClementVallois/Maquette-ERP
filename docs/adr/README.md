@@ -43,6 +43,7 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0031](./0031-reference-data-per-module-projections.md)                | Reference data: per-module projections, the seed as single writer          | accepted |
 | [0033](./0033-shared-kernel-holds-the-transported-vocabulary.md)       | The shared kernel holds the vocabulary the boundary transports             | accepted |
 | [0034](./0034-dated-references-resolved-at-the-close-of-the-period.md) | One dated-reference mechanism, resolved at the close of the period         | accepted |
+| [0035](./0035-exact-money-arithmetic-half-up-and-basis-points.md)      | Exact money arithmetic: half-up on integers, rates in basis points         | accepted |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
@@ -59,6 +60,10 @@ modules speak lives, given that the cruiser forbids the import that would otherw
 (0033), and how a dated reference resolves for a whole month rather than a day (0034). Both were
 written when they were taken, numbered after the reservations, and recorded in the Phase 1
 checkpoint.
+
+0035 onwards continue that sequence, for decisions Phase 2 reached that the plan had not identified.
+The plan's reservations for 0019–0032 are untouched: a number it assigned to a phase stays assigned
+to that phase, and a decision taken early takes the next free number instead of borrowing one.
 
 ## Identified, not yet decided
 

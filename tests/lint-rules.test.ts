@@ -9,6 +9,8 @@ const ESLINT = 'node_modules/.bin/eslint';
 const DOMAIN_CLOCK_FIXTURE = 'packages/timesheet/src/domain/__boundary-fixture__/wall-clock.ts';
 const TEST_CLOCK_FIXTURE = 'packages/timesheet/src/domain/__boundary-fixture__/wall-clock.test.ts';
 const KERNEL_CLOCK_FIXTURE = 'packages/platform/src/__boundary-fixture__/wall-clock.ts';
+const DOMAIN_MONEY_FIXTURE = 'packages/billing/src/domain/__boundary-fixture__/float-money.ts';
+const TEST_MONEY_FIXTURE = 'packages/billing/src/domain/__boundary-fixture__/float-money.test.ts';
 
 interface LintResult {
   filePath: string;
@@ -61,5 +63,31 @@ describe('the clock rules', () => {
 
     expect(rules.some((message) => message.includes('injected `Clock`'))).toBe(true);
     expect(rules.some((message) => message.includes('No public setter'))).toBe(true);
+  });
+});
+
+describe('the money rules', () => {
+  it('reject every way a float reaches a monetary value in shipped domain code', () => {
+    // The rule `BUILD-RULES.md` claimed in the present tense for two phases while nothing
+    // implemented it. Asserted by message rather than by count: four selectors, and a test that
+    // only counted would survive three of them being deleted.
+    const messages = lint(DOMAIN_MONEY_FIXTURE).map((message) => message.message);
+
+    expect(messages.some((message) => message.includes('No `parseFloat`'))).toBe(true);
+    expect(messages.some((message) => message.includes('No `Number()`'))).toBe(true);
+    expect(messages.some((message) => message.includes('No `Math.round`'))).toBe(true);
+    expect(messages.some((message) => message.includes('No decimal literal'))).toBe(true);
+  });
+
+  it('reject the same calls in a test, and allow the float a negative test has to write', () => {
+    // The narrowing this pair exists for. `halfDays(1.5)` is a test that proves a factory refuses
+    // a float, and it cannot be written without writing one — while a `Math.round` added to make
+    // an assertion pass is the failure the rule is about, wherever it is written.
+    const messages = lint(TEST_MONEY_FIXTURE).map((message) => message.message);
+
+    expect(messages.some((message) => message.includes('No `parseFloat`'))).toBe(true);
+    expect(messages.some((message) => message.includes('No `Number()`'))).toBe(true);
+    expect(messages.some((message) => message.includes('No `Math.round`'))).toBe(true);
+    expect(messages.some((message) => message.includes('No decimal literal'))).toBe(false);
   });
 });

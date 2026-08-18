@@ -26,6 +26,38 @@ const NO_WALL_CLOCK = [
   },
 ];
 
+// Float-producing arithmetic on money. `BUILD-RULES.md` § Money has claimed this rule in the
+// present tense since Phase 0 and nothing implemented it; ADR-0035 decides what it bans and what
+// replaces each ban. Split in two because the two halves have different scopes: the calls are
+// wrong in a test as well (a `Math.round` added to make an assertion pass is the failure itself),
+// while a decimal literal is how a negative test hands a float to the factory that refuses it.
+const NO_FLOAT_MONEY_CALLS = [
+  {
+    selector:
+      'CallExpression[callee.name="parseFloat"], MemberExpression[object.name="Number"][property.name="parseFloat"]',
+    message:
+      'No `parseFloat`: a monetary value is an integer number of cents (ADR-0002). Parsing a decimal string is how a float gets in.',
+  },
+  {
+    selector: 'CallExpression[callee.name="Number"]',
+    message:
+      'No `Number()`: it turns a decimal string into a float without saying so. `Number.parseInt` on an integer string is allowed and says which it is.',
+  },
+  {
+    selector: 'MemberExpression[object.name="Math"][property.name=/^(round|fround)$/]',
+    message:
+      'No `Math.round`: it recovers from a float that should never have existed. Round half-up on integers, at the call site that asserts its precondition (ADR-0035).',
+  },
+];
+
+const NO_DECIMAL_LITERAL = [
+  {
+    selector: 'Literal[raw=/^[0-9]*\\.[0-9]/]',
+    message:
+      'No decimal literal in the domain: an amount is cents, a rate is basis points, a quantity is half-days. A float literal is a unit escaping its type (ADR-0002, ADR-0035).',
+  },
+];
+
 const NO_BARE_ERROR = [
   {
     selector: `ThrowStatement > :matches(NewExpression, CallExpression)[callee.name=${NATIVE_ERROR_CTORS}]`,
@@ -144,6 +176,8 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'error',
         ...NO_BARE_ERROR,
+        ...NO_FLOAT_MONEY_CALLS,
+        ...NO_DECIMAL_LITERAL,
         {
           selector: 'NewExpression[callee.name="Date"]',
           message: 'No `new Date()` in the domain: time comes from the injected `Clock` port.',
@@ -169,7 +203,14 @@ export default tseslint.config(
       // Replaces the domain block's list for test files — `no-restricted-syntax` does not merge.
       // A fake clock is built from a literal instant, so the absolute ban on `new Date(...)` is
       // narrowed here to the wall clock, and the ban on bare errors is re-injected unchanged.
-      'no-restricted-syntax': ['error', ...NO_BARE_ERROR, ...NO_WALL_CLOCK],
+      // Same shape for money: the calls stay banned, the decimal LITERAL does not — a negative
+      // test proves a factory refuses a float by handing it one, and `halfDays(1.5)` is that test.
+      'no-restricted-syntax': [
+        'error',
+        ...NO_BARE_ERROR,
+        ...NO_WALL_CLOCK,
+        ...NO_FLOAT_MONEY_CALLS,
+      ],
       // No `packageDir`: each test is judged against the package.json of ITS OWN package, so a
       // domain test importing an ORM fails here.
       'import-x/no-extraneous-dependencies': ['error', { devDependencies: true }],
