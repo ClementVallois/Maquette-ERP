@@ -246,3 +246,75 @@ unannounced and unhelped — a French reader told to look up « avoir » finds a
 checked: the quickstart runs as written, all four README links resolve, the six CI gates and their
 commands match the table, the coverage threshold and its scope are what the README says, all eight
 dependency rules carry `severity: 'error'`, and VAT is genuinely grouped by rate in `document.ts`.
+
+The `rules-auditor` pass read the diff blind against `docs/BUILD-RULES.md` and found **eight
+points**. Two were defects I would not have merged, and both share a shape worth naming: **dormant
+today, live exactly when the next phase makes them matter.**
+
+- **`issue()` allocated the number before it validated.** A refusal left the invoice holding an
+  allocated number, series and date while still a draft, so a retry consumed a second number and
+  the first was burned — a gap, in the series whose only property is having none (ADR-0018). The
+  discipline was written and tested one file over, in `creditNote`, and not applied here. Today the
+  only reachable refusal is a bad sequence; from Phase 3 the coherence check can refuse too, on
+  totals read back from columns. Fixed, with the negative test that proves the retry takes the
+  number it was given.
+- **The money lint rule stopped at `domain/` while the money did not.** `packages/billing/src/
+application/draft-invoices.ts` — the file that reads a `Tjm` off the reference and hands it to a
+  line — matched no block carrying the rule, so `Math.round(tjmCents / 2)` linted clean there. This
+  is the failure family `BUILD-RULES.md` § Boundary and layering names in its own words, one
+  directory down, in the phase whose headline was closing that family. The three **calls** are now
+  repository-wide, which is how BUILD-RULES states them; the decimal **literal** stays scoped where
+  ADR-0035 put it, and a fixture in `application/` asserts both halves of that split.
+
+Four more were real and are fixed here:
+
+- **`**/testing/**` was borrowing the exemption granted to `*.test.ts`.** BUILD-RULES justifies that
+  exemption on "it is not shipped" — and a `testing/` file is in its package's `tsconfig`, compiles
+  to `dist`, and since this phase is where every seeded `tjmCents` in `billing` is written. It lost
+  three guards it should have had, including the decimal-literal ban, on the one file authoring
+  monetary values. It now keeps the domain list with the single narrowing a fixture builder needs.
+- **The decimal-literal ban could not see a float without a dot.** `85e-3` is 0.085 — the exact
+  value ADR-0035 § Context is written about — and the selector was anchored on the decimal point.
+  The guard's own fixture wrote only `0.2`, so the hole was invisible to the test that exists to
+  prove the guard fires.
+- **A refusal named the wrong reason.** `paymentTerms({ days: -1 })` answered "capped at 60 days,
+  and -1 was agreed". The commit `fix(platform): let a refusal name the value it refused` closed
+  exactly this family on `main` the day before this module was written, and it came back. The test
+  asserted only the class, so it locked the wrong reason in; it now asserts the message.
+- **`commercialMission` commented a premise it did not hold.** "A Tjm is a whole number of euros,
+  so it is even" — checking only evenness accepts 650,02 €, which contradicts `CONTEXT.md` § Tjm.
+  It now checks the premise. The evenness assertion at the division stays, because BUILD-RULES
+  names it there, and this is what guarantees it can never fire.
+
+Two were about the record rather than the code, and are the more instructive pair:
+
+- **The per-client split had no ADR.** Drafting returns a set, one invoice per client, and this
+  changes the cardinality of the chain every document in the repository states in the singular. It
+  was argued in a commit message, which is not where BUILD-RULES says a structural decision lives.
+  **ADR-0038** records it, with the two serious alternatives and the threshold — and it is the
+  right place for the consequence this checkpoint had already flagged for Phase 3, that ADR-0021's
+  idempotency is owed over the set.
+- **Six terms were in code and in neither `CONTEXT.md` nor this checkpoint's exclusion list** —
+  neither admitted nor deliberately declined, which is the gap the vocabulary rule exists to close.
+  `ServiceNature`, `BilledParty`, `PaymentTerms`, `EarlyPaymentDiscount`, `OperationCategory` and
+  `DeclinedDays` are now in the vocabulary. The auditor was right that `DeclinedDays` was the one
+  that mattered: ADR-0037 puts it on a manager's screen, which is the test.
+
+One more, taken under the narrow correction `docs/adr/README.md` allows **before a branch merges**:
+ADR-0035 stated half-up as `(numerator + denominator / 2) / denominator`, which divides by two and
+would produce the float its own third rule forbids. The code never did that. The sentence was false
+when it was written, the decision and the rejected option and the threshold are untouched, and the
+commit says so.
+
+**Cleared and worth recording, because an audit that lists only faults misreports the work**: the
+one-division-at-one-call-site claim is literally true (`invoice-line.ts` routes both the unit price
+and the amount through `lineAmountCents`); the per-rate rounding is proved on the discriminating
+case; no dependency was added (the lockfile diff is one importer gaining `vitest`); all twelve
+commit messages pass `commitlint` with no `Co-Authored-By` anywhere; and the French strings in
+`NOT_CHARGED_MENTIONS` are the case the language rule exists for — text art. 294-1 and art. 283-2
+du CGI legally require to be printed.
+
+**Considered and left alone**: `serviceNature` is accepted by `resolveVat` and no branch reads it.
+YAGNI would remove it; ADR-0010 names it as one of the four inputs, and `BUILD-RULES.md` says that
+when a rule and an ADR disagree the ADR wins. It stays, and the reason it is not dead code is that
+its absence is what makes a rate look like a property of the client.
