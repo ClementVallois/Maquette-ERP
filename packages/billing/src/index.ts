@@ -1,4 +1,13 @@
 export {
+  DECLINE_REASONS,
+  type DeclineReason,
+  type DeclinedDays,
+  draftInvoicesFrom,
+  type DraftInvoicesDependencies,
+  type DraftInvoicesResult,
+  onTimesheetValidated,
+} from './application/draft-invoices.ts';
+export {
   type Client,
   client,
   isFrench,
