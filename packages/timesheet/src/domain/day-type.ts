@@ -11,6 +11,13 @@ export type DayType = (typeof DAY_TYPES)[number];
 /** The two the calendar decides, never the consultant. */
 export type NonWorkableDay = Extract<DayType, 'publicHoliday' | 'weekend'>;
 
+/**
+ * The two a consultant records. A weekend is not an entry — the calendar already knows the day is
+ * one — so recording a day as `weekend` would be a second, contradictable source for a fact the
+ * calendar owns.
+ */
+export type RecordedDayType = Extract<DayType, 'worked' | 'absence'>;
+
 export function isBillable(dayType: DayType): boolean {
   return dayType === 'worked';
 }

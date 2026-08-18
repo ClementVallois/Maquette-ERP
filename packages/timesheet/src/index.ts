@@ -1,6 +1,24 @@
+export { Cra, type CraRefusal, type RecordDayInput } from './domain/cra.ts';
+export { type CraLine } from './domain/cra-line.ts';
 export { CRA_STATUSES, type CraStatus } from './domain/cra-status.ts';
-export { DAY_TYPES, type DayType, isBillable, type NonWorkableDay } from './domain/day-type.ts';
-export { UnknownCalendarYearError } from './domain/errors.ts';
+export {
+  DAY_TYPES,
+  type DayType,
+  isBillable,
+  type NonWorkableDay,
+  type RecordedDayType,
+} from './domain/day-type.ts';
+export {
+  CraTransitionError,
+  DayOutsidePeriodError,
+  DayOverbookedError,
+  MissionOnNonWorkedDayError,
+  MissionRequiredError,
+  RefusalReasonRequiredError,
+  UnknownCalendarYearError,
+  ValidatedCraIsImmutableError,
+} from './domain/errors.ts';
+export type { ConsultantId, CraId, MissionId, OfficeId } from './domain/ids.ts';
 export {
   PUBLIC_HOLIDAYS_2026,
   type WorkingCalendar,

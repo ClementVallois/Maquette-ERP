@@ -13,7 +13,7 @@ The monthly record of a consultant's worked days. Kept in French: "timesheet" dr
 _Avoid_: Timesheet, TimeSheet, ActivityReport
 
 **CraLine**:
-One day of a `Cra`, carrying a `DayType` and, when billable, the `Mission` it was worked on.
+Part of one day of a `Cra`: a count of `HalfDays`, the day type the consultant recorded — `worked` or `absence`, never `weekend` or `publicHoliday`, which the `WorkingCalendar` already knows — and, when worked, the `Mission` it was worked on. A day carries several lines when it is split between two missions, which is why the mission sits on the line and not on the day.
 _Avoid_: Entry, TimeEntry
 
 **CraStatus**:
@@ -39,6 +39,10 @@ _Avoid_: Month, Range, Interval
 **HalfDays**:
 A count of half-days: the single unit in which worked time is recorded, stored and transported (ADR-0012). Never hours, never a fraction of a day. A full day is two half-days, which is what keeps `Tjm ÷ 2` exact in integer cents.
 _Avoid_: Days, Duration, Hours, Workload
+
+**Refused**:
+A `Cra` the manager has sent back, with a reason the consultant can act on. Editable again, and resubmittable; the refusal is dropped when it is resubmitted, so no `Cra` awaiting validation carries a stale one. The one non-terminal answer a manager can give (ADR-0005).
+_Avoid_: Rejected, Denied, Returned
 
 **DayType**:
 What a calendar day counts as for a consultant: worked, absence, public holiday, weekend. Only worked days reach an invoice.

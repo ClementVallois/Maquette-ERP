@@ -59,8 +59,6 @@ Numbers are reserved so that what is **known and unsettled** is visible rather t
 
 | No.  | Decision                                                                                             | Blocked on                                 |
 | ---- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| 0005 | Cra lifecycle: the statuses in `CONTEXT.md`, and where immutability binds                            | to be written with the timesheet domain    |
 | 0006 | Separation of duties: whoever records a Cra does not validate it, whoever validates does not invoice | to be written with the validation use case |
 | 0007 | Gapless invoice numbering under concurrency                                                          | to be written with persistence             |
-| 0012 | Half-day as the single storage unit for recorded time                                                | to be written with the timesheet domain    |
 | 0013 | Polymorphic invoice line: it carries its origin even though only `Regie` exists                      | to be written with the billing domain      |
