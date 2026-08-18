@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { useTestTransaction } from '../../../../tests/harness/rollback.ts';
 import { client } from '../domain/client.ts';
+import { CraAlreadyProcessedError } from '../domain/errors.ts';
 import { regieLine } from '../domain/invoice-line.ts';
 import { billedParty, Invoice } from '../domain/invoice.ts';
 import { legalMentions, RECOVERY_INDEMNITY_CENTS } from '../domain/mentions.ts';
@@ -59,6 +60,20 @@ describe('PgInvoiceRepository', () => {
     },
   });
 
+  const otherClient = client({
+    id: 'client-energie',
+    name: 'Énergie Sud SAS',
+    siren: '443061841',
+    territoriality: 'metropolitanFrance',
+    billingAddress: {
+      line1: '5 avenue de la République',
+      line2: null,
+      postalCode: '69002',
+      city: 'Lyon',
+      country: 'FR',
+    },
+  });
+
   async function seedReferenceData(): Promise<void> {
     await tx.client.query(`
       INSERT INTO public.offices (id, name, city) VALUES ('office-paris', 'Paris', 'Paris');
@@ -70,6 +85,10 @@ describe('PgInvoiceRepository', () => {
     await tx.client.query(`
       INSERT INTO public.clients (id, name, territoriality, billing_address_street, billing_address_postal_code, billing_address_city, billing_address_country)
       VALUES ('client-banque', 'Banque Nord SA', 'metropolitanFrance', '12 rue de la Boétie', '75008', 'Paris', 'FR');
+    `);
+    await tx.client.query(`
+      INSERT INTO public.clients (id, name, territoriality, billing_address_street, billing_address_postal_code, billing_address_city, billing_address_country)
+      VALUES ('client-energie', 'Énergie Sud SAS', 'metropolitanFrance', '5 avenue de la République', '69002', 'Lyon', 'FR');
     `);
     await tx.client.query(`
       INSERT INTO public.consultants (id, first_name, last_name, email, office_id, practice_id, role)
@@ -268,5 +287,68 @@ describe('PgInvoiceRepository', () => {
     expect(found!.seller.siren).toBe('493296529');
     expect(found!.seller.numberPrefix).toBe('SEC');
     expect(found!.seller.shareCapitalCents).toBe(15_000_000);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Idempotency — ADR-0021
+  // ---------------------------------------------------------------------------
+
+  it('hasCraBeenProcessed returns false for a CRA with no invoice', async () => {
+    await seedReferenceData();
+    expect(await repo().hasCraBeenProcessed('cra-never-seen')).toBe(false);
+  });
+
+  it('hasCraBeenProcessed returns true after saveDraft', async () => {
+    await seedReferenceData();
+
+    const invoice = makeDraftInvoice();
+    await repo().saveDraft(invoice, 'cra-1');
+    expect(await repo().hasCraBeenProcessed('cra-1')).toBe(true);
+  });
+
+  it('saveDraft throws CraAlreadyProcessedError on duplicate CRA + same client', async () => {
+    await seedReferenceData();
+
+    const first = makeDraftInvoice('invoice-first');
+    await repo().saveDraft(first, 'cra-dup');
+
+    // A replayed event drafts a new invoice (fresh id) for the same CRA and client.
+    const replay = makeDraftInvoice('invoice-replay');
+
+    // The savepoint lets us assert the rejection without aborting the harness transaction.
+    await tx.client.query('SAVEPOINT before_replay');
+    await expect(repo().saveDraft(replay, 'cra-dup')).rejects.toThrow(CraAlreadyProcessedError);
+    await tx.client.query('ROLLBACK TO SAVEPOINT before_replay');
+  });
+
+  it('same CRA, different clients — both succeed (ADR-0038)', async () => {
+    await seedReferenceData();
+
+    const forBanque = makeDraftInvoice('invoice-banque');
+    await repo().saveDraft(forBanque, 'cra-multi');
+
+    const forEnergie = Invoice.draft({
+      id: 'invoice-energie',
+      officeId: PARIS,
+      seller: SELLER,
+      billedTo: billedParty(otherClient),
+      supplyPeriod: period(2026, 3),
+      lines: [
+        regieLine({
+          designation: 'Prestation de conseil — mars 2026',
+          missionId: 'mission-audit',
+          craId: 'cra-multi',
+          period: '2026-03',
+          halfDays: halfDays(20),
+          tjmCents: 55_000,
+          vat: { kind: 'taxable', basisPoints: 2000 },
+        }),
+      ],
+      terms: TERMS,
+      mentions: MENTIONS,
+      validatedBy: ['bruno'],
+    });
+
+    await expect(repo().saveDraft(forEnergie, 'cra-multi')).resolves.toBeUndefined();
   });
 });

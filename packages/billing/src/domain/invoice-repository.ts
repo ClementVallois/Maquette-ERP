@@ -22,4 +22,10 @@ export interface InvoiceRepository {
   list(query: InvoiceListQuery): Promise<readonly InvoiceListItem[]>;
   save(invoice: Invoice): Promise<void>;
   saveDraft(invoice: Invoice, craId: string): Promise<void>;
+  /**
+   * Internal invariant check — returns whether any invoice has already been drafted from this CRA.
+   * Not office-scoped: it is a boolean, exposes no data, and scoping it would let a replayed event
+   * draft duplicates in another office's transaction (ADR-0021).
+   */
+  hasCraBeenProcessed(craId: string): Promise<boolean>;
 }

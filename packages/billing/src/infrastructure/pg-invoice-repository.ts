@@ -5,6 +5,7 @@ import pg from 'pg';
 pg.types.setTypeParser(1082, (val: string) => val);
 
 import type { DocumentTotals } from '../domain/document.ts';
+import { CraAlreadyProcessedError } from '../domain/errors.ts';
 import type { ConsultantId, CraId, InvoiceId, MissionId, OfficeId } from '../domain/ids.ts';
 import type { InvoiceLine, LineOrigin } from '../domain/invoice-line.ts';
 import type {
@@ -76,9 +77,26 @@ export class PgInvoiceRepository implements InvoiceRepository {
   }
 
   async saveDraft(invoice: Invoice, craId: string): Promise<void> {
-    await this.#upsertInvoice(invoice, [craId]);
+    try {
+      await this.#upsertInvoice(invoice, [craId]);
+    } catch (error: unknown) {
+      if (isPgUniqueViolation(error, 'idx_invoices_source_cra_client')) {
+        throw new CraAlreadyProcessedError(craId, invoice.billedTo.clientId);
+      }
+      throw error;
+    }
     await this.#replaceLines(invoice);
     await this.#replaceVatGroups(invoice);
+  }
+
+  async hasCraBeenProcessed(craId: string): Promise<boolean> {
+    const { rows } = await this.#client.query<{ found: boolean }>(
+      `SELECT EXISTS (
+        SELECT 1 FROM billing.invoices WHERE $1 = ANY(source_cra_ids)
+      ) AS found`,
+      [craId],
+    );
+    return rows[0]!.found;
   }
 
   async #upsertInvoice(invoice: Invoice, sourceCraIds?: readonly string[]): Promise<void> {
@@ -433,4 +451,14 @@ interface LegalEntityRow {
   address_city: string;
   address_country: string;
   number_prefix: string;
+}
+
+function isPgUniqueViolation(error: unknown, constraintName: string): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    (error as { code: unknown }).code === '23505' &&
+    'constraint' in error &&
+    (error as { constraint: unknown }).constraint === constraintName
+  );
 }

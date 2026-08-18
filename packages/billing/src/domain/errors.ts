@@ -129,6 +129,22 @@ export class DocumentDoesNotAddUpError extends BusinessError {
   }
 }
 
+/**
+ * The safety net: the unique index on `(source_cra_ids[1], billed_to_client_id)` caught a race
+ * condition where two transactions both passed the application guard (ADR-0021). The application
+ * guard makes this unreachable in normal flow — this is the concurrent-transaction path only.
+ */
+export class CraAlreadyProcessedError extends BusinessError {
+  readonly problemType = '/problems/cra-already-processed';
+
+  constructor(craId: string, clientId: string) {
+    super(`CRA ${craId} has already produced an invoice for client ${clientId}`, {
+      craId,
+      clientId,
+    });
+  }
+}
+
 /** A credit note corrects an issued invoice. There is nothing else to correct. */
 export class NotAnIssuedInvoiceError extends BusinessError {
   readonly problemType = '/problems/not-an-issued-invoice';

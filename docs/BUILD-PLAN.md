@@ -503,8 +503,10 @@ trail. **ADR-0020**.
 ### 3.6 — Idempotency
 
 Validating the same Cra twice does not produce two invoices: a unique constraint on
-`(cra_id)` in the draft table plus the domain guard, tested by replaying the event. **ADR-0021**,
-which also covers the `Idempotency-Key` contract consumed in Phase 5.
+`(source_cra_ids[1], billed_to_client_id)` in the draft table plus the domain guard, tested by
+replaying the event. The constraint is composite, not single-column: ADR-0038 changed the
+cardinality (one CRA, multiple clients, multiple invoices). **ADR-0021**, which also covers the
+`Idempotency-Key` contract consumed in Phase 5.
 
 **Phase checkpoint.** PR to `main`.
 
