@@ -65,6 +65,26 @@ describe('the submission checks', () => {
     ).toThrow(MissionNotRunningError);
   });
 
+  it('refuse a day recorded before the mission started', () => {
+    // The other end of the same rule, and the one an end-date-only check misses: a mission that
+    // is still running today did not run in March.
+    const startsInApril = timesheetReference({
+      missions: [{ id: MISSION, startDate: '2026-04-01', endDate: null }],
+      assignments: [{ consultantId: CONSULTANT, missionId: MISSION, from: '2026-01-05', to: null }],
+    });
+
+    expect(() =>
+      runSubmissionChecks({
+        craId: 'cra-1',
+        consultantId: CONSULTANT,
+        period: MARCH,
+        lines: fullMonth(MARCH),
+        calendar,
+        reference: startsInApril,
+      }),
+    ).toThrow(MissionNotRunningError);
+  });
+
   it('refuse a day recorded on a mission the consultant is not staffed on', () => {
     const someoneElses = timesheetReference({
       missions: [{ id: MISSION, startDate: '2026-01-05', endDate: null }],

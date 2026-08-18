@@ -63,6 +63,15 @@ describe('a civil date', () => {
     expect(daysInMonth(2026, 4)).toBe(30);
   });
 
+  it('refuses to answer about a month that does not exist', () => {
+    // Both take an `IsoDate`, which is a string alias: nothing in the type system stops a caller
+    // from handing them something `isoDate()` never saw. Answering 0 days, or Monday, would be
+    // worse than refusing.
+    expect(() => daysInMonth(2026, 13)).toThrow(InvalidValueError);
+    expect(() => daysInMonth(2026, 0)).toThrow(InvalidValueError);
+    expect(() => dayOfWeek('2026-13-01')).toThrow(InvalidValueError);
+  });
+
   it('splits and rebuilds a date', () => {
     expect(partsOf('2026-03-09')).toStrictEqual({ year: 2026, month: 3, day: 9 });
     expect(toIsoDate(2026, 3, 9)).toBe('2026-03-09');

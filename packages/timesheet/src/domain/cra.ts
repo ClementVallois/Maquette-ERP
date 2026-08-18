@@ -12,7 +12,7 @@ import {
 
 import { type CraLine, craLine } from './cra-line.ts';
 import type { CraStatus } from './cra-status.ts';
-import type { RecordedDayType } from './day-type.ts';
+import { type RecordedDayType, isBillable } from './day-type.ts';
 import {
   CraTransitionError,
   DayOutsidePeriodError,
@@ -239,7 +239,7 @@ export class Cra {
     const perMission = new Map<MissionId, number>();
 
     for (const line of this.#lines) {
-      if (line.dayType !== 'worked' || line.missionId === null) continue;
+      if (!isBillable(line.dayType) || line.missionId === null) continue;
       perMission.set(line.missionId, (perMission.get(line.missionId) ?? 0) + line.halfDays);
     }
 

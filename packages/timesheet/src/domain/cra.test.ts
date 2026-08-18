@@ -21,6 +21,7 @@ import {
   MANAGER,
   managers,
   MISSION,
+  OFFICE,
   reference,
   submittedCra,
   validatedCra,
@@ -33,6 +34,15 @@ describe('a Cra', () => {
     expect(cra.status).toBe('draft');
     expect(cra.lines).toStrictEqual([]);
     expect(cra.submittedAt).toBeNull();
+  });
+
+  it('keeps what it was opened with', () => {
+    const cra = emptyCra('cra-77');
+
+    expect(cra.id).toBe('cra-77');
+    expect(cra.consultantId).toBe(CONSULTANT);
+    expect(cra.officeId).toBe(OFFICE);
+    expect(cra.period).toStrictEqual({ year: 2026, month: 3 });
   });
 
   it('records a day on a mission', () => {
@@ -132,6 +142,17 @@ describe('the Cra lifecycle', () => {
     expect(cra.status).toBe('validated');
     expect(cra.validatedBy).toBe(MANAGER);
     expect(cra.validatedAt).toStrictEqual(new Date('2026-04-03T10:00:00.000Z'));
+  });
+
+  it('carries the days the calendar flagged to the manager', () => {
+    // The flags are a deliverable of the manager's screen, not a by-product: a Saturday that was
+    // worked has to be visible to the person accepting the month.
+    const cra = completeCra();
+    cra.recordDay({ day: '2026-03-14', dayType: 'worked', missionId: MISSION, halfDays: 2 });
+
+    cra.submit({ clock: fixedClock(), calendar, reference });
+
+    expect(cra.flags).toStrictEqual([{ day: '2026-03-14', reason: 'weekend' }]);
   });
 
   it('sends a refused Cra back to the consultant, with the reason', () => {

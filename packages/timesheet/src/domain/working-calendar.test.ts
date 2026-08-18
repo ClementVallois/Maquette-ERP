@@ -55,6 +55,16 @@ describe('the working calendar', () => {
     expect(calendar.workableDaysOf(period(2026, 8))).toHaveLength(21);
   });
 
+  it('knows the years of the table it was built with, not 2026 by name', () => {
+    // ADR-0004's threshold is "the day the mockup spans a second year". This is what extending
+    // the table looks like, and it proves the year check reads the table rather than a constant.
+    const twoYears = workingCalendar(['2026-12-25', '2027-01-01']);
+
+    expect(twoYears.years).toStrictEqual([2026, 2027]);
+    expect(twoYears.isPublicHoliday('2027-01-01')).toBe(true);
+    expect(twoYears.isWorkable('2027-01-04')).toBe(true);
+  });
+
   it('refuses loudly a year it does not know', () => {
     // ADR-0004's threshold, made mechanical: the table is written for 2026 and answering
     // anything about 2027 would silently turn an unknown public holiday into a billable day.

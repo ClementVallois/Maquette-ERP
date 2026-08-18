@@ -21,7 +21,13 @@ export function isLeapYear(year: number): boolean {
 
 export function daysInMonth(year: number, month: number): number {
   if (month === 2 && isLeapYear(year)) return 29;
-  return DAYS_IN_MONTH[month - 1] ?? 0;
+
+  const days = DAYS_IN_MONTH[month - 1];
+  if (days === undefined) {
+    throw new InvalidValueError('month', month, 'a month between 1 and 12');
+  }
+
+  return days;
 }
 
 export interface DateParts {
@@ -80,15 +86,14 @@ const MONTH_OFFSET = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
 
 export function dayOfWeek(date: IsoDate): number {
   const { year, month, day } = partsOf(date);
+  const offset = MONTH_OFFSET[month - 1];
+  if (offset === undefined) {
+    throw new InvalidValueError('month', month, 'a month between 1 and 12');
+  }
+
   const y = month < 3 ? year - 1 : year;
   const sundayFirst =
-    (y +
-      Math.floor(y / 4) -
-      Math.floor(y / 100) +
-      Math.floor(y / 400) +
-      (MONTH_OFFSET[month - 1] ?? 0) +
-      day) %
-    7;
+    (y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) + offset + day) % 7;
 
   return sundayFirst === 0 ? SUNDAY : sundayFirst;
 }
