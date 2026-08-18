@@ -1,4 +1,10 @@
-import { type IsoDate, InvalidValueError, type Timeline, timeline } from '@erp/platform';
+import {
+  CENTS_PER_EURO,
+  type IsoDate,
+  InvalidValueError,
+  type Timeline,
+  timeline,
+} from '@erp/platform';
 
 import type { Client } from './client.ts';
 import type { ClientId, MissionId } from './ids.ts';
@@ -54,10 +60,12 @@ export function commercialMission(input: {
         'a whole number of cents above zero',
       );
     }
-    // The premise of `lineAmountCents`, checked where the rate enters rather than where it is
-    // divided: a Tjm is a whole number of euros (ADR-0002), so it is even.
-    if (entry.value % 2 !== 0) {
-      throw new InvalidValueError('mission.tjmCents', entry.value, 'an even number of cents');
+    // The premise itself, checked where the rate enters rather than inferred from it. `% 2` alone
+    // accepts 65 002 — 650,02 € — which is even, is not a whole number of euros, and contradicts
+    // `CONTEXT.md` § Tjm. The evenness assertion in `lineAmountCents` stays: it is the guard
+    // BUILD-RULES names at the division, and this one is why it can never fire.
+    if (entry.value % CENTS_PER_EURO !== 0) {
+      throw new InvalidValueError('mission.tjmCents', entry.value, 'a whole number of euros');
     }
   }
 

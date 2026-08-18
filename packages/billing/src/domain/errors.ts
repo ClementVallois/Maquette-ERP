@@ -13,7 +13,13 @@ export class NoVatRateError extends BusinessError {
   }
 }
 
-/** An agreed payment term above the legal cap is void, not merely unusual (art. L441-10). */
+/**
+ * An agreed payment term outside what the law allows. Two refusals and not one: a term above the
+ * cap is void (art. L441-10), and a term that is not a whole number of days at all is a different
+ * fault. Saying "capped at 60 days, and -1 was agreed" names a reason that is not the reason —
+ * the failure family the commit `fix(platform): let a refusal name the value it refused` closed on
+ * `main` the day before this module was written.
+ */
 export class PaymentTermsTooLongError extends BusinessError {
   readonly problemType = '/problems/payment-terms-too-long';
 
@@ -26,6 +32,18 @@ export class PaymentTermsTooLongError extends BusinessError {
         cap,
       },
     );
+  }
+}
+
+/** A payment term that is not a whole number of days from the invoice date. */
+export class InvalidPaymentTermError extends BusinessError {
+  readonly problemType = '/problems/invalid-payment-term';
+
+  constructor(kind: string, days: number) {
+    super(`${kind} payment terms run for a whole number of days, and ${String(days)} was agreed`, {
+      kind,
+      days,
+    });
   }
 }
 

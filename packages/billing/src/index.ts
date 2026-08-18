@@ -33,6 +33,7 @@ export {
 export {
   DocumentDoesNotAddUpError,
   EmptyInvoiceError,
+  InvalidPaymentTermError,
   InvalidSequenceError,
   InvoiceTransitionError,
   LineOutsideInvoicePeriodError,

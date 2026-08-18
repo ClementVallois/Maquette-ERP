@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   EmptyInvoiceError,
+  InvalidPaymentTermError,
   InvalidSequenceError,
   InvoiceTransitionError,
   LineOutsideInvoicePeriodError,
@@ -204,7 +205,14 @@ describe('payment terms', () => {
     expect(paymentTerms({ kind: 'endOfMonth', days: MAX_END_OF_MONTH_DAYS }).days).toBe(45);
     expect(() => paymentTerms({ kind: 'net', days: 61 })).toThrow(PaymentTermsTooLongError);
     expect(() => paymentTerms({ kind: 'endOfMonth', days: 46 })).toThrow(PaymentTermsTooLongError);
-    expect(() => paymentTerms({ kind: 'net', days: -1 })).toThrow(PaymentTermsTooLongError);
+  });
+
+  it('refuse a term that is not a whole number of days, and say that rather than "too long"', () => {
+    // −1 is not above the cap, and a refusal that says it is names a reason that is not the
+    // reason. The first version of this test asserted the throw and locked the wrong one in.
+    expect(() => paymentTerms({ kind: 'net', days: -1 })).toThrow(InvalidPaymentTermError);
+    expect(() => paymentTerms({ kind: 'net', days: 1.5 })).toThrow(InvalidPaymentTermError);
+    expect(() => paymentTerms({ kind: 'net', days: -1 })).toThrow(/whole number of days/);
   });
 
   it('read a due date off the invoice that agreed them', () => {

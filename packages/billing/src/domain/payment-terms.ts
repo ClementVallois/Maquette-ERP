@@ -1,6 +1,6 @@
 import { addDays, endOfMonth, type IsoDate } from '@erp/platform';
 
-import { PaymentTermsTooLongError } from './errors.ts';
+import { InvalidPaymentTermError, PaymentTermsTooLongError } from './errors.ts';
 
 /**
  * When the client has to pay, and the two forms French law allows for a business customer
@@ -18,7 +18,7 @@ export function paymentTerms(terms: PaymentTerms): PaymentTerms {
   const cap = terms.kind === 'net' ? MAX_NET_DAYS : MAX_END_OF_MONTH_DAYS;
 
   if (!Number.isSafeInteger(terms.days) || terms.days < 0) {
-    throw new PaymentTermsTooLongError(terms.kind, terms.days, cap);
+    throw new InvalidPaymentTermError(terms.kind, terms.days);
   }
   if (terms.days > cap) {
     throw new PaymentTermsTooLongError(terms.kind, terms.days, cap);

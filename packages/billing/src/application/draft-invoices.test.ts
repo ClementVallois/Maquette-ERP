@@ -8,10 +8,12 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { ValidatorCannotIssueError } from '../domain/errors.ts';
+import { billingReference, commercialMission } from '../domain/reference.ts';
 import {
   FORFAIT_MISSION,
   MENTIONS,
   OVERSEAS_MISSION,
+  parisClient,
   PARIS_CLIENT,
   REGIE_MISSION,
   REUNION_CLIENT,
@@ -143,6 +145,77 @@ describe('drafting from a validated Cra', () => {
     expect(declined[0]?.reason).toBe('unknownMission');
   });
 
+  it('declines a mission with no rate agreed on the day the month closed', () => {
+    // A reference-data fault, not a business outcome: ADR-0031 makes the seed the single writer of
+    // both projections, and this decline reason is what makes that job checkable. There is no
+    // coverage threshold on `application/`, so nothing but this test would have noticed.
+    const rateless = billingReference({
+      clients: [parisClient],
+      missions: [
+        commercialMission({
+          id: REGIE_MISSION,
+          clientId: PARIS_CLIENT,
+          billingModel: 'Regie',
+          tjmCents: [{ from: '2020-01-01', to: '2020-12-31', value: 62_000 }],
+        }),
+      ],
+    });
+
+    const { invoices, declined } = draftInvoicesFrom(
+      { ...dependencies, reference: rateless },
+      validated([{ missionId: REGIE_MISSION, halfDays: halfDays(2) }]),
+    );
+
+    expect(invoices).toStrictEqual([]);
+    expect(declined).toStrictEqual([
+      { missionId: REGIE_MISSION, halfDays: 2, reason: 'noAgreedRate' },
+    ]);
+  });
+
+  it('declines a mission whose client the projection has lost', () => {
+    // The other half of the same fault: the seed wrote one side and not the other. Left as an
+    // exception to swallow, it is a day that disappears between validation and invoicing.
+    const clientless = billingReference({
+      clients: [],
+      missions: [
+        commercialMission({
+          id: REGIE_MISSION,
+          clientId: PARIS_CLIENT,
+          billingModel: 'Regie',
+          tjmCents: [{ from: '2025-01-01', to: null, value: 65_000 }],
+        }),
+      ],
+    });
+
+    const { invoices, declined } = draftInvoicesFrom(
+      { ...dependencies, reference: clientless },
+      validated([{ missionId: REGIE_MISSION, halfDays: halfDays(2) }]),
+    );
+
+    expect(invoices).toStrictEqual([]);
+    expect(declined).toStrictEqual([
+      { missionId: REGIE_MISSION, halfDays: 2, reason: 'unknownClient' },
+    ]);
+  });
+
+  it('accounts for every half-day the event carried, in one list or the other', () => {
+    // The claim ADR-0037 makes, asserted as arithmetic rather than as prose.
+    const event = validated([
+      { missionId: REGIE_MISSION, halfDays: halfDays(20) },
+      { missionId: FORFAIT_MISSION, halfDays: halfDays(14) },
+      { missionId: 'mission-unknown', halfDays: halfDays(8) },
+    ]);
+    const { invoices, declined } = draftInvoicesFrom(dependencies, event);
+
+    const billed = invoices.flatMap((invoice) => invoice.lines.map((line) => line.origin.halfDays));
+    const total = [...billed, ...declined.map((entry) => entry.halfDays)].reduce(
+      (sum, count) => sum + count,
+      0,
+    );
+
+    expect(total).toBe(42);
+  });
+
   it('carries the validator onto every invoice it drafts', () => {
     const { invoices } = draftInvoicesFrom(
       dependencies,
@@ -174,9 +247,12 @@ describe('drafting from a validated Cra', () => {
 });
 
 describe('the subscriber', () => {
-  it('reacts to the fact and performs no I/O', async () => {
-    // A subscriber runs inside the emitter's transaction (ADR-0001), so it hands its result back
-    // rather than writing anything. The day one writes, an outbox is required.
+  it('hands its result back rather than writing it anywhere', async () => {
+    // The no-I/O property this asserts the *shape* of, not the property itself: that is held
+    // structurally, by `DraftInvoicesDependencies` carrying no I/O capability and by the cruiser
+    // sealing the domain. What this test proves is the handler's contract — it returns what it
+    // drafted, because a subscriber runs inside the emitter's transaction (ADR-0001). The day one
+    // writes, an outbox is required.
     const seen: number[] = [];
     const handler = onTimesheetValidated(dependencies, (result) => {
       seen.push(result.invoices.length);
