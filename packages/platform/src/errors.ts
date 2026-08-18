@@ -41,6 +41,19 @@ export abstract class TechnicalFailure extends Error {
 }
 
 /**
+ * A value handed to a factory that the factory refuses. One problem type for every value object
+ * in the kernel: what differs is `details.field`, and a client branching on the field learns more
+ * than it would from a hundred near-identical types.
+ */
+export class InvalidValueError extends BusinessError {
+  readonly problemType = '/problems/invalid-value';
+
+  constructor(field: string, value: unknown, expected: string) {
+    super(`${field} must be ${expected}, got ${String(value)}`, { field, value, expected });
+  }
+}
+
+/**
  * The discriminator the wire mapping consumes: a business refusal is published with its type and
  * its fields, anything else is a 500 with nothing in it.
  */

@@ -32,6 +32,14 @@ _Avoid_: Pending, AwaitingApproval, Sent
 A `Cra` the manager has accepted. Immutable, and the only status that produces an invoice.
 _Avoid_: Approved, Accepted, Closed, Locked
 
+**Period**:
+The month a `Cra` covers, written `YYYY-MM`. Every dated rule of the chain resolves against a day inside the period — the manager who validates March's `Cra` is March's manager, the `Tjm` applied is the one in force in March — never against the day the screen was opened.
+_Avoid_: Month, Range, Interval
+
+**HalfDays**:
+A count of half-days: the single unit in which worked time is recorded, stored and transported (ADR-0012). Never hours, never a fraction of a day. A full day is two half-days, which is what keeps `Tjm ÷ 2` exact in integer cents.
+_Avoid_: Days, Duration, Hours, Workload
+
 **DayType**:
 What a calendar day counts as for a consultant: worked, absence, public holiday, weekend. Only worked days reach an invoice.
 _Avoid_: Category, Kind
