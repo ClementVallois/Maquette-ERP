@@ -87,6 +87,125 @@ jobs:
 
       - run: pnpm run test:cov
 
+  test-integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: erp_migration
+          POSTGRES_PASSWORD: erp_local_dev
+          POSTGRES_DB: erp
+          PGTZ: UTC
+          TZ: UTC
+          POSTGRES_INITDB_ARGS: '--data-checksums'
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U erp_migration -d erp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 10s
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # The service container has no init scripts — create the app role and run migrations here.
+      - name: Create app role
+        run: |
+          psql "postgres://erp_migration:erp_local_dev@localhost:5433/erp" <<'EOSQL'
+            CREATE ROLE erp_app WITH LOGIN PASSWORD 'erp_local_dev';
+            GRANT CONNECT ON DATABASE erp TO erp_app;
+          EOSQL
+        env:
+          PGPASSWORD: erp_local_dev
+
+      - name: Run migrations
+        run: pnpm run migrate
+        env:
+          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
+
+      - name: Grant app role privileges
+        run: |
+          psql "postgres://erp_migration:erp_local_dev@localhost:5433/erp" <<'EOSQL'
+            GRANT USAGE ON SCHEMA timesheet TO erp_app;
+            GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA timesheet TO erp_app;
+            GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA timesheet TO erp_app;
+            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA timesheet
+              GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO erp_app;
+            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA timesheet
+              GRANT USAGE, SELECT ON SEQUENCES TO erp_app;
+            GRANT USAGE ON SCHEMA billing TO erp_app;
+            GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA billing TO erp_app;
+            GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA billing TO erp_app;
+            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA billing
+              GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO erp_app;
+            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA billing
+              GRANT USAGE, SELECT ON SEQUENCES TO erp_app;
+          EOSQL
+        env:
+          PGPASSWORD: erp_local_dev
+
+      - run: pnpm run test:int
+        env:
+          DATABASE_URL: postgres://erp_app:erp_local_dev@localhost:5433/erp
+          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
+
+  migrations-replayed-twice:
+    name: Migrations replayed twice
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: erp_migration
+          POSTGRES_PASSWORD: erp_local_dev
+          POSTGRES_DB: erp
+          PGTZ: UTC
+          TZ: UTC
+          POSTGRES_INITDB_ARGS: '--data-checksums'
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U erp_migration -d erp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 10s
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run migrations (first pass)
+        run: pnpm run migrate
+        env:
+          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
+
+      - name: Run migrations (second pass — must be a no-op)
+        run: pnpm run migrate
+        env:
+          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest

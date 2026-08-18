@@ -50,6 +50,7 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0036](./0036-a-credit-note-carries-positive-amounts.md)               | A credit note carries positive amounts; the document type carries the direction | accepted |
 | [0037](./0037-only-regie-days-become-invoice-lines.md)                 | Only Regie days become lines, and the days that do not are reported             | accepted |
 | [0038](./0038-one-invoice-per-client.md)                               | One validated Cra drafts one invoice per client, so drafting returns a set      | accepted |
+| [0019](./0019-tdd-extended-to-persistence.md)                          | Integration tests before SQL, real Postgres, per-test transaction rollback      | accepted |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering

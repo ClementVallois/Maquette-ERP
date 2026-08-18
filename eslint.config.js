@@ -264,6 +264,16 @@ export default tseslint.config(
   },
 
   {
+    // Test harness: infrastructure that hooks into Vitest and manages connections. Not shipped,
+    // not domain code — the bare-error ban and the devDependencies restriction do not apply.
+    files: ['tests/harness/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...NO_WALL_CLOCK, ...NO_FLOAT_MONEY_CALLS],
+      'import-x/no-extraneous-dependencies': ['error', { devDependencies: true }],
+    },
+  },
+
+  {
     files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
     extends: [tseslint.configs.disableTypeChecked],
   },
