@@ -4,24 +4,30 @@
 
 ## Où en est cette maquette
 
-**Phases 1 et 2 terminées le 18/08/2026** sur 10 (le plan complet, l'ordre et les dates :
-[`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md)). Ce qui existe aujourd'hui, en TypeScript pur et sans
+**Phases 1 et 2 terminées le 18/08/2026** — le plan en compte onze, numérotées 0 à 10
+([`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md)). Ce qui existe aujourd'hui, en TypeScript pur et sans
 base de données : le **domaine `timesheet`** — CRA, cycle de vie, calendrier ouvré, règles de
 soumission, validation et événement de domaine — et le **domaine `billing`** — arithmétique
 monétaire exacte, TVA résolue par territorialité, ligne de facture portant son origine, mentions
 légales obligatoires, numérotation, avoir. **La chaîne franchit déjà la frontière** : `billing`
-réagit à `timesheet.TimesheetValidated` et produit un projet de facture par client, sans qu'aucun
-fichier de `billing` — tests compris — n'importe `timesheet` ; la règle de dépendance l'interdit.
+réagit à `timesheet.TimesheetValidated` et produit un projet de facture par client. **Aucun fichier
+livré de `billing` — tests compris — n'importe `timesheet`**, et la règle de dépendance l'interdit :
+le seul fichier du dépôt qui franchit cette frontière est la violation délibérée de
+`packages/billing/src/__boundary-fixture__/`, exclue du build et du lint, qui existe pour que
+`tests/boundary-rule.test.ts` prouve que la règle la rejette.
 
-Ce qui n'existe **pas encore** : la base de données (phase 3), le jeu de données (phase 4), l'API
-(phase 5), les écrans (phase 6), l'instance hébergée (phase 8).
+Ce qui n'existe **pas encore** : la base de données (phase 3), **l'autorisation par rôle et par
+périmètre** — elle vit dans le dépôt de données, donc elle arrive avec lui en phase 3 — le jeu de
+données (phase 4), l'API (phase 5), les écrans (phase 6), l'instance hébergée (phase 8).
 
 Trois fichiers répondent aux questions qu'on se pose en arrivant :
 [`CONTEXT.md`](CONTEXT.md) définit le vocabulaire métier (`Tjm`, `régie`, `intercontrat`, `avoir`,
 `PASSI`…), [`docs/adr/`](docs/adr/README.md) contient les arbitrages avec l'option écartée, et
 [`docs/open-questions.md`](docs/open-questions.md) dit ce qui n'est **pas** tranché.
 
-Pour vérifier soi-même plutôt que me croire — Node ≥ 24.13 et pnpm 11 :
+Pour vérifier soi-même plutôt que me croire. Les versions sont **strictes** (`engine-strict` est
+activé, donc la première commande échoue au lieu d'avertir) : **Node ≥ 24.13.1** — la version exacte
+est dans `.nvmrc`, `nvm use` suffit — et **pnpm ≥ 11.4.0** :
 
 ```sh
 pnpm install --frozen-lockfile
@@ -34,6 +40,11 @@ la rendent vraie.
 
 ## Le problème métier
 
+Le cabinet modélisé ici est une **société de conseil en cybersécurité** — audit, SOC, GRC, IAM,
+sécurité offensive — d'environ 300 consultants, répartis en 5 pôles et 4 implantations. Ce détail
+n'est pas décoratif : c'est lui qui porte les contraintes que l'argumentaire de fin de page oppose
+à un ERP du marché (habilitation PASSI, indépendance auditeur/remédiation, export SIEM).
+
 Dans une société de conseil, le **compte rendu d'activité** (CRA) est le pivot : le même relevé de jours alimente le suivi d'avancement d'une mission, le staffing, et la facturation du client. Tant qu'il vit dans un tableur ou dans trois outils qui ne se parlent pas, chaque fin de mois est une ressaisie — et chaque ressaisie est une source d'écart entre ce qui a été produit et ce qui est facturé.
 
 Cette maquette prend **une seule chaîne, de bout en bout** : un consultant saisit son CRA, son manager le valide, et cette validation **déclenche la génération d'un projet de facture en régie**.
@@ -42,17 +53,24 @@ Périmètre volontairement étroit : deux modules, et **une seule flèche qui fr
 
 ## Ce que la maquette cherche à démontrer
 
-1. **Une frontière de module réelle, et vérifiée par la CI** — pas une convention de nommage. Le module de facturation (`packages/billing`) ne peut pas importer l'intérieur du module de saisie des temps (`packages/timesheet`) ; il réagit à un événement publié par celui-ci, dont le contrat vit dans un noyau partagé (`packages/platform`). Casser la frontière doit faire **échouer la CI**, pas produire un warning.
+1. **Une frontière de module réelle, et vérifiée par la CI** — pas une convention de nommage. Le module de facturation (`packages/billing`) ne peut pas importer l'intérieur du module de saisie des temps (`packages/timesheet`) ; il réagit à un événement publié par celui-ci, dont le contrat vit dans un noyau partagé (`packages/platform`). Casser la frontière doit faire **échouer la CI**, pas produire un warning. Où le vérifier sans me
+   croire : la règle est dans [`.dependency-cruiser.cjs`](.dependency-cruiser.cjs) — dont la liste
+   `allowed` est ce qui fait échouer aussi une flèche que personne n'a pensé à interdire — et
+   [`tests/boundary-rule.test.ts`](tests/boundary-rule.test.ts) prouve, sur des fichiers de violation
+   délibérée, qu'elle **rejette**. La CI lance les deux, dans deux étapes séparées.
 2. **Des invariants métier tenus par le code, pas par la discipline**
    - un CRA validé est **immuable** ;
    - les montants sont des **entiers en centimes** — jamais de flottant sur une valeur monétaire ;
-   - la numérotation des factures est **séquentielle et sans trou** ;
+   - la numérotation des factures est **séquentielle et sans trou** — ⚠️ à ce stade, seule la
+     **forme** de la série existe (ADR-0018) ; l'allocation qui la rend réellement sans trou sous
+     concurrence est un verrou de ligne dans la transaction d'émission, et c'est **ADR-0007, en
+     phase 3** ;
    - la TVA est arrondie **par taux** — ni par ligne, ni sur le total. C'est la règle fiscale
      française, et c'est ce que le récapitulatif obligatoire en pied de facture publie
      (**ADR-0010**). ⚠️ Les taux, seuils et mentions obligatoires retenus sont ceux connus au
      **17/08/2026** et **n'ont pas été validés par un expert-comptable** : cette maquette n'émet
      rien à un vrai client, et rien ici ne doit être repris en production sans cette validation.
-3. **L'autorisation est testée**, par rôle _et_ par périmètre : un manager d'une implantation ne lit pas les marges d'une mission qui n'est pas la sienne, et c'est un test qui le prouve.
+3. **L'autorisation sera testée**, par rôle _et_ par périmètre : un manager d'une implantation ne doit pas lire la marge d'une mission qui n'est pas la sienne. ⚠️ **Ce n'est pas encore construit** : l'autorisation vit dans le dépôt de données (ADR-0003), et il n'y a pas encore de dépôt de données — c'est la **phase 3**. Cette ligne est la seule de cette section qui décrive une intention plutôt que du code, et elle le dit.
 4. **Des arbitrages écrits au moment où ils sont pris** → `docs/adr/`. Chaque ADR nomme l'option écartée et le seuil auquel on changerait d'avis.
 
 ## Ce que je ne construis pas
@@ -145,7 +163,11 @@ reste à la cocher : voir la note sous le tableau.
 > _required checks_ dans la protection de branche GitHub, comme les cinq autres (même geste que la
 > tâche 0.5). Historique → `docs/open-questions.md`.
 
-Les hooks locaux (lefthook) doublent une partie de ces portes **avant** le commit et le push :
+Les hooks locaux (lefthook) doublent une partie de ces portes **avant** le commit et le push. ⚠️ Ils
+ne s'installent pas tout seuls : `ignore-scripts` est activé, donc un clone frais n'en a aucun tant
+qu'on n'a pas lancé `pnpm exec lefthook install`. Ce qu'ils font :
 gitleaks sur ce qui est indexé — le seul des deux qui empêche réellement la fuite, la CI ne scannant
-qu'une fois le secret poussé — puis `typecheck`, `boundaries` et les tests unitaires avant le push.
+qu'une fois le secret poussé — puis `typecheck`, `boundaries` et `test:cov` (les tests unitaires
+**avec le seuil de couverture**, délibérément : une porte qui passe sur une couverture qui s'effondre
+n'est pas une porte) avant le push.
 Les tests d'intégration en sont délibérément absents : un `git push` ne doit pas exiger Docker.
