@@ -86,6 +86,10 @@ _Avoid_: Customer, Account, Company, Party
 Where a `Client` is established, and the only client attribute the fiscal rules read: metropolitan France, an overseas department where VAT applies (Guadeloupe, Martinique, La Réunion), an overseas department outside the scope of VAT (Guyane, Mayotte, art. 294-1 CGI), or another European Union country. Four values because each carries a different mandatory mention, not because each carries a different number (ADR-0010).
 _Avoid_: Region, Country, Zone, TaxRegion
 
+**ServiceNature**:
+What is being sold, as the VAT rules see it. One value here — a consulting service — and an input to the rate resolution rather than an assumption baked into it (ADR-0010): a training course, a resold licence and a work on a building each resolve differently, and collapsing the input makes the rate look like a property of the `Client`.
+_Avoid_: Kind, ProductType, Category
+
 **Tjm** (🇫🇷 kept):
 _Taux journalier moyen_ — the daily rate agreed with the client for a consultant on a mission. Kept in French: it is the term written into the contract and opposable to the client. Always a **whole number of euros**, and dated: work done in June bills at June's `Tjm`. The whole-euro premise is what keeps half-day billing exact in integer cents (ADR-0002, ADR-0010).
 _Avoid_: DailyRate, Rate, Price
@@ -145,6 +149,26 @@ _Avoid_: TaxRate, Vat, TvaRate
 **Autoliquidation** (🇫🇷 kept):
 The reverse charge: on a service sold to a VAT-registered business in another EU member state, the customer accounts for the tax and the invoice carries no French VAT. Kept in French because it is the word the invoice is legally required to print (art. 283-2 du CGI).
 _Avoid_: ReverseCharge, SelfAssessment
+
+**BilledParty**:
+The `Client` **as the document states it**, copied at drafting and never read back. Distinct from `Client` on purpose, and the distinction is the documentary freeze: if the client moves office, the invoice already sent keeps the address it was sent to. Carries the delivery address the reform makes mandatory, falling back to the billing address by holding it rather than by leaving a blank.
+_Avoid_: Customer, Recipient, Buyer
+
+**PaymentTerms** (🇬🇧 translated from _conditions de règlement_):
+When the client has to pay, in one of the two forms French law allows between businesses: so many days from the invoice date, or so many days end of month. Capped at 60 and 45 respectively — an agreed term above the cap is void, not unusual, so it is refused rather than printed (art. L441-10 du code de commerce). Translates without loss.
+_Avoid_: Terms, DueDays, Delay
+
+**EarlyPaymentDiscount** (🇬🇧 translated from _escompte_):
+The reduction offered for paying before the due date. A mandatory mention **even to say there is none**, which is why "none" is a value of the type and not a missing field: the model cannot represent an invoice that forgot to say it.
+_Avoid_: Discount, Rebate, Escompte
+
+**OperationCategory**:
+What an invoice covers in the reform's terms — a supply of services, of goods, or both. Consulting days are services. A mandatory field of an electronic invoice, and one that decides which VAT date rules apply, so it is carried on the document rather than assumed.
+_Avoid_: Type, Nature, Kind
+
+**DeclinedDays**:
+Half-days a validated `Cra` carried that did **not** become an `InvoiceLine`, with the reason: the mission is not `Regie`, the mission is unknown to billing, no `Tjm` was agreed for that date, or the client is missing. Reported rather than skipped (ADR-0037) — every half-day the validation carried is in either the invoices or this list, and a day that vanishes between validation and invoicing is the discrepancy this whole chain exists to remove.
+_Avoid_: Skipped, Ignored, Rejected, Errors
 
 **InvoiceNumber**:
 The legal, sequential and gapless identifier of an issued `Invoice` or `CreditNote`, allocated from one series keyed on the issuing entity and the fiscal year (ADR-0018). Written `SEC-2026-000042`. Distinct from the document's internal id, and carrying no mark of which of the two kinds of document it numbers — the kind is the document's, and the number's job is chronological continuity.

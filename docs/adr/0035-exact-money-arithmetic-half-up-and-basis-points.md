@@ -29,9 +29,10 @@ Three rules, and each ban names what replaces it.
 
 **1. Rounding is half-up, written on integers, and `Math.round` is banned.** `Math.round` takes a
 float, so reaching for it means a float already exists — it is the recovery, not the rounding.
-Half-up on integers is `(numerator + denominator / 2) / denominator` truncated, at a call site that
-asserts the denominator is even, exactly as `(halfDays * tjmCents) / 2` already asserts
-`tjmCents % 2 === 0`.
+Half-up on integers is written with the remainder and no intermediate float: take
+`remainder = numerator % denominator`, divide `numerator - remainder` — a multiple of the
+denominator by construction, so that division is exact rather than rounded — and add one when
+`remainder * 2 >= denominator`.
 
 **2. A rate is an integer number of basis points, never a decimal fraction.** 20 % is `2000`, 8,5 %
 is `850`, 0 % is `0`. Applying a rate is `roundHalfUp(amountCents * basisPoints, 10_000)` — one
