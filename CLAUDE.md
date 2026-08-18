@@ -8,7 +8,7 @@
 
 ## What this is
 
-A working mockup of an internal ERP module for a **cybersecurity consulting firm (~300 consultants, 5 practices, 4 offices)**. It covers one end-to-end chain: **a consultant submits a timesheet (CRA), a manager validates it, and that validation triggers the generation of a draft invoice (time-and-materials billing).**
+A working mockup of an internal ERP module for a **cybersecurity consulting firm (~300 consultants, 5 practices, 4 offices)**. It covers one end-to-end chain: **a consultant submits a timesheet (CRA), a manager validates it, and that validation triggers the generation of the draft invoices (time-and-materials billing).** Plural since ADR-0038: a month is worked across missions, missions are sold to clients, and an invoice is addressed to exactly one client — so one validation drafts one invoice **per client**.
 
 The CRA is the pivot of every consulting firm's economics: the same daily record feeds project tracking, staffing, and client billing. When it lives in a spreadsheet — or in three tools that don't talk to each other — every month-end is a manual re-entry, and every re-entry is a source of discrepancy between work delivered and revenue invoiced.
 

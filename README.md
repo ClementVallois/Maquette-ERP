@@ -47,7 +47,7 @@ n'est pas décoratif : c'est lui qui porte les contraintes que l'argumentaire de
 
 Dans une société de conseil, le **compte rendu d'activité** (CRA) est le pivot : le même relevé de jours alimente le suivi d'avancement d'une mission, le staffing, et la facturation du client. Tant qu'il vit dans un tableur ou dans trois outils qui ne se parlent pas, chaque fin de mois est une ressaisie — et chaque ressaisie est une source d'écart entre ce qui a été produit et ce qui est facturé.
 
-Cette maquette prend **une seule chaîne, de bout en bout** : un consultant saisit son CRA, son manager le valide, et cette validation **déclenche la génération d'un projet de facture en régie**.
+Cette maquette prend **une seule chaîne, de bout en bout** : un consultant saisit son CRA, son manager le valide, et cette validation **déclenche la génération des projets de facture en régie** — au pluriel, parce qu'un mois se travaille sur plusieurs missions et que deux missions peuvent être vendues à deux clients différents. Une facture s'adresse à un client et tire sa TVA de la territorialité de celui-ci ; il n'existe donc pas de facture pour deux clients (**ADR-0038**).
 
 Périmètre volontairement étroit : deux modules, et **une seule flèche qui franchit la frontière** entre eux.
 
