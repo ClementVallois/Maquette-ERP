@@ -98,3 +98,66 @@ export function dayOfWeek(date: IsoDate): number {
 
   return sundayFirst === 0 ? SUNDAY : sundayFirst;
 }
+
+/**
+ * Civil-date arithmetic, done on integers. Building a `Date` would be the obvious implementation
+ * and it is a lint error here for the reason the type's own comment gives: an instant read back
+ * through a zone shifts a day over a midnight boundary, and a due date that moves by one is a
+ * legal document that is wrong.
+ *
+ * The conversion is to a day number and back — the standard civil-from-days algorithm, shifted so
+ * that the year starts in March and the leap day lands at the end of it, which is what removes
+ * every special case for February.
+ */
+const DAYS_PER_ERA = 146_097;
+const YEARS_PER_ERA = 400;
+const MARCH = 3;
+
+export function toDayNumber(date: IsoDate): number {
+  const { year, month, day } = partsOf(date);
+  const shiftedYear = month <= 2 ? year - 1 : year;
+  const era = Math.floor(shiftedYear / YEARS_PER_ERA);
+  const yearOfEra = shiftedYear - era * YEARS_PER_ERA;
+  const dayOfYear = Math.floor((153 * (month + (month > 2 ? -MARCH : 9)) + 2) / 5) + day - 1;
+  const dayOfEra =
+    yearOfEra * 365 + Math.floor(yearOfEra / 4) - Math.floor(yearOfEra / 100) + dayOfYear;
+
+  return era * DAYS_PER_ERA + dayOfEra - 719_468;
+}
+
+export function fromDayNumber(days: number): IsoDate {
+  const shifted = days + 719_468;
+  const era = Math.floor(shifted / DAYS_PER_ERA);
+  const dayOfEra = shifted - era * DAYS_PER_ERA;
+  const yearOfEra = Math.floor(
+    (dayOfEra -
+      Math.floor(dayOfEra / 1460) +
+      Math.floor(dayOfEra / 36_524) -
+      Math.floor(dayOfEra / (DAYS_PER_ERA - 1))) /
+      365,
+  );
+  const dayOfYear =
+    dayOfEra - (365 * yearOfEra + Math.floor(yearOfEra / 4) - Math.floor(yearOfEra / 100));
+  const monthOfShiftedYear = Math.floor((5 * dayOfYear + 2) / 153);
+  const day = dayOfYear - Math.floor((153 * monthOfShiftedYear + 2) / 5) + 1;
+  const month = monthOfShiftedYear + (monthOfShiftedYear < 10 ? MARCH : -9);
+  const year = yearOfEra + era * YEARS_PER_ERA + (month <= 2 ? 1 : 0);
+
+  return toIsoDate(year, month, day);
+}
+
+/** The same day of the calendar, `count` days later. A negative count moves backwards. */
+export function addDays(date: IsoDate, count: number): IsoDate {
+  if (!Number.isSafeInteger(count)) {
+    throw new InvalidValueError('addDays.count', count, 'a whole number of days');
+  }
+
+  return fromDayNumber(toDayNumber(date) + count);
+}
+
+/** The last day of the month a date falls in. */
+export function endOfMonth(date: IsoDate): IsoDate {
+  const { year, month } = partsOf(date);
+
+  return toIsoDate(year, month, daysInMonth(year, month));
+}

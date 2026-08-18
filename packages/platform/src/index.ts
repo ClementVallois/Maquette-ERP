@@ -14,13 +14,17 @@ export {
   MONDAY,
   SATURDAY,
   SUNDAY,
+  addDays,
   type DateParts,
   dayOfWeek,
   daysInMonth,
+  endOfMonth,
+  fromDayNumber,
   isLeapYear,
   isoDate,
   type IsoDate,
   partsOf,
+  toDayNumber,
   toIsoDate,
 } from './iso-date.ts';
 export {

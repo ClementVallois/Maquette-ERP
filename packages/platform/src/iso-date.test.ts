@@ -2,14 +2,18 @@ import { describe, expect, it } from 'vitest';
 
 import { InvalidValueError } from './errors.ts';
 import {
+  addDays,
   dayOfWeek,
   daysInMonth,
+  endOfMonth,
+  fromDayNumber,
   isLeapYear,
   isoDate,
   MONDAY,
   partsOf,
   SATURDAY,
   SUNDAY,
+  toDayNumber,
   toIsoDate,
 } from './iso-date.ts';
 
@@ -90,5 +94,52 @@ describe('a civil date', () => {
     expect(dayOfWeek('2024-01-01')).toBe(MONDAY);
     expect(dayOfWeek('2026-01-01')).toBe(4);
     expect(dayOfWeek('2026-12-31')).toBe(4);
+  });
+});
+
+describe('civil-date arithmetic', () => {
+  it('adds days across a month boundary', () => {
+    expect(addDays('2026-03-30', 3)).toBe('2026-04-02');
+  });
+
+  it('adds days across a year boundary', () => {
+    expect(addDays('2026-12-30', 5)).toBe('2027-01-04');
+  });
+
+  it('adds days across the leap day, and across the non-leap one', () => {
+    // 2028 is a leap year, 2026 is not, and February is the month a day-number conversion gets
+    // wrong when the year is not shifted to start in March.
+    expect(addDays('2028-02-28', 1)).toBe('2028-02-29');
+    expect(addDays('2026-02-28', 1)).toBe('2026-03-01');
+    expect(addDays('2100-02-28', 1)).toBe('2100-03-01');
+    expect(addDays('2000-02-28', 1)).toBe('2000-02-29');
+  });
+
+  it('moves backwards on a negative count, and stands still on zero', () => {
+    expect(addDays('2026-03-01', -1)).toBe('2026-02-28');
+    expect(addDays('2026-03-01', 0)).toBe('2026-03-01');
+  });
+
+  it('round-trips every day of a leap year through its day number', () => {
+    // The property that matters: the conversion is a bijection. A test of five dates would pass
+    // on an implementation that is wrong for one month.
+    let date = '2028-01-01';
+    for (let index = 0; index < 366; index += 1) {
+      expect(fromDayNumber(toDayNumber(date))).toBe(date);
+      date = addDays(date, 1);
+    }
+
+    expect(date).toBe('2029-01-01');
+  });
+
+  it('refuses a count that is not a whole number of days', () => {
+    expect(() => addDays('2026-03-01', 1.5)).toThrow(InvalidValueError);
+  });
+
+  it('answers the last day of a month, February included', () => {
+    expect(endOfMonth('2026-03-15')).toBe('2026-03-31');
+    expect(endOfMonth('2026-02-01')).toBe('2026-02-28');
+    expect(endOfMonth('2028-02-01')).toBe('2028-02-29');
+    expect(endOfMonth('2026-04-30')).toBe('2026-04-30');
   });
 });
