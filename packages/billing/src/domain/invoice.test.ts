@@ -47,6 +47,7 @@ function lineOf(amountBase: number, vat: VatTreatment, halfDays = 2): InvoiceLin
 function invoiceOf(lines: readonly InvoiceLine[], validatedBy = ['bruno']): Invoice {
   return Invoice.draft({
     id: 'invoice-1',
+    officeId: 'office-paris',
     seller: SELLER,
     billedTo: billedParty(parisClient),
     supplyPeriod: MARCH,
@@ -265,6 +266,7 @@ function base() {
 it('bills a client of La Réunion at its own rate, end to end', () => {
   const invoice = Invoice.draft({
     id: 'invoice-2',
+    officeId: 'office-paris',
     seller: SELLER,
     billedTo: billedParty(reunionClient),
     supplyPeriod: period(2026, 3),

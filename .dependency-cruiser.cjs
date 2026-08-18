@@ -94,7 +94,16 @@ module.exports = {
     // one so its failure reads well, and this entry is what refuses everything else.
     { from: { path: '^apps/' }, to: { path: '^packages/[^/]+/src/index\\.ts$' } },
     // Third-party code. The domain is held to nothing at all by a separate forbidden rule.
-    { from: {}, to: { dependencyTypes: ['npm', 'npm-dev', 'npm-optional', 'npm-peer', 'core'] } },
+    // `npm-no-pkg` is included because pnpm resolves through `.pnpm/` store symlinks, and
+    // dependency-cruiser cannot always match the resolved path back to a package.json.
+    {
+      from: {},
+      to: { dependencyTypes: ['npm', 'npm-dev', 'npm-optional', 'npm-peer', 'npm-no-pkg', 'core'] },
+    },
+    // Integration tests live in `packages/*/src/` (boundary rules apply) but import a shared
+    // harness outside of any package. The harness files also import each other.
+    { from: { path: '\\.int\\.test\\.ts$' }, to: { path: '^tests/' } },
+    { from: { path: '^tests/' }, to: { path: '^tests/' } },
   ],
 
   options: {

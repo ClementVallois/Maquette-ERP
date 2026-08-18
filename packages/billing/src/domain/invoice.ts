@@ -14,7 +14,7 @@ import {
   LineOutsideInvoicePeriodError,
   ValidatorCannotIssueError,
 } from './errors.ts';
-import type { ConsultantId, ClientId, InvoiceId } from './ids.ts';
+import type { ConsultantId, ClientId, InvoiceId, OfficeId } from './ids.ts';
 import type { InvoiceLine } from './invoice-line.ts';
 import type { InvoiceStatus } from './invoice-status.ts';
 import type { LegalMentions } from './mentions.ts';
@@ -57,6 +57,7 @@ export function billedParty(source: Client): BilledParty {
  */
 export class Invoice {
   readonly #id: InvoiceId;
+  readonly #officeId: OfficeId;
   readonly #seller: LegalEntity;
   readonly #billedTo: BilledParty;
   /** The month the work covers, `YYYY-MM`. Printed as the period of execution. */
@@ -80,6 +81,7 @@ export class Invoice {
 
   private constructor(input: {
     id: InvoiceId;
+    officeId: OfficeId;
     seller: LegalEntity;
     billedTo: BilledParty;
     supplyPeriod: string;
@@ -89,6 +91,7 @@ export class Invoice {
     validatedBy: readonly ConsultantId[];
   }) {
     this.#id = input.id;
+    this.#officeId = input.officeId;
     this.#seller = input.seller;
     this.#billedTo = input.billedTo;
     this.#supplyPeriod = input.supplyPeriod;
@@ -100,6 +103,7 @@ export class Invoice {
 
   static draft(input: {
     id: InvoiceId;
+    officeId: OfficeId;
     seller: LegalEntity;
     billedTo: BilledParty;
     supplyPeriod: Period;
@@ -122,8 +126,47 @@ export class Invoice {
     return new Invoice({ ...input, supplyPeriod });
   }
 
+  static reconstitute(input: {
+    id: InvoiceId;
+    officeId: OfficeId;
+    status: InvoiceStatus;
+    seller: LegalEntity;
+    billedTo: BilledParty;
+    supplyPeriod: string;
+    lines: readonly InvoiceLine[];
+    terms: PaymentTerms;
+    mentions: LegalMentions;
+    validatedBy: readonly ConsultantId[];
+    number: string | null;
+    issueDate: IsoDate | null;
+    series: SeriesKey | null;
+    totals: DocumentTotals | null;
+  }): Invoice {
+    const invoice = new Invoice({
+      id: input.id,
+      officeId: input.officeId,
+      seller: input.seller,
+      billedTo: input.billedTo,
+      supplyPeriod: input.supplyPeriod,
+      lines: input.lines,
+      terms: input.terms,
+      mentions: input.mentions,
+      validatedBy: input.validatedBy,
+    });
+    invoice.#status = input.status;
+    invoice.#number = input.number;
+    invoice.#issueDate = input.issueDate;
+    invoice.#series = input.series;
+    invoice.#totals = input.totals;
+    return invoice;
+  }
+
   get id(): InvoiceId {
     return this.#id;
+  }
+
+  get officeId(): OfficeId {
+    return this.#officeId;
   }
 
   get status(): InvoiceStatus {

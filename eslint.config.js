@@ -264,6 +264,24 @@ export default tseslint.config(
   },
 
   {
+    // Infrastructure adapters: persistence code that talks to Postgres. `@types/pg` is a
+    // devDependency (types are compile-time, not runtime), `query<T>` is the standard pg client
+    // pattern, and BIGINT columns return strings that must become numbers. The `Number()` ban is
+    // replaced by the integer-only subset: `Number.parseInt` names what it does and refuses a
+    // decimal. Non-null assertions are allowed on DB rows where the query has already asserted
+    // the column is present.
+    files: ['packages/*/src/infrastructure/**/*.ts'],
+    ignores: ['**/*.test.ts', '**/*.int.test.ts'],
+    rules: {
+      '@typescript-eslint/no-unnecessary-type-parameters': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      'no-restricted-syntax': ['error', ...NO_BARE_ERROR, ...NO_WALL_CLOCK],
+    },
+  },
+
+  {
     // Test harness: infrastructure that hooks into Vitest and manages connections. Not shipped,
     // not domain code — the bare-error ban and the devDependencies restriction do not apply.
     files: ['tests/harness/**/*.ts'],

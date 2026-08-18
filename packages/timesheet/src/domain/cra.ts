@@ -79,6 +79,31 @@ export class Cra {
     return new Cra(input.id, input.consultantId, input.officeId, input.period);
   }
 
+  static reconstitute(input: {
+    id: CraId;
+    consultantId: ConsultantId;
+    officeId: OfficeId;
+    period: Period;
+    status: CraStatus;
+    lines: CraLine[];
+    flags: CraFlag[];
+    submittedAt: Date | null;
+    validatedBy: ConsultantId | null;
+    validatedAt: Date | null;
+    refusal: CraRefusal | null;
+  }): Cra {
+    const cra = new Cra(input.id, input.consultantId, input.officeId, input.period);
+    cra.#status = input.status;
+    cra.#lines.push(...input.lines);
+    cra.#flags = input.flags;
+    cra.#submittedAt = input.submittedAt;
+    cra.#validatedBy = input.validatedBy;
+    cra.#validatedAt = input.validatedAt;
+    cra.#refusal = input.refusal;
+
+    return cra;
+  }
+
   get id(): CraId {
     return this.#id;
   }

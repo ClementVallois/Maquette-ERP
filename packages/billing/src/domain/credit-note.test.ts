@@ -32,6 +32,7 @@ function lineOf(tjmCents = 65_000, vat: VatTreatment = STANDARD): InvoiceLine {
 function issuedInvoice(lines: readonly InvoiceLine[] = [lineOf()]): Invoice {
   const invoice = Invoice.draft({
     id: 'invoice-1',
+    officeId: 'office-paris',
     seller: SELLER,
     billedTo: billedParty(parisClient),
     supplyPeriod: MARCH,
@@ -109,6 +110,7 @@ describe('a credit note', () => {
   it('refuses to correct anything but an issued invoice', () => {
     const draft = Invoice.draft({
       id: 'invoice-2',
+      officeId: 'office-paris',
       seller: SELLER,
       billedTo: billedParty(parisClient),
       supplyPeriod: MARCH,
