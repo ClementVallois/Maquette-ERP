@@ -20,6 +20,12 @@ export {
 } from './domain/errors.ts';
 export type { ConsultantId, CraId, MissionId, OfficeId } from './domain/ids.ts';
 export {
+  type Assignment,
+  type Mission,
+  type TimesheetReference,
+  timesheetReference,
+} from './domain/reference.ts';
+export {
   PUBLIC_HOLIDAYS_2026,
   type WorkingCalendar,
   workingCalendar,

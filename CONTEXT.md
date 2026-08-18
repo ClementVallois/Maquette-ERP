@@ -55,8 +55,12 @@ _Avoid_: Holidays, DateUtils
 ## Commercial shape
 
 **Mission** (🇫🇷/🇬🇧 identical):
-A body of work sold to a client, staffed with consultants and billed under one `BillingModel`.
+A body of work sold to a client, staffed with consultants and billed under one `BillingModel`. Each module holds only the projection its own rules read (ADR-0031): in `timesheet` a `Mission` is staffing dates and nothing else, in `billing` it is commercial terms and nothing else. Same identifier, same word, two types — a mission as staffing and a mission as a commercial object are not the same object.
 _Avoid_: Project, Engagement, Contract
+
+**Assignment** (🇬🇧 translated from _affectation_):
+The dated staffing of a `Consultant` on a `Mission`: from when, until when. Translates without loss. Dated because a consultant moves mid-month — what may be recorded on the 3rd is not what may be recorded on the 25th — and both bounds are inclusive, so a mission worked on its last day is recorded on its last day.
+_Avoid_: Staffing, Allocation, Booking
 
 **BillingModel**:
 How a `Mission` converts work into revenue. Two values, both kept French.
