@@ -52,7 +52,9 @@ const NO_FLOAT_MONEY_CALLS = [
 
 const NO_DECIMAL_LITERAL = [
   {
-    selector: 'Literal[raw=/^[0-9]*\\.[0-9]/]',
+    // Two forms, because a float does not need a dot: `85e-3` is 0.085, which is the exact value
+    // ADR-0035 was written about, and a selector anchored on the dot cannot see it.
+    selector: 'Literal[raw=/^[0-9]*\\.[0-9]/], Literal[raw=/^[0-9][0-9_]*[eE]-/]',
     message:
       'No decimal literal in the domain: an amount is cents, a rate is basis points, a quantity is half-days. A float literal is a unit escaping its type (ADR-0002, ADR-0035).',
   },
@@ -128,7 +130,12 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/only-throw-error': 'error',
-      'no-restricted-syntax': ['error', ...NO_BARE_ERROR],
+      // The three call bans are repository-wide, which is how BUILD-RULES § Money states them and
+      // is not how they were first written: scoped to `domain/`, they exempted `application/` —
+      // the layer that reads a rate off the reference and hands it to a line. That is the failure
+      // family the boundary rules already name, one directory down. The decimal-LITERAL ban stays
+      // narrow, in the block below, for the reason ADR-0035 gives.
+      'no-restricted-syntax': ['error', ...NO_BARE_ERROR, ...NO_FLOAT_MONEY_CALLS],
 
       // Not in strictTypeChecked: a missing `case` on a union has to break the build.
       '@typescript-eslint/switch-exhaustiveness-check': 'error',
@@ -196,7 +203,32 @@ export default tseslint.config(
   },
 
   {
-    files: ['**/*.test.ts', '**/*.int.test.ts', '**/testing/**/*.ts'],
+    // Shared fixtures, and NOT tests. BUILD-RULES justifies the test exemption on "it is not
+    // shipped"; a `testing/` file is in its package's tsconfig, compiles to `dist`, and — since
+    // Phase 2 — is where every seeded `tjmCents` in `billing` is written. It therefore keeps the
+    // domain list, with the single narrowing a fixture actually needs: a fake clock is built from
+    // a literal instant, so the absolute `new Date(...)` ban becomes the wall-clock ban.
+    files: ['**/testing/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      'no-restricted-syntax': [
+        'error',
+        ...NO_BARE_ERROR,
+        ...NO_WALL_CLOCK,
+        ...NO_FLOAT_MONEY_CALLS,
+        ...NO_DECIMAL_LITERAL,
+        {
+          selector: 'MethodDefinition[kind="set"]',
+          message:
+            'No public setter: an object must not be able to exist in an invalid state. Invariants belong in the factory or the constructor.',
+        },
+      ],
+      'import-x/no-extraneous-dependencies': ['error', { devDependencies: true }],
+    },
+  },
+
+  {
+    files: ['**/*.test.ts', '**/*.int.test.ts'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',

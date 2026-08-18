@@ -305,6 +305,26 @@ describe('issuing an invoice', () => {
     expect(invoice.number).toBe('SEC-2026-000001');
   });
 
+  it('burns no number when issuing is refused', () => {
+    // The ordering guarantee, and the reason it matters: a number allocated by an attempt that
+    // then throws is a number no document carries, and a series whose only property is having no
+    // gap has just acquired one (ADR-0018). The refusal reachable today is a bad sequence; from
+    // Phase 3 the coherence check can refuse too, on totals read back from columns.
+    const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
+
+    expect(() => {
+      invoice.issue({ by: 'claire', sequence: 0, issueDate: '2026-04-02' });
+    }).toThrow(InvalidSequenceError);
+    expect(invoice.status).toBe('draft');
+    expect(invoice.number).toBeNull();
+    expect(invoice.series).toBeNull();
+    expect(invoice.issueDate).toBeNull();
+
+    // And the retry takes the number it was given, not the next one.
+    invoice.issue({ by: 'claire', sequence: 1, issueDate: '2026-04-02' });
+    expect(invoice.number).toBe('SEC-2026-000001');
+  });
+
   it('keeps the totals it was issued with, whatever is asked of it afterwards', () => {
     const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
     invoice.issue({ by: 'claire', sequence: 1, issueDate: '2026-04-02' });

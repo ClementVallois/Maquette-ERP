@@ -203,23 +203,29 @@ export class Invoice {
       throw new ValidatorCannotIssueError(this.#id, input.by);
     }
 
+    // Everything that can refuse runs first, and nothing below it touches this object until all
+    // of it has passed. A number allocated by an attempt that then throws is a number no document
+    // carries, and that is a gap in a series whose only property is having none (ADR-0018). The
+    // same ordering is written and tested one file over, in `creditNote`.
     const series = seriesKeyOf(this.#seller, input.issueDate);
-
-    this.#number = documentNumber(this.#seller, series, input.sequence);
-    this.#series = series;
-    this.#issueDate = input.issueDate;
-    this.#totals = totalsOf(this.#lines);
+    const number = documentNumber(this.#seller, series, input.sequence);
+    const totals = totalsOf(this.#lines);
 
     // The gate BUILD-RULES puts before a document leaves. Tautological here and not written for
     // here — Phase 3 reconstructs a document from stored rows, where the totals are columns and
-    // the lines are another table, and the two can disagree.
+    // the lines are another table, and the two can disagree. That is also when this ordering
+    // stops being theoretical.
     assertDocumentAddsUp({
       id: this.#id,
       lines: this.#lines,
       vatBreakdown: this.vatBreakdown,
-      totals: this.#totals,
+      totals,
     });
 
+    this.#number = number;
+    this.#series = series;
+    this.#issueDate = input.issueDate;
+    this.#totals = totals;
     this.#status = 'issued';
   }
 

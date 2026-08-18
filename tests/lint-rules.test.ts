@@ -11,6 +11,9 @@ const TEST_CLOCK_FIXTURE = 'packages/timesheet/src/domain/__boundary-fixture__/w
 const KERNEL_CLOCK_FIXTURE = 'packages/platform/src/__boundary-fixture__/wall-clock.ts';
 const DOMAIN_MONEY_FIXTURE = 'packages/billing/src/domain/__boundary-fixture__/float-money.ts';
 const TEST_MONEY_FIXTURE = 'packages/billing/src/domain/__boundary-fixture__/float-money.test.ts';
+const APPLICATION_MONEY_FIXTURE =
+  'packages/billing/src/application/__boundary-fixture__/float-money.ts';
+const SHARED_FIXTURE_BUILDER = 'packages/billing/src/domain/testing/march-2026.ts';
 
 interface LintResult {
   filePath: string;
@@ -89,5 +92,41 @@ describe('the money rules', () => {
     expect(messages.some((message) => message.includes('No `Number()`'))).toBe(true);
     expect(messages.some((message) => message.includes('No `Math.round`'))).toBe(true);
     expect(messages.some((message) => message.includes('No decimal literal'))).toBe(false);
+  });
+});
+
+describe('the scopes the money rules apply to', () => {
+  it('rejects the calls outside the domain too, where the money also flows', () => {
+    // The rule was first written scoped to `domain/` and the kernel, which exempted the one layer
+    // that reads a rate off the reference and hands it to a line. `BUILD-RULES.md` § Money states
+    // the three calls with no scope, and now so does the config.
+    const messages = lint(APPLICATION_MONEY_FIXTURE).map((message) => message.message);
+
+    expect(messages.some((message) => message.includes('No `parseFloat`'))).toBe(true);
+    expect(messages.some((message) => message.includes('No `Number()`'))).toBe(true);
+    expect(messages.some((message) => message.includes('No `Math.round`'))).toBe(true);
+    // And the literal ban stays where ADR-0035 put it: the domain and the kernel.
+    expect(messages.some((message) => message.includes('No decimal literal'))).toBe(false);
+  });
+
+  it('holds a shared fixture builder to the domain rules, because it is shipped code', () => {
+    // `testing/` is not a test: it is in its package's tsconfig, it compiles, and it is where
+    // every seeded `tjmCents` of this module is written. It was borrowing the exemption
+    // `BUILD-RULES.md` grants to `*.test.ts` on the ground that a test is not shipped.
+    const config = JSON.parse(
+      execFileSync(ESLINT, ['--print-config', SHARED_FIXTURE_BUILDER], { encoding: 'utf8' }),
+    ) as { rules: Record<string, [number, ...{ message: string }[]]> };
+    const messages = (config.rules['no-restricted-syntax'] ?? [0]).slice(1) as {
+      message: string;
+    }[];
+    const held = messages.map((entry) => entry.message);
+
+    expect(held.some((message) => message.includes('No decimal literal'))).toBe(true);
+    expect(held.some((message) => message.includes('No public setter'))).toBe(true);
+    expect(held.some((message) => message.includes('No `Math.round`'))).toBe(true);
+    // The one narrowing a fixture builder actually needs: a fake clock is a literal instant.
+    expect(held.some((message) => message.includes('No `new Date()` without an argument'))).toBe(
+      true,
+    );
   });
 });
