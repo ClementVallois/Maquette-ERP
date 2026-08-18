@@ -94,6 +94,25 @@ resolution is asymmetric because the two halves are not the same exercise:
 Cost, stated rather than discovered: `pre-push` deliberately excludes Docker, so infrastructure TDD
 runs locally on demand and in CI, not on the push hook. That stays true.
 
+#### What the history shows about test-first
+
+**Decided 18/08/2026, at the start of Phase 2**, on the row Phase 1's checkpoint opened for exactly
+this date. Phase 1's preamble claimed "every step is red-green-refactor and the history shows it",
+and the history cannot show it: every task commit carries the test and the implementation together,
+so the order they were written in is not recoverable from git.
+
+The claim is **narrowed to what is verifiable**, and the discipline is unchanged: the test is
+written first, the commit carries both. Making the history show the red half would mean committing
+a failing test, which contradicts the `pre-push` hook (it runs `test:cov`) and would leave a red CI
+run on every branch push — a gate that is red by design is a gate nobody reads. Between a true
+claim and a green pipeline that habituates the reader to red, the claim gives.
+
+What that costs, said plainly: **"test written first" is a statement about the author's discipline,
+not a property this repository proves.** Two Phase 1 guards were in fact written _after_ a coverage
+report named them, which is honest work and is not test-first. Every claim in this build that a
+reviewer can check is one this repository holds itself to; this one is now labelled as the kind
+that cannot be, rather than left to be found.
+
 ### SOLID, OOP, DDD, Clean Architecture — the labels
 
 The triage already settled the labels question, and it is **not** reopened by the instruction, which
@@ -270,7 +289,8 @@ file in the same task.
 
 ## Phase 1 — `feat/timesheet-domain`
 
-Pure TypeScript, no database, no framework. Every step is red-green-refactor and the history shows it.
+Pure TypeScript, no database, no framework. Every step is test-first, and the history shows the
+test and the code arriving **together** — see "What the history shows about test-first" below.
 
 ### 1.1 — Value objects
 
