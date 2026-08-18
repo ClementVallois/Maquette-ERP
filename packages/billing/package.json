@@ -12,5 +12,8 @@
   },
   "dependencies": {
     "@erp/platform": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "4.1.10"
   }
 }
