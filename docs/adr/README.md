@@ -56,6 +56,8 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0021](./0021-idempotent-cra-processing.md)                             | Processing the same Cra twice drafts nothing new                                | accepted |
 | [0039](./0039-the-integration-harness-is-a-workspace-member.md)         | The integration harness is a workspace member, not a directory                  | accepted |
 | [0040](./0040-ci-gates-are-advisory-while-the-repository-is-private.md) | The CI gates are advisory while the repository is private on the free plan      | accepted |
+| [0022](./0022-deterministic-seed-is-a-deliverable.md)                   | The seed is a deliverable, not a fixture: deterministic, Zod-validated          | accepted |
+| [0041](./0041-deterministic-uuidv7-for-all-identifiers.md)              | Deterministic UUIDv7 for all identifiers, including child rows                  | accepted |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
@@ -82,6 +84,11 @@ available on this plan.
 
 The plan's reservations for 0019–0032 are untouched: a number it assigned to a phase stays assigned
 to that phase, and a decision taken early takes the next free number instead of borrowing one.
+
+0022 takes the number the plan reserved for the seed decision. 0041 continues the unplanned sequence
+for a decision Phase 4 reached that the plan had not identified: how child-row identifiers are
+generated (UUIDv7 everywhere, deterministic in the seed — the positional string alternative the open
+questions had carried was retired).
 
 ## Identified, not yet decided
 
