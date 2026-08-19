@@ -1,3 +1,4 @@
+export { type Actor, isRole, ROLES, type Role } from './actor.ts';
 export type { Clock } from './clock.ts';
 export { type Effective, type Timeline, timeline } from './dated.ts';
 export { BusinessError, InvalidValueError, TechnicalFailure, isBusinessError } from './errors.ts';

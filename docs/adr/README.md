@@ -24,42 +24,43 @@ Two record-keeping rules, because the point of this log is that it was not retou
 
 ## Accepted
 
-| No.                                                                     | Decision                                                                        | Status   |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------- | -------- |
-| [0001](./0001-sealed-modules-and-in-process-domain-event.md)            | Two sealed modules, one arrow, verified mechanically                            | accepted |
-| [0002](./0002-money-as-integer-cents.md)                                | Money is an integer number of cents, with no wrapper type                       | accepted |
-| [0003](./0003-authorization-at-the-repository.md)                       | Authorization lives in the repository, not in Postgres RLS                      | accepted |
-| [0004](./0004-working-calendar-with-a-fixed-holiday-table.md)           | The working calendar is a domain component with a fixed 2026 holiday table      | accepted |
-| [0005](./0005-cra-lifecycle-and-immutability.md)                        | The Cra lifecycle, and where immutability binds                                 | accepted |
-| [0006](./0006-separation-of-duties.md)                                  | Separation of duties: two rules, and where they are enforced                    | accepted |
-| [0008](./0008-fastify-not-nestjs.md)                                    | Fastify, not NestJS                                                             | accepted |
-| [0009](./0009-server-rendered-html-no-client-framework.md)              | Server-rendered HTML, with no client framework                                  | accepted |
-| [0010](./0010-vat-rounded-per-rate.md)                                  | VAT is rounded per rate, and the rate is resolved from territoriality           | accepted |
-| [0011](./0011-hand-written-sql-no-orm.md)                               | Hand-written SQL over `pg`, and no ORM                                          | accepted |
-| [0012](./0012-half-day-as-the-storage-unit.md)                          | The half-day is the single storage unit for recorded time                       | accepted |
-| [0013](./0013-invoice-line-carries-its-origin.md)                       | The invoice line carries its origin, though only `Regie` exists                 | accepted |
-| [0014](./0014-triage-leaves-the-public-history.md)                      | The working triage leaves the public history                                    | accepted |
-| [0015](./0015-apps-tier-separate-from-packages.md)                      | The application shell lives in `apps/`, a tier above `packages/`                | accepted |
-| [0016](./0016-typed-errors-business-versus-technical.md)                | Typed errors: business versus technical, and how they reach the wire            | accepted |
-| [0017](./0017-legal-mentions-modelled-not-templated.md)                 | Mandatory legal mentions are modelled on the document, not templated            | accepted |
-| [0018](./0018-one-series-for-invoices-and-credit-notes.md)              | One number series for invoices and credit notes, keyed (entity, fiscal year)    | accepted |
-| [0031](./0031-reference-data-per-module-projections.md)                 | Reference data: per-module projections, the seed as single writer               | accepted |
-| [0033](./0033-shared-kernel-holds-the-transported-vocabulary.md)        | The shared kernel holds the vocabulary the boundary transports                  | accepted |
-| [0034](./0034-dated-references-resolved-at-the-close-of-the-period.md)  | One dated-reference mechanism, resolved at the close of the period              | accepted |
-| [0035](./0035-exact-money-arithmetic-half-up-and-basis-points.md)       | Exact money arithmetic: half-up on integers, rates in basis points              | accepted |
-| [0036](./0036-a-credit-note-carries-positive-amounts.md)                | A credit note carries positive amounts; the document type carries the direction | accepted |
-| [0037](./0037-only-regie-days-become-invoice-lines.md)                  | Only Regie days become lines, and the days that do not are reported             | accepted |
-| [0038](./0038-one-invoice-per-client.md)                                | One validated Cra drafts one invoice per client, so drafting returns a set      | accepted |
-| [0019](./0019-tdd-extended-to-persistence.md)                           | Integration tests before SQL, real Postgres, per-test transaction rollback      | accepted |
-| [0007](./0007-gapless-invoice-numbering.md)                             | Gapless numbering: a counter row locked with `SELECT … FOR UPDATE`              | accepted |
-| [0020](./0020-domain-events-as-persisted-audit-journal.md)              | Domain events are persisted in the emitting transaction, as the audit journal   | accepted |
-| [0021](./0021-idempotent-cra-processing.md)                             | Processing the same Cra twice drafts nothing new                                | accepted |
-| [0039](./0039-the-integration-harness-is-a-workspace-member.md)         | The integration harness is a workspace member, not a directory                  | accepted |
-| [0040](./0040-ci-gates-are-advisory-while-the-repository-is-private.md) | The CI gates are advisory while the repository is private on the free plan      | accepted |
-| [0022](./0022-deterministic-seed-is-a-deliverable.md)                   | The seed is a deliverable, not a fixture: deterministic, Zod-validated          | accepted |
-| [0041](./0041-deterministic-uuidv7-for-all-identifiers.md)              | Deterministic UUIDv7 for all identifiers, including child rows                  | accepted |
-| [0024](./0024-structured-logging-redacted-by-allowlist.md)              | Structured logging, redacted by allowlist in the serialiser                     | accepted |
-| [0042](./0042-which-status-a-business-refusal-takes.md)                 | Which HTTP status a business refusal takes, and what it may publish             | accepted |
+| No.                                                                     | Decision                                                                         | Status   |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------- | -------- |
+| [0001](./0001-sealed-modules-and-in-process-domain-event.md)            | Two sealed modules, one arrow, verified mechanically                             | accepted |
+| [0002](./0002-money-as-integer-cents.md)                                | Money is an integer number of cents, with no wrapper type                        | accepted |
+| [0003](./0003-authorization-at-the-repository.md)                       | Authorization lives in the repository, not in Postgres RLS                       | accepted |
+| [0004](./0004-working-calendar-with-a-fixed-holiday-table.md)           | The working calendar is a domain component with a fixed 2026 holiday table       | accepted |
+| [0005](./0005-cra-lifecycle-and-immutability.md)                        | The Cra lifecycle, and where immutability binds                                  | accepted |
+| [0006](./0006-separation-of-duties.md)                                  | Separation of duties: two rules, and where they are enforced                     | accepted |
+| [0008](./0008-fastify-not-nestjs.md)                                    | Fastify, not NestJS                                                              | accepted |
+| [0009](./0009-server-rendered-html-no-client-framework.md)              | Server-rendered HTML, with no client framework                                   | accepted |
+| [0010](./0010-vat-rounded-per-rate.md)                                  | VAT is rounded per rate, and the rate is resolved from territoriality            | accepted |
+| [0011](./0011-hand-written-sql-no-orm.md)                               | Hand-written SQL over `pg`, and no ORM                                           | accepted |
+| [0012](./0012-half-day-as-the-storage-unit.md)                          | The half-day is the single storage unit for recorded time                        | accepted |
+| [0013](./0013-invoice-line-carries-its-origin.md)                       | The invoice line carries its origin, though only `Regie` exists                  | accepted |
+| [0014](./0014-triage-leaves-the-public-history.md)                      | The working triage leaves the public history                                     | accepted |
+| [0015](./0015-apps-tier-separate-from-packages.md)                      | The application shell lives in `apps/`, a tier above `packages/`                 | accepted |
+| [0016](./0016-typed-errors-business-versus-technical.md)                | Typed errors: business versus technical, and how they reach the wire             | accepted |
+| [0017](./0017-legal-mentions-modelled-not-templated.md)                 | Mandatory legal mentions are modelled on the document, not templated             | accepted |
+| [0018](./0018-one-series-for-invoices-and-credit-notes.md)              | One number series for invoices and credit notes, keyed (entity, fiscal year)     | accepted |
+| [0031](./0031-reference-data-per-module-projections.md)                 | Reference data: per-module projections, the seed as single writer                | accepted |
+| [0033](./0033-shared-kernel-holds-the-transported-vocabulary.md)        | The shared kernel holds the vocabulary the boundary transports                   | accepted |
+| [0034](./0034-dated-references-resolved-at-the-close-of-the-period.md)  | One dated-reference mechanism, resolved at the close of the period               | accepted |
+| [0035](./0035-exact-money-arithmetic-half-up-and-basis-points.md)       | Exact money arithmetic: half-up on integers, rates in basis points               | accepted |
+| [0036](./0036-a-credit-note-carries-positive-amounts.md)                | A credit note carries positive amounts; the document type carries the direction  | accepted |
+| [0037](./0037-only-regie-days-become-invoice-lines.md)                  | Only Regie days become lines, and the days that do not are reported              | accepted |
+| [0038](./0038-one-invoice-per-client.md)                                | One validated Cra drafts one invoice per client, so drafting returns a set       | accepted |
+| [0019](./0019-tdd-extended-to-persistence.md)                           | Integration tests before SQL, real Postgres, per-test transaction rollback       | accepted |
+| [0007](./0007-gapless-invoice-numbering.md)                             | Gapless numbering: a counter row locked with `SELECT … FOR UPDATE`               | accepted |
+| [0020](./0020-domain-events-as-persisted-audit-journal.md)              | Domain events are persisted in the emitting transaction, as the audit journal    | accepted |
+| [0021](./0021-idempotent-cra-processing.md)                             | Processing the same Cra twice drafts nothing new                                 | accepted |
+| [0039](./0039-the-integration-harness-is-a-workspace-member.md)         | The integration harness is a workspace member, not a directory                   | accepted |
+| [0040](./0040-ci-gates-are-advisory-while-the-repository-is-private.md) | The CI gates are advisory while the repository is private on the free plan       | accepted |
+| [0022](./0022-deterministic-seed-is-a-deliverable.md)                   | The seed is a deliverable, not a fixture: deterministic, Zod-validated           | accepted |
+| [0041](./0041-deterministic-uuidv7-for-all-identifiers.md)              | Deterministic UUIDv7 for all identifiers, including child rows                   | accepted |
+| [0024](./0024-structured-logging-redacted-by-allowlist.md)              | Structured logging, redacted by allowlist in the serialiser                      | accepted |
+| [0042](./0042-which-status-a-business-refusal-takes.md)                 | Which HTTP status a business refusal takes, and what it may publish              | accepted |
+| [0023](./0023-persona-selector-instead-of-authentication.md)            | A persona selector instead of authentication, and where authorization is decided | accepted |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering

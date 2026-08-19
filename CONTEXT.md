@@ -132,6 +132,14 @@ _Avoid_: Clearance, Certification, Qualification
 _Prestataire d'audit de la sécurité des systèmes d'information_ — an ANSSI qualification. A proper noun; never translated.
 _Avoid_: SecurityAuditQualification
 
+**Role**:
+What a person is allowed to do in the CRA-to-invoice chain: `consultant` records and submits, `manager` validates and reads margins, `billing` issues the numbered document. Three values, and they are **not** the firm's org-chart roles — the seed writes `consultant | manager | director` on a `Consultant`, which is an HR fact the authorization model never reads (ADR-0023). A `Role` is always exercised inside one `Office`: scope and role are two dimensions, never one.
+_Avoid_: Permission, Profile, Group, AccessLevel
+
+**Persona**:
+One of the four selectable identities the mockup offers instead of authentication — a named pairing of a `Consultant` with a `Role`, seeded as reference data and chosen explicitly. It is called a persona and not a user because nothing about it is authenticated: anyone may select any of them, and the README says so. Two personas share the `manager` role in different offices, which is what makes an out-of-scope refusal something a reader can reproduce rather than be told about.
+_Avoid_: User, Account, Login, Profile, Impersonation
+
 ## Money out
 
 **Invoice** (🇬🇧 translated from _facture_):
