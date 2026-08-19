@@ -274,7 +274,10 @@ decided stack. Add a `pnpm run env:check` assertion so the drift is caught rathe
 
 Merge `feature/ci-pipeline` and `develop` into `main`, delete `develop`, narrow the CI `pull_request`
 trigger to `main`, document the branch protection required checks in the README (a job that does not
-block a merge is a warning, not a gate). **Human step**: enabling branch protection in the GitHub UI.
+block a merge is a warning, not a gate). ~~**Human step**: enabling branch protection in the GitHub
+UI.~~ **That step was never available**: branch protection needs GitHub Pro or a public repository,
+and this one is private on the free plan — found on 19/08/2026 when the first pull request was
+opened. The eight gates are advisory until the repository goes public in Phase 9. **ADR-0040**.
 
 ### 0.6 — `BUILD-RULES.md` and `CLAUDE.md` point at this plan
 
