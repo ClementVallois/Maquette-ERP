@@ -121,12 +121,21 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      # The service container has no init scripts — create the app role and run migrations here.
-      - name: Create app role
+      # The service container runs no init scripts, so this step is the CI counterpart of
+      # `docker/postgres/init/01-roles.sh` and must stay identical to it: same role, same grants,
+      # same `public` default privileges, and — critically — run BEFORE the migrations, so tables
+      # created afterwards inherit them. It stops here. The per-schema grants for `timesheet` and
+      # `billing` are migration 001's job, and this workflow used to repeat them in a later step,
+      # which meant a broken grant block in the migration merged green.
+      - name: Create app role, as the local init script does
         run: |
           psql "postgres://erp_migration:erp_local_dev@localhost:5433/erp" <<'EOSQL'
             CREATE ROLE erp_app WITH LOGIN PASSWORD 'erp_local_dev';
             GRANT CONNECT ON DATABASE erp TO erp_app;
+            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
+              GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO erp_app;
+            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
+              GRANT USAGE, SELECT ON SEQUENCES TO erp_app;
           EOSQL
         env:
           PGPASSWORD: erp_local_dev
@@ -135,27 +144,6 @@ jobs:
         run: pnpm run migrate
         env:
           MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
-
-      - name: Grant app role privileges
-        run: |
-          psql "postgres://erp_migration:erp_local_dev@localhost:5433/erp" <<'EOSQL'
-            GRANT USAGE ON SCHEMA timesheet TO erp_app;
-            GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA timesheet TO erp_app;
-            GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA timesheet TO erp_app;
-            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA timesheet
-              GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO erp_app;
-            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA timesheet
-              GRANT USAGE, SELECT ON SEQUENCES TO erp_app;
-            GRANT USAGE ON SCHEMA billing TO erp_app;
-            GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA billing TO erp_app;
-            GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA billing TO erp_app;
-            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA billing
-              GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO erp_app;
-            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA billing
-              GRANT USAGE, SELECT ON SEQUENCES TO erp_app;
-          EOSQL
-        env:
-          PGPASSWORD: erp_local_dev
 
       - run: pnpm run test:int
         env:
