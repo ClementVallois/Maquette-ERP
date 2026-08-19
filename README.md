@@ -173,12 +173,26 @@ _(à écrire — il doit ressembler à la réalité d'un cabinet : plusieurs pô
 
 ## Tests et portes de CI
 
-Une porte qui ne bloque pas un merge est un avertissement, pas une porte. Les huit suivantes tournent
-sur chaque push ; **cinq sont exigées** par la protection de branche sur `main` — tant que l'une est
-rouge, le bouton de merge est désactivé. Les trois autres — `Tests`, et les deux portes base de
-données arrivées avec la phase 3 — sont vertes et restent à cocher : voir la note sous le tableau.
+Une porte qui ne bloque pas un merge est un avertissement, pas une porte. Le mot « avertissement »
+sert ici deux fois, pour deux choses différentes, et il vaut mieux les séparer tout de suite :
 
-| Porte (job CI)                | Commande                                            | Ce qu'elle empêche de merger                                                                                                                                                                                                                                                                                                                                                                           |
+1. **Une règle qui reste verte sur une violation** — le `warn` de dependency-cruiser au lieu de son
+   `error`. C'est le sens du mot en tête de ce README (« casser la frontière doit faire échouer la
+   CI, pas produire un warning »), et **ce piège-là est fermé** : les huit jobs ci-dessous
+   échouent réellement, et `tests/boundary-rule.test.ts` le prouve sur des violations délibérées.
+2. **Une porte qui échoue sans rien empêcher.** C'est le sens de la phrase d'ouverture, et
+   **c'est l'état actuel des huit** — écrit ici plutôt que sous-entendu.
+
+Elles tournent sur chaque push et sur chaque pull request, et elles passent au rouge. Mais la seule
+chose capable de désactiver le bouton de merge — la _protection de branche_ GitHub — exige un compte
+**Pro** ou un dépôt **public** ; celui-ci est privé sur le plan gratuit. **Aucun check n'est donc
+exigé sur `main`** : la règle « rien ne merge en rouge » est tenue par l'auteur, pas par la
+plateforme. Ce README a affirmé le contraire — « cinq sont exigées » — depuis la phase 0, et
+c'était faux : la bascule n'était pas en attente, elle était indisponible. Décision, option écartée
+et seuil → **[ADR-0040](docs/adr/0040-ci-gates-are-advisory-while-the-repository-is-private.md)**.
+La bascule est gratuite le jour où le dépôt devient public, et coûte alors huit cases à cocher.
+
+| Porte (job CI)                | Commande                                            | Ce qu'elle fait passer au rouge                                                                                                                                                                                                                                                                                                                                                                        |
 | ----------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Module boundary**           | `pnpm run boundaries` + le test négatif             | Un import qui franchit la frontière `timesheet`/`billing`, une flèche jamais déclarée — et une règle **morte** : le test rejoue une violation délibérée et exige qu'elle soit refusée                                                                                                                                                                                                                  |
 | **Lint, format, types**       | `lint` · `format:check` · `typecheck` · `env:check` | Du code hors des règles ESLint (dont les invariants du domaine rendus mécaniques), un formatage divergent, une erreur de type — et une variable de `compose.yml` absente de `.env.example`                                                                                                                                                                                                             |
@@ -189,20 +203,20 @@ données arrivées avec la phase 3 — sont vertes et restent à cocher : voir l
 | **Integration tests**         | `pnpm run test:int` sur un vrai PostgreSQL          | Une requête SQL fausse, une colonne manquante, une règle d'autorisation par périmètre qui ne refuse plus — les tests tournent contre le schéma réel, appliqué par le runner de migrations                                                                                                                                                                                                              |
 | **Migrations replayed twice** | `pnpm run migrate` deux fois de suite               | Un runner de migrations non idempotent : le second passage doit être un no-op. ⚠️ Cette porte ne vérifie **pas** que les migrations sont additives — un `DROP COLUMN` dans un fichier `007` passerait les deux passages au vert, puisque le runner saute les versions déjà inscrites dans `schema_migrations`. La règle additive reste tenue à la relecture ; ce qui est mécanique ici, c'est le rejeu |
 
-> ✅ **La porte `Tests` est verte depuis la phase 1** (18/08/2026), et pas encore exigée.
-> Elle était rouge depuis l'ajout des seuils de couverture, faute de domaine à mesurer : la rendre
-> vert plus tôt aurait demandé soit d'abaisser le seuil, soit d'écrire un test qui ne prouve rien.
-> La phase 1 livre le domaine `timesheet` et ses tests — 99 % des lignes, 100 % des branches — et
-> la porte devient une contrainte réelle. ⚠️ **Étape humaine restante** : l'ajouter à la liste des
-> _required checks_ dans la protection de branche GitHub, comme les cinq autres (même geste que la
-> tâche 0.5). Historique → `docs/open-questions.md`.
+> ✅ **Les huit sont vertes**, et chacune l'est devenue en livrant ce qu'elle mesure plutôt qu'en
+> baissant son seuil. `Tests` est restée **rouge de la phase 0 à la phase 1** : le seuil de
+> couverture existait avant le domaine à mesurer, et la rendre verte plus tôt aurait demandé soit
+> d'abaisser le seuil, soit d'écrire un test qui ne prouve rien. `Integration tests` et
+> `Migrations replayed twice` arrivent avec la phase 3, dans la même PR que le code qu'elles
+> testent — et toutes deux ont échoué à leur premier run sur une pull request, pour une raison qui
+> n'avait rien à voir avec le code : `pnpm run migrate` chargeait un `.env` absent du runner.
+> Historique complet → `docs/open-questions.md`.
 >
-> ⚠️ **Même étape humaine pour les deux portes de la phase 3** — `Integration tests` et
-> `Migrations replayed twice` — vertes dès leur premier run, jamais encore exigées. Une porte verte
-> et non cochée n'empêche aucun merge : c'est un test, pas une porte, tant que le geste n'est pas
-> fait.
+> ⚠️ Aucune de ces huit n'empêche un merge aujourd'hui, pour la raison donnée plus haut : la
+> protection de branche n'est pas disponible sur ce plan. C'est une limite assumée et datée
+> (ADR-0040), pas une case oubliée.
 
-Les hooks locaux (lefthook) doublent une partie de ces portes **avant** le commit et le push. ⚠️ Ils
+Les hooks locaux (lefthook) rejouent une partie de ces portes **avant** le commit et le push — et depuis ADR-0040 ils ne les doublent plus, ils sont **le seul arrêt mécanique** qui précède un merge, puisque aucune des huit ne le bloque. ⚠️ Ils
 ne s'installent pas tout seuls : `ignore-scripts` est activé, donc un clone frais n'en a aucun tant
 qu'on n'a pas lancé `pnpm exec lefthook install`. Ce qu'ils font :
 gitleaks sur ce qui est indexé — le seul des deux qui empêche réellement la fuite, la CI ne scannant

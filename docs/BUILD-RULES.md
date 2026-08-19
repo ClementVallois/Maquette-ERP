@@ -161,7 +161,7 @@ React, Vue, PDF generation, OpenTelemetry, Testcontainers.
 
 ## Claimed out loud, and not claimed
 
-Claimed: **YAGNI** (the sorting criterion), the CI-enforced boundary, exact monetary arithmetic,
+Claimed: **YAGNI** (the sorting criterion), the CI-enforced boundary — meaning the job **fails**, not that the merge button locks: branch protection is unavailable on this plan and **ADR-0040** says so out loud — exact monetary arithmetic,
 authorization by role and scope, the CRA → line → invoice trail **as** the _piste d'audit fiable_.
 
 Not claimed: **SOLID** (only two of five have teeth here, and they already have other names), DDD

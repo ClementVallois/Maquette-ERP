@@ -33,7 +33,9 @@ pre-push:
       run: pnpm run boundaries
 
     # Integration tests are deliberately absent: a push must not require Docker. Coverage is
-    # NOT absent: `test:cov` is what the required CI gate runs, and a hook that runs a weaker
-    # command than the gate it stands in for sends red pushes to CI to be discovered there.
+    # NOT absent: `test:cov` is what the CI gate runs, and a hook that runs a weaker command than
+    # the gate it stands in for sends red pushes to CI to be discovered there. Since ADR-0040 the
+    # word "required" is wrong and the stake is higher: no CI gate blocks a merge on this plan, so
+    # these hooks are the only mechanical stop before one.
     - name: test-unit
       run: pnpm run test:cov
