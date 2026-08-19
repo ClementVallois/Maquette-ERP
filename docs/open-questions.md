@@ -66,6 +66,27 @@ event, 1.7 typed errors, 1.8 the dated hierarchy. Two departures from the plan, 
   `timesheet`, so a unit defined there is a unit Phase 2 has to redefine. ADR-0033 records the
   criterion and the rejected options.
 
+19. **The two database CI jobs this phase added had never run a migration.** `pnpm run migrate` is
+    `node --env-file=.env …`, and `--env-file` is a _hard error_ when the file is absent. `.env` is
+    gitignored, so on the runner both `Integration tests` and `Migrations replayed twice` died at
+    `node: .env: not found` — exit 9, before reaching the connection string the workflow hands them
+    as a real environment variable. The jobs BUILD-PLAN 3.1 required "in the same PR that adds the
+    harness" were therefore red from their first run, and the phase's claim that integration tests
+    run in CI rested on a job that had never got as far as connecting. → **Fixed now**:
+    `--env-file-if-exists`, so a real environment variable is enough and `.env` stays a local
+    convenience. Reproduced locally by moving `.env` aside before it was fixed.
+
+20. **The secret-scan job could not run on a pull request at all.** `gitleaks-action` asks the API
+    for the PR's commits on a `pull_request` event, which `permissions: contents: read` does not
+    grant; it exited on a 403. The push path scans the history directly and never needed it, so
+    this surfaced only when the repository's **first** pull request was opened. → **Fixed now**:
+    `pull-requests: read` on that job, and nothing wider.
+
+Both of 19 and 20 are the same shape as points 8 and 15, one layer out: **a gate nobody had watched
+run in the mode it will actually be judged in**. Phase 3 wrote its CI and never opened a PR with
+it. The lesson is recorded here rather than as an ADR because it is not a decision — it is that
+"the workflow is written" and "the workflow has passed" are different claims.
+
 **Deferred, named rather than dropped:**
 
 - **`CraRepository` is not built.** The plan's TDD table has an `application/` layer against

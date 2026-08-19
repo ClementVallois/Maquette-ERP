@@ -211,6 +211,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # On a `pull_request` event the action asks the API for the PR's commits, which `contents`
+      # alone does not grant. Without this the job dies with a 403 on the first PR ever opened —
+      # the push path scans the history directly and never needed it.
+      pull-requests: read
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:

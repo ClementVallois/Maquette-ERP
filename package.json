@@ -26,7 +26,7 @@
     "test": "vitest run --project unit",
     "test:int": "vitest run --project integration",
     "test:cov": "vitest run --project unit --coverage",
-    "migrate": "node --env-file=.env scripts/migrate.ts",
+    "migrate": "node --env-file-if-exists=.env scripts/migrate.ts",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
     "db:reset": "docker compose down -v && pnpm run db:up && pnpm run migrate && pnpm run seed"
