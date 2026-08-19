@@ -6,7 +6,7 @@ import { contextOf, sendProblem } from '../http/reply.ts';
 import { personaFor, PUBLIC } from '../personas/access.ts';
 import type { Persona } from '../personas/catalogue.ts';
 import { clearedPersonaCookie, personaCookie } from '../personas/cookie.ts';
-import { malformed, parseBody } from '../validation.ts';
+import { malformed, parseInput } from '../validation.ts';
 
 /**
  * Choosing a persona (ADR-0023). All three routes are public, and the reason is the same in each
@@ -62,7 +62,7 @@ export function registerSessionRoutes(
     '/api/v1/session/persona',
     { config: { access: PUBLIC('choosing a persona is how an identity is acquired at all') } },
     async (request, reply) => {
-      const body = parseBody(SelectPersona, request.body);
+      const body = parseInput(SelectPersona, request.body);
       if (!body.ok) return sendProblem(reply, malformed(body.errors, contextOf(request)));
 
       const persona = await dependencies.personas.byKey(body.value.key);

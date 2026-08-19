@@ -16,6 +16,14 @@ import { PgNumberingCounter } from './pg-numbering-counter.ts';
 // Simple sequential tests — the per-test rollback harness is enough.
 // ---------------------------------------------------------------------------
 
+/**
+ * Child-row ids for these tests. Not the production generator: the repositories take a factory
+ * precisely so that the composition root chooses one (ADR-0041), and a test is a composition
+ * root too. Counter-based so a failure names a readable id.
+ */
+let testIdCounter = 0;
+const testIds = (): string => `test-id-${String(++testIdCounter)}`;
+
 describe('PgNumberingCounter', () => {
   const tx = useTestTransaction();
 
@@ -153,7 +161,7 @@ describe('PgNumberingCounter — transactional guarantees', () => {
       await seedReferenceData(writer);
 
       const counter = new PgNumberingCounter(writer);
-      const invoiceRepo = new PgInvoiceRepository(writer);
+      const invoiceRepo = new PgInvoiceRepository(writer, testIds);
 
       const seq = await counter.nextSequence('entity-fr', 2026);
       expect(seq).toBe(1);

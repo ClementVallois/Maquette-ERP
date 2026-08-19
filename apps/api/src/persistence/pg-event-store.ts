@@ -1,29 +1,31 @@
-import { randomUUID } from 'node:crypto';
+import type { DomainEvent } from '@erp/platform';
+
+import { uuidv7 } from '../ids/uuidv7.ts';
 
 interface PgClient {
   query(text: string, values?: unknown[]): Promise<{ rows: unknown[] }>;
 }
 
 /**
- * The shape `persist` accepts. Matches `DomainEvent` from `@erp/platform` without importing it —
- * the harness carries no workspace dependency, and the fields are the table's columns.
+ * What `persist` accepts. It is `DomainEvent` now that the store lives at the composition root:
+ * in `tests/harness/` it was a structural copy, because the harness deliberately carries no
+ * workspace dependency and could not import the contract it was writing.
  */
-export interface PersistableEvent {
-  readonly type: string;
-  readonly version: number;
-  readonly occurredAt: Date;
-  readonly correlationId: string;
-  readonly causationId: string | null;
-  readonly payload: unknown;
+export type PersistableEvent = DomainEvent;
+
+export interface EventStore {
+  persist(event: PersistableEvent): Promise<string>;
 }
 
 /**
  * Writes a domain event to `domain_events` using the caller's PgClient — which means the event
  * commits or rolls back with the state change it describes (ADR-0020).
  *
- * Lives in `tests/harness/` in Phase 3; promoted to `apps/api/` in Phase 5.
+ * Promoted here from `tests/harness/` in Phase 5, as ADR-0020 said it would be. The move also
+ * settles the open question of 18/08/2026: the event id was a UUIDv4 because the harness had no
+ * v7 generator it was allowed to reach, and the composition root has one.
  */
-export class PgEventStore {
+export class PgEventStore implements EventStore {
   readonly #client: PgClient;
 
   constructor(client: PgClient) {
@@ -31,7 +33,7 @@ export class PgEventStore {
   }
 
   async persist(event: PersistableEvent): Promise<string> {
-    const id = randomUUID();
+    const id = uuidv7();
 
     await this.#client.query(
       `INSERT INTO public.domain_events (id, type, version, occurred_at, correlation_id, causation_id, payload)

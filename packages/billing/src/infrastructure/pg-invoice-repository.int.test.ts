@@ -12,6 +12,14 @@ import { legalEntity } from '../domain/seller.ts';
 
 import { PgInvoiceRepository } from './pg-invoice-repository.ts';
 
+/**
+ * Child-row ids for these tests. Not the production generator: the repositories take a factory
+ * precisely so that the composition root chooses one (ADR-0041), and a test is a composition
+ * root too. Counter-based so a failure names a readable id.
+ */
+let testIdCounter = 0;
+const testIds = (): string => `test-id-${String(++testIdCounter)}`;
+
 describe('PgInvoiceRepository', () => {
   const tx = useTestTransaction();
 
@@ -116,7 +124,7 @@ describe('PgInvoiceRepository', () => {
   }
 
   function repo(): PgInvoiceRepository {
-    return new PgInvoiceRepository(tx.client);
+    return new PgInvoiceRepository(tx.client, testIds);
   }
 
   function makeDraftInvoice(id = 'invoice-1', officeId = PARIS): Invoice {

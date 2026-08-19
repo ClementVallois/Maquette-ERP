@@ -17,15 +17,11 @@ import type { ProblemContext } from './http/problem.ts';
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; errors: Record<string, string[]> };
 
-export function parseBody<T>(schema: z.ZodType<T>, body: unknown): Parsed<T> {
-  const result = schema.safeParse(body);
+export function parseInput<T>(schema: z.ZodType<T>, input: unknown): Parsed<T> {
+  const result = schema.safeParse(input);
   if (result.success) return { ok: true, value: result.data };
 
   return { ok: false, errors: fieldErrors(result.error) };
-}
-
-export function parseQuery<T>(schema: z.ZodType<T>, query: unknown): Parsed<T> {
-  return parseBody(schema, query);
 }
 
 function fieldErrors(error: z.ZodError): Record<string, string[]> {

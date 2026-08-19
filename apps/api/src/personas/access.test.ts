@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import type { ApiConfig } from '../config.ts';
 import type { ServerDependencies } from '../dependencies.ts';
+import { ApiFailure } from '../errors.ts';
+import type { Transactionally } from '../persistence/unit-of-work.ts';
 import { buildServer } from '../server.ts';
 
 import { forRoles, personaFor, PUBLIC } from './access.ts';
@@ -21,11 +23,18 @@ const config: ApiConfig = {
   logLevel: 'silent',
 };
 
+/** No database in these tests: a route that reaches for one is a route in the wrong test file. */
+const noDatabase: Transactionally = () => {
+  throw new ApiFailure('this test builds no unit of work');
+};
+
 const dependencies: ServerDependencies = {
   config,
   clock: { now: () => new Date('2026-06-15T09:00:00.000Z') },
   probeDatabase: () => Promise.resolve(),
   personas: inMemoryPersonas(),
+  transactionally: noDatabase,
+  newId: () => 'test-id',
 };
 
 function cookieFor(key: string): string {

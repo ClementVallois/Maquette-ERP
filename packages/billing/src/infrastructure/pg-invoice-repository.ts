@@ -12,6 +12,7 @@ import type {
 } from '../domain/ids.ts';
 import type { InvoiceLine, LineOrigin } from '../domain/invoice-line.ts';
 import type {
+  DeclinedDaysRecord,
   InvoiceListItem,
   InvoiceListQuery,
   InvoiceRepository,
@@ -35,8 +36,15 @@ interface PgClient {
 export class PgInvoiceRepository implements InvoiceRepository {
   readonly #client: PgClient;
 
-  constructor(client: PgClient) {
+  readonly #newId: () => string;
+
+  /**
+   * `newId` is injected rather than imported (ADR-0041): the generator lives in the composition
+   * root, and the dependency rule grants this module `@erp/platform` and nothing else.
+   */
+  constructor(client: PgClient, newId: () => string) {
     this.#client = client;
+    this.#newId = newId;
   }
 
   async findById(id: InvoiceId, actor: Actor): Promise<Invoice | null> {
@@ -70,20 +78,11 @@ export class PgInvoiceRepository implements InvoiceRepository {
       [actor.officeId, limit, query.offset],
     );
 
-    return rows.map((row) => ({
-      id: row.id,
-      status: row.status,
-      supplyPeriod: row.supply_period,
-      billedToName: row.billed_to_name,
-      invoiceNumber: row.invoice_number,
-      issueDate: row.issue_date === null ? null : isoDateOf(row.issue_date),
-      totalTtcCents:
-        row.total_ttc_cents !== null ? exactInteger('total_ttc_cents', row.total_ttc_cents) : null,
-    }));
+    return rows.map(toListItem);
   }
 
-  async save(invoice: Invoice): Promise<void> {
-    await this.#upsertInvoice(invoice);
+  async save(invoice: Invoice, options?: { issuanceIdempotencyKey: string }): Promise<void> {
+    await this.#upsertInvoice(invoice, undefined, options?.issuanceIdempotencyKey);
     await this.#replaceLines(invoice);
     await this.#replaceVatGroups(invoice);
   }
@@ -101,6 +100,59 @@ export class PgInvoiceRepository implements InvoiceRepository {
     await this.#replaceVatGroups(invoice);
   }
 
+  /** ADR-0021's "replay → original result": the documents the first validation drafted. */
+  async findDraftedFrom(craId: string, actor: Actor): Promise<readonly InvoiceListItem[]> {
+    if (readScope(actor, 'invoice') === 'none') return [];
+
+    const { rows } = await this.#client.query<InvoiceListRow>(
+      `SELECT id, status, supply_period, billed_to_name, invoice_number, issue_date, total_ttc_cents
+       FROM billing.invoices
+       WHERE $1 = ANY(source_cra_ids) AND office_id = $2
+       ORDER BY billed_to_name`,
+      [craId, actor.officeId],
+    );
+
+    return rows.map(toListItem);
+  }
+
+  /**
+   * Idempotent by `(cra_id, mission_id, reason)`: a replayed validation writes the same rows and
+   * appends nothing. `DO NOTHING` rather than `DO UPDATE`, because a decline is a fact about a
+   * Cra that was validated once — there is nothing about it that can legitimately change.
+   */
+  async saveDeclinedDays(
+    officeId: OfficeId,
+    declined: readonly DeclinedDaysRecord[],
+  ): Promise<void> {
+    for (const record of declined) {
+      await this.#client.query(
+        `INSERT INTO billing.declined_days (id, cra_id, mission_id, half_days, reason, office_id)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (cra_id, mission_id, reason) DO NOTHING`,
+        [this.#newId(), record.craId, record.missionId, record.halfDays, record.reason, officeId],
+      );
+    }
+  }
+
+  async findDeclinedDays(craId: string, actor: Actor): Promise<readonly DeclinedDaysRecord[]> {
+    if (readScope(actor, 'invoice') === 'none') return [];
+
+    const { rows } = await this.#client.query<DeclinedDaysRow>(
+      `SELECT cra_id, mission_id, half_days, reason
+       FROM billing.declined_days
+       WHERE cra_id = $1 AND office_id = $2
+       ORDER BY mission_id`,
+      [craId, actor.officeId],
+    );
+
+    return rows.map((row) => ({
+      craId: row.cra_id as CraId,
+      missionId: row.mission_id as MissionId,
+      halfDays: exactInteger('half_days', row.half_days),
+      reason: row.reason as DeclinedDaysRecord['reason'],
+    }));
+  }
+
   async hasCraBeenProcessed(craId: string): Promise<boolean> {
     const { rows } = await this.#client.query<{ found: boolean }>(
       `SELECT EXISTS (
@@ -115,7 +167,25 @@ export class PgInvoiceRepository implements InvoiceRepository {
   // the INSERT and never updated: `save` does not carry it, so `EXCLUDED.source_cra_ids` is `'{}'`
   // there, and updating the column would blank the provenance of every invoice at issuance —
   // taking `hasCraBeenProcessed` and the partial unique index of migration 006 with it.
-  async #upsertInvoice(invoice: Invoice, sourceCraIds?: readonly string[]): Promise<void> {
+  async findIssuedWithKey(key: string, actor: Actor): Promise<InvoiceListItem | null> {
+    if (readScope(actor, 'invoice') === 'none') return null;
+
+    const { rows } = await this.#client.query<InvoiceListRow>(
+      `SELECT id, status, supply_period, billed_to_name, invoice_number, issue_date, total_ttc_cents
+       FROM billing.invoices
+       WHERE issuance_idempotency_key = $1 AND office_id = $2`,
+      [key, actor.officeId],
+    );
+    const row = rows[0];
+
+    return row === undefined ? null : toListItem(row);
+  }
+
+  async #upsertInvoice(
+    invoice: Invoice,
+    sourceCraIds?: readonly string[],
+    issuanceIdempotencyKey?: string,
+  ): Promise<void> {
     const totals = invoice.status === 'issued' ? invoice.totals : null;
     const mentions = invoice.mentions;
 
@@ -132,7 +202,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
         mentions_late_penalty_rate, mentions_recovery_indemnity, mentions_vat_on_debits,
         invoice_number, issue_date, series_entity_id, series_fiscal_year, due_date,
         total_ht_cents, total_tax_cents, total_ttc_cents,
-        validated_by, source_cra_ids
+        validated_by, source_cra_ids, issuance_idempotency_key
       ) VALUES (
         $1, $2, $3, $4, $5,
         $6, $7, $8, $9,
@@ -142,7 +212,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
         $20, $21, $22, $23, $24, $25,
         $26, $27, $28, $29, $30,
         $31, $32, $33,
-        $34, $35
+        $34, $35, $36
       ) ON CONFLICT (id) DO UPDATE SET
         status = EXCLUDED.status,
         invoice_number = EXCLUDED.invoice_number,
@@ -152,7 +222,11 @@ export class PgInvoiceRepository implements InvoiceRepository {
         due_date = EXCLUDED.due_date,
         total_ht_cents = EXCLUDED.total_ht_cents,
         total_tax_cents = EXCLUDED.total_tax_cents,
-        total_ttc_cents = EXCLUDED.total_ttc_cents`,
+        total_ttc_cents = EXCLUDED.total_ttc_cents,
+        -- COALESCE, not EXCLUDED: a later re-save carries no key and must not erase the one the
+        -- issuance wrote. source_cra_ids learned the same lesson in Phase 3, by being erased.
+        issuance_idempotency_key = COALESCE(
+          EXCLUDED.issuance_idempotency_key, billing.invoices.issuance_idempotency_key)`,
       [
         invoice.id,
         invoice.officeId,
@@ -191,6 +265,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
         totals?.totalIncludingVatCents ?? null,
         invoice.validatedBy,
         sourceCraIds ?? [],
+        issuanceIdempotencyKey ?? null,
       ],
     );
   }
@@ -209,7 +284,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
           vat_kind, vat_basis_points, vat_not_charged_reason
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
         [
-          `${invoice.id}-line-${String(index)}`,
+          this.#newId(),
           invoice.id,
           index,
           line.designation,
@@ -235,17 +310,11 @@ export class PgInvoiceRepository implements InvoiceRepository {
       invoice.id,
     ]);
 
-    for (const [index, group] of invoice.vatBreakdown.entries()) {
+    for (const group of invoice.vatBreakdown) {
       await this.#client.query(
         `INSERT INTO billing.invoice_vat_groups (id, invoice_id, group_key, base_cents, tax_cents)
          VALUES ($1, $2, $3, $4, $5)`,
-        [
-          `${invoice.id}-vat-${String(index)}`,
-          invoice.id,
-          group.key,
-          group.baseCents,
-          group.vatCents ?? 0,
-        ],
+        [this.#newId(), invoice.id, group.key, group.baseCents, group.vatCents ?? 0],
       );
     }
   }
@@ -428,13 +497,33 @@ interface InvoiceRow {
   source_cra_ids: string[] | null;
 }
 
+function toListItem(row: InvoiceListRow): InvoiceListItem {
+  return {
+    id: row.id as InvoiceId,
+    status: row.status,
+    supplyPeriod: row.supply_period,
+    billedToName: row.billed_to_name,
+    invoiceNumber: row.invoice_number,
+    issueDate: row.issue_date === null ? null : isoDateOf(row.issue_date),
+    totalTtcCents:
+      row.total_ttc_cents !== null ? exactInteger('total_ttc_cents', row.total_ttc_cents) : null,
+  };
+}
+
+interface DeclinedDaysRow {
+  cra_id: string;
+  mission_id: string;
+  half_days: string | number;
+  reason: string;
+}
+
 interface InvoiceListRow {
   id: string;
   status: string;
   supply_period: string;
   billed_to_name: string;
   invoice_number: string | null;
-  issue_date: string | null;
+  issue_date: Date | string | null;
   total_ttc_cents: string | number | null;
 }
 

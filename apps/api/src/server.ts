@@ -10,6 +10,7 @@ import {
 import { contextOf, CORRELATION_ID_HEADER, correlationIdOf, sendProblem } from './http/reply.ts';
 import { loggerOptions } from './logging.ts';
 import { registerAccessControl, registerOriginCheck } from './personas/access.ts';
+import { registerApiRoutes } from './routes/api.ts';
 import { registerOpsRoutes } from './routes/ops.ts';
 import { registerSessionRoutes } from './routes/session.ts';
 
@@ -104,6 +105,7 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
 
   registerOpsRoutes(app, dependencies);
   registerSessionRoutes(app, dependencies);
+  registerApiRoutes(app, dependencies);
 
   return app;
 }

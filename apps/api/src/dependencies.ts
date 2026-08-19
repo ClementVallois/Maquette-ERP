@@ -1,6 +1,7 @@
 import type { Clock } from '@erp/platform';
 
 import type { ApiConfig } from './config.ts';
+import type { Transactionally } from './persistence/unit-of-work.ts';
 import type { PersonaCatalogue } from './personas/catalogue.ts';
 
 /**
@@ -18,4 +19,8 @@ export interface ServerDependencies {
   readonly probeDatabase: () => Promise<void>;
   /** The four selectable identities of ADR-0023, read from the seeded reference table. */
   readonly personas: PersonaCatalogue;
+  /** The transaction boundary. Every route that touches the database goes through it. */
+  readonly transactionally: Transactionally;
+  /** UUIDv7 (ADR-0041). The composition root owns it; the modules are handed it. */
+  readonly newId: () => string;
 }

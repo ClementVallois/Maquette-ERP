@@ -61,6 +61,8 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0024](./0024-structured-logging-redacted-by-allowlist.md)              | Structured logging, redacted by allowlist in the serialiser                      | accepted |
 | [0042](./0042-which-status-a-business-refusal-takes.md)                 | Which HTTP status a business refusal takes, and what it may publish              | accepted |
 | [0023](./0023-persona-selector-instead-of-authentication.md)            | A persona selector instead of authentication, and where authorization is decided | accepted |
+| [0043](./0043-economics-is-read-at-the-composition-root.md)             | Margin is read at the composition root, because it belongs to neither module     | accepted |
+| [0044](./0044-idempotency-key-is-stored-not-merely-required.md)         | `Idempotency-Key` is stored, not merely required                                 | accepted |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
@@ -99,6 +101,13 @@ fixed only **where** a `problemType` becomes an HTTP status, and applying it to 
 turned out to need two rulings nothing had made — that a domain refusal never answers 400 (422 and
 409 split what "validation" was one word for), and that a 403 publishes the rule that denied it and
 none of the business fields that would describe what it is hiding.
+
+0043 and 0044 continue it, for two more the plan had not identified and that writing the routes
+forced. 0043: margin needs `Tjm` from one module and `Cjm` from neither, so the read has no module
+to live in — and improvising the join inside a route handler is what the ADR discipline exists to
+stop. 0044: ADR-0021 promised "replay → original result" through a port that could only answer a
+boolean, and BUILD-PLAN required an `Idempotency-Key` that nothing stored; a required header that
+changes no behaviour is a gate that is present and inert.
 
 ## Identified, not yet decided
 

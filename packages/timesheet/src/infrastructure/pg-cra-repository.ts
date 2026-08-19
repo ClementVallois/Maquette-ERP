@@ -25,9 +25,17 @@ interface PgClient {
 
 export class PgCraRepository implements CraRepository {
   readonly #client: PgClient;
+  readonly #newId: () => string;
 
-  constructor(client: PgClient) {
+  /**
+   * `newId` is injected rather than imported: ADR-0041 puts the UUIDv7 generator in the
+   * composition root, and the dependency rule grants this module `@erp/platform` and nothing
+   * else. It mints child-row ids — the positional `${cra.id}-line-${index}` strings it replaces
+   * were not UUIDs at all.
+   */
+  constructor(client: PgClient, newId: () => string) {
     this.#client = client;
+    this.#newId = newId;
   }
 
   async findById(id: CraId, actor: Actor): Promise<Cra | null> {
@@ -125,26 +133,19 @@ export class PgCraRepository implements CraRepository {
     await this.#client.query(`DELETE FROM timesheet.cra_lines WHERE cra_id = $1`, [cra.id]);
     await this.#client.query(`DELETE FROM timesheet.cra_flags WHERE cra_id = $1`, [cra.id]);
 
-    for (const [index, line] of cra.lines.entries()) {
+    for (const line of cra.lines) {
       await this.#client.query(
         `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [
-          `${cra.id}-line-${String(index)}`,
-          cra.id,
-          line.day,
-          line.dayType,
-          line.missionId,
-          line.halfDays,
-        ],
+        [this.#newId(), cra.id, line.day, line.dayType, line.missionId, line.halfDays],
       );
     }
 
-    for (const [index, flag] of cra.flags.entries()) {
+    for (const flag of cra.flags) {
       await this.#client.query(
         `INSERT INTO timesheet.cra_flags (id, cra_id, day, reason)
          VALUES ($1, $2, $3, $4)`,
-        [`${cra.id}-flag-${String(index)}`, cra.id, flag.day, flag.reason],
+        [this.#newId(), cra.id, flag.day, flag.reason],
       );
     }
   }

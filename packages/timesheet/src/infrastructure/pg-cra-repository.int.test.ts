@@ -9,6 +9,14 @@ import { workingCalendar } from '../domain/working-calendar.ts';
 
 import { PgCraRepository } from './pg-cra-repository.ts';
 
+/**
+ * Child-row ids for these tests. Not the production generator: the repositories take a factory
+ * precisely so that the composition root chooses one (ADR-0041), and a test is a composition
+ * root too. Counter-based so a failure names a readable id.
+ */
+let testIdCounter = 0;
+const testIds = (): string => `test-id-${String(++testIdCounter)}`;
+
 describe('PgCraRepository', () => {
   const tx = useTestTransaction();
 
@@ -46,7 +54,7 @@ describe('PgCraRepository', () => {
   }
 
   function repo(): PgCraRepository {
-    return new PgCraRepository(tx.client);
+    return new PgCraRepository(tx.client, testIds);
   }
 
   // The three collaborators `submit` and `validate` need, built for June 2026 against the rows

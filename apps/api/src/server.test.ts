@@ -4,8 +4,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { ApiConfig } from './config.ts';
 import type { ServerDependencies } from './dependencies.ts';
+import { ApiFailure } from './errors.ts';
 import { PROBLEM_JSON } from './http/problem.ts';
 import { CORRELATION_ID_HEADER, correlationIdOf } from './http/reply.ts';
+import type { Transactionally } from './persistence/unit-of-work.ts';
 import { PUBLIC } from './personas/access.ts';
 import { inMemoryPersonas } from './personas/testing/catalogue.ts';
 import { buildServer } from './server.ts';
@@ -30,12 +32,19 @@ class NotTheManager extends BusinessError {
 /** Neither a `BusinessError` nor a `TechnicalFailure`: what a third-party driver actually throws. */
 class DriverBlewUp extends Error {}
 
+/** No database in these tests: a route that reaches for one is a route in the wrong test file. */
+const noDatabase: Transactionally = () => {
+  throw new ApiFailure('this test builds no unit of work');
+};
+
 function dependencies(overrides: Partial<ServerDependencies> = {}): ServerDependencies {
   return {
     config,
     clock: { now: () => new Date('2026-06-15T09:00:00.000Z') },
     probeDatabase: () => Promise.resolve(),
     personas: inMemoryPersonas(),
+    transactionally: noDatabase,
+    newId: () => 'test-id',
     ...overrides,
   };
 }

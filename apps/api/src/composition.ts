@@ -3,6 +3,8 @@ import pg from 'pg';
 
 import type { ApiConfig } from './config.ts';
 import type { ServerDependencies } from './dependencies.ts';
+import { uuidv7 } from './ids/uuidv7.ts';
+import { pgTransactionally } from './persistence/unit-of-work.ts';
 import { PgPersonaCatalogue } from './personas/catalogue.ts';
 
 /**
@@ -49,6 +51,8 @@ export function compose(config: ApiConfig): Composition {
       // Over the pool, not over a checked-out client: reading the catalogue is a lookup, not part
       // of anyone's unit of work.
       personas: new PgPersonaCatalogue(pool),
+      transactionally: pgTransactionally(pool, uuidv7),
+      newId: uuidv7,
     },
   };
 }
