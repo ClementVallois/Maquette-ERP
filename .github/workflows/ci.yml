@@ -272,7 +272,7 @@ jobs:
               expected CONSTANT text[][] := ARRAY[
                 ['public.offices','4'], ['public.practices','5'], ['public.personas','4'],
                 ['public.consultants','9'], ['public.clients','5'], ['public.missions','7'],
-                ['timesheet.cras','6'], ['billing.invoices','4'], ['public.domain_events','6']
+                ['timesheet.cras','6'], ['billing.invoices','3'], ['public.domain_events','5']
               ];
               found bigint;
             BEGIN

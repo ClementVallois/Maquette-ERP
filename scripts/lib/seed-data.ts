@@ -625,6 +625,17 @@ export const managerAttachments = [
   },
 ] as const;
 
+/**
+ * The one consultant whose June is **submitted and not validated**.
+ *
+ * Without it the seeded instance has nothing to validate, so the chain this whole repository is
+ * about — a manager accepts a month and the draft invoices appear — could be described but not
+ * performed. Claire is in Paris, so `manager-paris` is in scope to validate her; her mission bills
+ * the Réunion client at 8,5 %, so the invoice that appears is also the one that exercises the DOM
+ * VAT rate.
+ */
+export const SUBMITTED_NOT_VALIDATED_EMAIL = 'claire.dubois@secureco.test';
+
 // ── Personas ────────────────────────────────────────────────────────────────
 // The four selectable identities of ADR-0023. Four entries over three roles, and the fourth is
 // the point: `manager-lyon` is what makes an out-of-scope refusal reproducible by switching

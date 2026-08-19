@@ -64,6 +64,7 @@ import {
   practices,
   SEED_CLOCK_INSTANT,
   SEED_TIMESTAMP_MS,
+  SUBMITTED_NOT_VALIDATED_EMAIL,
 } from './lib/seed-data.ts';
 
 const { Client: PgClient } = pg;
@@ -522,7 +523,6 @@ async function seed(): Promise<void> {
         }
       }
 
-      // Submit and validate
       cra.submit({ clock, calendar, reference: tsRef });
 
       const manager = mgmtHierarchy.managerOf(consultant.id, period);
@@ -532,9 +532,14 @@ async function seed(): Promise<void> {
         );
       }
 
-      const payload = cra.validate({ by: manager, clock, hierarchy: mgmtHierarchy });
+      // One Cra stops at `submitted`, on purpose: a dataset where every month is already
+      // validated leaves the chain describable and not performable. This is the one the demo
+      // validates, and it is why an invoice appears while somebody is watching.
+      if (consultant.email !== SUBMITTED_NOT_VALIDATED_EMAIL) {
+        const payload = cra.validate({ by: manager, clock, hierarchy: mgmtHierarchy });
 
-      seededCras.push({ officeId: consultant.officeId, payload });
+        seededCras.push({ officeId: consultant.officeId, payload });
+      }
 
       // Persist the CRA
       await client.query(
