@@ -1,4 +1,4 @@
-import { BusinessError } from '@erp/platform';
+import { BusinessError, TechnicalFailure } from '@erp/platform';
 
 /**
  * The working calendar was asked about a year it does not hold. ADR-0004 keeps a written table
@@ -183,5 +183,21 @@ export class NotTheManagerError extends BusinessError {
         (input.manager === null ? ' (nobody was)' : ''),
       { ...input },
     );
+  }
+}
+
+/**
+ * A persisted `Cra` came back in a state the aggregate's own transitions cannot produce — a
+ * `validated` record with nobody who validated it, a `refused` one with no refusal. A **technical**
+ * failure and not a business one: no user action produces it, and no retry fixes it. `reconstitute`
+ * is the one door into an aggregate that skips the transitions, so it is the one place that has to
+ * refuse; without this check "an object must not be able to exist in an invalid state"
+ * (`docs/BUILD-RULES.md`) would hold for every caller except the database.
+ */
+export class InconsistentPersistedCraError extends TechnicalFailure {
+  readonly retryable = false;
+
+  constructor(craId: string, detail: string) {
+    super(`cra ${craId} was persisted in a state its transitions cannot produce: ${detail}`);
   }
 }

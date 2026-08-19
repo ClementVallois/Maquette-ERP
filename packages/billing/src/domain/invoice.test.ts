@@ -2,8 +2,10 @@ import { InvalidValueError, period } from '@erp/platform';
 import { describe, expect, it } from 'vitest';
 
 import {
+  CraAlreadyProcessedError,
   EmptyInvoiceError,
   InvalidPaymentTermError,
+  InconsistentPersistedInvoiceError,
   InvalidSequenceError,
   InvoiceTransitionError,
   LineOutsideInvoicePeriodError,
@@ -398,5 +400,102 @@ describe('the number series', () => {
     expect(() => documentNumber(SELLER, key, 0)).toThrow(InvalidSequenceError);
     expect(() => documentNumber(SELLER, key, 1_000_000)).toThrow(InvalidSequenceError);
     expect(() => documentNumber(SELLER, key, 1.5)).toThrow(InvalidSequenceError);
+  });
+});
+
+describe('Invoice.reconstitute', () => {
+  // The one door into the aggregate that sets a status without running `issue`, which is what
+  // sets the number, the date, the series and the totals together. Phase 3 added it for the
+  // repository and no unit test touched it.
+  function persistedInvoice(
+    overrides: Partial<Parameters<typeof Invoice.reconstitute>[0]> = {},
+  ): Invoice {
+    return Invoice.reconstitute({
+      id: 'invoice-1',
+      officeId: 'office-paris',
+      status: 'draft',
+      seller: SELLER,
+      billedTo: billedParty(parisClient),
+      supplyPeriod: '2026-03',
+      lines: [lineOf(100_000, STANDARD)],
+      terms: TERMS,
+      mentions: MENTIONS,
+      validatedBy: ['bruno'],
+      number: null,
+      issueDate: null,
+      series: null,
+      totals: null,
+      ...overrides,
+    });
+  }
+
+  const ISSUED = {
+    status: 'issued',
+    number: 'SEC-2026-000042',
+    issueDate: '2026-04-02',
+    series: { entityId: 'entity-fr', fiscalYear: 2026 },
+    totals: {
+      totalExcludingVatCents: 100_000,
+      vatTotalCents: 20_000,
+      totalIncludingVatCents: 120_000,
+    },
+  } as const;
+
+  it('rebuilds a draft, and an issued invoice with everything issue set', () => {
+    expect(persistedInvoice().status).toBe('draft');
+
+    const issued = persistedInvoice({ ...ISSUED });
+    expect(issued.status).toBe('issued');
+    expect(issued.number).toBe('SEC-2026-000042');
+  });
+
+  it('refuses an issued invoice with no number', () => {
+    // The state `issue` cannot produce, and the state a row can hold: an invoice that has left
+    // and cannot say under what number. Without the guard the aggregate exists in it.
+    expect(() => persistedInvoice({ ...ISSUED, number: null })).toThrow(
+      InconsistentPersistedInvoiceError,
+    );
+  });
+
+  it('refuses an issued invoice with no frozen totals', () => {
+    expect(() => persistedInvoice({ ...ISSUED, totals: null })).toThrow(
+      InconsistentPersistedInvoiceError,
+    );
+  });
+
+  it('names every missing field at once, not the first one', () => {
+    // A refusal that names one field sends the reader back for a second round trip per column.
+    expect(() => persistedInvoice({ ...ISSUED, series: null, issueDate: null })).toThrow(
+      /no issue date, no series/,
+    );
+  });
+
+  it('refuses a draft that already carries a number', () => {
+    // The same fault from the other side: a status behind the fields rather than ahead of them.
+    expect(() => persistedInvoice({ number: 'SEC-2026-000042' })).toThrow(
+      InconsistentPersistedInvoiceError,
+    );
+  });
+
+  it('is not retryable: the row will read the same way next time', () => {
+    try {
+      persistedInvoice({ ...ISSUED, number: null });
+      expect.unreachable();
+    } catch (error) {
+      expect((error as InconsistentPersistedInvoiceError).retryable).toBe(false);
+    }
+  });
+});
+
+describe('CraAlreadyProcessedError', () => {
+  it('names the CRA and the client, because ADR-0038 makes the pair the key', () => {
+    // One CRA drafts one invoice per client, so "this CRA is done" is not the fact — "this CRA
+    // is done for this client" is, and the refusal has to carry both to be actionable.
+    const error = new CraAlreadyProcessedError('cra-1', 'client-1');
+
+    expect(error.message).toContain('cra-1');
+    expect(error.message).toContain('client-1');
+    expect(error.problemType).toBe('/problems/cra-already-processed');
+    expect(error.details).toStrictEqual({ craId: 'cra-1', clientId: 'client-1' });
   });
 });

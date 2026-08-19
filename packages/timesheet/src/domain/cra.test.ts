@@ -1,11 +1,13 @@
 import { InvalidValueError } from '@erp/platform';
 import { describe, expect, it } from 'vitest';
 
+import { Cra } from './cra.ts';
 import {
   CraTransitionError,
   DayOutsidePeriodError,
   DayOverbookedError,
   MissionOnNonWorkedDayError,
+  InconsistentPersistedCraError,
   MissionRequiredError,
   NotTheManagerError,
   RefusalReasonRequiredError,
@@ -20,6 +22,7 @@ import {
   fixedClock,
   MANAGER,
   managers,
+  MARCH,
   MISSION,
   OFFICE,
   reference,
@@ -297,5 +300,82 @@ describe('who may validate', () => {
     expect(() =>
       cra.validate({ by: MANAGER, clock: fixedClock(), hierarchy: hierarchy([]) }),
     ).toThrow(NotTheManagerError);
+  });
+});
+
+describe('Cra.reconstitute', () => {
+  // The one door into the aggregate that sets a status without running the transition that sets
+  // the fields alongside it. Phase 3 added it for the repository and no unit test touched it.
+  const AN_INSTANT = new Date('2026-04-03T10:00:00.000Z');
+
+  function persistedCra(overrides: Partial<Parameters<typeof Cra.reconstitute>[0]> = {}): Cra {
+    return Cra.reconstitute({
+      id: 'cra-1',
+      consultantId: CONSULTANT,
+      officeId: OFFICE,
+      period: MARCH,
+      status: 'draft',
+      lines: [],
+      flags: [],
+      submittedAt: null,
+      validatedBy: null,
+      validatedAt: null,
+      refusal: null,
+      ...overrides,
+    });
+  }
+
+  it('rebuilds a validated Cra with everything the transition set', () => {
+    const cra = persistedCra({
+      status: 'validated',
+      validatedBy: MANAGER,
+      validatedAt: AN_INSTANT,
+    });
+
+    expect(cra.status).toBe('validated');
+    expect(cra.validatedBy).toBe(MANAGER);
+  });
+
+  it('refuses a validated Cra that nobody validated', () => {
+    // The state `validate` cannot produce, and the state a row can hold. Without the guard the
+    // aggregate exists in it, which is what "no object in an invalid state" is supposed to rule
+    // out — for every caller including the database.
+    expect(() => persistedCra({ status: 'validated', validatedAt: AN_INSTANT })).toThrow(
+      InconsistentPersistedCraError,
+    );
+  });
+
+  it('refuses a validated Cra with no validation date', () => {
+    expect(() => persistedCra({ status: 'validated', validatedBy: MANAGER })).toThrow(
+      InconsistentPersistedCraError,
+    );
+  });
+
+  it('refuses a refused Cra with no refusal', () => {
+    expect(() => persistedCra({ status: 'refused' })).toThrow(InconsistentPersistedCraError);
+  });
+
+  it('refuses a submitted Cra with no submission date', () => {
+    expect(() => persistedCra({ status: 'submitted' })).toThrow(InconsistentPersistedCraError);
+  });
+
+  it('refuses a draft that already carries a submission date', () => {
+    // The same fault from the other side: a status that is behind the fields, not ahead of them.
+    expect(() => persistedCra({ submittedAt: AN_INSTANT })).toThrow(InconsistentPersistedCraError);
+  });
+
+  it('refuses a Cra that is not validated yet carries a validation', () => {
+    expect(() =>
+      persistedCra({ status: 'submitted', submittedAt: AN_INSTANT, validatedBy: MANAGER }),
+    ).toThrow(InconsistentPersistedCraError);
+  });
+
+  it('is not retryable: the row will read the same way next time', () => {
+    try {
+      persistedCra({ status: 'refused' });
+      expect.unreachable();
+    } catch (error) {
+      expect((error as InconsistentPersistedCraError).retryable).toBe(false);
+    }
   });
 });
