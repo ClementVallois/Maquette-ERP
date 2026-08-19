@@ -8,7 +8,7 @@
  * Grade carrying the default Tjm grid · Cjm as the sensitive value the scope test protects.
  */
 
-import { deterministicIdFactory } from './uuidv7.ts';
+import { deterministicIdFactory } from '@erp/api';
 
 // A frozen timestamp for the whole dataset: 2026-06-15T00:00:00.000Z.
 // Arbitrary but stable: every UUIDv7 in the seed shares this prefix.

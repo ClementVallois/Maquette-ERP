@@ -52,6 +52,7 @@
     "vitest": "4.1.10"
   },
   "dependencies": {
+    "@erp/api": "workspace:*",
     "@erp/billing": "workspace:*",
     "@erp/platform": "workspace:*",
     "@erp/timesheet": "workspace:*",

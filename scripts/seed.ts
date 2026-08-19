@@ -10,6 +10,7 @@
 import pg from 'pg';
 import { z } from 'zod/v4';
 
+import { uuidv7Deterministic } from '@erp/api';
 import {
   billingReference,
   client as clientFactory,
@@ -62,7 +63,6 @@ import {
   SEED_CLOCK_INSTANT,
   SEED_TIMESTAMP_MS,
 } from './lib/seed-data.ts';
-import { uuidv7Deterministic } from './lib/uuidv7.ts';
 
 const { Client: PgClient } = pg;
 

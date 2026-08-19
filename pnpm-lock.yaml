@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@erp/api':
+        specifier: workspace:*
+        version: link:apps/api
       '@erp/billing':
         specifier: workspace:*
         version: link:packages/billing

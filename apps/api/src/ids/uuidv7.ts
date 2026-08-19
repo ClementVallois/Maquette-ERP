@@ -7,6 +7,16 @@
  *
  * Hand-written rather than imported: Node 24's `crypto.randomUUID()` is v4 only, and the
  * layout is 22 lines of bit-packing — simpler than evaluating a library (ADR-0041).
+ *
+ * It lives here because ADR-0041 said it would: "the repositories import from `scripts/lib/` at
+ * seed time … or, once `apps/api/` exists (Phase 5), from the composition root". `@erp/platform`
+ * is not an option — it imports not even a Node builtin, and `randomBytes` is one — and the two
+ * composition roots that mint ids, the runtime one here and the deterministic one in the seed,
+ * must mint them the same way or the seed stops proving anything about the running system.
+ *
+ * The modules themselves never import it: the dependency rule grants them `@erp/platform` and
+ * nothing else, so a repository that needs an id is **given a factory**, which is what keeps the
+ * choice of generator on this side of the boundary.
  */
 
 import { randomBytes } from 'node:crypto';
