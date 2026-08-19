@@ -597,3 +597,11 @@ protects, named alongside its partner `Tjm` with the French pair explained.
 
 **No ADR numbers were borrowed.** 0022 takes the plan's reservation; 0041 continues the unplanned
 sequence (after 0040). Both are recorded in `docs/adr/README.md`.
+
+**The two reviewers did not run before this merge.** Neither the `rules-auditor` nor the
+`cold-reader` agent was dispatched for Phase 4. `CLAUDE.md` requires both before every merge to
+`main`; the omission is deliberate (time constraint) and recorded here rather than discovered later.
+The debt is bounded: Phase 4 is data and a CI job, not domain code or a README change, so the
+cold-reader's surface is unchanged and the rules-auditor's is the seed script and migration 007.
+Both should run retroactively before Phase 5 merges — or at the latest before Phase 9, which owns
+the final review.
