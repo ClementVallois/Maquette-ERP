@@ -3,6 +3,10 @@ packages:
   # What is deployed, as opposed to what is composed. Declared before it is populated because
   # vitest.config.ts and .dependency-cruiser.cjs already name `apps/**`. See docs/adr/0015.
   - 'apps/*'
+  # The integration harness. A workspace member, not a directory reached by a relative path:
+  # `rootDir` is `src` in every package, so a `../../../../tests/` climb puts a file outside
+  # the package that imports it and `tsc --noEmit` fails with TS6059.
+  - 'tests/harness'
 
 # In pnpm 11 this key is not read from .npmrc. Without it, `pnpm add` reintroduces `^` ranges.
 saveExact: true

@@ -138,6 +138,10 @@ _Avoid_: LineItem, Item, Ligne
 The origin of an `InvoiceLine` that came from validated `Cra` days on a `Regie` mission: the mission, the `Cra`, the month worked, the count of `HalfDays` and the `Tjm` in force then. The only origin this mockup produces, and a tagged one from the first line written (ADR-0013) — a second origin is a variant, not a migration over documents that are legally immutable. It is also what makes the CRA → line → invoice chain checkable rather than claimed.
 _Avoid_: Source, Reference, Provenance
 
+**Piste d'audit fiable** (🇫🇷 kept):
+The reliable audit trail French tax law requires between a delivered service and the invoice that bills it (art. 289-VII du CGI): a documented, permanent and chronological link, each step tied to the one before. Kept in French because "audit trail" in English is a logging term and loses the legal obligation entirely — this is the reason the phrase is the load-bearing one in ADR-0013 and ADR-0020 rather than decoration. Here it is materialised by two things and not by a claim: an `InvoiceLine` carries its `RegieDays` origin down to the `Cra` it came from, and every domain event is written to `domain_events` in **the same transaction** as the change that emitted it, carrying its `correlationId` and `causationId`.
+_Avoid_: AuditTrail, AuditLog, Traceability, Journal
+
 **CreditNote** (🇬🇧 translated from _avoir_):
 The document that corrects an issued `Invoice`, since an issued invoice is never modified. Standard accounting term, exact translation. It reverses the invoice **in full** — a partial one is not built here — carries **positive** amounts with its own type carrying the direction (ADR-0036), takes its number from the same series as the invoice (ADR-0018), and says why in a typed `CreditNoteReason`: an entry error, a commercial gesture, a scope dispute, or a cancellation. It has no lifecycle: it is issued in one act and never changes.
 _Avoid_: Avoir, Refund, Reversal, Credit
@@ -169,6 +173,10 @@ _Avoid_: Type, Nature, Kind
 **DeclinedDays**:
 Half-days a validated `Cra` carried that did **not** become an `InvoiceLine`, with the reason: the mission is not `Regie`, the mission is unknown to billing, no `Tjm` was agreed for that date, or the client is missing. Reported rather than skipped (ADR-0037) — every half-day the validation carried is in either the invoices or this list, and a day that vanishes between validation and invoicing is the discrepancy this whole chain exists to remove.
 _Avoid_: Skipped, Ignored, Rejected, Errors
+
+**CraAlreadyProcessedError**:
+The refusal returned when a `Cra` that has already produced a draft invoice for a client is processed again. A **business** error and not a technical one: replaying a `timesheet.TimesheetValidated` event is expected — at-least-once delivery, a retried request, a manual replay — and the right answer is a named refusal, not a second invoice and not a crash. Enforced twice on purpose (ADR-0021): a unique constraint in the draft table, and the domain guard in front of it, so the invariant does not rest on the database alone. Destined for a `409 Conflict` when Phase 5 puts an API in front of it.
+_Avoid_: DuplicateInvoice, AlreadyBilled, ConflictError
 
 **InvoiceNumber**:
 The legal, sequential and gapless identifier of an issued `Invoice` or `CreditNote`, allocated from one series keyed on the issuing entity and the fiscal year (ADR-0018). Written `SEC-2026-000042`. Distinct from the document's internal id, and carrying no mark of which of the two kinds of document it numbers — the kind is the document's, and the number's job is chronological continuity.

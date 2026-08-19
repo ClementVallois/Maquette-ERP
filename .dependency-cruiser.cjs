@@ -42,7 +42,17 @@ module.exports = {
         path: '^packages/(?:[^/]+/src/domain|platform/src)/',
         pathNot: '\\.test\\.ts$',
       },
-      to: { dependencyTypes: ['npm', 'npm-dev', 'npm-optional', 'npm-peer', 'core'] },
+      // `npm-no-pkg` is in this list, and its absence was this rule's second death. It is what
+      // dependency-cruiser reports when the IMPORTING package's own manifest does not declare the
+      // package — exactly what a domain reaching for something it was never given produces. The
+      // whitelist below granted it from the day the driver landed; the ban never listed it, so a
+      // domain file importing `pg` cruised clean for the whole of Phase 3.
+      // `tests/boundary-rule.test.ts` holds the negative test, against a fixture importing a
+      // package only the ROOT manifest declares — the `vitest` fixture next to it classifies as
+      // `npm-dev` and would not have caught this.
+      to: {
+        dependencyTypes: ['npm', 'npm-dev', 'npm-optional', 'npm-peer', 'npm-no-pkg', 'core'],
+      },
     },
     {
       name: 'domain-not-to-outer-layers',
@@ -94,7 +104,18 @@ module.exports = {
     // one so its failure reads well, and this entry is what refuses everything else.
     { from: { path: '^apps/' }, to: { path: '^packages/[^/]+/src/index\\.ts$' } },
     // Third-party code. The domain is held to nothing at all by a separate forbidden rule.
-    { from: {}, to: { dependencyTypes: ['npm', 'npm-dev', 'npm-optional', 'npm-peer', 'core'] } },
+    // `npm-no-pkg` is what dependency-cruiser reports when the IMPORTING package's manifest does
+    // not declare the package — not, as this comment used to say, a pnpm symlink it cannot
+    // resolve. The two modules now declare `pg` themselves, so their imports classify as `npm`;
+    // this entry stays for a root-only devDependency reached from repository tooling.
+    {
+      from: {},
+      to: { dependencyTypes: ['npm', 'npm-dev', 'npm-optional', 'npm-peer', 'npm-no-pkg', 'core'] },
+    },
+    // Integration tests live in `packages/*/src/` (boundary rules apply) but import a shared
+    // harness outside of any package. The harness files also import each other.
+    { from: { path: '\\.int\\.test\\.ts$' }, to: { path: '^tests/' } },
+    { from: { path: '^tests/' }, to: { path: '^tests/' } },
   ],
 
   options: {

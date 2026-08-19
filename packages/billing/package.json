@@ -11,9 +11,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@erp/platform": "workspace:*"
+    "@erp/platform": "workspace:*",
+    "pg": "8.23.0"
   },
   "devDependencies": {
+    "@erp/test-harness": "workspace:*",
+    "@types/pg": "8.23.0",
     "vitest": "4.1.10"
   }
 }

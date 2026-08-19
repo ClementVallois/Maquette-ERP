@@ -1,4 +1,4 @@
-import { BusinessError } from '@erp/platform';
+import { BusinessError, TechnicalFailure } from '@erp/platform';
 
 /**
  * The VAT reference was asked about a date it does not cover. Loud on purpose, for the reason
@@ -129,6 +129,22 @@ export class DocumentDoesNotAddUpError extends BusinessError {
   }
 }
 
+/**
+ * The safety net: the unique index on `(source_cra_ids[1], billed_to_client_id)` caught a race
+ * condition where two transactions both passed the application guard (ADR-0021). The application
+ * guard makes this unreachable in normal flow — this is the concurrent-transaction path only.
+ */
+export class CraAlreadyProcessedError extends BusinessError {
+  readonly problemType = '/problems/cra-already-processed';
+
+  constructor(craId: string, clientId: string) {
+    super(`CRA ${craId} has already produced an invoice for client ${clientId}`, {
+      craId,
+      clientId,
+    });
+  }
+}
+
 /** A credit note corrects an issued invoice. There is nothing else to correct. */
 export class NotAnIssuedInvoiceError extends BusinessError {
   readonly problemType = '/problems/not-an-issued-invoice';
@@ -138,5 +154,23 @@ export class NotAnIssuedInvoiceError extends BusinessError {
       invoiceId,
       status,
     });
+  }
+}
+
+/**
+ * A persisted `Invoice` came back in a state the aggregate's own transitions cannot produce — an
+ * `issued` document with no number or no frozen totals, a `draft` one that already carries them.
+ * A **technical** failure and not a business one: no user action produces it, and no retry fixes
+ * it. `reconstitute` is the one door into the aggregate that skips `issue`, so it is the one place
+ * that has to refuse; without this check "an object must not be able to exist in an invalid state"
+ * (`docs/BUILD-RULES.md`) would hold for every caller except the database.
+ */
+export class InconsistentPersistedInvoiceError extends TechnicalFailure {
+  readonly retryable = false;
+
+  constructor(invoiceId: string, detail: string) {
+    super(
+      `invoice ${invoiceId} was persisted in a state its transitions cannot produce: ${detail}`,
+    );
   }
 }

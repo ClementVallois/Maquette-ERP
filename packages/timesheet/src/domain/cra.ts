@@ -21,6 +21,7 @@ import {
   RefusalReasonRequiredError,
   SelfValidationForbiddenError,
   ValidatedCraIsImmutableError,
+  InconsistentPersistedCraError,
 } from './errors.ts';
 import type { Hierarchy } from './hierarchy.ts';
 import type { ConsultantId, CraId, MissionId, OfficeId } from './ids.ts';
@@ -77,6 +78,33 @@ export class Cra {
     period: Period;
   }): Cra {
     return new Cra(input.id, input.consultantId, input.officeId, input.period);
+  }
+
+  static reconstitute(input: {
+    id: CraId;
+    consultantId: ConsultantId;
+    officeId: OfficeId;
+    period: Period;
+    status: CraStatus;
+    lines: CraLine[];
+    flags: CraFlag[];
+    submittedAt: Date | null;
+    validatedBy: ConsultantId | null;
+    validatedAt: Date | null;
+    refusal: CraRefusal | null;
+  }): Cra {
+    assertCraStateIsCoherent(input);
+
+    const cra = new Cra(input.id, input.consultantId, input.officeId, input.period);
+    cra.#status = input.status;
+    cra.#lines.push(...input.lines);
+    cra.#flags = input.flags;
+    cra.#submittedAt = input.submittedAt;
+    cra.#validatedBy = input.validatedBy;
+    cra.#validatedAt = input.validatedAt;
+    cra.#refusal = input.refusal;
+
+    return cra;
   }
 
   get id(): CraId {
@@ -272,5 +300,43 @@ export class Cra {
     if (this.#status === 'validated') {
       throw new ValidatedCraIsImmutableError(this.#id, attempted);
     }
+  }
+}
+
+/**
+ * The transitions each set a field alongside the status. Reading a row back is the one path that
+ * can set the status without them, so it is the one that has to check.
+ */
+function assertCraStateIsCoherent(input: {
+  id: CraId;
+  status: CraStatus;
+  submittedAt: Date | null;
+  validatedBy: ConsultantId | null;
+  validatedAt: Date | null;
+  refusal: CraRefusal | null;
+}): void {
+  const refuse = (detail: string): never => {
+    throw new InconsistentPersistedCraError(input.id, detail);
+  };
+
+  switch (input.status) {
+    case 'draft':
+      if (input.submittedAt !== null) refuse('a draft carries a submission date');
+      if (input.refusal !== null) refuse('a draft carries a refusal');
+      break;
+    case 'submitted':
+      if (input.submittedAt === null) refuse('submitted with no submission date');
+      break;
+    case 'refused':
+      if (input.refusal === null) refuse('refused with no refusal');
+      break;
+    case 'validated':
+      if (input.validatedBy === null) refuse('validated by nobody');
+      if (input.validatedAt === null) refuse('validated with no validation date');
+      break;
+  }
+
+  if (input.status !== 'validated' && (input.validatedBy !== null || input.validatedAt !== null)) {
+    refuse(`not validated, yet carrying a validation (status ${input.status})`);
   }
 }

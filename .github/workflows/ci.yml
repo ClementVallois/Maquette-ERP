@@ -87,11 +87,122 @@ jobs:
 
       - run: pnpm run test:cov
 
+  test-integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: erp_migration
+          POSTGRES_PASSWORD: erp_local_dev
+          POSTGRES_DB: erp
+          PGTZ: UTC
+          TZ: UTC
+          POSTGRES_INITDB_ARGS: '--data-checksums'
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U erp_migration -d erp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 10s
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # The service container runs no init scripts, so this step is the CI counterpart of
+      # `docker/postgres/init/01-roles.sh` and must stay identical to it: same role, same grants,
+      # same `public` default privileges, and — critically — run BEFORE the migrations, so tables
+      # created afterwards inherit them. It stops here. The per-schema grants for `timesheet` and
+      # `billing` are migration 001's job, and this workflow used to repeat them in a later step,
+      # which meant a broken grant block in the migration merged green.
+      - name: Create app role, as the local init script does
+        run: |
+          psql "postgres://erp_migration:erp_local_dev@localhost:5433/erp" <<'EOSQL'
+            CREATE ROLE erp_app WITH LOGIN PASSWORD 'erp_local_dev';
+            GRANT CONNECT ON DATABASE erp TO erp_app;
+            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
+              GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO erp_app;
+            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
+              GRANT USAGE, SELECT ON SEQUENCES TO erp_app;
+          EOSQL
+        env:
+          PGPASSWORD: erp_local_dev
+
+      - name: Run migrations
+        run: pnpm run migrate
+        env:
+          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
+
+      - run: pnpm run test:int
+        env:
+          DATABASE_URL: postgres://erp_app:erp_local_dev@localhost:5433/erp
+          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
+
+  migrations-replayed-twice:
+    name: Migrations replayed twice
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: erp_migration
+          POSTGRES_PASSWORD: erp_local_dev
+          POSTGRES_DB: erp
+          PGTZ: UTC
+          TZ: UTC
+          POSTGRES_INITDB_ARGS: '--data-checksums'
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U erp_migration -d erp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 10s
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run migrations (first pass)
+        run: pnpm run migrate
+        env:
+          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
+
+      - name: Run migrations (second pass — must be a no-op)
+        run: pnpm run migrate
+        env:
+          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # On a `pull_request` event the action asks the API for the PR's commits, which `contents`
+      # alone does not grant. Without this the job dies with a 403 on the first PR ever opened —
+      # the push path scans the history directly and never needed it.
+      pull-requests: read
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:

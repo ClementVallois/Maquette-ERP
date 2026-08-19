@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  // Only ESLint reads this. The fixtures are excluded from their package's tsconfig — they are
+  // deliberate violations and must not be built — but a type-aware lint rule cannot evaluate a
+  // file that belongs to no project, and the guards' negative tests lint exactly these files.
+  "extends": "../../../../../tsconfig.base.json",
+  "compilerOptions": { "noEmit": true, "rootDir": "." },
+  "include": ["*.ts"]
+}

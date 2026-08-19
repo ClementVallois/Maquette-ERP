@@ -26,6 +26,7 @@
     "test": "vitest run --project unit",
     "test:int": "vitest run --project integration",
     "test:cov": "vitest run --project unit --coverage",
+    "migrate": "node --env-file-if-exists=.env scripts/migrate.ts",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
     "db:reset": "docker compose down -v && pnpm run db:up && pnpm run migrate && pnpm run seed"
@@ -35,6 +36,7 @@
     "@commitlint/config-conventional": "21.2.0",
     "@eslint/js": "10.0.1",
     "@types/node": "24.13.3",
+    "@types/pg": "8.23.0",
     "@vitest/coverage-v8": "4.1.10",
     "dependency-cruiser": "17.0.1",
     "eslint": "10.8.0",
@@ -47,5 +49,8 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.65.0",
     "vitest": "4.1.10"
+  },
+  "dependencies": {
+    "pg": "8.23.0"
   }
 }

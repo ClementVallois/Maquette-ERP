@@ -56,6 +56,11 @@ export {
   regieLine,
   type RegieDaysOrigin,
 } from './domain/invoice-line.ts';
+export type {
+  InvoiceListItem,
+  InvoiceListQuery,
+  InvoiceRepository,
+} from './domain/invoice-repository.ts';
 export { INVOICE_STATUSES, type InvoiceStatus } from './domain/invoice-status.ts';
 export {
   BILLING_MODELS,

@@ -11,6 +11,9 @@ const APP_FIXTURE = ['apps/__boundary-fixture__/src/**/*.ts'];
 const MODULE_TO_APP_FIXTURE = ['packages/timesheet/src/__boundary-fixture__/**/*.ts'];
 const DOMAIN_NPM_FIXTURE = ['packages/timesheet/src/domain/__boundary-fixture__/**/*.ts'];
 const KERNEL_NPM_FIXTURE = ['packages/platform/src/__boundary-fixture__/forbidden-npm-import.ts'];
+const UNDECLARED_NPM_FIXTURE = [
+  'packages/timesheet/src/domain/__boundary-fixture__/undeclared-npm-import.ts',
+];
 
 const APP_ALLOWED = 'apps/__boundary-fixture__/src/allowed-public-import.ts';
 const APP_DEEP = 'apps/__boundary-fixture__/src/forbidden-deep-import.ts';
@@ -87,6 +90,20 @@ describe('the module boundary rule', () => {
     // from the graph, so only a `node:` builtin could trip it and a domain importing an ORM
     // reported clean. This fixture imports the test runner from a domain file.
     const { summary } = cruise(DOMAIN_NPM_FIXTURE, '.dependency-cruiser.fixture.cjs');
+
+    expect(summary.violations.map((violation) => violation.rule.name)).toContain(
+      'domain-has-no-external-dependency',
+    );
+  });
+
+  it('rejects an npm import the importing package never declared', () => {
+    // The rule's second death, and the one the fixture above could not see. dependency-cruiser
+    // classifies by the IMPORTING package's manifest: `vitest` is declared there, so it lands in
+    // `npm-dev`, which the ban listed. A package declared only in the root manifest lands in
+    // `npm-no-pkg`, which it did not — so for the whole of Phase 3 a domain file could import the
+    // Postgres driver and cruise clean. Verified by deleting `npm-no-pkg` from the rule: this
+    // fixture then reports zero violations.
+    const { summary } = cruise(UNDECLARED_NPM_FIXTURE, '.dependency-cruiser.fixture.cjs');
 
     expect(summary.violations.map((violation) => violation.rule.name)).toContain(
       'domain-has-no-external-dependency',

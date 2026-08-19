@@ -3,6 +3,7 @@ export {
   type ValidateCraDependencies,
   validateCra,
 } from './application/validate-cra.ts';
+export type { CraListItem, CraListQuery, CraRepository } from './domain/cra-repository.ts';
 export { Cra, type CraRefusal, type RecordDayInput } from './domain/cra.ts';
 export { type CraLine } from './domain/cra-line.ts';
 export { CRA_STATUSES, type CraStatus } from './domain/cra-status.ts';

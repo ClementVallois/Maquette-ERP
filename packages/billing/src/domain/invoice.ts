@@ -13,8 +13,9 @@ import {
   InvoiceTransitionError,
   LineOutsideInvoicePeriodError,
   ValidatorCannotIssueError,
+  InconsistentPersistedInvoiceError,
 } from './errors.ts';
-import type { ConsultantId, ClientId, InvoiceId } from './ids.ts';
+import type { ConsultantId, ClientId, InvoiceId, OfficeId } from './ids.ts';
 import type { InvoiceLine } from './invoice-line.ts';
 import type { InvoiceStatus } from './invoice-status.ts';
 import type { LegalMentions } from './mentions.ts';
@@ -57,6 +58,7 @@ export function billedParty(source: Client): BilledParty {
  */
 export class Invoice {
   readonly #id: InvoiceId;
+  readonly #officeId: OfficeId;
   readonly #seller: LegalEntity;
   readonly #billedTo: BilledParty;
   /** The month the work covers, `YYYY-MM`. Printed as the period of execution. */
@@ -80,6 +82,7 @@ export class Invoice {
 
   private constructor(input: {
     id: InvoiceId;
+    officeId: OfficeId;
     seller: LegalEntity;
     billedTo: BilledParty;
     supplyPeriod: string;
@@ -89,6 +92,7 @@ export class Invoice {
     validatedBy: readonly ConsultantId[];
   }) {
     this.#id = input.id;
+    this.#officeId = input.officeId;
     this.#seller = input.seller;
     this.#billedTo = input.billedTo;
     this.#supplyPeriod = input.supplyPeriod;
@@ -100,6 +104,7 @@ export class Invoice {
 
   static draft(input: {
     id: InvoiceId;
+    officeId: OfficeId;
     seller: LegalEntity;
     billedTo: BilledParty;
     supplyPeriod: Period;
@@ -122,8 +127,49 @@ export class Invoice {
     return new Invoice({ ...input, supplyPeriod });
   }
 
+  static reconstitute(input: {
+    id: InvoiceId;
+    officeId: OfficeId;
+    status: InvoiceStatus;
+    seller: LegalEntity;
+    billedTo: BilledParty;
+    supplyPeriod: string;
+    lines: readonly InvoiceLine[];
+    terms: PaymentTerms;
+    mentions: LegalMentions;
+    validatedBy: readonly ConsultantId[];
+    number: string | null;
+    issueDate: IsoDate | null;
+    series: SeriesKey | null;
+    totals: DocumentTotals | null;
+  }): Invoice {
+    assertInvoiceStateIsCoherent(input);
+
+    const invoice = new Invoice({
+      id: input.id,
+      officeId: input.officeId,
+      seller: input.seller,
+      billedTo: input.billedTo,
+      supplyPeriod: input.supplyPeriod,
+      lines: input.lines,
+      terms: input.terms,
+      mentions: input.mentions,
+      validatedBy: input.validatedBy,
+    });
+    invoice.#status = input.status;
+    invoice.#number = input.number;
+    invoice.#issueDate = input.issueDate;
+    invoice.#series = input.series;
+    invoice.#totals = input.totals;
+    return invoice;
+  }
+
   get id(): InvoiceId {
     return this.#id;
+  }
+
+  get officeId(): OfficeId {
+    return this.#officeId;
   }
 
   get status(): InvoiceStatus {
@@ -240,5 +286,51 @@ export class Invoice {
     }
 
     this.#status = 'cancelledByCreditNote';
+  }
+}
+
+/**
+ * `issue` sets the number, the date, the series and the totals together, and nothing unsets them.
+ * Reading a row back is the one path that can set the status without them, so it is the one that
+ * has to check — in both directions, because a draft already carrying a number is the same fault
+ * seen from the other side.
+ */
+function assertInvoiceStateIsCoherent(input: {
+  id: InvoiceId;
+  status: InvoiceStatus;
+  number: string | null;
+  issueDate: IsoDate | null;
+  series: SeriesKey | null;
+  totals: DocumentTotals | null;
+}): void {
+  const issuedFields = {
+    number: input.number,
+    'issue date': input.issueDate,
+    series: input.series,
+    totals: input.totals,
+  };
+
+  const missing = Object.entries(issuedFields)
+    .filter(([, value]) => value === null)
+    .map(([name]) => name);
+
+  if (input.status === 'draft') {
+    const present = Object.entries(issuedFields)
+      .filter(([, value]) => value !== null)
+      .map(([name]) => name);
+    if (present.length > 0) {
+      throw new InconsistentPersistedInvoiceError(
+        input.id,
+        `a draft carrying ${present.join(', ')}`,
+      );
+    }
+    return;
+  }
+
+  if (missing.length > 0) {
+    throw new InconsistentPersistedInvoiceError(
+      input.id,
+      `${input.status} with no ${missing.join(', no ')}`,
+    );
   }
 }

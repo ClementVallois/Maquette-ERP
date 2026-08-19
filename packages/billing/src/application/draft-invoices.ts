@@ -124,6 +124,7 @@ export function draftInvoicesFrom(
     .map(([, bucket]) =>
       Invoice.draft({
         id: dependencies.newInvoiceId(),
+        officeId: payload.officeId,
         seller: dependencies.seller,
         billedTo: billedParty(bucket.client),
         supplyPeriod: period,

@@ -4,21 +4,33 @@
 
 ## Où en est cette maquette
 
-**Phases 1 et 2 terminées le 18/08/2026** — le plan en compte onze, numérotées 0 à 10
-([`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md)). Ce qui existe aujourd'hui, en TypeScript pur et sans
-base de données : le **domaine `timesheet`** — CRA, cycle de vie, calendrier ouvré, règles de
-soumission, validation et événement de domaine — et le **domaine `billing`** — arithmétique
-monétaire exacte, TVA résolue par territorialité, ligne de facture portant son origine, mentions
-légales obligatoires, numérotation, avoir. **La chaîne franchit déjà la frontière** : `billing`
-réagit à `timesheet.TimesheetValidated` et produit un projet de facture par client. **Aucun fichier
-livré de `billing` — tests compris — n'importe `timesheet`**, et la règle de dépendance l'interdit :
-le seul fichier du dépôt qui franchit cette frontière est la violation délibérée de
-`packages/billing/src/__boundary-fixture__/`, exclue du build et du lint, qui existe pour que
-`tests/boundary-rule.test.ts` prouve que la règle la rejette.
+**Phases 1, 2 et 3 terminées le 19/08/2026** — le plan en compte onze, numérotées 0 à 10
+([`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md)).
 
-Ce qui n'existe **pas encore** : la base de données (phase 3), **l'autorisation par rôle et par
-périmètre** — elle vit dans le dépôt de données, donc elle arrive avec lui en phase 3 — le jeu de
-données (phase 4), l'API (phase 5), les écrans (phase 6), l'instance hébergée (phase 8).
+Les **domaines**, en TypeScript pur et sans base de données : `timesheet` — CRA, cycle de vie,
+calendrier ouvré, règles de soumission, validation et événement de domaine — et `billing` —
+arithmétique monétaire exacte, TVA résolue par territorialité, ligne de facture portant son origine,
+mentions légales obligatoires, numérotation, avoir.
+
+La **persistance**, depuis la phase 3 : six migrations SQL numérotées et un runner rejouable, un
+schéma PostgreSQL par module, les dépôts `PgCraRepository` et `PgInvoiceRepository`, la numérotation
+sans trou sous un verrou de ligne (ADR-0007), les événements de domaine écrits **dans la même
+transaction** que ce qui les émet (ADR-0020), et le traitement d'un CRA rendu idempotent
+(ADR-0021). 43 tests d'intégration tournent contre un vrai PostgreSQL, en CI comme en local — sur 307 au total.
+
+**La chaîne franchit déjà la frontière** : `billing` réagit à `timesheet.TimesheetValidated` et
+produit un projet de facture par client. **Aucun fichier livré de `billing` — tests compris —
+n'importe `timesheet`**, et la règle de dépendance l'interdit. Deux fichiers du dépôt franchissent
+délibérément une frontière, tous deux exclus du build et du lint, tous deux là pour que
+`tests/boundary-rule.test.ts` prouve que la règle les rejette :
+`packages/billing/src/__boundary-fixture__/` viole la frontière `billing` → `timesheet` nommément, et
+`packages/__boundary-fixture__/undeclared-module/` est un module qui n'existe dans aucune règle — il
+prouve que la liste `allowed` **refuse par défaut**, ce qui est la moitié la plus facile à perdre.
+
+Ce qui n'existe **pas encore** : le jeu de données (phase 4), l'API (phase 5), les écrans
+(phase 6), l'instance hébergée (phase 8). Et une **moitié** de l'autorisation : le filtrage **par
+périmètre** (`Office`) est construit et testé dans les dépôts, la dimension **par rôle** ne l'est
+pas — voir le point 3 de la section suivante, qui dit exactement où passe la ligne.
 
 Trois fichiers répondent aux questions qu'on se pose en arrivant :
 [`CONTEXT.md`](CONTEXT.md) définit le vocabulaire métier (`Tjm`, `régie`, `intercontrat`, `avoir`,
@@ -31,12 +43,14 @@ est dans `.nvmrc`, `nvm use` suffit — et **pnpm ≥ 11.4.0** :
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm run env:init   # crée .env depuis .env.example — .env est gitignoré, un clone frais n'en a pas
 pnpm run check      # env, lint, frontière, format, types, tests + couverture
 pnpm run boundaries # la frontière de modules seule
 ```
 
-La section « Démarrer » plus bas (base de données, migrations, seed) s'écrit avec les phases qui
-la rendent vraie.
+`env:init` n'est pas optionnel sur un clone frais : `check` commence par vérifier `.env` et
+s'arrête s'il n'existe pas. Aucune de ces trois commandes ne demande Docker. Pour la base de
+données et les tests d'intégration, voir « Démarrer » plus bas.
 
 ## Le problème métier
 
@@ -61,16 +75,17 @@ Périmètre volontairement étroit : deux modules, et **une seule flèche qui fr
 2. **Des invariants métier tenus par le code, pas par la discipline**
    - un CRA validé est **immuable** ;
    - les montants sont des **entiers en centimes** — jamais de flottant sur une valeur monétaire ;
-   - la numérotation des factures est **séquentielle et sans trou** — ⚠️ à ce stade, seule la
-     **forme** de la série existe (ADR-0018) ; l'allocation qui la rend réellement sans trou sous
-     concurrence est un verrou de ligne dans la transaction d'émission, et c'est **ADR-0007, en
-     phase 3** ;
+   - la numérotation des factures est **séquentielle et sans trou** — construit en phase 3
+     (**ADR-0007**) : la forme de la série vient d'ADR-0018, et l'allocation est un `SELECT … FOR
+UPDATE` sur la ligne de compteur, dans la transaction d'émission. Jamais une `SEQUENCE`
+     PostgreSQL : `nextval` n'est pas transactionnel, donc un rollback laisse un trou. Un test
+     lance deux émissions concurrentes et exige zéro trou et zéro doublon ;
    - la TVA est arrondie **par taux** — ni par ligne, ni sur le total. C'est la règle fiscale
      française, et c'est ce que le récapitulatif obligatoire en pied de facture publie
      (**ADR-0010**). ⚠️ Les taux, seuils et mentions obligatoires retenus sont ceux connus au
      **17/08/2026** et **n'ont pas été validés par un expert-comptable** : cette maquette n'émet
      rien à un vrai client, et rien ici ne doit être repris en production sans cette validation.
-3. **L'autorisation sera testée**, par rôle _et_ par périmètre : un manager d'une implantation ne doit pas lire la marge d'une mission qui n'est pas la sienne. ⚠️ **Ce n'est pas encore construit** : l'autorisation vit dans le dépôt de données (ADR-0003), et il n'y a pas encore de dépôt de données — c'est la **phase 3**. Cette ligne est la seule de cette section qui décrive une intention plutôt que du code, et elle le dit.
+3. **L'autorisation par périmètre est construite et testée** — et la dimension par rôle ne l'est pas encore. Le filtrage vit dans le dépôt de données (**ADR-0003**), au seul endroit par où les données entrent : `findById` prend l'implantation de l'appelant, un CRA d'une autre implantation revient `null`, et les tests d'intégration le prouvent dans les deux sens (l'accès légitime passe, l'accès hors périmètre est refusé). `Cjm`, `Tjm` et marge n'apparaissent dans aucune projection de liste, et la pagination est plafonnée en dur. ⚠️ **Ce qui manque, nommément** : (a) la dimension **par rôle** — les dépôts ne connaissent aujourd'hui que l'implantation, pas les trois rôles ; (b) le refus **typé en 403 qui nomme la règle** — au niveau du dépôt un refus est un `null`, et ADR-0003 dit lui-même que la seconde moitié de la démonstration est un appel API direct, donc elle arrive avec l'API en **phase 5**. Les deux sont suivis dans [`docs/open-questions.md`](docs/open-questions.md) avec la phase qui les tranche.
 4. **Des arbitrages écrits au moment où ils sont pris** → `docs/adr/`. Chaque ADR nomme l'option écartée et le seuil auquel on changerait d'avis.
 
 ## Ce que je ne construis pas
@@ -133,7 +148,24 @@ _(à écrire — la stack se choisit dans un ADR, elle ne se décrète pas dans 
 
 ## Démarrer
 
-_(à écrire — un `docker compose up` + une commande de migration + une commande de seed, et rien d'autre à savoir.)_
+La base de données et les migrations sont là depuis la phase 3. **Le seed ne l'est pas** — il arrive
+en phase 4 — donc `pnpm run setup` et `pnpm run db:reset` échouent tous les deux sur leur dernière
+étape, `pnpm run seed`, qui n'existe pas encore. C'est écrit ici plutôt que découvert à l'exécution.
+En attendant, les trois commandes ci-dessous marchent :
+
+```sh
+pnpm run db:up      # PostgreSQL 18 via docker compose, attend qu'il soit healthy
+pnpm run migrate    # applique les migrations en attente, rejouable sans effet
+pnpm run test:int   # les tests d'intégration contre ce PostgreSQL
+```
+
+`pnpm run db:up` crée deux rôles distincts : `erp_migration` possède le schéma et l'applique,
+`erp_app` s'y connecte avec les seuls droits `SELECT/INSERT/UPDATE/DELETE`. Les tests d'intégration
+utilisent `erp_app` — un test qui passerait en propriétaire du schéma ne prouverait rien sur ce que
+l'application aura le droit de faire.
+
+Sans base de données, `pnpm run check` reste complet et vert : seuls les tests d'intégration
+demandent Docker.
 
 ## Jeu de données
 
@@ -141,19 +173,21 @@ _(à écrire — il doit ressembler à la réalité d'un cabinet : plusieurs pô
 
 ## Tests et portes de CI
 
-Une porte qui ne bloque pas un merge est un avertissement, pas une porte. Les six suivantes tournent
+Une porte qui ne bloque pas un merge est un avertissement, pas une porte. Les huit suivantes tournent
 sur chaque push ; **cinq sont exigées** par la protection de branche sur `main` — tant que l'une est
-rouge, le bouton de merge est désactivé. La sixième, `Tests`, est verte depuis la phase 1 et il
-reste à la cocher : voir la note sous le tableau.
+rouge, le bouton de merge est désactivé. Les trois autres — `Tests`, et les deux portes base de
+données arrivées avec la phase 3 — sont vertes et restent à cocher : voir la note sous le tableau.
 
-| Porte (job CI)          | Commande                                            | Ce qu'elle empêche de merger                                                                                                                                                               |
-| ----------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Module boundary**     | `pnpm run boundaries` + le test négatif             | Un import qui franchit la frontière `timesheet`/`billing`, une flèche jamais déclarée — et une règle **morte** : le test rejoue une violation délibérée et exige qu'elle soit refusée      |
-| **Lint, format, types** | `lint` · `format:check` · `typecheck` · `env:check` | Du code hors des règles ESLint (dont les invariants du domaine rendus mécaniques), un formatage divergent, une erreur de type — et une variable de `compose.yml` absente de `.env.example` |
-| **Secret scan**         | gitleaks sur l'historique                           | Un secret commité, y compris dans un commit ancien de la branche                                                                                                                           |
-| **Dependency scan**     | `pnpm audit` + osv-scanner                          | Une dépendance portant une vulnérabilité connue de niveau haut ou critique                                                                                                                 |
-| **SAST**                | Semgrep OSS                                         | Les motifs de vulnérabilité applicative détectables statiquement                                                                                                                           |
-| **Tests**               | `pnpm run test:cov`                                 | Un invariant du domaine cassé, et une couverture du **domaine** sous 90 % (branches : 85 %) — le seuil ne porte que sur `domain/` et sur le noyau partagé, pas sur le dépôt entier         |
+| Porte (job CI)                | Commande                                            | Ce qu'elle empêche de merger                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Module boundary**           | `pnpm run boundaries` + le test négatif             | Un import qui franchit la frontière `timesheet`/`billing`, une flèche jamais déclarée — et une règle **morte** : le test rejoue une violation délibérée et exige qu'elle soit refusée                                                                                                                                                                                                                  |
+| **Lint, format, types**       | `lint` · `format:check` · `typecheck` · `env:check` | Du code hors des règles ESLint (dont les invariants du domaine rendus mécaniques), un formatage divergent, une erreur de type — et une variable de `compose.yml` absente de `.env.example`                                                                                                                                                                                                             |
+| **Secret scan**               | gitleaks sur l'historique                           | Un secret commité, y compris dans un commit ancien de la branche                                                                                                                                                                                                                                                                                                                                       |
+| **Dependency scan**           | `pnpm audit` + osv-scanner                          | Une dépendance portant une vulnérabilité connue de niveau haut ou critique                                                                                                                                                                                                                                                                                                                             |
+| **SAST**                      | Semgrep OSS                                         | Les motifs de vulnérabilité applicative détectables statiquement                                                                                                                                                                                                                                                                                                                                       |
+| **Tests**                     | `pnpm run test:cov`                                 | Un invariant du domaine cassé, et une couverture du **domaine** sous 90 % (branches : 85 %) — le seuil ne porte que sur `domain/` et sur le noyau partagé, pas sur le dépôt entier                                                                                                                                                                                                                     |
+| **Integration tests**         | `pnpm run test:int` sur un vrai PostgreSQL          | Une requête SQL fausse, une colonne manquante, une règle d'autorisation par périmètre qui ne refuse plus — les tests tournent contre le schéma réel, appliqué par le runner de migrations                                                                                                                                                                                                              |
+| **Migrations replayed twice** | `pnpm run migrate` deux fois de suite               | Un runner de migrations non idempotent : le second passage doit être un no-op. ⚠️ Cette porte ne vérifie **pas** que les migrations sont additives — un `DROP COLUMN` dans un fichier `007` passerait les deux passages au vert, puisque le runner saute les versions déjà inscrites dans `schema_migrations`. La règle additive reste tenue à la relecture ; ce qui est mécanique ici, c'est le rejeu |
 
 > ✅ **La porte `Tests` est verte depuis la phase 1** (18/08/2026), et pas encore exigée.
 > Elle était rouge depuis l'ajout des seuils de couverture, faute de domaine à mesurer : la rendre
@@ -162,6 +196,11 @@ reste à la cocher : voir la note sous le tableau.
 > la porte devient une contrainte réelle. ⚠️ **Étape humaine restante** : l'ajouter à la liste des
 > _required checks_ dans la protection de branche GitHub, comme les cinq autres (même geste que la
 > tâche 0.5). Historique → `docs/open-questions.md`.
+>
+> ⚠️ **Même étape humaine pour les deux portes de la phase 3** — `Integration tests` et
+> `Migrations replayed twice` — vertes dès leur premier run, jamais encore exigées. Une porte verte
+> et non cochée n'empêche aucun merge : c'est un test, pas une porte, tant que le geste n'est pas
+> fait.
 
 Les hooks locaux (lefthook) doublent une partie de ces portes **avant** le commit et le push. ⚠️ Ils
 ne s'installent pas tout seuls : `ignore-scripts` est activé, donc un clone frais n'en a aucun tant
