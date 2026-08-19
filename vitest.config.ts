@@ -6,7 +6,10 @@ export default defineConfig({
       {
         test: {
           name: 'unit',
-          include: ['packages/**/*.test.ts', 'tests/**/*.test.ts'],
+          // `apps/**` is in this list and its absence was a gate that had stopped looking: the
+          // integration project already named `apps/**/*.int.test.ts`, so a unit test written in
+          // `apps/api` would have been collected by nothing and reported by nothing.
+          include: ['packages/**/*.test.ts', 'apps/**/*.test.ts', 'tests/**/*.test.ts'],
           // `*.int.test.ts` also matches `*.test.ts`. Without this exclusion the unit run
           // requires Docker. The fixtures include a `*.test.ts` that exists to be linted, not
           // run — it holds deliberate violations and declares no test.
