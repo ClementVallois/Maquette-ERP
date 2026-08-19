@@ -133,7 +133,24 @@ _(à écrire — la stack se choisit dans un ADR, elle ne se décrète pas dans 
 
 ## Démarrer
 
-_(à écrire — un `docker compose up` + une commande de migration + une commande de seed, et rien d'autre à savoir.)_
+La base de données et les migrations sont là depuis la phase 3. **Le seed ne l'est pas** — il arrive
+en phase 4 — donc `pnpm run setup` et `pnpm run db:reset` échouent tous les deux sur leur dernière
+étape, `pnpm run seed`, qui n'existe pas encore. C'est écrit ici plutôt que découvert à l'exécution.
+En attendant, les trois commandes ci-dessous marchent :
+
+```sh
+pnpm run db:up      # PostgreSQL 18 via docker compose, attend qu'il soit healthy
+pnpm run migrate    # applique les migrations en attente, rejouable sans effet
+pnpm run test:int   # les tests d'intégration contre ce PostgreSQL
+```
+
+`pnpm run db:up` crée deux rôles distincts : `erp_migration` possède le schéma et l'applique,
+`erp_app` s'y connecte avec les seuls droits `SELECT/INSERT/UPDATE/DELETE`. Les tests d'intégration
+utilisent `erp_app` — un test qui passerait en propriétaire du schéma ne prouverait rien sur ce que
+l'application aura le droit de faire.
+
+Sans base de données, `pnpm run check` reste complet et vert : seuls les tests d'intégration
+demandent Docker.
 
 ## Jeu de données
 
@@ -141,19 +158,21 @@ _(à écrire — il doit ressembler à la réalité d'un cabinet : plusieurs pô
 
 ## Tests et portes de CI
 
-Une porte qui ne bloque pas un merge est un avertissement, pas une porte. Les six suivantes tournent
+Une porte qui ne bloque pas un merge est un avertissement, pas une porte. Les huit suivantes tournent
 sur chaque push ; **cinq sont exigées** par la protection de branche sur `main` — tant que l'une est
-rouge, le bouton de merge est désactivé. La sixième, `Tests`, est verte depuis la phase 1 et il
-reste à la cocher : voir la note sous le tableau.
+rouge, le bouton de merge est désactivé. Les trois autres — `Tests`, et les deux portes base de
+données arrivées avec la phase 3 — sont vertes et restent à cocher : voir la note sous le tableau.
 
-| Porte (job CI)          | Commande                                            | Ce qu'elle empêche de merger                                                                                                                                                               |
-| ----------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Module boundary**     | `pnpm run boundaries` + le test négatif             | Un import qui franchit la frontière `timesheet`/`billing`, une flèche jamais déclarée — et une règle **morte** : le test rejoue une violation délibérée et exige qu'elle soit refusée      |
-| **Lint, format, types** | `lint` · `format:check` · `typecheck` · `env:check` | Du code hors des règles ESLint (dont les invariants du domaine rendus mécaniques), un formatage divergent, une erreur de type — et une variable de `compose.yml` absente de `.env.example` |
-| **Secret scan**         | gitleaks sur l'historique                           | Un secret commité, y compris dans un commit ancien de la branche                                                                                                                           |
-| **Dependency scan**     | `pnpm audit` + osv-scanner                          | Une dépendance portant une vulnérabilité connue de niveau haut ou critique                                                                                                                 |
-| **SAST**                | Semgrep OSS                                         | Les motifs de vulnérabilité applicative détectables statiquement                                                                                                                           |
-| **Tests**               | `pnpm run test:cov`                                 | Un invariant du domaine cassé, et une couverture du **domaine** sous 90 % (branches : 85 %) — le seuil ne porte que sur `domain/` et sur le noyau partagé, pas sur le dépôt entier         |
+| Porte (job CI)                | Commande                                            | Ce qu'elle empêche de merger                                                                                                                                                               |
+| ----------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Module boundary**           | `pnpm run boundaries` + le test négatif             | Un import qui franchit la frontière `timesheet`/`billing`, une flèche jamais déclarée — et une règle **morte** : le test rejoue une violation délibérée et exige qu'elle soit refusée      |
+| **Lint, format, types**       | `lint` · `format:check` · `typecheck` · `env:check` | Du code hors des règles ESLint (dont les invariants du domaine rendus mécaniques), un formatage divergent, une erreur de type — et une variable de `compose.yml` absente de `.env.example` |
+| **Secret scan**               | gitleaks sur l'historique                           | Un secret commité, y compris dans un commit ancien de la branche                                                                                                                           |
+| **Dependency scan**           | `pnpm audit` + osv-scanner                          | Une dépendance portant une vulnérabilité connue de niveau haut ou critique                                                                                                                 |
+| **SAST**                      | Semgrep OSS                                         | Les motifs de vulnérabilité applicative détectables statiquement                                                                                                                           |
+| **Tests**                     | `pnpm run test:cov`                                 | Un invariant du domaine cassé, et une couverture du **domaine** sous 90 % (branches : 85 %) — le seuil ne porte que sur `domain/` et sur le noyau partagé, pas sur le dépôt entier         |
+| **Integration tests**         | `pnpm run test:int` sur un vrai PostgreSQL          | Une requête SQL fausse, une colonne manquante, une règle d'autorisation par périmètre qui ne refuse plus — les tests tournent contre le schéma réel, appliqué par le runner de migrations  |
+| **Migrations replayed twice** | `pnpm run migrate` deux fois de suite               | Une migration non rejouable : le second passage doit être un no-op. C'est la règle « additive » vérifiée mécaniquement, pas affirmée                                                       |
 
 > ✅ **La porte `Tests` est verte depuis la phase 1** (18/08/2026), et pas encore exigée.
 > Elle était rouge depuis l'ajout des seuils de couverture, faute de domaine à mesurer : la rendre
@@ -162,6 +181,11 @@ reste à la cocher : voir la note sous le tableau.
 > la porte devient une contrainte réelle. ⚠️ **Étape humaine restante** : l'ajouter à la liste des
 > _required checks_ dans la protection de branche GitHub, comme les cinq autres (même geste que la
 > tâche 0.5). Historique → `docs/open-questions.md`.
+>
+> ⚠️ **Même étape humaine pour les deux portes de la phase 3** — `Integration tests` et
+> `Migrations replayed twice` — vertes dès leur premier run, jamais encore exigées. Une porte verte
+> et non cochée n'empêche aucun merge : c'est un test, pas une porte, tant que le geste n'est pas
+> fait.
 
 Les hooks locaux (lefthook) doublent une partie de ces portes **avant** le commit et le push. ⚠️ Ils
 ne s'installent pas tout seuls : `ignore-scripts` est activé, donc un clone frais n'en a aucun tant

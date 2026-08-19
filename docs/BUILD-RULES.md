@@ -136,7 +136,20 @@ React, Vue, PDF generation, OpenTelemetry, Testcontainers.
   used in code until it is in there.
 - Comment only a non-obvious **mechanical** fact — a trap, a footgun, a setting that silently does
   nothing. Reasoning belongs in an ADR; link to it instead of restating it.
-- TDD on domain invariants only (they are testable without a database). Not on infrastructure.
+- TDD on the domain **and on infrastructure**, asymmetrically. A domain invariant gets a unit test
+  with a fake `Clock` and no database; a repository or a migration gets an **integration test
+  against a real Postgres, written before the SQL** (**ADR-0019**), isolated by a per-test
+  transaction that is rolled back. This line used to read "on domain invariants only … not on
+  infrastructure"; ADR-0019 superseded it in Phase 3, and the rule follows the ADR as the preamble
+  of this file requires. What the history proves is narrowed on purpose: the test is written first,
+  the commit carries both — see `docs/BUILD-PLAN.md`, § "What the history shows about test-first".
+- Integration tests run in CI and on demand, never in `pre-push`: they need Docker. They are
+  deliberately outside the coverage threshold, and their contract is the replacement — every
+  repository method has a positive **and** a negative test, and every authorization scope rule has
+  a test that asserts the refusal.
+- The shared integration harness is a **workspace member**, `@erp/test-harness` (**ADR-0039**), not
+  a directory reached by a relative path. `rootDir` is `src` in every package, and a climb out of it
+  fails the per-package `tsc --noEmit` — which the `quality` CI job runs.
 - Every foreign key is indexed in the migration that creates it. Migrations are additive and are
   replayed twice in CI.
 - A worked day is a `date`; an event is a `timestamptz`. Never a bare `timestamp`.
