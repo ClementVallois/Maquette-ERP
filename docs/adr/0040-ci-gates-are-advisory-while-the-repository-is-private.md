@@ -5,10 +5,16 @@
 
 ## Context
 
-The first claim this mockup makes is a module boundary **enforced by CI** — and both `CLAUDE.md`
-and the README sharpen it into a rule: _une porte qui ne bloque pas un merge est un avertissement,
-pas une porte_. Task 0.5 acted on that rule, documented five required checks in the README, and
+The first claim this mockup makes is a module boundary **enforced by CI**. The README sharpens it
+into a rule — _une porte qui ne bloque pas un merge est un avertissement, pas une porte_: **a gate
+that does not block a merge is a warning, not a gate** — and `docs/BUILD-PLAN.md` § 0.5 states the
+same sentence in English. Task 0.5 acted on it, documented five required checks in the README, and
 named "enabling branch protection in the GitHub UI" as a human step still outstanding.
+
+(`CLAUDE.md` § 1 makes the neighbouring but **different** claim, "breaking the boundary must fail
+the CI, not produce a warning", which is about a rule's _severity_ and is unaffected by this ADR.
+The two senses of "warning" are disentangled in the README's gate section; conflating them is what
+made this ADR look, at first, like it demolished the headline.)
 
 Opening the repository's first pull request on 19/08/2026 showed that the step is not outstanding.
 It is **unavailable**:
@@ -45,15 +51,18 @@ questions were written for a reader who receives the link deliberately, and that
 Phase 9 — it is already an open question of 18/08/2026, and pre-empting it to close a documentation
 gap would be deciding the larger thing for the smaller reason.
 
-**Deleting the sentence** was the third option and the worst. It is the sentence that makes the
-thesis checkable; without it a reader cannot tell whether the gates block anything, and the repo
-would be quieter rather than more honest.
+**Deleting the sentence** — «cinq sont exigées par la protection de branche», _five are required by
+branch protection_ — was the third option and the worst. It is the sentence that makes the thesis
+checkable; without it a reader cannot tell whether the gates block anything, and the repo would be
+quieter rather than more honest.
 
 ## Reconsideration threshold
 
-**The day the repository becomes public — task 9.2, before the link goes out.** Branch protection is
-free on a public repository, so ticking the eight required checks costs nothing then, and a
-superseding ADR records it.
+**The day the repository becomes public** — the disclosure decision recorded as an open question on
+18/08/2026 in `docs/open-questions.md`, and scheduled as **task 9.2 bis** of `docs/BUILD-PLAN.md`,
+before the link goes out. (Not task 9.2, which is the cold reader's five-line path and decides
+nothing about publication.) Branch protection is free on a public repository, so ticking the eight
+required checks costs nothing then, and a superseding ADR records it.
 
 Reopened earlier if **a second person gains write access**. "Nothing merges red" is one person's
 discipline; it stops being a credible control the moment it is more than one person's, and at that
@@ -66,7 +75,11 @@ states what is true. The demo is untouched: breaking the boundary live still tur
 which is what is being shown.
 
 **Expensive.** The strongest form of the claim is not available, and a reviewer who checks will find
-eight green advisory jobs. It also means the local `lefthook` hooks are doing more of the real work
+eight green advisory jobs. A private repository also has **no visible Actions tab and no status
+badge** for whoever holds the link, so "the eight are green" is the one statement in that README
+section a reader is asked to take on trust — against a README whose stated ethos is _pour vérifier
+soi-même plutôt que me croire_, _to check for yourself rather than believe me_. Going public buys
+the badge in the same act as the protection. It also means the local `lefthook` hooks are doing more of the real work
 than the pipeline is — and they are opt-in (`ignore-scripts` is on, so a fresh clone has none until
 `pnpm exec lefthook install`), which the README already says.
 

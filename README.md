@@ -173,8 +173,15 @@ _(à écrire — il doit ressembler à la réalité d'un cabinet : plusieurs pô
 
 ## Tests et portes de CI
 
-Une porte qui ne bloque pas un merge est un avertissement, pas une porte. **Par cette définition,
-les huit ci-dessous sont aujourd'hui des avertissements**, et c'est écrit ici plutôt que sous-entendu.
+Une porte qui ne bloque pas un merge est un avertissement, pas une porte. Le mot « avertissement »
+sert ici deux fois, pour deux choses différentes, et il vaut mieux les séparer tout de suite :
+
+1. **Une règle qui reste verte sur une violation** — le `warn` de dependency-cruiser au lieu de son
+   `error`. C'est le sens du mot en tête de ce README (« casser la frontière doit faire échouer la
+   CI, pas produire un warning »), et **ce piège-là est fermé** : les huit jobs ci-dessous
+   échouent réellement, et `tests/boundary-rule.test.ts` le prouve sur des violations délibérées.
+2. **Une porte qui échoue sans rien empêcher.** C'est le sens de la phrase d'ouverture, et
+   **c'est l'état actuel des huit** — écrit ici plutôt que sous-entendu.
 
 Elles tournent sur chaque push et sur chaque pull request, et elles passent au rouge. Mais la seule
 chose capable de désactiver le bouton de merge — la _protection de branche_ GitHub — exige un compte
@@ -209,7 +216,7 @@ La bascule est gratuite le jour où le dépôt devient public, et coûte alors h
 > protection de branche n'est pas disponible sur ce plan. C'est une limite assumée et datée
 > (ADR-0040), pas une case oubliée.
 
-Les hooks locaux (lefthook) doublent une partie de ces portes **avant** le commit et le push. ⚠️ Ils
+Les hooks locaux (lefthook) rejouent une partie de ces portes **avant** le commit et le push — et depuis ADR-0040 ils ne les doublent plus, ils sont **le seul arrêt mécanique** qui précède un merge, puisque aucune des huit ne le bloque. ⚠️ Ils
 ne s'installent pas tout seuls : `ignore-scripts` est activé, donc un clone frais n'en a aucun tant
 qu'on n'a pas lancé `pnpm exec lefthook install`. Ce qu'ils font :
 gitleaks sur ce qui est indexé — le seul des deux qui empêche réellement la fuite, la CI ne scannant

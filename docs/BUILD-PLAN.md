@@ -663,9 +663,19 @@ writes the **vulnerability-management procedure** the triage retained: what happ
 recorded, and where it is written. A gate with no procedure for its own red light gets disabled the
 first time it fires.
 
-### 7.3 — Branch protection, documented
+### 7.3 — Branch protection: not here, and the reason is written down
 
-Required checks configured **and** listed in the README. **Human step**: the GitHub setting itself.
+This task **cannot run in Phase 7** and is not deferred so much as relocated. Branch protection
+needs GitHub Pro or a public repository (**ADR-0040**, 19/08/2026), and the decision is to stay
+private on the free plan until the repository goes public — which is Phase 9's call, not this
+phase's. Scheduling the setting here would put an impossible step two phases ahead of the threshold
+that makes it possible.
+
+What Phase 7 still owes is the half that does not need the platform: the README's gate table stays
+accurate as jobs are added, and it says the gates are advisory. That is already true as of ADR-0040.
+
+The setting itself moves to **Phase 9**, alongside the decision to publish: eight checkboxes, free
+on a public repository, recorded by the ADR that supersedes 0040.
 
 **Phase checkpoint.** PR to `main`.
 
@@ -780,6 +790,20 @@ with its caveat that it has already slipped.
 Five lines at the top of the README: README → one ADR → the test that proves the boundary → the
 screen → the live instance.
 
+### 9.2 bis — Going public, and the eight checkboxes that come free with it
+
+The **disclosure decision** — whether this repository becomes public, and what saying so about
+"the 24/08 conversation" discloses — is Clement's and is the open question of 18/08/2026. It is
+named here rather than in 9.2 because 9.2 is about a reading path, not about publication.
+
+If the answer is yes, two things follow in the same act and neither costs anything: branch
+protection becomes available, so the **eight required checks** are ticked (the step Phase 7 could
+not run — **ADR-0040**), and the Actions status becomes visible to anyone holding the link, so the
+README can carry a CI badge instead of asking to be believed. A superseding ADR records both.
+
+If the answer is no, ADR-0040 stands unchanged and the README keeps saying the gates are advisory.
+That is a complete outcome, not a failure to reach one.
+
 ### 9.3 — `docs/demo.md`
 
 The written scenario: seed → Cra entered → validated → draft invoice → out-of-scope read refused →
@@ -846,7 +870,7 @@ deferred rows belong in the README's "Ce que je ne construis pas" and are closed
 | **4** | Demonstration dataset as a deliverable · deterministic seed · protection of test data (synthetic, no real name or rate) · the CI job that replays `setup`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | **5** | Application shape (server-rendered plus `/api/v1`) · server framework · data access · validation at the boundaries · authentication by persona selector · reduced observability (pino alone) · graceful shutdown · separate health and readiness · structured logger · redacted logs · correlation and causation ids · versioned API routes · `Idempotency-Key` on issuance · configuration validated at startup with immediate failure · **progressive disclosure: the logged single-record read of `Tjm`, `Cjm` and margin**                                                                                                                                                                                                                                                                 |
 | **6** | Route groups as personas · the three feedback states · the refusal reason shown, not a greyed-out button · filters in the URL · Cra entry grid · printable Cra for client signature · the pré-facturier as the central screen · **the reveal click on `Tjm` and margin** · French formats and locale · reduced accessibility (keyboard, labels, contrast) · a front with no framework                                                                                                                                                                                                                                                                                                                                                                                                          |
-| **7** | Required checks and branch protection · mutation testing on `domain/` in nightly · grouped and scheduled Renovate · the written vulnerability-management process (the `setup` replay and replayed migrations moved to Phases 4 and 3, where the code they test lands)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **7** | ~~Required checks and branch protection~~ (moved to Phase 9 — unavailable on this plan, ADR-0040) · mutation testing on `domain/` in nightly · grouped and scheduled Renovate · the written vulnerability-management process (the `setup` replay and replayed migrations moved to Phases 4 and 3, where the code they test lands)                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | **8** | New scope, and a reopening: "there is no CD", "no secret in CI", build/deploy separation, artifact signing, runtime hardening and hosting were all settled on the premise that nothing is deployed. Each is re-decided against the new premise by ADR-0028/0029/0030 — built, or left deferred with the reason restated · **the resettable public demo and its seed lifecycle (ADR-0032)**                                                                                                                                                                                                                                                                                                                                                                                                     |
 | **9** | The cold reader's path · `docs/demo.md` · the compromise procedure · plus every **rule** owed to the README: the honest limit against an insider, the pipeline as an evidence factory, the Cra as a legal document, the three billing engines, the five decisions and the prioritisation filter, the three horizons, the OCR arbitration, the notification rules, the go-live risk, build cost and ROI, the audit trail, the full commercial chain, the "why not Odoo" answer, mission reports out of scope, and the label positions (YAGNI claimed, SOLID not)                                                                                                                                                                                                                                |
 
