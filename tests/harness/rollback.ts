@@ -2,6 +2,7 @@ import type pg from 'pg';
 import { afterAll, afterEach, beforeEach } from 'vitest';
 
 import { getPool, closePool } from './db.ts';
+import { HarnessMisconfiguredError } from './errors.ts';
 
 export interface TestTransaction {
   readonly client: pg.PoolClient;
@@ -17,7 +18,9 @@ export function useTestTransaction(): TestTransaction {
 
   const ref: TestTransaction = {
     get client(): pg.PoolClient {
-      if (handle.client === null) throw new Error('No transaction — are you inside a test?');
+      if (handle.client === null) {
+        throw new HarnessMisconfiguredError('No transaction — are you inside a test?');
+      }
       return handle.client;
     },
   };

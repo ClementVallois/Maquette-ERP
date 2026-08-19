@@ -6,7 +6,6 @@ import {
   isoDate,
   periodFromIso,
 } from '@erp/platform';
-// eslint-disable-next-line import-x/no-extraneous-dependencies -- pg is in dependencies; @types/pg is a devDependency because types are compile-time
 import pg from 'pg';
 
 // Tell pg to return DATE columns as strings, not Date objects. pg's default parser applies the

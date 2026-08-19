@@ -186,10 +186,36 @@ describe('PgInvoiceRepository', () => {
     expect(lyonResults).toHaveLength(0);
   });
 
-  it('caps pagination at MAX_PAGE_SIZE', async () => {
+  it('caps pagination at MAX_PAGE_SIZE, however large the caller asks', async () => {
+    // Seeded past the cap on purpose. Asking for 1000 against an empty table also returns "no
+    // more than 50" and proves nothing — the cap has to be the reason the answer is short.
     await seedReferenceData();
-    const results = await repo().list({ officeId: PARIS, limit: 1000, offset: 0 });
-    expect(results).toHaveLength(0);
+    await tx.client.query(`
+      INSERT INTO billing.invoices (
+        id, office_id, seller_id, status, supply_period,
+        billed_to_client_id, billed_to_name,
+        billed_to_billing_street, billed_to_billing_postal_code,
+        billed_to_billing_city, billed_to_billing_country,
+        billed_to_delivery_street, billed_to_delivery_postal_code,
+        billed_to_delivery_city, billed_to_delivery_country,
+        payment_terms_kind, payment_terms_days,
+        mentions_operation_category, mentions_early_payment_kind,
+        mentions_late_penalty_rate, mentions_recovery_indemnity, mentions_vat_on_debits
+      )
+      SELECT 'invoice-bulk-' || g, 'office-paris', 'entity-fr', 'draft', '2026-03',
+             'client-1', 'Client Test',
+             '1 rue Test', '75001', 'Paris', 'France',
+             '1 rue Test', '75001', 'Paris', 'France',
+             'net', 30, 'services', 'none', 1000, 4000, false
+      FROM generate_series(1, 60) AS g
+    `);
+
+    const capped = await repo().list({ officeId: PARIS, limit: 1000, offset: 0 });
+    expect(capped).toHaveLength(50);
+
+    // And a caller under the cap still gets what it asked for, so the fix is not "always 50".
+    const asked = await repo().list({ officeId: PARIS, limit: 10, offset: 0 });
+    expect(asked).toHaveLength(10);
   });
 
   it('list items do not expose Tjm, Cjm or margin', async () => {
@@ -200,11 +226,19 @@ describe('PgInvoiceRepository', () => {
 
     const items = await repo().list({ officeId: PARIS, limit: 10, offset: 0 });
     const item = items[0]!;
-    const keys = Object.keys(item);
-    expect(keys).not.toContain('tjm');
-    expect(keys).not.toContain('cjm');
-    expect(keys).not.toContain('margin');
-    expect(keys).not.toContain('lines');
+
+    // Asserted as the WHOLE shape, not as four absent names. `tjm`, `cjm` and `margin` are
+    // spellings this codebase never uses — a leak would arrive as `tjmCents` or `cjmCents` and
+    // an absence test would stay green. A projection that grows a field fails here instead.
+    expect(Object.keys(item).sort()).toStrictEqual([
+      'billedToName',
+      'id',
+      'invoiceNumber',
+      'issueDate',
+      'status',
+      'supplyPeriod',
+      'totalTtcCents',
+    ]);
   });
 
   it('saves and retrieves an issued invoice with frozen totals', async () => {
@@ -237,6 +271,54 @@ describe('PgInvoiceRepository', () => {
       ['invoice-1'],
     );
     expect(rows[0]!.source_cra_ids).toStrictEqual(['cra-1']);
+  });
+
+  it('keeps the source CRA id when the invoice is issued', async () => {
+    // The regression this test exists for. `save` carries no source ids, so `EXCLUDED
+    // .source_cra_ids` is `'{}'` on its upsert; updating the column there blanked the provenance
+    // of every invoice at the moment it was issued — which is the moment it becomes permanent.
+    await seedReferenceData();
+
+    const invoice = makeDraftInvoice();
+    await repo().saveDraft(invoice, 'cra-1');
+
+    invoice.issue({ by: 'claire', sequence: 7, issueDate: '2026-04-02' });
+    await repo().save(invoice);
+
+    const { rows } = await tx.client.query<{ source_cra_ids: string[] }>(
+      `SELECT source_cra_ids FROM billing.invoices WHERE id = $1`,
+      ['invoice-1'],
+    );
+    expect(rows[0]!.source_cra_ids).toStrictEqual(['cra-1']);
+  });
+
+  it('still reports a CRA as processed after its invoice is issued', async () => {
+    // The consequence of the line above, stated as the invariant rather than as the column:
+    // the idempotency guard has to survive issuance, or a replayed event drafts a duplicate of a
+    // document that has already left.
+    await seedReferenceData();
+
+    const invoice = makeDraftInvoice();
+    await repo().saveDraft(invoice, 'cra-1');
+    invoice.issue({ by: 'claire', sequence: 8, issueDate: '2026-04-02' });
+    await repo().save(invoice);
+
+    expect(await repo().hasCraBeenProcessed('cra-1')).toBe(true);
+  });
+
+  it('refuses a second draft from the same CRA after the first was issued', async () => {
+    // And the database half of the same invariant: the partial unique index of migration 006 is
+    // `WHERE source_cra_ids <> '{}'`, so blanking the column also removed the row from the index.
+    await seedReferenceData();
+
+    const first = makeDraftInvoice();
+    await repo().saveDraft(first, 'cra-1');
+    first.issue({ by: 'claire', sequence: 9, issueDate: '2026-04-02' });
+    await repo().save(first);
+
+    const replay = makeDraftInvoice('invoice-2');
+
+    await expect(repo().saveDraft(replay, 'cra-1')).rejects.toThrow(CraAlreadyProcessedError);
   });
 
   it('persists the VAT breakdown alongside the invoice', async () => {

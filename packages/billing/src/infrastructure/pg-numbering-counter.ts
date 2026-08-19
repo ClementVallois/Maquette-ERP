@@ -22,7 +22,9 @@ export class PgNumberingCounter {
       [entityId, fiscalYear],
     );
 
-    const { rows } = await this.#client.query<{ last_sequence: number }>(
+    // Read for the lock, not for the value: `FOR UPDATE` is what serialises two concurrent
+    // issuances, and the value comes from the UPDATE's RETURNING below.
+    await this.#client.query(
       `SELECT last_sequence
        FROM billing.numbering_series
        WHERE entity_id = $1 AND fiscal_year = $2
@@ -30,15 +32,17 @@ export class PgNumberingCounter {
       [entityId, fiscalYear],
     );
 
-    const next = rows[0]!.last_sequence + 1;
-
-    await this.#client.query(
+    // The lock is already held by the SELECT above, so reading and writing back would be
+    // equivalent — but ADR-0007 step 3 says `last_sequence = last_sequence + 1`, and an ADR the
+    // code merely agrees with is one someone will defend out loud and be wrong about.
+    const { rows: updated } = await this.#client.query<{ last_sequence: number }>(
       `UPDATE billing.numbering_series
-       SET last_sequence = $1
-       WHERE entity_id = $2 AND fiscal_year = $3`,
-      [next, entityId, fiscalYear],
+       SET last_sequence = last_sequence + 1
+       WHERE entity_id = $1 AND fiscal_year = $2
+       RETURNING last_sequence`,
+      [entityId, fiscalYear],
     );
 
-    return next;
+    return updated[0]!.last_sequence;
   }
 }

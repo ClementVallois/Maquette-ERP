@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 
 import pg from 'pg';
 
+import { HarnessMisconfiguredError } from './errors.ts';
+
 const { Pool } = pg;
 
 let pool: InstanceType<typeof Pool> | null = null;
@@ -28,14 +30,18 @@ loadEnvIfMissing();
 
 function connectionString(): string {
   const url = process.env['DATABASE_URL'];
-  if (!url) throw new Error('DATABASE_URL is not set — run `pnpm run env:init`');
+  if (!url)
+    throw new HarnessMisconfiguredError('DATABASE_URL is not set — run `pnpm run env:init`');
 
   return url;
 }
 
 function migrationConnectionString(): string {
   const url = process.env['MIGRATION_DATABASE_URL'];
-  if (!url) throw new Error('MIGRATION_DATABASE_URL is not set — run `pnpm run env:init`');
+  if (!url)
+    throw new HarnessMisconfiguredError(
+      'MIGRATION_DATABASE_URL is not set — run `pnpm run env:init`',
+    );
 
   return url;
 }

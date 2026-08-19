@@ -1,5 +1,4 @@
 import { type IsoDate, halfDays } from '@erp/platform';
-// eslint-disable-next-line import-x/no-extraneous-dependencies -- pg is in dependencies; @types/pg is a devDependency because types are compile-time
 import pg from 'pg';
 
 pg.types.setTypeParser(1082, (val: string) => val);
@@ -27,6 +26,8 @@ import type { SeriesKey } from '../domain/numbering.ts';
 import type { PaymentTerms } from '../domain/payment-terms.ts';
 import type { LegalEntity } from '../domain/seller.ts';
 import type { VatTreatment } from '../domain/vat.ts';
+
+import { exactInteger, ReferencedRowMissingError } from './columns.ts';
 
 const MAX_PAGE_SIZE = 50;
 
@@ -73,7 +74,8 @@ export class PgInvoiceRepository implements InvoiceRepository {
       billedToName: row.billed_to_name,
       invoiceNumber: row.invoice_number,
       issueDate: row.issue_date,
-      totalTtcCents: row.total_ttc_cents !== null ? Number(row.total_ttc_cents) : null,
+      totalTtcCents:
+        row.total_ttc_cents !== null ? exactInteger('total_ttc_cents', row.total_ttc_cents) : null,
     }));
   }
 
@@ -106,6 +108,10 @@ export class PgInvoiceRepository implements InvoiceRepository {
     return rows[0]!.found;
   }
 
+  // `source_cra_ids` is deliberately absent from the ON CONFLICT SET list above. It is written by
+  // the INSERT and never updated: `save` does not carry it, so `EXCLUDED.source_cra_ids` is `'{}'`
+  // there, and updating the column would blank the provenance of every invoice at issuance —
+  // taking `hasCraBeenProcessed` and the partial unique index of migration 006 with it.
   async #upsertInvoice(invoice: Invoice, sourceCraIds?: readonly string[]): Promise<void> {
     const totals = invoice.status === 'issued' ? invoice.totals : null;
     const mentions = invoice.mentions;
@@ -143,8 +149,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
         due_date = EXCLUDED.due_date,
         total_ht_cents = EXCLUDED.total_ht_cents,
         total_tax_cents = EXCLUDED.total_tax_cents,
-        total_ttc_cents = EXCLUDED.total_ttc_cents,
-        source_cra_ids = EXCLUDED.source_cra_ids`,
+        total_ttc_cents = EXCLUDED.total_ttc_cents`,
       [
         invoice.id,
         invoice.officeId,
@@ -253,9 +258,9 @@ export class PgInvoiceRepository implements InvoiceRepository {
     const lines: InvoiceLine[] = lineRows.map((lr) => ({
       designation: lr.designation,
       origin: this.#reconstructOrigin(lr),
-      quantityHalfDays: halfDays(Number(lr.quantity_half_days)),
-      unitPriceCents: Number(lr.unit_price_cents),
-      amountCents: Number(lr.amount_cents),
+      quantityHalfDays: halfDays(exactInteger('quantity_half_days', lr.quantity_half_days)),
+      unitPriceCents: exactInteger('unit_price_cents', lr.unit_price_cents),
+      amountCents: exactInteger('amount_cents', lr.amount_cents),
       vat: this.#reconstructVat(lr),
     }));
 
@@ -294,7 +299,10 @@ export class PgInvoiceRepository implements InvoiceRepository {
       operationCategory: row.mentions_operation_category as OperationCategory,
       earlyPaymentDiscount,
       latePaymentBasisPoints: row.mentions_late_penalty_rate,
-      recoveryIndemnityCents: Number(row.mentions_recovery_indemnity),
+      recoveryIndemnityCents: exactInteger(
+        'mentions_recovery_indemnity',
+        row.mentions_recovery_indemnity,
+      ),
       vatOnDebitsOption: row.mentions_vat_on_debits,
     };
 
@@ -306,9 +314,9 @@ export class PgInvoiceRepository implements InvoiceRepository {
     const totals: DocumentTotals | null =
       row.total_ht_cents !== null && row.total_tax_cents !== null && row.total_ttc_cents !== null
         ? {
-            totalExcludingVatCents: Number(row.total_ht_cents),
-            vatTotalCents: Number(row.total_tax_cents),
-            totalIncludingVatCents: Number(row.total_ttc_cents),
+            totalExcludingVatCents: exactInteger('total_ht_cents', row.total_ht_cents),
+            vatTotalCents: exactInteger('total_tax_cents', row.total_tax_cents),
+            totalIncludingVatCents: exactInteger('total_ttc_cents', row.total_ttc_cents),
           }
         : null;
 
@@ -335,13 +343,14 @@ export class PgInvoiceRepository implements InvoiceRepository {
       `SELECT * FROM public.legal_entities WHERE id = $1`,
       [sellerId],
     );
-    const row = rows[0]!;
+    const row = rows[0];
+    if (row === undefined) throw new ReferencedRowMissingError('public.legal_entities', sellerId);
 
     return {
       id: row.id,
       name: row.name,
       legalForm: row.legal_form,
-      shareCapitalCents: Number(row.share_capital_cents),
+      shareCapitalCents: exactInteger('share_capital_cents', row.share_capital_cents),
       siren: row.siren,
       intraCommunityVatNumber: row.intra_community_vat_number,
       rcsRegistration: row.rcs_registration,
@@ -363,7 +372,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
       craId: lr.origin_cra_id! as CraId,
       period: lr.origin_period!,
       halfDays: halfDays(lr.origin_half_days!),
-      tjmCents: Number(lr.origin_tjm_cents!),
+      tjmCents: exactInteger('origin_tjm_cents', lr.origin_tjm_cents!),
     };
   }
 

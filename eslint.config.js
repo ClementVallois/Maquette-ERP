@@ -266,10 +266,13 @@ export default tseslint.config(
   {
     // Infrastructure adapters: persistence code that talks to Postgres. `@types/pg` is a
     // devDependency (types are compile-time, not runtime), `query<T>` is the standard pg client
-    // pattern, and BIGINT columns return strings that must become numbers. The `Number()` ban is
-    // replaced by the integer-only subset: `Number.parseInt` names what it does and refuses a
-    // decimal. Non-null assertions are allowed on DB rows where the query has already asserted
-    // the column is present.
+    // pattern, and BIGINT columns return strings that must become numbers. `NO_FLOAT_MONEY_CALLS`
+    // already permits the integer-only subset — its `Number()` selector matches a bare call and
+    // not `Number.parseInt`, which names what it does — so this block keeps it. It was dropped
+    // here when the block was written, which switched `parseFloat`, `Number()` and `Math.round`
+    // back on in the one layer that reads money out of the database: the failure family the
+    // `application/` scope fix already named, one directory further out. `tests/lint-rules.test.ts`
+    // holds the negative test.
     files: ['packages/*/src/infrastructure/**/*.ts'],
     ignores: ['**/*.test.ts', '**/*.int.test.ts'],
     rules: {
@@ -277,16 +280,30 @@ export default tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
-      'no-restricted-syntax': ['error', ...NO_BARE_ERROR, ...NO_WALL_CLOCK],
+      'no-restricted-syntax': [
+        'error',
+        ...NO_BARE_ERROR,
+        ...NO_WALL_CLOCK,
+        ...NO_FLOAT_MONEY_CALLS,
+      ],
     },
   },
 
   {
-    // Test harness: infrastructure that hooks into Vitest and manages connections. Not shipped,
-    // not domain code — the bare-error ban and the devDependencies restriction do not apply.
+    // Test harness: infrastructure that hooks into Vitest and manages connections. The
+    // devDependencies restriction does not apply — it is not shipped. The **bare-error ban does**,
+    // and it was dropped here when this block was written: that made `tests/harness/` the only
+    // place in the repository where `throw new Error()` was legal, including for `PgEventStore`,
+    // which ADR-0020 says is promoted to `apps/api/` in Phase 5. Its errors are typed by
+    // `errors.ts`, which is local on purpose — the harness carries no workspace dependency.
     files: ['tests/harness/**/*.ts'],
     rules: {
-      'no-restricted-syntax': ['error', ...NO_WALL_CLOCK, ...NO_FLOAT_MONEY_CALLS],
+      'no-restricted-syntax': [
+        'error',
+        ...NO_BARE_ERROR,
+        ...NO_WALL_CLOCK,
+        ...NO_FLOAT_MONEY_CALLS,
+      ],
       'import-x/no-extraneous-dependencies': ['error', { devDependencies: true }],
     },
   },

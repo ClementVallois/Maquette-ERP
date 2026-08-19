@@ -3,6 +3,9 @@ import { useTestTransaction } from '@erp/test-harness';
 import { describe, expect, it } from 'vitest';
 
 import { Cra } from '../domain/cra.ts';
+import { hierarchy } from '../domain/hierarchy.ts';
+import { timesheetReference } from '../domain/reference.ts';
+import { workingCalendar } from '../domain/working-calendar.ts';
 
 import { PgCraRepository } from './pg-cra-repository.ts';
 
@@ -38,6 +41,29 @@ describe('PgCraRepository', () => {
 
   function repo(): PgCraRepository {
     return new PgCraRepository(tx.client);
+  }
+
+  // The three collaborators `submit` and `validate` need, built for June 2026 against the rows
+  // `seedOffices` inserts, so a transition can actually run here instead of being asserted around.
+  const fixedClock = { now: () => new Date('2026-07-02T09:00:00.000Z') };
+  const juneCalendar = workingCalendar();
+  const juneReference = timesheetReference({
+    missions: [{ id: 'mission-1', startDate: '2026-01-01', endDate: null }],
+    assignments: [
+      { consultantId: 'consultant-1', missionId: 'mission-1', from: '2026-01-01', to: null },
+    ],
+  });
+  const juneHierarchy = hierarchy([
+    { consultantId: 'consultant-1', managerId: 'manager-1', from: '2025-01-01', to: null },
+  ]);
+
+  /** Every workable day of June worked on `mission-1`: the shape `submit` requires. */
+  function makeCompleteCra(): Cra {
+    const cra = makeCra();
+    for (const day of juneCalendar.workableDaysOf(period(2026, 6))) {
+      cra.recordDay({ day, dayType: 'worked', missionId: 'mission-1', halfDays: 2 });
+    }
+    return cra;
   }
 
   function makeCra(): Cra {
@@ -101,27 +127,63 @@ describe('PgCraRepository', () => {
     expect(lyonResults).toHaveLength(0);
   });
 
-  it('caps pagination at MAX_PAGE_SIZE', async () => {
+  it('caps pagination at MAX_PAGE_SIZE, however large the caller asks', async () => {
+    // Seeded past the cap on purpose. Asking for 1000 against an empty table also returns "no
+    // more than 50" and proves nothing — the cap has to be the reason the answer is short.
     await seedOffices();
-    const results = await repo().list({ officeId: PARIS, limit: 1000, offset: 0 });
-    expect(results).toHaveLength(0);
+    await tx.client.query(`
+      INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+      SELECT 'cra-' || g, 'consultant-1', 'office-paris',
+             to_char(DATE '2020-01-01' + (g || ' month')::interval, 'YYYY-MM'), 'draft'
+      FROM generate_series(1, 60) AS g
+    `);
+
+    const capped = await repo().list({ officeId: PARIS, limit: 1000, offset: 0 });
+    expect(capped).toHaveLength(50);
+
+    // And a caller under the cap still gets what it asked for, so the fix is not "always 50".
+    const asked = await repo().list({ officeId: PARIS, limit: 10, offset: 0 });
+    expect(asked).toHaveLength(10);
   });
 
-  it('saves and retrieves a Cra with refusal', async () => {
+  it('round-trips a refusal, with who refused it and why', async () => {
+    // This test used to save a fresh draft and assert its refusal was null, under this name. The
+    // three refusal columns of migration 002 were written by nothing and read by nothing.
     await seedOffices();
 
-    const cra = makeCra();
-    cra.recordDay({
-      day: isoDate('2026-06-02'),
-      dayType: 'worked',
-      missionId: 'mission-1',
-      halfDays: 2,
+    const cra = makeCompleteCra();
+    cra.submit({ clock: fixedClock, calendar: juneCalendar, reference: juneReference });
+    cra.refuse({
+      by: 'manager-1',
+      reason: 'mission-1 was not staffed that week',
+      clock: fixedClock,
     });
 
     await repo().save(cra);
     const found = await repo().findById('cra-001', { officeId: PARIS });
-    expect(found).not.toBeNull();
-    expect(found!.refusal).toBeNull();
+
+    expect(found!.status).toBe('refused');
+    expect(found!.refusal).not.toBeNull();
+    expect(found!.refusal!.by).toBe('manager-1');
+    expect(found!.refusal!.reason).toBe('mission-1 was not staffed that week');
+    expect(found!.refusal!.at).toBeInstanceOf(Date);
+  });
+
+  it('round-trips a validated Cra, with who validated it', async () => {
+    // The status the whole chain turns on, and the one no test persisted. `validated_by` and
+    // `validated_at` were written by nothing and read by nothing.
+    await seedOffices();
+
+    const cra = makeCompleteCra();
+    cra.submit({ clock: fixedClock, calendar: juneCalendar, reference: juneReference });
+    cra.validate({ by: 'manager-1', clock: fixedClock, hierarchy: juneHierarchy });
+
+    await repo().save(cra);
+    const found = await repo().findById('cra-001', { officeId: PARIS });
+
+    expect(found!.status).toBe('validated');
+    expect(found!.validatedBy).toBe('manager-1');
+    expect(found!.validatedAt).toBeInstanceOf(Date);
   });
 
   it('finds by consultant and period', async () => {
@@ -157,13 +219,22 @@ describe('PgCraRepository', () => {
 
     const items = await repo().list({ officeId: PARIS, limit: 10, offset: 0 });
     const item = items[0]!;
-    const keys = Object.keys(item);
-    expect(keys).not.toContain('tjm');
-    expect(keys).not.toContain('cjm');
-    expect(keys).not.toContain('margin');
+
+    // Asserted as the WHOLE shape, not as three absent names. `tjm`, `cjm` and `margin` are
+    // spellings this codebase never uses — a leak would arrive as `tjmCents` or `cjmCents` and
+    // an absence test would stay green. A projection that grows a field fails here instead.
+    expect(Object.keys(item).sort()).toStrictEqual([
+      'consultantId',
+      'id',
+      'officeId',
+      'period',
+      'status',
+    ]);
   });
 
-  it('updates status on re-save (upsert)', async () => {
+  it('updates status and lines on re-save (upsert)', async () => {
+    // Under this name, this test used to save once and assert the status was still `draft`. It
+    // never re-saved, so the upsert it is named for ran in no test.
     await seedOffices();
 
     const cra = makeCra();
@@ -175,8 +246,24 @@ describe('PgCraRepository', () => {
     });
     await repo().save(cra);
 
-    const found1 = await repo().findById('cra-001', { officeId: PARIS });
-    expect(found1!.status).toBe('draft');
-    expect(found1!.lines).toHaveLength(1);
+    const first = await repo().findById('cra-001', { officeId: PARIS });
+    expect(first!.status).toBe('draft');
+    expect(first!.lines).toHaveLength(1);
+
+    const complete = makeCompleteCra();
+    complete.submit({ clock: fixedClock, calendar: juneCalendar, reference: juneReference });
+    await repo().save(complete);
+
+    const workableDays = juneCalendar.workableDaysOf(period(2026, 6)).length;
+    const second = await repo().findById('cra-001', { officeId: PARIS });
+    expect(second!.status).toBe('submitted');
+    expect(second!.lines).toHaveLength(workableDays);
+
+    // The rows are replaced, not appended: `#replaceLines` deletes before it inserts.
+    const { rows } = await tx.client.query<{ count: string }>(
+      `SELECT count(*) AS count FROM timesheet.cra_lines WHERE cra_id = $1`,
+      ['cra-001'],
+    );
+    expect(Number.parseInt(rows[0]!.count, 10)).toBe(workableDays);
   });
 });
