@@ -1,4 +1,4 @@
-import { halfDays, period } from '@erp/platform';
+import { type Actor, halfDays, OutOfScopeError, period } from '@erp/platform';
 import { useTestTransaction } from '@erp/test-harness';
 import { describe, expect, it } from 'vitest';
 
@@ -17,6 +17,17 @@ describe('PgInvoiceRepository', () => {
 
   const PARIS = 'office-paris';
   const LYON = 'office-lyon';
+
+  // ADR-0023: an actor is a role inside an office. Billing and the manager both read the office's
+  // invoices; a consultant reads none at all, whichever office they are in.
+  const parisManager: Actor = { consultantId: 'manager-1', officeId: PARIS, role: 'manager' };
+  const lyonManager: Actor = { consultantId: 'manager-2', officeId: LYON, role: 'manager' };
+  const parisBilling: Actor = { consultantId: 'henri', officeId: PARIS, role: 'billing' };
+  const parisConsultant: Actor = {
+    consultantId: 'consultant-1',
+    officeId: PARIS,
+    role: 'consultant',
+  };
 
   const SELLER = legalEntity({
     id: 'entity-fr',
@@ -137,7 +148,7 @@ describe('PgInvoiceRepository', () => {
 
     const invoice = makeDraftInvoice();
     await repo().save(invoice);
-    const found = await repo().findById('invoice-1', { officeId: PARIS });
+    const found = await repo().findById('invoice-1', parisManager);
 
     expect(found).not.toBeNull();
     expect(found!.id).toBe('invoice-1');
@@ -157,18 +168,37 @@ describe('PgInvoiceRepository', () => {
 
   it('returns null when invoice does not exist', async () => {
     await seedReferenceData();
-    const found = await repo().findById('nonexistent', { officeId: PARIS });
+    const found = await repo().findById('nonexistent', parisManager);
     expect(found).toBeNull();
   });
 
-  it('returns null when actor office does not match — authorization scope', async () => {
+  it('refuses, rather than hides, an invoice of another office — ADR-0003 beat two', async () => {
     await seedReferenceData();
 
     const invoice = makeDraftInvoice();
     await repo().save(invoice);
 
-    const found = await repo().findById('invoice-1', { officeId: LYON });
-    expect(found).toBeNull();
+    await expect(repo().findById('invoice-1', lyonManager)).rejects.toThrow(OutOfScopeError);
+  });
+
+  it('refuses a consultant every invoice, including one billing their own days', async () => {
+    // The role dimension on a resource that has no subject: `consultant` is `none` here, so
+    // office membership does not help.
+    await seedReferenceData();
+    await repo().save(makeDraftInvoice());
+
+    await expect(repo().findById('invoice-1', parisConsultant)).rejects.toThrow(OutOfScopeError);
+    expect(await repo().list({ actor: parisConsultant, limit: 10, offset: 0 })).toHaveLength(0);
+  });
+
+  it('lets billing read the invoices of its own office', async () => {
+    await seedReferenceData();
+    await repo().save(makeDraftInvoice());
+
+    const found = await repo().findById('invoice-1', parisBilling);
+
+    expect(found).not.toBeNull();
+    expect(await repo().list({ actor: parisBilling, limit: 10, offset: 0 })).toHaveLength(1);
   });
 
   it('lists invoices filtered by office', async () => {
@@ -177,12 +207,12 @@ describe('PgInvoiceRepository', () => {
     const invoice = makeDraftInvoice();
     await repo().save(invoice);
 
-    const parisResults = await repo().list({ officeId: PARIS, limit: 10, offset: 0 });
+    const parisResults = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
     expect(parisResults).toHaveLength(1);
     expect(parisResults[0]!.id).toBe('invoice-1');
     expect(parisResults[0]!.billedToName).toBe('Banque Nord SA');
 
-    const lyonResults = await repo().list({ officeId: LYON, limit: 10, offset: 0 });
+    const lyonResults = await repo().list({ actor: lyonManager, limit: 10, offset: 0 });
     expect(lyonResults).toHaveLength(0);
   });
 
@@ -210,11 +240,11 @@ describe('PgInvoiceRepository', () => {
       FROM generate_series(1, 60) AS g
     `);
 
-    const capped = await repo().list({ officeId: PARIS, limit: 1000, offset: 0 });
+    const capped = await repo().list({ actor: parisManager, limit: 1000, offset: 0 });
     expect(capped).toHaveLength(50);
 
     // And a caller under the cap still gets what it asked for, so the fix is not "always 50".
-    const asked = await repo().list({ officeId: PARIS, limit: 10, offset: 0 });
+    const asked = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
     expect(asked).toHaveLength(10);
   });
 
@@ -224,7 +254,7 @@ describe('PgInvoiceRepository', () => {
     const invoice = makeDraftInvoice();
     await repo().save(invoice);
 
-    const items = await repo().list({ officeId: PARIS, limit: 10, offset: 0 });
+    const items = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
     const item = items[0]!;
 
     // Asserted as the WHOLE shape, not as four absent names. `tjm`, `cjm` and `margin` are
@@ -248,7 +278,7 @@ describe('PgInvoiceRepository', () => {
     invoice.issue({ by: 'claire', sequence: 42, issueDate: '2026-04-02' });
 
     await repo().save(invoice);
-    const found = await repo().findById('invoice-1', { officeId: PARIS });
+    const found = await repo().findById('invoice-1', parisManager);
 
     expect(found).not.toBeNull();
     expect(found!.status).toBe('issued');
@@ -347,13 +377,13 @@ describe('PgInvoiceRepository', () => {
     const invoice = makeDraftInvoice();
     await repo().save(invoice);
 
-    const found1 = await repo().findById('invoice-1', { officeId: PARIS });
+    const found1 = await repo().findById('invoice-1', parisManager);
     expect(found1!.status).toBe('draft');
 
     invoice.issue({ by: 'claire', sequence: 1, issueDate: '2026-04-02' });
     await repo().save(invoice);
 
-    const found2 = await repo().findById('invoice-1', { officeId: PARIS });
+    const found2 = await repo().findById('invoice-1', parisManager);
     expect(found2!.status).toBe('issued');
     expect(found2!.number).toBe('SEC-2026-000001');
   });
@@ -363,7 +393,7 @@ describe('PgInvoiceRepository', () => {
 
     const invoice = makeDraftInvoice();
     await repo().save(invoice);
-    const found = await repo().findById('invoice-1', { officeId: PARIS });
+    const found = await repo().findById('invoice-1', parisManager);
 
     expect(found!.seller.name).toBe('Sécurité & Conseil');
     expect(found!.seller.siren).toBe('493296529');

@@ -9,6 +9,7 @@ import {
   fromDayNumber,
   isLeapYear,
   isoDate,
+  isoDateOf,
   MONDAY,
   partsOf,
   SATURDAY,
@@ -141,5 +142,34 @@ describe('civil-date arithmetic', () => {
     expect(endOfMonth('2026-02-01')).toBe('2026-02-28');
     expect(endOfMonth('2028-02-01')).toBe('2028-02-29');
     expect(endOfMonth('2026-04-30')).toBe('2026-04-30');
+  });
+});
+
+describe('isoDateOf', () => {
+  it('passes a string straight through, after checking it is a date', () => {
+    expect(isoDateOf('2026-04-02')).toBe('2026-04-02');
+    expect(() => isoDateOf('2026-02-30')).toThrow();
+  });
+
+  it('undoes the local construction pg performs, rather than reading UTC off it', () => {
+    // This is the one that was wrong, silently, for two phases. `pg` builds a DATE with the local
+    // constructor, so on a machine east of Greenwich the instant is the PREVIOUS day in UTC.
+    // Reading UTC parts back answers the 1st for a column holding the 2nd — an off-by-one visible
+    // in Paris and invisible on a UTC CI runner, which is the worst combination available.
+    const asPgBuildsIt = new Date(2026, 3, 2);
+
+    expect(isoDateOf(asPgBuildsIt)).toBe('2026-04-02');
+  });
+
+  it('round-trips every day of a month, whatever the offset', () => {
+    for (let day = 1; day <= 31; day++) {
+      expect(isoDateOf(new Date(2026, 0, day))).toBe(`2026-01-${String(day).padStart(2, '0')}`);
+    }
+  });
+
+  it('handles the two days a timezone shift actually falls on', () => {
+    // Europe/Paris moves on the last Sunday of March and October.
+    expect(isoDateOf(new Date(2026, 2, 29))).toBe('2026-03-29');
+    expect(isoDateOf(new Date(2026, 9, 25))).toBe('2026-10-25');
   });
 });

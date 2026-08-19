@@ -1,4 +1,4 @@
-import { isoDate, period } from '@erp/platform';
+import { type Actor, isoDate, OutOfScopeError, period } from '@erp/platform';
 import { useTestTransaction } from '@erp/test-harness';
 import { describe, expect, it } from 'vitest';
 
@@ -14,6 +14,12 @@ describe('PgCraRepository', () => {
 
   const PARIS = 'office-paris';
   const LYON = 'office-lyon';
+
+  // The role dimension arrived with ADR-0023, so an actor is no longer an office alone. The
+  // manager reads the office; the consultant reads their own month and nothing else.
+  const parisManager: Actor = { consultantId: 'manager-1', officeId: PARIS, role: 'manager' };
+  const lyonManager: Actor = { consultantId: 'manager-2', officeId: LYON, role: 'manager' };
+  const alice: Actor = { consultantId: 'consultant-1', officeId: PARIS, role: 'consultant' };
 
   async function seedOffices(): Promise<void> {
     await tx.client.query(`
@@ -87,7 +93,7 @@ describe('PgCraRepository', () => {
     });
 
     await repo().save(cra);
-    const found = await repo().findById('cra-001', { officeId: PARIS });
+    const found = await repo().findById('cra-001', parisManager);
 
     expect(found).not.toBeNull();
     expect(found!.id).toBe('cra-001');
@@ -99,18 +105,58 @@ describe('PgCraRepository', () => {
 
   it('returns null when CRA does not exist', async () => {
     await seedOffices();
-    const found = await repo().findById('nonexistent', { officeId: PARIS });
+    const found = await repo().findById('nonexistent', parisManager);
     expect(found).toBeNull();
   });
 
-  it('returns null when actor office does not match — authorization scope', async () => {
+  it('refuses, rather than hides, a CRA of another office — ADR-0003 beat two', async () => {
     await seedOffices();
 
     const cra = makeCra();
     await repo().save(cra);
 
-    const found = await repo().findById('cra-001', { officeId: LYON });
-    expect(found).toBeNull();
+    // Not `null`: a record that exists and is out of reach raises a typed refusal, because
+    // ADR-0003's second beat is a 403 that NAMES the rule and a `null` names nothing.
+    await expect(repo().findById('cra-001', lyonManager)).rejects.toThrow(OutOfScopeError);
+  });
+
+  it("refuses a consultant a colleague's CRA in their own office", async () => {
+    // The dimension office scope alone cannot see: same office, different person.
+    await seedOffices();
+    await repo().save(makeCra());
+
+    const colleague: Actor = { consultantId: 'someone-else', officeId: PARIS, role: 'consultant' };
+
+    await expect(repo().findById('cra-001', colleague)).rejects.toThrow(OutOfScopeError);
+  });
+
+  it('lets a consultant read their own CRA', async () => {
+    await seedOffices();
+    await repo().save(makeCra());
+
+    const found = await repo().findById('cra-001', alice);
+
+    expect(found).not.toBeNull();
+    expect(found!.consultantId).toBe('consultant-1');
+  });
+
+  it("lists a consultant's own CRAs only, where the manager lists the whole office", async () => {
+    await seedOffices();
+    await repo().save(makeCra());
+
+    const asManager = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
+    const asAlice = await repo().list({ actor: alice, limit: 10, offset: 0 });
+    const asColleague = await repo().list({
+      actor: { consultantId: 'someone-else', officeId: PARIS, role: 'consultant' },
+      limit: 10,
+      offset: 0,
+    });
+
+    expect(asManager).toHaveLength(1);
+    expect(asAlice).toHaveLength(1);
+    // Same office, same query, different person: the list is filtered rather than refused —
+    // that is ADR-0003's FIRST beat, the empty state.
+    expect(asColleague).toHaveLength(0);
   });
 
   it('lists CRAs filtered by office', async () => {
@@ -119,11 +165,11 @@ describe('PgCraRepository', () => {
     const cra = makeCra();
     await repo().save(cra);
 
-    const parisResults = await repo().list({ officeId: PARIS, limit: 10, offset: 0 });
+    const parisResults = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
     expect(parisResults).toHaveLength(1);
     expect(parisResults[0]!.id).toBe('cra-001');
 
-    const lyonResults = await repo().list({ officeId: LYON, limit: 10, offset: 0 });
+    const lyonResults = await repo().list({ actor: lyonManager, limit: 10, offset: 0 });
     expect(lyonResults).toHaveLength(0);
   });
 
@@ -138,11 +184,11 @@ describe('PgCraRepository', () => {
       FROM generate_series(1, 60) AS g
     `);
 
-    const capped = await repo().list({ officeId: PARIS, limit: 1000, offset: 0 });
+    const capped = await repo().list({ actor: parisManager, limit: 1000, offset: 0 });
     expect(capped).toHaveLength(50);
 
     // And a caller under the cap still gets what it asked for, so the fix is not "always 50".
-    const asked = await repo().list({ officeId: PARIS, limit: 10, offset: 0 });
+    const asked = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
     expect(asked).toHaveLength(10);
   });
 
@@ -160,7 +206,7 @@ describe('PgCraRepository', () => {
     });
 
     await repo().save(cra);
-    const found = await repo().findById('cra-001', { officeId: PARIS });
+    const found = await repo().findById('cra-001', parisManager);
 
     expect(found!.status).toBe('refused');
     expect(found!.refusal).not.toBeNull();
@@ -179,7 +225,7 @@ describe('PgCraRepository', () => {
     cra.validate({ by: 'manager-1', clock: fixedClock, hierarchy: juneHierarchy });
 
     await repo().save(cra);
-    const found = await repo().findById('cra-001', { officeId: PARIS });
+    const found = await repo().findById('cra-001', parisManager);
 
     expect(found!.status).toBe('validated');
     expect(found!.validatedBy).toBe('manager-1');
@@ -192,23 +238,24 @@ describe('PgCraRepository', () => {
     const cra = makeCra();
     await repo().save(cra);
 
-    const found = await repo().findByConsultantAndPeriod('consultant-1', period(2026, 6), {
-      officeId: PARIS,
-    });
+    const found = await repo().findByConsultantAndPeriod(
+      'consultant-1',
+      period(2026, 6),
+      parisManager,
+    );
     expect(found).not.toBeNull();
     expect(found!.id).toBe('cra-001');
   });
 
-  it('findByConsultantAndPeriod returns null for wrong office', async () => {
+  it('findByConsultantAndPeriod refuses a CRA of another office', async () => {
     await seedOffices();
 
     const cra = makeCra();
     await repo().save(cra);
 
-    const found = await repo().findByConsultantAndPeriod('consultant-1', period(2026, 6), {
-      officeId: LYON,
-    });
-    expect(found).toBeNull();
+    await expect(
+      repo().findByConsultantAndPeriod('consultant-1', period(2026, 6), lyonManager),
+    ).rejects.toThrow(OutOfScopeError);
   });
 
   it('list items do not expose Tjm, Cjm or margin', async () => {
@@ -217,7 +264,7 @@ describe('PgCraRepository', () => {
     const cra = makeCra();
     await repo().save(cra);
 
-    const items = await repo().list({ officeId: PARIS, limit: 10, offset: 0 });
+    const items = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
     const item = items[0]!;
 
     // Asserted as the WHOLE shape, not as three absent names. `tjm`, `cjm` and `margin` are
@@ -246,7 +293,7 @@ describe('PgCraRepository', () => {
     });
     await repo().save(cra);
 
-    const first = await repo().findById('cra-001', { officeId: PARIS });
+    const first = await repo().findById('cra-001', parisManager);
     expect(first!.status).toBe('draft');
     expect(first!.lines).toHaveLength(1);
 
@@ -255,7 +302,7 @@ describe('PgCraRepository', () => {
     await repo().save(complete);
 
     const workableDays = juneCalendar.workableDaysOf(period(2026, 6)).length;
-    const second = await repo().findById('cra-001', { officeId: PARIS });
+    const second = await repo().findById('cra-001', parisManager);
     expect(second!.status).toBe('submitted');
     expect(second!.lines).toHaveLength(workableDays);
 

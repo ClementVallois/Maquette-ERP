@@ -45,9 +45,11 @@ export const API_PROBLEM_TYPES = {
   unknownPersona: '/problems/unknown-persona',
   /** A state-changing request arrived from an origin this instance does not serve. */
   forbiddenOrigin: '/problems/forbidden-origin',
-  /** The record exists and belongs to another `Office` (ADR-0003). */
-  outOfScope: '/problems/out-of-scope',
-  /** The persona's role does not carry this action. */
+  /**
+   * The persona's role does not carry this action. Distinct from `/problems/out-of-scope`, which
+   * is a *domain* refusal raised by a repository about a record that exists — this one is about
+   * the action and is decided before any record is read.
+   */
   insufficientRole: '/problems/insufficient-role',
   notFound: '/problems/not-found',
   /** A POST that allocates a numbered document arrived without `Idempotency-Key` (ADR-0021). */

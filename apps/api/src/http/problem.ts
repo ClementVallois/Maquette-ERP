@@ -27,6 +27,9 @@ const FORBIDDEN = 403;
 const STATUS_BY_PROBLEM_TYPE: Readonly<Record<string, number>> = {
   // @erp/platform
   '/problems/invalid-value': UNPROCESSABLE,
+  // Beat two of ADR-0003's demonstration: the record exists, the actor may not read it, and the
+  // answer names the rule. `deniedBy` carries the rule; ADR-0042 keeps every business field off it.
+  '/problems/out-of-scope': FORBIDDEN,
 
   // @erp/timesheet
   '/problems/unknown-calendar-year': UNPROCESSABLE,

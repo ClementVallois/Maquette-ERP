@@ -63,6 +63,26 @@ export function isoDate(value: string): IsoDate {
 }
 
 /** Splits a date that has already been through `isoDate`. */
+/**
+ * A DATE column as an `IsoDate`, whichever shape the driver hands over.
+ *
+ * `pg` builds a `DATE` into a `Date` with the **local** constructor — `new Date(y, m - 1, d)` —
+ * so `2026-04-02` becomes `2026-04-01T22:00:00Z` on a machine in Paris. The inverse is therefore
+ * the **local** getters, not the UTC ones: reading `getUTCDate()` off that instant answers the
+ * 1st, which is the off-by-one this function exists to undo. It reads the process timezone on
+ * purpose, because the value it is decoding was encoded with it.
+ *
+ * The composition roots also install a type parser that keeps the string, so this branch is
+ * usually not taken. It exists because a sealed module's correctness must not depend on a
+ * process-global that somebody else installs — the failure would be a date off by one, in one
+ * timezone, and invisible on a UTC continuous-integration runner.
+ */
+export function isoDateOf(value: Date | string): IsoDate {
+  if (typeof value === 'string') return isoDate(value);
+
+  return toIsoDate(value.getFullYear(), value.getMonth() + 1, value.getDate());
+}
+
 export function partsOf(date: IsoDate): DateParts {
   return {
     year: Number.parseInt(date.slice(0, 4), 10),

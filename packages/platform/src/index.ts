@@ -24,6 +24,7 @@ export {
   isLeapYear,
   isoDate,
   type IsoDate,
+  isoDateOf,
   partsOf,
   toDayNumber,
   toIsoDate,
@@ -38,4 +39,13 @@ export {
   periodOf,
   periodToIso,
 } from './period.ts';
+export {
+  assertMayRead,
+  OutOfScopeError,
+  type ReadScope,
+  readScope,
+  type Resource,
+  RESOURCES,
+  type ScopedRecord,
+} from './scope.ts';
 export { CENTS_PER_EURO, tjmCentsFromEuros } from './tjm.ts';

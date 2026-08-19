@@ -1,7 +1,4 @@
-import { type IsoDate, halfDays } from '@erp/platform';
-import pg from 'pg';
-
-pg.types.setTypeParser(1082, (val: string) => val);
+import { type Actor, assertMayRead, halfDays, isoDateOf, readScope } from '@erp/platform';
 
 import type { DocumentTotals } from '../domain/document.ts';
 import { CraAlreadyProcessedError } from '../domain/errors.ts';
@@ -42,7 +39,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
     this.#client = client;
   }
 
-  async findById(id: InvoiceId, actor: { officeId: OfficeId }): Promise<Invoice | null> {
+  async findById(id: InvoiceId, actor: Actor): Promise<Invoice | null> {
     const { rows } = await this.#client.query<InvoiceRow>(
       `SELECT * FROM billing.invoices WHERE id = $1`,
       [id],
@@ -50,13 +47,19 @@ export class PgInvoiceRepository implements InvoiceRepository {
 
     if (rows.length === 0) return null;
     const row = rows[0]!;
-    if (row.office_id !== actor.officeId) return null;
+    // An invoice is about no single consultant, so it carries no subject: the `own` scope cannot
+    // apply to one, which is why `consultant` is given `none` on this resource rather than `own`.
+    assertMayRead(actor, 'invoice', { officeId: row.office_id, subjectId: null });
 
     return this.#reconstitute(row);
   }
 
+  /** Filtered, never refused — the first of ADR-0003's two beats. See `PgCraRepository.list`. */
   async list(query: InvoiceListQuery): Promise<readonly InvoiceListItem[]> {
     const limit = Math.min(query.limit, MAX_PAGE_SIZE);
+    const { actor } = query;
+
+    if (readScope(actor, 'invoice') === 'none') return [];
 
     const { rows } = await this.#client.query<InvoiceListRow>(
       `SELECT id, status, supply_period, billed_to_name, invoice_number, issue_date, total_ttc_cents
@@ -64,7 +67,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
        WHERE office_id = $1
        ORDER BY supply_period DESC, billed_to_name
        LIMIT $2 OFFSET $3`,
-      [query.officeId, limit, query.offset],
+      [actor.officeId, limit, query.offset],
     );
 
     return rows.map((row) => ({
@@ -73,7 +76,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
       supplyPeriod: row.supply_period,
       billedToName: row.billed_to_name,
       invoiceNumber: row.invoice_number,
-      issueDate: row.issue_date,
+      issueDate: row.issue_date === null ? null : isoDateOf(row.issue_date),
       totalTtcCents:
         row.total_ttc_cents !== null ? exactInteger('total_ttc_cents', row.total_ttc_cents) : null,
     }));
@@ -332,7 +335,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
       mentions,
       validatedBy: (row.validated_by ?? []) as ConsultantId[],
       number: row.invoice_number,
-      issueDate: (row.issue_date ?? null) as IsoDate | null,
+      issueDate: row.issue_date === null ? null : isoDateOf(row.issue_date),
       series,
       totals,
     });
