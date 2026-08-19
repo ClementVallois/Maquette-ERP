@@ -58,6 +58,8 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0040](./0040-ci-gates-are-advisory-while-the-repository-is-private.md) | The CI gates are advisory while the repository is private on the free plan      | accepted |
 | [0022](./0022-deterministic-seed-is-a-deliverable.md)                   | The seed is a deliverable, not a fixture: deterministic, Zod-validated          | accepted |
 | [0041](./0041-deterministic-uuidv7-for-all-identifiers.md)              | Deterministic UUIDv7 for all identifiers, including child rows                  | accepted |
+| [0024](./0024-structured-logging-redacted-by-allowlist.md)              | Structured logging, redacted by allowlist in the serialiser                     | accepted |
+| [0042](./0042-which-status-a-business-refusal-takes.md)                 | Which HTTP status a business refusal takes, and what it may publish             | accepted |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
@@ -89,6 +91,13 @@ to that phase, and a decision taken early takes the next free number instead of 
 for a decision Phase 4 reached that the plan had not identified: how child-row identifiers are
 generated (UUIDv7 everywhere, deterministic in the seed — the positional string alternative the open
 questions had carried was retired).
+
+0024 takes the number the plan reserved for structured logging. 0042 continues the unplanned
+sequence, for a decision Phase 5 reached that the plan had not identified: ADR-0016 deliberately
+fixed only **where** a `problemType` becomes an HTTP status, and applying it to twenty-six refusals
+turned out to need two rulings nothing had made — that a domain refusal never answers 400 (422 and
+409 split what "validation" was one word for), and that a 403 publishes the rule that denied it and
+none of the business fields that would describe what it is hiding.
 
 ## Identified, not yet decided
 

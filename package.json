@@ -26,6 +26,8 @@
     "test": "vitest run --project unit",
     "test:int": "vitest run --project integration",
     "test:cov": "vitest run --project unit --coverage",
+    "api": "node --env-file-if-exists=.env apps/api/src/main.ts",
+    "api:dev": "node --env-file-if-exists=.env --watch apps/api/src/main.ts",
     "migrate": "node --env-file-if-exists=.env scripts/migrate.ts",
     "seed": "node --env-file-if-exists=.env scripts/seed.ts",
     "db:up": "docker compose up -d --wait",
