@@ -112,6 +112,14 @@ _Avoid_: Site, Location, Branch, Agency
 Who a `Consultant` reported to, between which dates. Dated, and read against the month rather than against today: the `Cra` of March is accepted by the manager of March, even when it is validated in July and the consultant has since changed team (ADR-0034). A month resolves at its close — the manager in place when it ended.
 _Avoid_: Reporting line, Team, Supervisor
 
+**Grade**:
+A named seniority level of a consultant: Junior, Confirmed, Senior, Principal. A grade carries a default `Tjm` grid (the starting point for pricing a mission) and a ranked ordering. A consultant's grade assignment is dated and carries the `Cjm`.
+_Avoid_: Level, Rank, Seniority, Title
+
+**Cjm** (🇫🇷 kept):
+_Coût journalier moyen_ — the average daily cost of a consultant to the firm. Kept in French because it is the partner to `Tjm` in the firm's margin vocabulary and changing one without the other breaks the pair. Whole euros, like `Tjm`. This is the sensitive value the authorization model protects: a consultant's cost is visible only to their own office's management, and the scope test proves it.
+_Avoid_: DailyCost, CostRate, InternalRate
+
 **Intercontrat** (🇫🇷 kept):
 A consultant currently staffed on no mission. Kept in French: "bench" describes a different employment reality and has no French-law equivalent.
 _Avoid_: Bench, Idle, Unassigned, Available
