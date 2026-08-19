@@ -6,7 +6,14 @@ pg.types.setTypeParser(1082, (val: string) => val);
 
 import type { DocumentTotals } from '../domain/document.ts';
 import { CraAlreadyProcessedError } from '../domain/errors.ts';
-import type { ConsultantId, CraId, InvoiceId, MissionId, OfficeId } from '../domain/ids.ts';
+import type {
+  ClientId,
+  ConsultantId,
+  CraId,
+  InvoiceId,
+  MissionId,
+  OfficeId,
+} from '../domain/ids.ts';
 import type { InvoiceLine, LineOrigin } from '../domain/invoice-line.ts';
 import type {
   InvoiceListItem,

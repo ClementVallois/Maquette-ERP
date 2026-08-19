@@ -1,8 +1,7 @@
 import { halfDays, period } from '@erp/platform';
+import { closePool, getPool, useTestTransaction } from '@erp/test-harness';
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { closePool, getPool } from '../../../../tests/harness/db.ts';
-import { useTestTransaction } from '../../../../tests/harness/rollback.ts';
 import { client } from '../domain/client.ts';
 import { regieLine } from '../domain/invoice-line.ts';
 import { billedParty, Invoice } from '../domain/invoice.ts';

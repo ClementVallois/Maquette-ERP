@@ -70,6 +70,9 @@ importers:
         specifier: workspace:*
         version: link:../platform
     devDependencies:
+      '@erp/test-harness':
+        specifier: workspace:*
+        version: link:../../tests/harness
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(vite@8.2.1(@types/node@24.13.3)(jiti@2.6.1))
@@ -88,6 +91,18 @@ importers:
         specifier: workspace:*
         version: link:../platform
     devDependencies:
+      '@erp/test-harness':
+        specifier: workspace:*
+        version: link:../../tests/harness
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(vite@8.2.1(@types/node@24.13.3)(jiti@2.6.1))
+
+  tests/harness:
+    devDependencies:
+      pg:
+        specifier: 8.23.0
+        version: 8.23.0
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(vite@8.2.1(@types/node@24.13.3)(jiti@2.6.1))

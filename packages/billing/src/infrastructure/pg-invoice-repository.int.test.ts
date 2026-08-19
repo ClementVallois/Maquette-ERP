@@ -1,7 +1,7 @@
 import { halfDays, period } from '@erp/platform';
+import { useTestTransaction } from '@erp/test-harness';
 import { describe, expect, it } from 'vitest';
 
-import { useTestTransaction } from '../../../../tests/harness/rollback.ts';
 import { client } from '../domain/client.ts';
 import { CraAlreadyProcessedError } from '../domain/errors.ts';
 import { regieLine } from '../domain/invoice-line.ts';

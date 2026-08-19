@@ -51,6 +51,10 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0037](./0037-only-regie-days-become-invoice-lines.md)                 | Only Regie days become lines, and the days that do not are reported             | accepted |
 | [0038](./0038-one-invoice-per-client.md)                               | One validated Cra drafts one invoice per client, so drafting returns a set      | accepted |
 | [0019](./0019-tdd-extended-to-persistence.md)                          | Integration tests before SQL, real Postgres, per-test transaction rollback      | accepted |
+| [0007](./0007-gapless-invoice-numbering.md)                            | Gapless numbering: a counter row locked with `SELECT … FOR UPDATE`              | accepted |
+| [0020](./0020-domain-events-as-persisted-audit-journal.md)             | Domain events are persisted in the emitting transaction, as the audit journal   | accepted |
+| [0021](./0021-idempotent-cra-processing.md)                            | Processing the same Cra twice drafts nothing new                                | accepted |
+| [0039](./0039-the-integration-harness-is-a-workspace-member.md)        | The integration harness is a workspace member, not a directory                  | accepted |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
@@ -68,7 +72,10 @@ modules speak lives, given that the cruiser forbids the import that would otherw
 written when they were taken, numbered after the reservations, and recorded in the Phase 1
 checkpoint.
 
-0035 onwards continue that sequence, for decisions Phase 2 reached that the plan had not identified.
+0035 onwards continue that sequence, for decisions Phase 2 reached that the plan had not identified,
+and 0039 for the one Phase 3 reached on its way out — where the shared integration harness lives,
+forced by a per-package type error the phase had recorded as an open question on a false premise.
+
 The plan's reservations for 0019–0032 are untouched: a number it assigned to a phase stays assigned
 to that phase, and a decision taken early takes the next free number instead of borrowing one.
 
@@ -76,6 +83,6 @@ to that phase, and a decision taken early takes the next free number instead of 
 
 Numbers are reserved so that what is **known and unsettled** is visible rather than implied.
 
-| No.  | Decision                                    | Blocked on                     |
-| ---- | ------------------------------------------- | ------------------------------ |
-| 0007 | Gapless invoice numbering under concurrency | to be written with persistence |
+**Empty since 19/08/2026.** 0007 was the only entry and Phase 3 wrote it. The reservations that
+remain live in `docs/BUILD-PLAN.md`, which assigns each number to the phase that consumes it; this
+table returns when a decision is identified that the plan did not.

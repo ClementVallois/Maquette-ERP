@@ -1,7 +1,7 @@
 import { isoDate, period } from '@erp/platform';
+import { useTestTransaction } from '@erp/test-harness';
 import { describe, expect, it } from 'vitest';
 
-import { useTestTransaction } from '../../../../tests/harness/rollback.ts';
 import { Cra } from '../domain/cra.ts';
 
 import { PgCraRepository } from './pg-cra-repository.ts';

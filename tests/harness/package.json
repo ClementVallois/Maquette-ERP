@@ -1,0 +1,14 @@
+{
+  "name": "@erp/test-harness",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Integration test harness: a real Postgres, a per-test transaction rolled back",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "devDependencies": {
+    "pg": "8.23.0",
+    "vitest": "4.1.10"
+  }
+}
