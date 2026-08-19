@@ -625,6 +625,41 @@ export const managerAttachments = [
   },
 ] as const;
 
+// ── Personas ────────────────────────────────────────────────────────────────
+// The four selectable identities of ADR-0023. Four entries over three roles, and the fourth is
+// the point: `manager-lyon` is what makes an out-of-scope refusal reproducible by switching
+// persona rather than by hand-crafting a URL.
+//
+// `billing-paris` is Henri and not a manager, because `Invoice.issue()` refuses whoever validated
+// the days it bills (ADR-0006 rule 2). Henri validates nobody's CRA in this dataset — Bruno and
+// Emma do — and appears on no invoice's `validated_by`, which is what lets the demonstration's
+// happy path reach an issued document.
+
+export const personas = [
+  {
+    id: ids.next(),
+    key: 'consultant-paris',
+    role: 'consultant',
+    consultantId: alice.id,
+    displayOrder: 1,
+  },
+  {
+    id: ids.next(),
+    key: 'manager-paris',
+    role: 'manager',
+    consultantId: bruno.id,
+    displayOrder: 2,
+  },
+  { id: ids.next(), key: 'manager-lyon', role: 'manager', consultantId: emma.id, displayOrder: 3 },
+  {
+    id: ids.next(),
+    key: 'billing-paris',
+    role: 'billing',
+    consultantId: henri.id,
+    displayOrder: 4,
+  },
+] as const;
+
 // ── CRA period ──────────────────────────────────────────────────────────────
 // June 2026: a month where the working calendar is valid and the Intercontrat scenario works.
 

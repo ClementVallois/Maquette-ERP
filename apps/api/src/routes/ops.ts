@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 
 import type { ServerDependencies } from '../dependencies.ts';
 import { sendProblem } from '../http/reply.ts';
+import { PUBLIC } from '../personas/access.ts';
 
 /**
  * Liveness and readiness, deliberately two routes and not one.
@@ -18,9 +19,13 @@ import { sendProblem } from '../http/reply.ts';
 const SERVICE_UNAVAILABLE = 503;
 
 export function registerOpsRoutes(app: FastifyInstance, dependencies: ServerDependencies): void {
-  app.get('/healthz', (_request, reply) => reply.send({ status: 'ok' }));
+  const access = PUBLIC(
+    'an orchestrator has no persona, and a probe that needs one probes nothing',
+  );
 
-  app.get('/readyz', async (request, reply) => {
+  app.get('/healthz', { config: { access } }, (_request, reply) => reply.send({ status: 'ok' }));
+
+  app.get('/readyz', { config: { access } }, async (request, reply) => {
     try {
       await dependencies.probeDatabase();
     } catch (error) {

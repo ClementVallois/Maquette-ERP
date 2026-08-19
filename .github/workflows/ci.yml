@@ -259,6 +259,37 @@ jobs:
         env:
           MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
 
+      # The half the seed itself cannot prove: it runs as the schema OWNER, so a successful seed
+      # says nothing about whether the least-privilege role the API actually uses can read what
+      # was written. Phase 4's checkpoint deferred this here by name. Every table the API reads is
+      # queried as `erp_app`, and the counts are asserted rather than merely printed — a `SELECT`
+      # that answers zero rows also "succeeds".
+      - name: The app role can read what the seed wrote
+        run: |
+          psql -v ON_ERROR_STOP=1 "postgres://erp_app:erp_local_dev@localhost:5433/erp" <<'EOSQL'
+            DO $$
+            DECLARE
+              expected CONSTANT text[][] := ARRAY[
+                ['public.offices','4'], ['public.practices','5'], ['public.personas','4'],
+                ['public.consultants','9'], ['public.clients','5'], ['public.missions','7'],
+                ['timesheet.cras','6'], ['billing.invoices','4'], ['public.domain_events','6']
+              ];
+              found bigint;
+            BEGIN
+              FOR i IN 1 .. array_length(expected, 1) LOOP
+                EXECUTE format('SELECT count(*) FROM %s', expected[i][1]) INTO found;
+                IF found <> expected[i][2]::bigint THEN
+                  RAISE EXCEPTION 'erp_app reads % rows from %, expected %',
+                    found, expected[i][1], expected[i][2];
+                END IF;
+              END LOOP;
+              RAISE NOTICE 'erp_app reads every seeded table at the expected volume.';
+            END
+            $$;
+          EOSQL
+        env:
+          PGPASSWORD: erp_local_dev
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest

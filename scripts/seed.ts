@@ -25,6 +25,7 @@ import {
 import {
   type Clock,
   periodFromIso,
+  ROLES,
   TechnicalFailure,
   TIMESHEET_VALIDATED,
   TIMESHEET_VALIDATED_VERSION,
@@ -59,6 +60,7 @@ import {
   missions,
   missionTjm,
   offices,
+  personas,
   practices,
   SEED_CLOCK_INSTANT,
   SEED_TIMESTAMP_MS,
@@ -164,6 +166,14 @@ const ManagerAttachmentSchema = z.object({
   toDate: z.string().nullable(),
 });
 
+const PersonaSchema = z.object({
+  id: z.string(),
+  key: z.string().regex(/^[a-z][a-z0-9-]*$/),
+  role: z.enum(ROLES),
+  consultantId: z.string(),
+  displayOrder: z.number().int().positive(),
+});
+
 function validate<T>(schema: z.ZodType<T>, data: unknown, label: string): T {
   const result = schema.safeParse(data);
   if (!result.success) {
@@ -202,6 +212,7 @@ async function seed(): Promise<void> {
     managerAttachments,
     'managerAttachments',
   );
+  const validatedPersonas = validateArray(PersonaSchema, personas, 'personas');
 
   const client = new PgClient({ connectionString: url });
   await client.connect();
@@ -227,6 +238,7 @@ async function seed(): Promise<void> {
     await client.query('DELETE FROM public.assignments');
     await client.query('DELETE FROM public.mission_tjm');
     await client.query('DELETE FROM public.missions');
+    await client.query('DELETE FROM public.personas');
     await client.query('DELETE FROM public.manager_attachments');
     await client.query('DELETE FROM public.clients');
     await client.query('DELETE FROM public.consultants');
@@ -399,6 +411,15 @@ async function seed(): Promise<void> {
       );
     }
     console.log(`Seeded ${String(validatedManagerAttachments.length)} manager attachments.`);
+
+    for (const persona of validatedPersonas) {
+      await client.query(
+        `INSERT INTO public.personas (id, key, role, consultant_id, display_order)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [persona.id, persona.key, persona.role, persona.consultantId, persona.displayOrder],
+      );
+    }
+    console.log(`Seeded ${String(validatedPersonas.length)} personas.`);
 
     // ── Drive domain aggregates ───────────────────────────────────────────
     //

@@ -9,7 +9,9 @@ import {
 } from './http/problem.ts';
 import { contextOf, CORRELATION_ID_HEADER, correlationIdOf, sendProblem } from './http/reply.ts';
 import { loggerOptions } from './logging.ts';
+import { registerAccessControl, registerOriginCheck } from './personas/access.ts';
 import { registerOpsRoutes } from './routes/ops.ts';
+import { registerSessionRoutes } from './routes/session.ts';
 
 /**
  * The HTTP edge. Everything it knows how to do with a failure is turn it into RFC 9457
@@ -94,7 +96,14 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
     return sendProblem(reply, internalProblem(context));
   });
 
+  // Order matters and is not incidental: `registerAccessControl` installs an `onRoute` hook, and
+  // Fastify fires that hook only for routes registered after it. Registering a route first would
+  // make it exempt from the declaration check — silently.
+  registerOriginCheck(app, dependencies);
+  registerAccessControl(app, dependencies);
+
   registerOpsRoutes(app, dependencies);
+  registerSessionRoutes(app, dependencies);
 
   return app;
 }

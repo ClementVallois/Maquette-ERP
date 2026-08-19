@@ -1,6 +1,7 @@
 import type { Clock } from '@erp/platform';
 
 import type { ApiConfig } from './config.ts';
+import type { PersonaCatalogue } from './personas/catalogue.ts';
 
 /**
  * Everything the routes are allowed to reach, gathered in one place: the composition root builds
@@ -15,4 +16,6 @@ export interface ServerDependencies {
    * `/healthz` — which must depend on nothing — is testable without one.
    */
   readonly probeDatabase: () => Promise<void>;
+  /** The four selectable identities of ADR-0023, read from the seeded reference table. */
+  readonly personas: PersonaCatalogue;
 }

@@ -6,6 +6,8 @@ import type { ApiConfig } from './config.ts';
 import type { ServerDependencies } from './dependencies.ts';
 import { PROBLEM_JSON } from './http/problem.ts';
 import { CORRELATION_ID_HEADER, correlationIdOf } from './http/reply.ts';
+import { PUBLIC } from './personas/access.ts';
+import { inMemoryPersonas } from './personas/testing/catalogue.ts';
 import { buildServer } from './server.ts';
 
 const config: ApiConfig = {
@@ -33,6 +35,7 @@ function dependencies(overrides: Partial<ServerDependencies> = {}): ServerDepend
     config,
     clock: { now: () => new Date('2026-06-15T09:00:00.000Z') },
     probeDatabase: () => Promise.resolve(),
+    personas: inMemoryPersonas(),
     ...overrides,
   };
 }
@@ -120,7 +123,7 @@ describe('the HTTP edge', () => {
   });
 
   it('turns a business refusal into its mapped status', async () => {
-    app.get('/boom', () => {
+    app.get('/boom', { config: { access: PUBLIC('a fixture route') } }, () => {
       throw new CraIncomplete('3 workable days are unaccounted for', { missing: 3 });
     });
 
@@ -135,7 +138,7 @@ describe('the HTTP edge', () => {
   });
 
   it('names the rule that denied a 403 and publishes no business field', async () => {
-    app.get('/denied', () => {
+    app.get('/denied', { config: { access: PUBLIC('a fixture route') } }, () => {
       throw new NotTheManager("March is validated by March's manager", { managerId: 'mgr-7' });
     });
 
@@ -147,7 +150,7 @@ describe('the HTTP edge', () => {
   });
 
   it('publishes nothing but the correlation id when something unexpected fails', async () => {
-    app.get('/crash', () => {
+    app.get('/crash', { config: { access: PUBLIC('a fixture route') } }, () => {
       throw new DriverBlewUp('connection string postgres://erp_app:hunter2@localhost/erp');
     });
 
@@ -160,12 +163,15 @@ describe('the HTTP edge', () => {
   });
 
   it('answers a body that is not JSON with a malformed-request problem', async () => {
-    app.post('/echo', () => ({ ok: true }));
+    app.post('/echo', { config: { access: PUBLIC('a fixture route') } }, () => ({ ok: true }));
 
     const response = await app.inject({
       method: 'POST',
       url: '/echo',
-      headers: { 'content-type': 'application/json' },
+      // The origin check runs on `onRequest`, before the body is parsed, so a POST without it
+      // never reaches the parser. That ordering is deliberate — a cross-site request is refused
+      // before anything reads its payload.
+      headers: { 'content-type': 'application/json', origin: config.publicOrigin },
       body: '{not json',
     });
 

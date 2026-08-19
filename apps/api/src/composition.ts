@@ -3,6 +3,7 @@ import pg from 'pg';
 
 import type { ApiConfig } from './config.ts';
 import type { ServerDependencies } from './dependencies.ts';
+import { PgPersonaCatalogue } from './personas/catalogue.ts';
 
 /**
  * The composition root: the one place that constructs things with a connection, a clock or a
@@ -45,6 +46,9 @@ export function compose(config: ApiConfig): Composition {
       probeDatabase: async () => {
         await pool.query('SELECT 1');
       },
+      // Over the pool, not over a checked-out client: reading the catalogue is a lookup, not part
+      // of anyone's unit of work.
+      personas: new PgPersonaCatalogue(pool),
     },
   };
 }
