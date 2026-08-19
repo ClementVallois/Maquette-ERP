@@ -194,6 +194,71 @@ jobs:
         env:
           MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
 
+  setup:
+    name: Cold setup (migrate + seed)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: erp_migration
+          POSTGRES_PASSWORD: erp_local_dev
+          POSTGRES_DB: erp
+          PGTZ: UTC
+          TZ: UTC
+          POSTGRES_INITDB_ARGS: '--data-checksums'
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U erp_migration -d erp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 10s
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Create app role, as the local init script does
+        run: |
+          psql "postgres://erp_migration:erp_local_dev@localhost:5433/erp" <<'EOSQL'
+            CREATE ROLE erp_app WITH LOGIN PASSWORD 'erp_local_dev';
+            GRANT CONNECT ON DATABASE erp TO erp_app;
+            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
+              GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO erp_app;
+            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
+              GRANT USAGE, SELECT ON SEQUENCES TO erp_app;
+          EOSQL
+        env:
+          PGPASSWORD: erp_local_dev
+
+      - name: Environment template sanity check
+        run: pnpm run env:init && pnpm run env:check
+
+      - name: Run migrations
+        run: pnpm run migrate
+        env:
+          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
+
+      - name: Run seed (first pass)
+        run: pnpm run seed
+        env:
+          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
+
+      - name: Run seed (second pass — must be idempotent)
+        run: pnpm run seed
+        env:
+          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest
