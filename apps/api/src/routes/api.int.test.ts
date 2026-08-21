@@ -30,9 +30,16 @@ const ALICE = 'api-alice';
 const BRUNO = 'api-bruno';
 const EMMA = 'api-emma';
 const HENRI = 'api-henri';
+const CHLOE = 'api-chloe';
 const MISSION = 'api-mission';
 const CLIENT = 'api-client';
 const CRA = 'api-cra';
+// A second consultant of the **same** office, on a mission sold to a second client. Two records
+// that differ only in whose they are is what makes a scope refusal provable rather than assumed,
+// and ADR-0038 turns the second client into a second invoice.
+const MISSION_TWO = 'api-mission-2';
+const CLIENT_TWO = 'api-client-2';
+const CRA_TWO = 'api-cra-2';
 
 const config: ApiConfig = {
   databaseUrl: 'unused: every read goes through the injected unit of work',
@@ -75,6 +82,14 @@ const personas: readonly Persona[] = [
     officeId: PARIS,
     officeName: 'Paris',
     displayName: 'Henri Laurent',
+  },
+  {
+    key: 'consultant-paris-2',
+    role: 'consultant',
+    consultantId: CHLOE,
+    officeId: PARIS,
+    officeName: 'Paris',
+    displayName: 'Chloé Dubois',
   },
 ];
 
@@ -123,8 +138,9 @@ beforeEach(async () => {
      VALUES ($1, 'Alice', 'Martin', 'api-a@t', $5, 'api-practice', 'consultant'),
             ($2, 'Bruno', 'Leroy', 'api-b@t', $5, 'api-practice', 'manager'),
             ($3, 'Emma', 'Robert', 'api-e@t', $6, 'api-practice', 'manager'),
-            ($4, 'Henri', 'Laurent', 'api-h@t', $5, 'api-practice', 'director')`,
-    [ALICE, BRUNO, EMMA, HENRI, PARIS, LYON],
+            ($4, 'Henri', 'Laurent', 'api-h@t', $5, 'api-practice', 'director'),
+            ($7, 'Chloé', 'Dubois', 'api-c@t', $5, 'api-practice', 'consultant')`,
+    [ALICE, BRUNO, EMMA, HENRI, PARIS, LYON, CHLOE],
   );
   await client.query(
     `INSERT INTO public.consultant_grades (id, consultant_id, grade_id, from_date, to_date, cjm_cents)
@@ -134,28 +150,33 @@ beforeEach(async () => {
   await client.query(
     `INSERT INTO public.clients (id, name, siren, territoriality, billing_address_street,
        billing_address_postal_code, billing_address_city, billing_address_country)
-     VALUES ($1, 'Banque Nationale de Test', '443061841', 'metropolitanFrance', '10 av', '75008', 'Paris', 'France')`,
-    [CLIENT],
+     VALUES ($1, 'Banque Nationale de Test', '443061841', 'metropolitanFrance', '10 av', '75008', 'Paris', 'France'),
+            ($2, 'Zenith Industries', '552081317', 'metropolitanFrance', '2 rue', '69002', 'Lyon', 'France')`,
+    [CLIENT, CLIENT_TWO],
   );
   await client.query(
     `INSERT INTO public.missions (id, client_id, name, billing_model, start_date)
-     VALUES ($1, $2, 'Audit DORA', 'Regie', '2026-01-05')`,
-    [MISSION, CLIENT],
+     VALUES ($1, $2, 'Audit DORA', 'Regie', '2026-01-05'),
+            ($3, $4, 'SOC run', 'Regie', '2026-01-05')`,
+    [MISSION, CLIENT, MISSION_TWO, CLIENT_TWO],
   );
   await client.query(
     `INSERT INTO public.mission_tjm (id, mission_id, from_date, to_date, tjm_cents)
-     VALUES ($1, $2, '2026-01-05', NULL, 85000)`,
-    [uuidv7(), MISSION],
+     VALUES ($1, $2, '2026-01-05', NULL, 85000),
+            ($3, $4, '2026-01-05', NULL, 85000)`,
+    [uuidv7(), MISSION, uuidv7(), MISSION_TWO],
   );
   await client.query(
     `INSERT INTO public.assignments (id, consultant_id, mission_id, from_date, to_date)
-     VALUES ($1, $2, $3, '2026-01-05', NULL)`,
-    [uuidv7(), ALICE, MISSION],
+     VALUES ($1, $2, $3, '2026-01-05', NULL),
+            ($4, $5, $6, '2026-01-05', NULL)`,
+    [uuidv7(), ALICE, MISSION, uuidv7(), CHLOE, MISSION_TWO],
   );
   await client.query(
     `INSERT INTO public.manager_attachments (id, consultant_id, manager_id, from_date, to_date)
-     VALUES ($1, $2, $3, '2024-01-01', NULL)`,
-    [uuidv7(), ALICE, BRUNO],
+     VALUES ($1, $2, $3, '2024-01-01', NULL),
+            ($4, $5, $6, '2024-01-01', NULL)`,
+    [uuidv7(), ALICE, BRUNO, uuidv7(), CHLOE, BRUNO],
   );
   await client.query(
     `INSERT INTO public.legal_entities (id, name, legal_form, share_capital_cents, siren,
@@ -166,14 +187,15 @@ beforeEach(async () => {
   );
   await client.query(
     `INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status, submitted_at)
-     VALUES ($1, $2, $3, '2026-06', 'submitted', '2026-07-01T09:00:00Z')`,
-    [CRA, ALICE, PARIS],
+     VALUES ($1, $2, $3, '2026-06', 'submitted', '2026-07-01T09:00:00Z'),
+            ($4, $5, $3, '2026-06', 'submitted', '2026-07-01T09:00:00Z')`,
+    [CRA, ALICE, PARIS, CRA_TWO, CHLOE],
   );
   for (const day of workedDaysOfJune()) {
     await client.query(
       `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
-       VALUES ($1, $2, $3, 'worked', $4, 2)`,
-      [uuidv7(), CRA, day, MISSION],
+       VALUES ($1, $2, $3, 'worked', $4, 2), ($5, $6, $3, 'worked', $7, 2)`,
+      [uuidv7(), CRA, day, MISSION, uuidv7(), CRA_TWO, MISSION_TWO],
     );
   }
 });
@@ -235,19 +257,27 @@ describe('ADR-0003, both beats', () => {
   });
 
   it("refuses a consultant a colleague's Cra, in their own office", async () => {
+    // Same office, same role, same URL: `cra: 'own'` is the only thing between the two answers,
+    // so this is the scope dimension that the office check cannot stand in for.
     const colleague = await app.inject({
       method: 'GET',
       url: `/api/v1/cras/${CRA}`,
-      headers: as('billing-paris'),
+      headers: as('consultant-paris-2'),
     });
-    expect(colleague.statusCode).toBe(200);
 
-    // Alice's own Cra is readable by Alice…
+    expect(colleague.statusCode).toBe(403);
+    expect(colleague.json()).toMatchObject({
+      type: '/problems/out-of-scope',
+      deniedBy: '/problems/out-of-scope',
+    });
+    expect(colleague.body).not.toContain(ALICE);
+
     const own = await app.inject({
       method: 'GET',
       url: `/api/v1/cras/${CRA}`,
       headers: as('consultant-paris'),
     });
+
     expect(own.statusCode).toBe(200);
   });
 });
