@@ -46,6 +46,11 @@ async function start(): Promise<void> {
     });
 
   await app.listen({ host: config.host, port: config.port });
+
+  // Fastify's own line names the address it bound. This one names the origin, which is what a
+  // reader has to type: a write sent to any other origin is refused (ADR-0023), and `localhost`
+  // and `127.0.0.1` are the same machine under two different origins.
+  app.log.info({ origin: config.publicOrigin }, 'open this url');
 }
 
 try {
