@@ -99,7 +99,8 @@ an integration test hitting the route, in both directions, plus a third assertin
 persona is refused **in its own office** — which is the role dimension standing alone, with scope
 holding constant.
 
-The cost: `apps/api` now contains SQL. It is read-only, it touches `public.*` only, and it is
-confined to two files — but it is a persistence layer in the application tier, and a reader is
-entitled to notice. The alternative was putting a cost figure inside a billing module, and that is
+The cost: `apps/api` now contains SQL, in three files. Two of them read `public.*` and nothing
+else; the third writes, `INSERT INTO public.domain_events`, which ADR-0020 promised the composition
+root would own and which `eslint.config.js` permits by naming the file. It is a persistence layer
+in the application tier, and a reader is entitled to notice. The alternative was putting a cost figure inside a billing module, and that is
 worse for a reason that would have been much harder to see later.

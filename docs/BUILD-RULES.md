@@ -136,8 +136,12 @@ React, Vue, PDF generation, OpenTelemetry, Testcontainers.
   quarantine and `ignore-scripts` stay on.
 - Scope changes go to the README's "Ce que je ne construis pas", never into the code.
 - One structural decision = one ADR, written **at the time**, naming the rejected option and the
-  reconsideration threshold. Numbering is never reassigned; an ADR is never rewritten — a changed
-  decision gets a new one that supersedes it.
+  reconsideration threshold. Numbering is never reassigned. **A changed decision gets a new ADR
+  that supersedes the old one; a statement that was never true is corrected in place** — the test
+  is whether the decision moved, and only a description of the code may be brought into line with
+  the code (**ADR-0045**). The number, the date, the Status line, the rejected option and the
+  threshold are never edited. This line was absolute — "an ADR is never rewritten" — until
+  21/08/2026, when three ADRs turned out to describe code they had never described.
 - One commit = one step defensible out loud. Conventional commits, scope from the closed enum in
   `commitlint.config.js`. **No `Co-Authored-By` trailer, ever**, however the code was produced.
 - Everything in English except `README.md`. French business terms stay French only where

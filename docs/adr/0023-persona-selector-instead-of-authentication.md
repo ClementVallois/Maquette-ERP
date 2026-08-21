@@ -121,11 +121,18 @@ what the rule forbids, and it is not what this is.
 
 The **data scope** rule in the repositories gains the role dimension it was missing:
 
-| Role         | CRAs                | Invoices     | `Tjm`, `Cjm`, margin |
-| ------------ | ------------------- | ------------ | -------------------- |
-| `consultant` | **their own only**  | none         | none                 |
-| `manager`    | their office        | their office | their office         |
-| `billing`    | their office (read) | their office | none                 |
+| Role         | CRAs                | Invoices     | `Tjm`, on a record | `Cjm`, margin |
+| ------------ | ------------------- | ------------ | ------------------ | ------------- |
+| `consultant` | **their own only**  | none         | none               | none          |
+| `manager`    | their office        | their office | their office       | their office  |
+| `billing`    | their office (read) | their office | their office       | none          |
+
+The last two columns are separate because the asset they protect is not the same one. **`Cjm` and
+margin are what the firm pays and what it keeps** — they belong to management, and `billing` never
+sees them. **`Tjm` is what the client is charged**, and it is printed on the document `billing`
+issues: a role that may not read the rate cannot check the invoice it is putting its name to. So
+`billing` reads a `Tjm` **on a record** and never in a list — the control is on the aggregate in
+volume, not on single access, and no list projection in either module carries a rate.
 
 `billing` reads CRAs and does not read margins: the CRA is the source document behind the invoice
 line — that is the _piste d'audit fiable_ this repository claims — while the cost of the consultant

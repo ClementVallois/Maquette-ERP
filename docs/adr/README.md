@@ -109,6 +109,12 @@ stop. 0044: ADR-0021 promised "replay → original result" through a port that c
 boolean, and BUILD-PLAN required an `Idempotency-Key` that nothing stored; a required header that
 changes no behaviour is a gate that is present and inert.
 
+0045 continues the unplanned sequence, and is the only one so far about the record rather than the
+code: three ADRs were found to contain statements that were never true, and the absolute
+"an ADR is never rewritten" rule would have answered a typo with a superseding note. The test is
+now whether the **decision** moved — if it did, supersede; if only its description was wrong, fix
+the sentence, because these files are decisions and not logs.
+
 ## Identified, not yet decided
 
 Numbers are reserved so that what is **known and unsettled** is visible rather than implied.

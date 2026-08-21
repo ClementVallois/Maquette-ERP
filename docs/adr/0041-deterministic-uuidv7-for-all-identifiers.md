@@ -32,11 +32,15 @@ Two modes of operation:
 - **Seed** (deterministic): `uuidv7Deterministic(timestamp, counter)` with a frozen timestamp and
   a monotonic counter. Produces the same output on every run.
 
-Both functions live in a new `scripts/lib/` directory, not in `@erp/platform`: the generator needs
-`node:crypto` (runtime mode) or takes a counter (seed mode), and `@erp/platform` imports not even
-a Node builtin (ADR-0033, BUILD-RULES § Boundary). The repositories import from `scripts/lib/` at
-seed time, and from their own local copy at runtime — or, once `apps/api/` exists (Phase 5), from
-the composition root.
+Both functions live in the composition root — `apps/api/src/ids/uuidv7.ts` — and not in
+`@erp/platform`: the generator needs `node:crypto` (runtime mode) or takes a counter (seed mode),
+and `@erp/platform` imports not even a Node builtin (ADR-0033, BUILD-RULES § Boundary).
+
+**A repository never imports it.** It receives a `() => string` factory from whoever composes it,
+which is the only arrangement that works: `rootDir` is `src` in every package, so a climb out of a
+package to reach a shared file fails the per-package `tsc --noEmit` that the `quality` job runs.
+The seed is a composition root too, and injects the deterministic factory the same way the API
+injects the runtime one.
 
 The generator is hand-written rather than imported: Node 24's `crypto.randomUUID()` is UUIDv4 only,
 and the RFC 9562 layout is 22 lines of bit-packing, which is simpler than evaluating a library
@@ -59,7 +63,11 @@ across processes, and the hand-written generator is replaced by one that provide
 ## Consequences
 
 - Every id in the database is a valid UUIDv7. No positional string, no v4.
-- Child-row identity is stable: reordering lines does not rewrite ids.
+- Child-row identity is **not** stable across a re-save: `save` does `DELETE` + `INSERT`, so every
+  line, flag and VAT group is minted a fresh id. Bounded while nothing references a child id —
+  nothing does — and tracked in `docs/open-questions.md` with the phase that ends it. What this
+  decision does buy is that those ids are valid UUIDv7 rather than positional strings, so the day
+  something does reference one, making it stable is a change to one method and not to a format.
 - The seed produces identical ids on every run, and those ids are valid UUIDv7 with a frozen
   timestamp prefix.
 - Repositories gain an `id` parameter on child-row persistence methods, or generate the id before
