@@ -636,6 +636,35 @@ export const managerAttachments = [
  */
 export const SUBMITTED_NOT_VALIDATED_EMAIL = 'claire.dubois@secureco.test';
 
+/**
+ * The month that is **not** uniform.
+ *
+ * Every other seeded June is every workable day, two half-days, one mission — which is a legible
+ * default and exercises none of the three things the model spends structure on. `CONTEXT.md`
+ * § Records of time gives the split day as the *structural reason* the mission sits on the line
+ * rather than on the day, and until this existed no dataset contained one; `timesheet.cra_flags`
+ * was created, indexed and read by nothing because no seeded day was ever flaggable; and no
+ * `absence` existed, so a non-billable recorded day was a code path with no example.
+ *
+ * Alice carries all three because she is the one consultant staffed on two missions, and both are
+ * sold to the same client — so the split day produces a second **line** on one invoice rather than
+ * a second invoice, which is the shape ADR-0038 says to expect and is what a reader should see
+ * first.
+ *
+ * There is no flagged **public holiday**, and that is the calendar rather than an omission: June
+ * 2026 has none (ADR-0004's table puts Ascension on 14/05 and Pentecost on 25/05). The weekend
+ * half of the rule is what June can demonstrate.
+ */
+export const VARIED_MONTH = {
+  email: 'alice.martin@secureco.test',
+  /** One half-day on each of Alice's two missions. Thursday, an ordinary workable day. */
+  splitDay: '2026-06-11',
+  /** A full day off. Recorded, so the month still adds up; not billable, so no line comes of it. */
+  absenceDay: '2026-06-18',
+  /** A Saturday worked. Not a refusal — it is the manager's to accept — so it is flagged. */
+  flaggedSaturday: '2026-06-13',
+} as const;
+
 // ── Personas ────────────────────────────────────────────────────────────────
 // The four selectable identities of ADR-0023. Four entries over three roles, and the fourth is
 // the point: `manager-lyon` is what makes an out-of-scope refusal reproducible by switching

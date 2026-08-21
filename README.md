@@ -316,9 +316,15 @@ Deux propriétés en font un livrable et pas un script de confort (**ADR-0022**)
   (`pnpm run seed:fingerprint`) — un hash de contenu et un compte de lignes par table. Une passe
   non idempotente déplace un compte, une passe non déterministe déplace tous les identifiants.
 
-Ce que le jeu de données **n'exerce pas encore** est suivi dans
-[`docs/open-questions.md`](docs/open-questions.md) : le mois seedé est uniforme, donc aucun samedi
-signalé, aucune absence, aucune journée partagée entre deux affectations. La phase 6 tranche.
+Le mois d'Alice est **volontairement irrégulier** : une journée partagée entre ses deux missions
+(une demi-journée sur chacune), une journée d'absence, et un **samedi travaillé donc signalé**. Ce
+n'est pas de la décoration — la journée partagée est la raison structurelle pour laquelle la mission
+est portée par la _ligne_ et non par le _jour_, et le jeu de données ne l'exerçait pas jusqu'à la
+phase 6. Les deux missions d'Alice étant vendues au **même client**, la journée partagée produit une
+seconde _ligne_ sur une facture, pas une seconde facture (ADR-0038).
+
+Ce que juin 2026 ne peut pas montrer : un **jour férié** signalé. Il n'y en a aucun ce mois-là
+(ADR-0004 place l'Ascension au 14/05 et la Pentecôte au 25/05) ; c'est le calendrier, pas un oubli.
 
 ## Tests et portes de CI
 

@@ -67,6 +67,7 @@ import {
   SEED_CLOCK_INSTANT,
   SEED_TIMESTAMP_MS,
   SUBMITTED_NOT_VALIDATED_EMAIL,
+  VARIED_MONTH,
 } from './lib/seed-data.ts';
 
 const { Client: PgClient } = pg;
@@ -608,21 +609,64 @@ async function seed(): Promise<void> {
           (a.toDate === null || a.toDate >= '2026-06-01'),
       );
 
-      // Record every workable day as worked on the first active assignment
+      // Record every workable day as worked on the first active assignment — except for the one
+      // consultant whose month is deliberately varied (VARIED_MONTH), so that a split day, an
+      // absence and a flagged Saturday exist in the data the screens render rather than only in
+      // the model that permits them.
       const primaryAssignment = activeAssignments[0];
+      const secondAssignment = activeAssignments[1];
+      const varied = consultant.email === VARIED_MONTH.email;
+
       if (primaryAssignment !== undefined) {
         for (const day of workableDays) {
           if (
-            day >= primaryAssignment.fromDate &&
-            (primaryAssignment.toDate === null || day <= primaryAssignment.toDate)
+            day < primaryAssignment.fromDate ||
+            (primaryAssignment.toDate !== null && day > primaryAssignment.toDate)
           ) {
+            continue;
+          }
+
+          if (varied && day === VARIED_MONTH.absenceDay) {
+            // No mission: a day not worked is not worked *on* anything (`craLine` refuses the
+            // combination), and it produces no invoice line while still making the month add up.
+            cra.recordDay({ day, dayType: 'absence', missionId: null, halfDays: 2 });
+            continue;
+          }
+
+          if (varied && day === VARIED_MONTH.splitDay && secondAssignment !== undefined) {
             cra.recordDay({
               day,
               dayType: 'worked',
               missionId: primaryAssignment.missionId,
-              halfDays: 2,
+              halfDays: 1,
             });
+            cra.recordDay({
+              day,
+              dayType: 'worked',
+              missionId: secondAssignment.missionId,
+              halfDays: 1,
+            });
+            continue;
           }
+
+          cra.recordDay({
+            day,
+            dayType: 'worked',
+            missionId: primaryAssignment.missionId,
+            halfDays: 2,
+          });
+        }
+
+        // Outside `workableDays` by construction, which is exactly why it ends up in
+        // `timesheet.cra_flags`: the calendar says the day is not workable, the record says it was
+        // worked, and the submission checks surface the disagreement instead of refusing it.
+        if (varied) {
+          cra.recordDay({
+            day: VARIED_MONTH.flaggedSaturday,
+            dayType: 'worked',
+            missionId: primaryAssignment.missionId,
+            halfDays: 2,
+          });
         }
       }
 
