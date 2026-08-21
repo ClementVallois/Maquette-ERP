@@ -48,11 +48,6 @@ export interface CraRow {
   readonly blocking: readonly { readonly halfDays: number; readonly why: Blocking }[];
 }
 
-/**
- * Whether this actor may answer a submitted month. `false` for `billing`, which reads the same
- * table and decides nothing on it — the route refuses either way (ADR-0023), and this is only the
- * navigational echo of that, exactly like `NAV_BY_ROLE`.
- */
 export interface PreFacturierView {
   /** `null` when this office has no Cra at all — an empty state, not a refusal. */
   readonly period: string | null;
@@ -62,6 +57,11 @@ export interface PreFacturierView {
   /** ADR-0054: half-days of a **closed** month that have not reached `Validated`. */
   readonly lateHalfDays: number;
   readonly periodClosed: boolean;
+  /**
+   * Whether this actor may answer a submitted month. `false` for `billing`, which reads the same
+   * table and decides nothing on it — the route refuses either way (ADR-0023), and this is only
+   * the navigational echo of that, exactly like `NAV_BY_ROLE`.
+   */
   readonly mayDecide: boolean;
 }
 
@@ -169,7 +169,11 @@ function blockingCell(row: CraRow): Html {
 }
 
 /**
- * The manager's two answers to a submitted month. Both are ordinary form posts answered with a 303
+ * The manager's two answers to a submitted month. Both carry the month they were acted from, so
+ * the redirect afterwards comes back to the view the manager was looking at — BUILD-PLAN 6.6 puts
+ * the filter in the URL, and a POST that forgets it makes every action a jump to the default month.
+ *
+ * Both are ordinary form posts answered with a 303
  * — no key and no hidden field, because validation is idempotent by ADR-0021 and a refusal is a
  * transition that refuses from any state but `submitted` (ADR-0059 says why issuance is different).
  *
@@ -177,16 +181,18 @@ function blockingCell(row: CraRow): Html {
  * between "I want to refuse" and "here is why": ADR-0005 makes the reason the whole value of a
  * refusal, and a two-step flow is a step at which it can be skipped.
  */
-function decideCell(row: CraRow): Html {
+function decideCell(row: CraRow, period: string): Html {
   if (row.status !== 'submitted') {
     return html`<td class="no-print">${LABELS.cra.nothing}</td>`;
   }
 
   return html`<td class="no-print">
     <form class="inline" method="post" action="${`${PATHS.validateCra}/${row.craId}`}">
+      <input type="hidden" name="periode" value="${period}" />
       <button type="submit">${LABELS.preFacturier.validate}</button>
     </form>
     <form class="refusal" method="post" action="${`${PATHS.refuseCra}/${row.craId}`}">
+      <input type="hidden" name="periode" value="${period}" />
       <label class="sr-only" for="${`refus-${row.craId}`}">${LABELS.preFacturier.refusalReason}</label>
       <input
         id="${`refus-${row.craId}`}"
@@ -241,7 +247,7 @@ function craTable(view: PreFacturierView, period: string): Html {
             </td>
             <td class="num">${frenchDays(row.recordedHalfDays)}</td>
             <td>${blockingCell(row)}</td>
-            ${view.mayDecide ? decideCell(row) : null}
+            ${view.mayDecide ? decideCell(row, period) : null}
             <td class="no-print">
               <a href="${`${PATHS.craPrint}/${row.craId}`}"
                 >${LABELS.craPrint.open}<span class="sr-only">

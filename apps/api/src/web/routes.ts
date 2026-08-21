@@ -59,7 +59,6 @@ const IdParam = z.object({ id: z.string().min(1).max(64) });
  * and both checks exist on purpose: this one answers "is this a request", the domain's answers
  * "is this a legitimate refusal" — a whitespace-only reason passes the first and not the second.
  */
-const Refusal = z.object({ reason: z.string().min(1).max(500) });
 
 /** The key the form minted when it rendered (ADR-0059), in the shape ADR-0044 requires. */
 const Issuance = z.object({ idempotencyKey: z.string().min(8).max(200) });
@@ -91,6 +90,18 @@ const GridSubmission = z.looseObject({
 });
 
 const SLOT_FIELD = /^(\d{4}-\d{2}-\d{2}):([01])$/u;
+
+const Refusal = z.object({
+  reason: z.string().min(1).max(500),
+  ...PeriodFilter.shape,
+});
+
+/** The month the manager was looking at, echoed back so the redirect returns to that view. */
+const ActedFrom = z.object(PeriodFilter.shape);
+
+function backToPreFacturier(periode: string | undefined): string {
+  return periode === undefined ? PATHS.preFacturier : `${PATHS.preFacturier}?periode=${periode}`;
+}
 
 /**
  * The posted form, read back into half-day entries. Anything that is not a slot field is ignored
@@ -626,6 +637,9 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
       const params = parseInput(IdParam, request.params);
       if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
 
+      const from = parseInput(ActedFrom, request.body);
+      if (!from.ok) return sendProblem(reply, malformed(from.errors, contextOf(request)));
+
       // The same function `/api/v1` calls, so the transaction, the event and the drafted invoices
       // are the same ones — there is no second validation to keep in step. A replay answers with
       // the first result (ADR-0021), which is why no key is needed here.
@@ -640,7 +654,7 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
 
       if (outcome.kind === 'notFound') return sendProblem(reply, craNotFound(request));
 
-      return redirectTo(reply, PATHS.preFacturier);
+      return redirectTo(reply, backToPreFacturier(from.value.periode));
     },
   );
 
@@ -665,7 +679,7 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
 
       if (outcome.kind === 'notFound') return sendProblem(reply, craNotFound(request));
 
-      return redirectTo(reply, PATHS.preFacturier);
+      return redirectTo(reply, backToPreFacturier(body.value.periode));
     },
   );
 

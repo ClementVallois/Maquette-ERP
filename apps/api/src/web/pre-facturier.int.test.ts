@@ -521,17 +521,57 @@ describe('the Cra as a printable record', () => {
   });
 });
 
+/**
+ * ADR-0061 states two claims universally — every data table scopes its headers, and no element
+ * carries a `title`. `accessibility.test.ts` proves them on the two pages it can build fixtures
+ * for; these four pages need a database, so the same two assertions run here on their rendered
+ * bodies. A gate scoped to a third of the pages is a gate that stopped looking.
+ */
+function assertMechanicalAccessibility(body: string): void {
+  // `(?=[\\s>])` so the lookahead does not read `<thead>` as an unscoped `<th>`.
+  expect([...body.matchAll(/<th(?=[\s>])(?![^>]*scope=)[^>]*>/gu)]).toStrictEqual([]);
+  expect(body).not.toMatch(/<[a-z][^>]*\stitle="/u);
+}
+
+describe('the pages ADR-0061 claims about, and only a database can render', () => {
+  it('scopes every table header and carries no title, on all four', async () => {
+    await validateAliceJune();
+
+    const listed = await app.inject({
+      method: 'GET',
+      url: `${PATHS.preFacturier}?periode=2026-06`,
+      headers: as('manager-paris'),
+    });
+    const invoiceHref = /\/facture\/[\w-]+/u.exec(listed.body)?.[0] ?? '';
+
+    for (const url of [
+      invoiceHref,
+      `${PATHS.craPrint}/${CRA_VALIDATED}`,
+      `${PATHS.margin}/${ALICE}?periode=2026-06`,
+    ]) {
+      const response = await app.inject({ method: 'GET', url, headers: as('manager-paris') });
+      expect(response.statusCode).toBe(200);
+      assertMechanicalAccessibility(response.body);
+    }
+
+    assertMechanicalAccessibility(listed.body);
+  });
+});
+
 describe('the three verbs of the chain, on screen', () => {
   it('lets the manager validate a submitted month, and the invoice appears', async () => {
     const validated = await app.inject({
       method: 'POST',
       url: `${PATHS.validateCra}/${CRA_VALIDATED}`,
       headers: posting('manager-paris'),
+      payload: 'periode=2026-06',
     });
 
-    // POST-then-redirect, so a refresh does not re-validate.
+    // POST-then-redirect, so a refresh does not re-validate — and back to the month the manager
+    // was looking at, not to the default one. BUILD-PLAN 6.6 puts the filter in the URL, and an
+    // action that drops it makes every decision a jump somewhere else.
     expect(validated.statusCode).toBe(303);
-    expect(validated.headers.location).toBe(PATHS.preFacturier);
+    expect(validated.headers.location).toBe(`${PATHS.preFacturier}?periode=2026-06`);
 
     const listed = await app.inject({
       method: 'GET',
@@ -546,10 +586,11 @@ describe('the three verbs of the chain, on screen', () => {
       method: 'POST',
       url: `${PATHS.refuseCra}/${CRA_VALIDATED}`,
       headers: posting('manager-paris'),
-      payload: 'reason=le+12+est+une+mission+termin%C3%A9e',
+      payload: 'reason=le+12+est+une+mission+termin%C3%A9e&periode=2026-06',
     });
 
     expect(refused.statusCode).toBe(303);
+    expect(refused.headers.location).toBe(`${PATHS.preFacturier}?periode=2026-06`);
 
     const grid = await app.inject({
       method: 'GET',

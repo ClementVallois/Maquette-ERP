@@ -37,7 +37,7 @@ accessibility, 7 is CI, 8 is deploy, 9 is docs), so deferring it would have been
 home. It landed here, with **ADR-0059** for the one part of it that is a decision rather than
 plumbing.
 
-**Ten ADRs were written in this phase**: 0052 (the margin reveal is a screen, and the disclosure log
+**Ten ADRs were written in tasks 6.4 to 6.7** (the phase's total is sixteen — 6.1 to 6.3 wrote ADR-0025, ADR-0026 and ADR-0048 to ADR-0051 earlier on this branch): 0052 (the margin reveal is a screen, and the disclosure log
 moves inside the read), 0053 (the pré-facturier is a composition, not a query), 0054 (what a late
 day is), 0055 (the invoice is a printable page, no PDF engine), 0056 (the printable Cra is one
 document for the month), 0057 (a credit note is a domain rule, not a stored document), 0058

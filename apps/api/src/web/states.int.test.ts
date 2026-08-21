@@ -138,6 +138,17 @@ describe('a refusal, rendered', () => {
     expect(response.body).not.toContain('This role does not carry this action');
   });
 
+  it('scopes its table headers and carries no title, like every other page (ADR-0061)', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: PATHS.preFacturier,
+      headers: as('consultant-paris'),
+    });
+
+    expect([...response.body.matchAll(/<th(?=[\s>])(?![^>]*scope=)[^>]*>/gu)]).toStrictEqual([]);
+    expect(response.body).not.toMatch(/<[a-z][^>]*\stitle="/u);
+  });
+
   it('keeps the machine-readable type alongside the sentence', async () => {
     const response = await app.inject({
       method: 'GET',
