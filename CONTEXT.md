@@ -140,6 +140,14 @@ _Avoid_: Permission, Profile, Group, AccessLevel
 One of the four selectable identities the mockup offers instead of authentication — a named pairing of a `Consultant` with a `Role`, seeded as reference data and chosen explicitly. It is called a persona and not a user because nothing about it is authenticated: anyone may select any of them, and the README says so. Two personas share the `manager` role in different offices, which is what makes an out-of-scope refusal something a reader can reproduce rather than be told about.
 _Avoid_: User, Account, Login, Profile, Impersonation
 
+**Actor**:
+The `Role` and the `Office` a request acts under, together with the `Consultant` it acts as — the three fields every authorization decision reads (ADR-0023). It is on both modules' public ports, and it is deliberately **not** a `Persona`: a persona is a selectable identity in a catalogue and a fact about this mockup's front door, while an actor is what a request carries once one has been selected. The modules know the second and must never learn the first.
+_Avoid_: User, Principal, Subject, CurrentUser, Identity
+
+**Session** (transport only, never a stored thing):
+The word on the HTTP surface — `GET /api/v1/session`, `SESSION_SIGNING_KEY` — and it names **no** record: ADR-0023 § Decision says "no session store", and there is none. The route reports which `Persona` the request currently carries, and the signing key exists so the persona cookie cannot be forged into one the caller was never offered. It is listed here because it is published on the wire and a reader will meet it; the domain term for the thing behind it is `Persona`, and nothing in `packages/` uses this word.
+_Avoid_: using it for anything server-side — there is no session state, no expiry, no store
+
 ## Money out
 
 **Invoice** (🇬🇧 translated from _facture_):
@@ -188,6 +196,7 @@ _Avoid_: Type, Nature, Kind
 
 **DeclinedDays**:
 Half-days a validated `Cra` carried that did **not** become an `InvoiceLine`, with the reason: the mission is not `Regie`, the mission is unknown to billing, no `Tjm` was agreed for that date, or the client is missing. Reported rather than skipped (ADR-0037) — every half-day the validation carried is in either the invoices or this list, and a day that vanishes between validation and invoicing is the discrepancy this whole chain exists to remove.
+One row of it — the half-days one `Mission` on one `Cra` declined, for one reason — is a **`DeclinedDaysRecord`** on the repository port and in `billing.declined_days`. The two names are one term: the plural is the concept, the record is a row of it.
 _Avoid_: Skipped, Ignored, Rejected, Errors
 
 **CraAlreadyProcessedError**:
