@@ -24,4 +24,6 @@ export const PATHS = {
    * to `problem+json` and a browser following that link would land on a JSON document.
    */
   margin: '/marge',
+  /** One invoice, draft or issued, as the printable document of ADR-0055. */
+  invoice: '/facture',
 } as const;

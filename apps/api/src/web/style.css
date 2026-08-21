@@ -474,3 +474,73 @@ tfoot td {
   border-top: 2px solid var(--rule);
   font-weight: 600;
 }
+
+/* The document (ADR-0055): the invoice and the printable Cra. Sized for A4 rather than for a
+   screen — a document that reflows to the window width prints at a measure nobody reads. */
+article.document {
+  max-width: 46rem;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: calc(var(--space) * 1.5);
+}
+
+.parties {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space);
+  margin-bottom: var(--space);
+}
+
+.party {
+  flex: 1 1 18rem;
+}
+
+.party h2,
+.mentions h2,
+.origin h2 {
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft);
+  margin-bottom: 0.25rem;
+}
+
+.address {
+  font-style: normal;
+}
+
+table.lines,
+table.vat {
+  margin: var(--space) 0;
+}
+
+table.vat {
+  max-width: 30rem;
+}
+
+.mentions ul,
+.origin ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.mentions li,
+.origin li {
+  margin-bottom: 0.2rem;
+  max-width: var(--measure);
+}
+
+.origin li {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+@media print {
+  /* On paper the panel chrome is noise: the sheet edge is the border. */
+  article.document {
+    border: none;
+    padding: 0;
+    max-width: none;
+  }
+}

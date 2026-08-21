@@ -338,6 +338,107 @@ describe('the pré-facturier', () => {
   });
 });
 
+describe('the invoice as a printable document', () => {
+  /** The draft the validation produced, reached the way the screen reaches it. */
+  async function openTheInvoice(): Promise<string> {
+    await validateAliceJune();
+
+    const listed = await app.inject({
+      method: 'GET',
+      url: `${PATHS.preFacturier}?periode=2026-06`,
+      headers: as('manager-paris'),
+    });
+    const href = /\/facture\/[\w-]+/u.exec(listed.body)?.[0];
+    expect(href).toBeDefined();
+
+    const response = await app.inject({ method: 'GET', url: href!, headers: as('manager-paris') });
+    expect(response.statusCode).toBe(200);
+
+    return response.body;
+  }
+
+  it('carries the seller, the client, and the delivery address the reform makes mandatory', async () => {
+    const body = await openTheInvoice();
+
+    expect(body).toContain('SecureCo SAS');
+    expect(body).toContain('732829320');
+    expect(body).toContain('RCS Paris 732 829 320');
+    expect(body).toContain('Banque Nationale de Test');
+    expect(body).toContain('443061841');
+    expect(body).toContain(LABELS.invoice.deliveryAddress);
+  });
+
+  it('carries every mandatory mention, from the model rather than from prose', async () => {
+    const body = await openTheInvoice();
+
+    // The four the chain's policy sets (`validate-cra.ts`), each rendered with its value filled in
+    // from `LegalMentions`. The early-payment one is the tell: it is mandatory **even to say there
+    // is none**, so its absence here would mean the model stopped carrying it.
+    expect(body).toContain('15\u202f%');
+    expect(body).toContain(frenchEuros(4000));
+    expect(body).toContain(LABELS.invoice.noDiscount);
+    expect(body).toContain(LABELS.invoice.vatOnCollection);
+    expect(body).toContain(LABELS.invoice.operationCategories.services);
+  });
+
+  it('recapitulates VAT per rate, and the three totals agree with it', async () => {
+    const body = await openTheInvoice();
+
+    expect(body).toContain(LABELS.invoice.vatRecap);
+    // 17 000 € HT at 20 % = 3 400 € of VAT, 20 400 € TTC. Rounded once over the grouped base, not
+    // per line (ADR-0010) — which is the same arithmetic the pré-facturier showed.
+    expect(body).toContain(frenchEuros(1_700_000));
+    expect(body).toContain(frenchEuros(340_000));
+    expect(body).toContain(frenchEuros(2_040_000));
+  });
+
+  it('prints the Cra each line came from — the piste d’audit fiable, on the document', async () => {
+    const body = await openTheInvoice();
+
+    expect(body).toContain(LABELS.invoice.origin);
+    expect(body).toContain(CRA_VALIDATED);
+  });
+
+  it('says a draft is not an invoice, and shows it has neither number nor date', async () => {
+    const body = await openTheInvoice();
+
+    expect(body).toContain(LABELS.invoice.draftNotice);
+    expect(body).toContain(LABELS.invoice.draftHeading);
+    expect(body).not.toContain('PFT-2026-');
+  });
+
+  it('is not reachable by a consultant, whose days it is about', async () => {
+    await validateAliceJune();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `${PATHS.invoice}/anything`,
+      headers: as('consultant-paris'),
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.body).toContain('/problems/insufficient-role');
+  });
+
+  it('refuses a manager of another office, and does not answer 404 instead', async () => {
+    await validateAliceJune();
+
+    const listed = await app.inject({
+      method: 'GET',
+      url: `${PATHS.preFacturier}?periode=2026-06`,
+      headers: as('manager-paris'),
+    });
+    const href = /\/facture\/[\w-]+/u.exec(listed.body)?.[0] ?? '';
+
+    const response = await app.inject({ method: 'GET', url: href, headers: as('manager-lyon') });
+
+    // ADR-0003's second beat: the record exists and is refused by name, rather than being hidden
+    // behind an absence that would say nothing about why.
+    expect(response.statusCode).toBe(403);
+    expect(response.body).toContain('/problems/out-of-scope');
+  });
+});
+
 describe('the reveal behind the pré-facturier', () => {
   it('serves the margin to a manager of the office, as a page', async () => {
     const response = await app.inject({

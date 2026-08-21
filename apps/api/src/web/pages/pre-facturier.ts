@@ -112,6 +112,7 @@ function billableTable(view: PreFacturierView): Html {
         <th scope="col">${LABELS.preFacturier.invoiceNumber}</th>
         <th scope="col" class="num">${LABELS.preFacturier.totalExcludingVat}</th>
         <th scope="col" class="num">${LABELS.preFacturier.totalIncludingVat}</th>
+        <th scope="col"><span class="sr-only">${LABELS.invoice.open}</span></th>
       </tr>
     </thead>
     <tbody>
@@ -123,6 +124,9 @@ function billableTable(view: PreFacturierView): Html {
             <td>${row.invoiceNumber ?? LABELS.preFacturier.notNumberedYet}</td>
             <td class="num">${frenchEuros(row.totalExcludingVatCents)}</td>
             <td class="num">${frenchEuros(row.totalIncludingVatCents)}</td>
+            <td class="no-print">
+              <a href="${`${PATHS.invoice}/${row.invoiceId}`}">${LABELS.invoice.open}</a>
+            </td>
           </tr>`,
       )}
     </tbody>

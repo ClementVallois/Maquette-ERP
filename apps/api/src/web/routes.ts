@@ -18,6 +18,7 @@ import { malformed, parseInput } from '../validation.ts';
 import { STYLESHEET } from './assets.ts';
 import { craGridPage, type GridDay, type SlotValue, totalsOf } from './pages/cra-grid.ts';
 import { craListPage } from './pages/cra-list.ts';
+import { invoicePage } from './pages/invoice.ts';
 import { marginPage } from './pages/margin.ts';
 import { personaSelectorPage } from './pages/persona-selector.ts';
 import { type CraRow, preFacturierPage } from './pages/pre-facturier.ts';
@@ -40,6 +41,7 @@ const MAX_MONTHS = 50;
 const SLOTS = [0, 1] as const;
 
 const ConsultantParam = z.object({ consultantId: z.string().min(1).max(64) });
+const IdParam = z.object({ id: z.string().min(1).max(64) });
 
 const SelectPersona = z.object({ key: z.string().min(1).max(64) });
 const PeriodParam = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u) });
@@ -429,6 +431,51 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
       });
 
       return sendPage(reply, preFacturierPage(view, personaFor(request)));
+    },
+  );
+
+  /**
+   * One invoice, draft or issued, as the printable document of ADR-0055.
+   *
+   * `manager` and `billing` alike, matching `GET /api/v1/invoices/:id`: the repository is what
+   * decides which office's invoices either of them may see, and the route only says the action is
+   * theirs to attempt (ADR-0023). A consultant is refused here — what their days are worth to the
+   * firm is not theirs to read (ADR-0003).
+   */
+  app.get(
+    `${PATHS.invoice}/:id`,
+    { config: { access: forRoles('manager', 'billing') } },
+    async (request, reply) => {
+      const params = parseInput(IdParam, request.params);
+      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
+
+      const actor = requireActor(request);
+      const invoice = await dependencies.transactionally((unit) =>
+        unit.invoices.findById(params.value.id, actor),
+      );
+
+      if (invoice === null) {
+        return sendProblem(reply, {
+          type: API_PROBLEM_TYPES.notFound,
+          title: 'No such invoice',
+          status: NOT_FOUND,
+          detail: "Cette facture n'existe pas, ou n'a jamais existé.",
+          ...contextOf(request),
+        });
+      }
+
+      return sendPage(
+        reply,
+        invoicePage(
+          {
+            invoice,
+            // A draft has no issue date, so it has no due date: the term runs from the date the
+            // document leaves, and a draft has not left.
+            dueDate: invoice.issueDate === null ? null : invoice.dueDateFrom(invoice.issueDate),
+          },
+          personaFor(request),
+        ),
+      );
     },
   );
 
