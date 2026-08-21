@@ -1,4 +1,7 @@
-import type { InvoiceId, OfficeId } from './ids.ts';
+import type { Actor } from '@erp/platform';
+
+import type { DeclineReason } from './declined-days.ts';
+import type { CraId, InvoiceId, MissionId, OfficeId } from './ids.ts';
 import type { Invoice } from './invoice.ts';
 
 export interface InvoiceListItem {
@@ -12,15 +15,33 @@ export interface InvoiceListItem {
 }
 
 export interface InvoiceListQuery {
-  readonly officeId: OfficeId;
+  readonly actor: Actor;
   readonly limit: number;
   readonly offset: number;
 }
 
+/** A row of the pré-facturier's blocking-reason column: days that produced no line (ADR-0037). */
+export interface DeclinedDaysRecord {
+  readonly craId: CraId;
+  readonly missionId: MissionId;
+  readonly halfDays: number;
+  readonly reason: DeclineReason;
+}
+
 export interface InvoiceRepository {
-  findById(id: InvoiceId, actor: { officeId: OfficeId }): Promise<Invoice | null>;
+  /**
+   * `null` means there is no such invoice; an invoice that exists and is out of reach raises
+   * `OutOfScopeError` (ADR-0003, ADR-0023).
+   */
+  findById(id: InvoiceId, actor: Actor): Promise<Invoice | null>;
   list(query: InvoiceListQuery): Promise<readonly InvoiceListItem[]>;
-  save(invoice: Invoice): Promise<void>;
+  /**
+   * `issuanceIdempotencyKey` is written only by an issuance, and only once: the unique index in
+   * migration 009 is what makes a retry visible rather than a second numbered document (ADR-0044).
+   */
+  save(invoice: Invoice, options?: { issuanceIdempotencyKey: string }): Promise<void>;
+  /** The document a previous issuance already produced under this key, if this actor may see it. */
+  findIssuedWithKey(key: string, actor: Actor): Promise<InvoiceListItem | null>;
   saveDraft(invoice: Invoice, craId: string): Promise<void>;
   /**
    * Internal invariant check — returns whether any invoice has already been drafted from this CRA.
@@ -28,4 +49,13 @@ export interface InvoiceRepository {
    * draft duplicates in another office's transaction (ADR-0021).
    */
   hasCraBeenProcessed(craId: string): Promise<boolean>;
+  /**
+   * The invoices already drafted from this Cra. ADR-0021's contract is "replay → original result,
+   * not rejection", and a boolean cannot return the original result — this is what lets a replayed
+   * validation answer with the documents the first one produced.
+   */
+  findDraftedFrom(craId: string, actor: Actor): Promise<readonly InvoiceListItem[]>;
+  /** Idempotent by `(craId, missionId, reason)`: replaying a validation appends no second copy. */
+  saveDeclinedDays(officeId: OfficeId, declined: readonly DeclinedDaysRecord[]): Promise<void>;
+  findDeclinedDays(craId: string, actor: Actor): Promise<readonly DeclinedDaysRecord[]>;
 }

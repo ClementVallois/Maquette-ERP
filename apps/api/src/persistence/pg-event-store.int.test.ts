@@ -1,8 +1,7 @@
+import { closePool, getPool, useTestTransaction } from '@erp/test-harness';
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { closePool, getPool } from './db.ts';
 import { type PersistableEvent, PgEventStore } from './pg-event-store.ts';
-import { useTestTransaction } from './rollback.ts';
 
 // ---------------------------------------------------------------------------
 // Simple persistence tests — the per-test rollback harness is enough.

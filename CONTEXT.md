@@ -121,7 +121,7 @@ _Coût journalier moyen_ — the average daily cost of a consultant to the firm.
 _Avoid_: DailyCost, CostRate, InternalRate
 
 **Intercontrat** (🇫🇷 kept):
-A consultant currently staffed on no mission. Kept in French: "bench" describes a different employment reality and has no French-law equivalent.
+A consultant currently on no **client** mission. Kept in French: "bench" describes a different employment reality and has no French-law equivalent. **Modelled as an internal `Forfait` mission named `Intercontrat`**, sold by the firm to itself, that the consultant is assigned to (ADR-0046) — so their days are recorded like anyone's, the completeness rule stays absolute, and the days are declined as `notRegie` by ADR-0037 instead of being billed. There is no `DayType` for it and no consultant with no assignment: "staffed on nothing" is a fact about staffing, and the mission dimension is where it lives.
 _Avoid_: Bench, Idle, Unassigned, Available
 
 **Habilitation** (🇫🇷 kept):
@@ -131,6 +131,22 @@ _Avoid_: Clearance, Certification, Qualification
 **Passi** (🇫🇷 kept):
 _Prestataire d'audit de la sécurité des systèmes d'information_ — an ANSSI qualification. A proper noun; never translated.
 _Avoid_: SecurityAuditQualification
+
+**Role**:
+What a person is allowed to do in the CRA-to-invoice chain: `consultant` records and submits, `manager` validates and reads margins, `billing` issues the numbered document. Three values, and they are **not** the firm's org-chart roles — the seed writes `consultant | manager | director` on a `Consultant`, which is an HR fact the authorization model never reads (ADR-0023). A `Role` is always exercised inside one `Office`: scope and role are two dimensions, never one.
+_Avoid_: Permission, Profile, Group, AccessLevel
+
+**Persona**:
+One of the four selectable identities the mockup offers instead of authentication — a named pairing of a `Consultant` with a `Role`, seeded as reference data and chosen explicitly. It is called a persona and not a user because nothing about it is authenticated: anyone may select any of them, and the README says so. Two personas share the `manager` role in different offices, which is what makes an out-of-scope refusal something a reader can reproduce rather than be told about.
+_Avoid_: User, Account, Login, Profile, Impersonation
+
+**Actor**:
+The `Role` and the `Office` a request acts under, together with the `Consultant` it acts as — the three fields every authorization decision reads (ADR-0023). It is on both modules' public ports, and it is deliberately **not** a `Persona`: a persona is a selectable identity in a catalogue and a fact about this mockup's front door, while an actor is what a request carries once one has been selected. The modules know the second and must never learn the first.
+_Avoid_: User, Principal, Subject, CurrentUser, Identity
+
+**Session** (transport only, never a stored thing):
+The word on the HTTP surface — `GET /api/v1/session`, `SESSION_SIGNING_KEY` — and it names **no** record: ADR-0023 § Decision says "no session store", and there is none. The route reports which `Persona` the request currently carries, and the signing key exists so the persona cookie cannot be forged into one the caller was never offered. It is listed here because it is published on the wire and a reader will meet it; the domain term for the thing behind it is `Persona`, and nothing in `packages/` uses this word.
+_Avoid_: using it for anything server-side — there is no session state, no expiry, no store
 
 ## Money out
 
@@ -180,6 +196,7 @@ _Avoid_: Type, Nature, Kind
 
 **DeclinedDays**:
 Half-days a validated `Cra` carried that did **not** become an `InvoiceLine`, with the reason: the mission is not `Regie`, the mission is unknown to billing, no `Tjm` was agreed for that date, or the client is missing. Reported rather than skipped (ADR-0037) — every half-day the validation carried is in either the invoices or this list, and a day that vanishes between validation and invoicing is the discrepancy this whole chain exists to remove.
+One row of it — the half-days one `Mission` on one `Cra` declined, for one reason — is a **`DeclinedDaysRecord`** on the repository port and in `billing.declined_days`. The two names are one term: the plural is the concept, the record is a row of it.
 _Avoid_: Skipped, Ignored, Rejected, Errors
 
 **CraAlreadyProcessedError**:

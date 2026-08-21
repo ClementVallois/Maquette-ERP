@@ -8,7 +8,7 @@
  * Grade carrying the default Tjm grid · Cjm as the sensitive value the scope test protects.
  */
 
-import { deterministicIdFactory } from './uuidv7.ts';
+import { deterministicIdFactory } from '@erp/api';
 
 // A frozen timestamp for the whole dataset: 2026-06-15T00:00:00.000Z.
 // Arbitrary but stable: every UUIDv7 in the seed shares this prefix.
@@ -622,6 +622,52 @@ export const managerAttachments = [
     managerId: henri.id,
     fromDate: '2023-06-01',
     toDate: null,
+  },
+] as const;
+
+/**
+ * The one consultant whose June is **submitted and not validated**.
+ *
+ * Without it the seeded instance has nothing to validate, so the chain this whole repository is
+ * about — a manager accepts a month and the draft invoices appear — could be described but not
+ * performed. Claire is in Paris, so `manager-paris` is in scope to validate her; her mission bills
+ * the Réunion client at 8,5 %, so the invoice that appears is also the one that exercises the DOM
+ * VAT rate.
+ */
+export const SUBMITTED_NOT_VALIDATED_EMAIL = 'claire.dubois@secureco.test';
+
+// ── Personas ────────────────────────────────────────────────────────────────
+// The four selectable identities of ADR-0023. Four entries over three roles, and the fourth is
+// the point: `manager-lyon` is what makes an out-of-scope refusal reproducible by switching
+// persona rather than by hand-crafting a URL.
+//
+// `billing-paris` is Henri and not a manager, because `Invoice.issue()` refuses whoever validated
+// the days it bills (ADR-0006 rule 2). Henri validates nobody's CRA in this dataset — Bruno and
+// Emma do — and appears on no invoice's `validated_by`, which is what lets the demonstration's
+// happy path reach an issued document.
+
+export const personas = [
+  {
+    id: ids.next(),
+    key: 'consultant-paris',
+    role: 'consultant',
+    consultantId: alice.id,
+    displayOrder: 1,
+  },
+  {
+    id: ids.next(),
+    key: 'manager-paris',
+    role: 'manager',
+    consultantId: bruno.id,
+    displayOrder: 2,
+  },
+  { id: ids.next(), key: 'manager-lyon', role: 'manager', consultantId: emma.id, displayOrder: 3 },
+  {
+    id: ids.next(),
+    key: 'billing-paris',
+    role: 'billing',
+    consultantId: henri.id,
+    displayOrder: 4,
   },
 ] as const;
 

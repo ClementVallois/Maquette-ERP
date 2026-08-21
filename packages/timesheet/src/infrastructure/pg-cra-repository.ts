@@ -1,17 +1,13 @@
 import {
+  type Actor,
+  assertMayRead,
   type HalfDays,
-  type IsoDate,
   type Period,
   halfDays,
-  isoDate,
+  isoDateOf,
   periodFromIso,
+  readScope,
 } from '@erp/platform';
-import pg from 'pg';
-
-// Tell pg to return DATE columns as strings, not Date objects. pg's default parser applies the
-// local timezone, which shifts the date by one day when the machine is not UTC — a worked day
-// is a date (BUILD-RULES), and a date must survive a round trip without shifting.
-pg.types.setTypeParser(1082, (val: string) => val);
 
 import type { CraLine } from '../domain/cra-line.ts';
 import type { CraListItem, CraListQuery, CraRepository } from '../domain/cra-repository.ts';
@@ -29,12 +25,20 @@ interface PgClient {
 
 export class PgCraRepository implements CraRepository {
   readonly #client: PgClient;
+  readonly #newId: () => string;
 
-  constructor(client: PgClient) {
+  /**
+   * `newId` is injected rather than imported: ADR-0041 puts the UUIDv7 generator in the
+   * composition root, and the dependency rule grants this module `@erp/platform` and nothing
+   * else. It mints child-row ids — the positional `${cra.id}-line-${index}` strings it replaces
+   * were not UUIDs at all.
+   */
+  constructor(client: PgClient, newId: () => string) {
     this.#client = client;
+    this.#newId = newId;
   }
 
-  async findById(id: CraId, actor: { officeId: OfficeId }): Promise<Cra | null> {
+  async findById(id: CraId, actor: Actor): Promise<Cra | null> {
     const { rows } = await this.#client.query<CraRow>(
       `SELECT * FROM timesheet.cras WHERE id = $1`,
       [id],
@@ -42,7 +46,7 @@ export class PgCraRepository implements CraRepository {
 
     if (rows.length === 0) return null;
     const row = rows[0]!;
-    if (row.office_id !== actor.officeId) return null;
+    assertMayRead(actor, 'cra', { officeId: row.office_id, subjectId: row.consultant_id });
 
     return this.#reconstitute(row);
   }
@@ -50,7 +54,7 @@ export class PgCraRepository implements CraRepository {
   async findByConsultantAndPeriod(
     consultantId: ConsultantId,
     period: Period,
-    actor: { officeId: OfficeId },
+    actor: Actor,
   ): Promise<Cra | null> {
     const periodIso = `${String(period.year)}-${String(period.month).padStart(2, '0')}`;
     const { rows } = await this.#client.query<CraRow>(
@@ -60,21 +64,31 @@ export class PgCraRepository implements CraRepository {
 
     if (rows.length === 0) return null;
     const row = rows[0]!;
-    if (row.office_id !== actor.officeId) return null;
+    assertMayRead(actor, 'cra', { officeId: row.office_id, subjectId: row.consultant_id });
 
     return this.#reconstitute(row);
   }
 
+  /**
+   * A list is filtered, never refused: an empty page is the honest answer to "show me what I may
+   * see", and it is the FIRST of ADR-0003's two beats. The second — a typed refusal on a direct
+   * read of a record that exists — is `findById` above.
+   */
   async list(query: CraListQuery): Promise<readonly CraListItem[]> {
     const limit = Math.min(query.limit, MAX_PAGE_SIZE);
+    const { actor } = query;
+    const scope = readScope(actor, 'cra');
+
+    if (scope === 'none') return [];
 
     const { rows } = await this.#client.query<CraListRow>(
       `SELECT id, consultant_id, office_id, period, status
        FROM timesheet.cras
        WHERE office_id = $1
+         AND ($2::text IS NULL OR consultant_id = $2)
        ORDER BY period DESC, consultant_id
-       LIMIT $2 OFFSET $3`,
-      [query.officeId, limit, query.offset],
+       LIMIT $3 OFFSET $4`,
+      [actor.officeId, scope === 'own' ? actor.consultantId : null, limit, query.offset],
     );
 
     return rows.map((row) => ({
@@ -119,26 +133,19 @@ export class PgCraRepository implements CraRepository {
     await this.#client.query(`DELETE FROM timesheet.cra_lines WHERE cra_id = $1`, [cra.id]);
     await this.#client.query(`DELETE FROM timesheet.cra_flags WHERE cra_id = $1`, [cra.id]);
 
-    for (const [index, line] of cra.lines.entries()) {
+    for (const line of cra.lines) {
       await this.#client.query(
         `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [
-          `${cra.id}-line-${String(index)}`,
-          cra.id,
-          line.day,
-          line.dayType,
-          line.missionId,
-          line.halfDays,
-        ],
+        [this.#newId(), cra.id, line.day, line.dayType, line.missionId, line.halfDays],
       );
     }
 
-    for (const [index, flag] of cra.flags.entries()) {
+    for (const flag of cra.flags) {
       await this.#client.query(
         `INSERT INTO timesheet.cra_flags (id, cra_id, day, reason)
          VALUES ($1, $2, $3, $4)`,
-        [`${cra.id}-flag-${String(index)}`, cra.id, flag.day, flag.reason],
+        [this.#newId(), cra.id, flag.day, flag.reason],
       );
     }
   }
@@ -155,14 +162,14 @@ export class PgCraRepository implements CraRepository {
     );
 
     const lines: CraLine[] = lineRows.map((lineRow) => ({
-      day: isoDate(toDateString(lineRow.day)) as IsoDate,
+      day: isoDateOf(lineRow.day),
       dayType: lineRow.day_type as RecordedDayType,
       missionId: (lineRow.mission_id ?? null) as MissionId | null,
       halfDays: halfDays(lineRow.half_days) as HalfDays,
     }));
 
     const flags: CraFlag[] = flagRows.map((flagRow) => ({
-      day: isoDate(toDateString(flagRow.day)) as IsoDate,
+      day: isoDateOf(flagRow.day),
       reason: flagRow.reason as 'weekend' | 'publicHoliday',
     }));
 
@@ -185,16 +192,6 @@ export class PgCraRepository implements CraRepository {
       refusal,
     });
   }
-}
-
-function toDateString(pgDate: Date | string): string {
-  if (typeof pgDate === 'string') return pgDate;
-  // pg returns DATE columns as Date objects at midnight UTC. Using toISOString() is correct
-  // because the container and connection are both UTC.
-  const year = pgDate.getUTCFullYear();
-  const month = String(pgDate.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(pgDate.getUTCDate()).padStart(2, '0');
-  return `${String(year)}-${month}-${day}`;
 }
 
 interface CraRow {

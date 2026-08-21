@@ -1,12 +1,10 @@
 export {
-  DECLINE_REASONS,
-  type DeclineReason,
-  type DeclinedDays,
   draftInvoicesFrom,
   type DraftInvoicesDependencies,
   type DraftInvoicesResult,
   onTimesheetValidated,
 } from './application/draft-invoices.ts';
+export { DECLINE_REASONS, type DeclineReason, type DeclinedDays } from './domain/declined-days.ts';
 export {
   type Client,
   client,
@@ -57,10 +55,13 @@ export {
   type RegieDaysOrigin,
 } from './domain/invoice-line.ts';
 export type {
+  DeclinedDaysRecord,
   InvoiceListItem,
   InvoiceListQuery,
   InvoiceRepository,
 } from './domain/invoice-repository.ts';
+export { PgInvoiceRepository } from './infrastructure/pg-invoice-repository.ts';
+export { PgNumberingCounter } from './infrastructure/pg-numbering-counter.ts';
 export { INVOICE_STATUSES, type InvoiceStatus } from './domain/invoice-status.ts';
 export {
   BILLING_MODELS,
@@ -97,5 +98,6 @@ export {
   type PaymentTerms,
   paymentTerms,
 } from './domain/payment-terms.ts';
+export { lineAmountCents, roundHalfUp } from './domain/money.ts';
 export { type LegalEntity, legalEntity } from './domain/seller.ts';
 export { documentNumber, sameSeries, type SeriesKey, seriesKeyOf } from './domain/numbering.ts';

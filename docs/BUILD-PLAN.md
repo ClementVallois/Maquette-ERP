@@ -691,7 +691,8 @@ Records the reopening. The triage settled four rules on one premise — "there i
 CI", and hosting, artifact signing and runtime hardening deferred to the target ERP — and the premise
 was that nothing is deployed. That premise is now false. The ADR names what replaces each rule and updates
 `BUILD-RULES.md`, the README's "Renvoyé à l'ERP cible" list, and `.env.example`'s header in the same
-pass — ADRs are never rewritten, so ADR-0028 supersedes rather than edits.
+pass — the decision itself moved, so ADR-0028 supersedes rather than edits (ADR-0045 draws that
+line: a changed decision is superseded, a sentence that was never true is corrected in place).
 
 ### 8.2 — ADR-0029: pull-based deploy, no inbound credential
 

@@ -17,6 +17,9 @@ const UNDECLARED_NPM_FIXTURE = [
 
 const APP_ALLOWED = 'apps/__boundary-fixture__/src/allowed-public-import.ts';
 const APP_DEEP = 'apps/__boundary-fixture__/src/forbidden-deep-import.ts';
+const SCRIPTS_FIXTURE = ['scripts/__boundary-fixture__/**/*.ts'];
+const SCRIPTS_ALLOWED = 'scripts/__boundary-fixture__/allowed-public-import.ts';
+const SCRIPTS_DEEP = 'scripts/__boundary-fixture__/forbidden-deep-import.ts';
 
 interface CruiseResult {
   summary: {
@@ -70,6 +73,28 @@ describe('the module boundary rule', () => {
 
     const rules = summary.violations
       .filter((violation) => violation.from === APP_DEEP)
+      .map((violation) => violation.rule.name);
+
+    expect(rules).toContain('not-in-allowed');
+  });
+
+  it('lets a script import a module through its public entry point', () => {
+    const { summary } = cruise(SCRIPTS_FIXTURE, '.dependency-cruiser.fixture.cjs');
+
+    expect(summary.totalCruised).toBeGreaterThan(0);
+    expect(
+      summary.violations.filter((violation) => violation.from === SCRIPTS_ALLOWED),
+    ).toStrictEqual([]);
+  });
+
+  it('rejects a script reaching past a module entry point', () => {
+    // `scripts/seed.ts` is a composition root outside `apps/`, and until Phase 5's closure the
+    // boundary globs did not reach the directory at all. The grant it now has is an app's grant,
+    // and this is the half that proves it is a grant rather than a blanket permission.
+    const { summary } = cruise(SCRIPTS_FIXTURE, '.dependency-cruiser.fixture.cjs');
+
+    const rules = summary.violations
+      .filter((violation) => violation.from === SCRIPTS_DEEP)
       .map((violation) => violation.rule.name);
 
     expect(rules).toContain('not-in-allowed');

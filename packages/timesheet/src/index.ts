@@ -44,3 +44,4 @@ export {
   type WorkingCalendar,
   workingCalendar,
 } from './domain/working-calendar.ts';
+export { PgCraRepository } from './infrastructure/pg-cra-repository.ts';

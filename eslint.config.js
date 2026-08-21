@@ -273,7 +273,7 @@ export default tseslint.config(
     // back on in the one layer that reads money out of the database: the failure family the
     // `application/` scope fix already named, one directory further out. `tests/lint-rules.test.ts`
     // holds the negative test.
-    files: ['packages/*/src/infrastructure/**/*.ts'],
+    files: ['packages/*/src/infrastructure/**/*.ts', 'apps/*/src/persistence/**/*.ts'],
     ignores: ['**/*.test.ts', '**/*.int.test.ts'],
     rules: {
       '@typescript-eslint/no-unnecessary-type-parameters': 'off',

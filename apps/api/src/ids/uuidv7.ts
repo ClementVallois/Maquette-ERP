@@ -7,6 +7,16 @@
  *
  * Hand-written rather than imported: Node 24's `crypto.randomUUID()` is v4 only, and the
  * layout is 22 lines of bit-packing — simpler than evaluating a library (ADR-0041).
+ *
+ * It lives here because ADR-0041 said it would: "the repositories import from `scripts/lib/` at
+ * seed time … or, once `apps/api/` exists (Phase 5), from the composition root". `@erp/platform`
+ * is not an option — it imports not even a Node builtin, and `randomBytes` is one — and the two
+ * composition roots that mint ids, the runtime one here and the deterministic one in the seed,
+ * must mint them the same way or the seed stops proving anything about the running system.
+ *
+ * The modules themselves never import it: the dependency rule grants them `@erp/platform` and
+ * nothing else, so a repository that needs an id is **given a factory**, which is what keeps the
+ * choice of generator on this side of the boundary.
  */
 
 import { randomBytes } from 'node:crypto';
@@ -66,8 +76,16 @@ export function uuidv7(): string {
 /** Deterministic UUIDv7: frozen timestamp, counter-based suffix. Same inputs → same output. */
 export function uuidv7Deterministic(timestampMs: number, counter: number): string {
   const suffix = new Uint8Array(10);
-  // Write the counter as a big-endian 64-bit value across the 10 bytes (top 2 bytes stay 0,
-  // which is fine — the version and variant bits overwrite bytes 0 and 2 of the suffix anyway).
+  // These eight assignments do **not** write a 64-bit counter, whatever they look like. A JS
+  // bitwise shift coerces to int32 and takes its count mod 32, so `counter >> 56` evaluates as
+  // `counter >> 24`: `suffix[2..5]` and `suffix[6..9]` receive the same four bytes, and only the
+  // low 32 bits of the counter reach the id at all.
+  //
+  // The consequence is the real limit: two counters that agree modulo 2**32 produce the **same**
+  // id. Nothing here approaches it — the seed's counters reach about 2040 — and the duplicated
+  // bytes cost nothing, so the code stands as written; the arithmetic is what needed saying.
+  // `suffix[0]` and `suffix[1]` are left at zero, which is free: the version and variant nibbles
+  // overwrite bytes 0 and 2 of the suffix anyway.
   suffix[2] = (counter >> 56) & 0xff;
   suffix[3] = (counter >> 48) & 0xff;
   suffix[4] = (counter >> 40) & 0xff;

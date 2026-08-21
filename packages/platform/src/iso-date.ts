@@ -63,6 +63,63 @@ export function isoDate(value: string): IsoDate {
 }
 
 /** Splits a date that has already been through `isoDate`. */
+/**
+ * A DATE column as an `IsoDate`, whichever shape the driver hands over.
+ *
+ * `pg` builds a `DATE` into a `Date` with the **local** constructor — `new Date(y, m - 1, d)` —
+ * so `2026-04-02` becomes `2026-04-01T22:00:00Z` on a machine in Paris. The inverse is therefore
+ * the **local** getters, not the UTC ones: reading `getUTCDate()` off that instant answers the
+ * 1st, which is the off-by-one this function exists to undo. It reads the process timezone on
+ * purpose, because the value it is decoding was encoded with it.
+ *
+ * The composition roots also install a type parser that keeps the string, so this branch is
+ * usually not taken. It exists because a sealed module's correctness must not depend on a
+ * process-global that somebody else installs — the failure would be a date off by one, in one
+ * timezone, and invisible on a UTC continuous-integration runner.
+ */
+export function isoDateOf(value: Date | string): IsoDate {
+  if (typeof value === 'string') return isoDate(value);
+
+  return toIsoDate(value.getFullYear(), value.getMonth() + 1, value.getDate());
+}
+
+/**
+ * The firm's timezone. Every legal date this build stamps is a day on **this** calendar, not on
+ * UTC's — `docs/BUILD-RULES.md` fixes it, and an invoice is a French document whatever zone the
+ * host happens to run in.
+ */
+export const FIRM_TIME_ZONE = 'Europe/Paris';
+
+// One formatter, built once: constructing an `Intl.DateTimeFormat` is the expensive part, and it
+// is stateless. `formatToParts` and not `format`, because the layout of a formatted date is a
+// property of the locale and only the parts are guaranteed.
+const FIRM_CALENDAR_DAY = new Intl.DateTimeFormat('en-US', {
+  timeZone: FIRM_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/**
+ * The calendar day an instant falls on in the firm's timezone.
+ *
+ * Not `instant.toISOString().slice(0, 10)`, which answers the day in **UTC**. Paris runs one or
+ * two hours ahead, so an issuance between midnight and 02:00 local stamps the previous day — and
+ * on 1 January it stamps the previous **fiscal year**, which is half the key an invoice series is
+ * numbered by (ADR-0007). The window is small, it is nightly, and a UTC continuous-integration
+ * runner never sees it.
+ *
+ * The offset is 1 or 2 hours depending on the date, so it is read from the zone database rather
+ * than written down: the two days a year it changes are exactly the ones a constant gets wrong.
+ */
+export function isoDateInFirmTimeZone(instant: Date): IsoDate {
+  const parts = FIRM_CALENDAR_DAY.formatToParts(instant);
+  const value = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? '';
+
+  return isoDate(`${value('year')}-${value('month')}-${value('day')}`);
+}
+
 export function partsOf(date: IsoDate): DateParts {
   return {
     year: Number.parseInt(date.slice(0, 4), 10),

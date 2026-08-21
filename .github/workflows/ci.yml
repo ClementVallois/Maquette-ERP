@@ -254,10 +254,64 @@ jobs:
         env:
           MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
 
-      - name: Run seed (second pass — must be idempotent)
+      - name: Fingerprint the database the first pass produced
+        run: pnpm run seed:fingerprint | tee "$RUNNER_TEMP/first-pass.txt"
+        env:
+          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
+
+      - name: Run seed (second pass)
         run: pnpm run seed
         env:
           MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
+
+      # What "prove idempotency" needs and running the seed twice does not give. The seed clears
+      # every table inside one transaction and re-inserts, so a second pass **cannot** exit
+      # non-zero — asserting `exit 0` asserts nothing. Comparing the two fingerprints closes both
+      # halves of ADR-0022 at once: a non-idempotent pass moves a row count, and a
+      # non-deterministic one moves every id — swapping `uuidv7Deterministic` for
+      # `crypto.randomUUID` used to leave all nine jobs green and now fails here. `diff` also
+      # names the table that moved, which an `exit 1` would not.
+      #
+      # What it does not cover: rows already present before the first pass. Both passes see them,
+      # so both fingerprints agree. That is the seed's reset step, and it is asserted by the
+      # step's own DELETEs rather than here.
+      - name: The second pass produced exactly the same database
+        run: |
+          pnpm run seed:fingerprint > "$RUNNER_TEMP/second-pass.txt"
+          diff -u "$RUNNER_TEMP/first-pass.txt" "$RUNNER_TEMP/second-pass.txt"
+        env:
+          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
+
+      # The half the seed itself cannot prove: it runs as the schema OWNER, so a successful seed
+      # says nothing about whether the least-privilege role the API actually uses can read what
+      # was written. Phase 4's checkpoint deferred this here by name. Every table the API reads is
+      # queried as `erp_app`, and the counts are asserted rather than merely printed — a `SELECT`
+      # that answers zero rows also "succeeds".
+      - name: The app role can read what the seed wrote
+        run: |
+          psql -v ON_ERROR_STOP=1 "postgres://erp_app:erp_local_dev@localhost:5433/erp" <<'EOSQL'
+            DO $$
+            DECLARE
+              expected CONSTANT text[][] := ARRAY[
+                ['public.offices','4'], ['public.practices','5'], ['public.personas','4'],
+                ['public.consultants','9'], ['public.clients','5'], ['public.missions','7'],
+                ['timesheet.cras','6'], ['billing.invoices','3'], ['public.domain_events','5']
+              ];
+              found bigint;
+            BEGIN
+              FOR i IN 1 .. array_length(expected, 1) LOOP
+                EXECUTE format('SELECT count(*) FROM %s', expected[i][1]) INTO found;
+                IF found <> expected[i][2]::bigint THEN
+                  RAISE EXCEPTION 'erp_app reads % rows from %, expected %',
+                    found, expected[i][1], expected[i][2];
+                END IF;
+              END LOOP;
+              RAISE NOTICE 'erp_app reads every seeded table at the expected volume.';
+            END
+            $$;
+          EOSQL
+        env:
+          PGPASSWORD: erp_local_dev
 
   secrets:
     name: Secret scan

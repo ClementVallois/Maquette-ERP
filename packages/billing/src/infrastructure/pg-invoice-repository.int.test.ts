@@ -1,4 +1,4 @@
-import { halfDays, period } from '@erp/platform';
+import { type Actor, halfDays, OutOfScopeError, period } from '@erp/platform';
 import { useTestTransaction } from '@erp/test-harness';
 import { describe, expect, it } from 'vitest';
 
@@ -12,11 +12,30 @@ import { legalEntity } from '../domain/seller.ts';
 
 import { PgInvoiceRepository } from './pg-invoice-repository.ts';
 
+/**
+ * Child-row ids for these tests. Not the production generator: the repositories take a factory
+ * precisely so that the composition root chooses one (ADR-0041), and a test is a composition
+ * root too. Counter-based so a failure names a readable id.
+ */
+let testIdCounter = 0;
+const testIds = (): string => `test-id-${String(++testIdCounter)}`;
+
 describe('PgInvoiceRepository', () => {
   const tx = useTestTransaction();
 
   const PARIS = 'office-paris';
   const LYON = 'office-lyon';
+
+  // ADR-0023: an actor is a role inside an office. Billing and the manager both read the office's
+  // invoices; a consultant reads none at all, whichever office they are in.
+  const parisManager: Actor = { consultantId: 'manager-1', officeId: PARIS, role: 'manager' };
+  const lyonManager: Actor = { consultantId: 'manager-2', officeId: LYON, role: 'manager' };
+  const parisBilling: Actor = { consultantId: 'henri', officeId: PARIS, role: 'billing' };
+  const parisConsultant: Actor = {
+    consultantId: 'consultant-1',
+    officeId: PARIS,
+    role: 'consultant',
+  };
 
   const SELLER = legalEntity({
     id: 'entity-fr',
@@ -33,7 +52,13 @@ describe('PgInvoiceRepository', () => {
       city: 'Paris',
       country: 'FR',
     },
-    numberPrefix: 'SEC',
+    // **Not** the seed's `SEC`. `billing.invoices.invoice_number` is `TEXT UNIQUE` across the
+    // whole table, and the harness rolls back what a test writes without isolating it from rows
+    // that are already committed. A test that mints `SEC-2026-000001` therefore passes until
+    // somebody walks the demo and issues the real one — which happened, during the review that
+    // found this. A prefix no seed and no demo uses makes the collision impossible rather than
+    // unlikely.
+    numberPrefix: 'TST',
   });
 
   const TERMS = paymentTerms({ kind: 'net', days: 30 });
@@ -100,12 +125,12 @@ describe('PgInvoiceRepository', () => {
     `);
     await tx.client.query(`
       INSERT INTO public.legal_entities (id, name, legal_form, share_capital_cents, siren, intra_community_vat_number, rcs_registration, address_street, address_postal_code, address_city, address_country, number_prefix)
-      VALUES ('entity-fr', 'Sécurité & Conseil', 'SAS', 15000000, '493296529', 'FR23493296529', 'RCS Paris 493 296 529', '12 rue de la Boétie', '75008', 'Paris', 'FR', 'SEC');
+      VALUES ('entity-fr', 'Sécurité & Conseil', 'SAS', 15000000, '493296529', 'FR23493296529', 'RCS Paris 493 296 529', '12 rue de la Boétie', '75008', 'Paris', 'FR', 'TST');
     `);
   }
 
   function repo(): PgInvoiceRepository {
-    return new PgInvoiceRepository(tx.client);
+    return new PgInvoiceRepository(tx.client, testIds);
   }
 
   function makeDraftInvoice(id = 'invoice-1', officeId = PARIS): Invoice {
@@ -137,7 +162,7 @@ describe('PgInvoiceRepository', () => {
 
     const invoice = makeDraftInvoice();
     await repo().save(invoice);
-    const found = await repo().findById('invoice-1', { officeId: PARIS });
+    const found = await repo().findById('invoice-1', parisManager);
 
     expect(found).not.toBeNull();
     expect(found!.id).toBe('invoice-1');
@@ -157,18 +182,37 @@ describe('PgInvoiceRepository', () => {
 
   it('returns null when invoice does not exist', async () => {
     await seedReferenceData();
-    const found = await repo().findById('nonexistent', { officeId: PARIS });
+    const found = await repo().findById('nonexistent', parisManager);
     expect(found).toBeNull();
   });
 
-  it('returns null when actor office does not match — authorization scope', async () => {
+  it('refuses, rather than hides, an invoice of another office — ADR-0003 beat two', async () => {
     await seedReferenceData();
 
     const invoice = makeDraftInvoice();
     await repo().save(invoice);
 
-    const found = await repo().findById('invoice-1', { officeId: LYON });
-    expect(found).toBeNull();
+    await expect(repo().findById('invoice-1', lyonManager)).rejects.toThrow(OutOfScopeError);
+  });
+
+  it('refuses a consultant every invoice, including one billing their own days', async () => {
+    // The role dimension on a resource that has no subject: `consultant` is `none` here, so
+    // office membership does not help.
+    await seedReferenceData();
+    await repo().save(makeDraftInvoice());
+
+    await expect(repo().findById('invoice-1', parisConsultant)).rejects.toThrow(OutOfScopeError);
+    expect(await repo().list({ actor: parisConsultant, limit: 10, offset: 0 })).toHaveLength(0);
+  });
+
+  it('lets billing read the invoices of its own office', async () => {
+    await seedReferenceData();
+    await repo().save(makeDraftInvoice());
+
+    const found = await repo().findById('invoice-1', parisBilling);
+
+    expect(found).not.toBeNull();
+    expect(await repo().list({ actor: parisBilling, limit: 10, offset: 0 })).toHaveLength(1);
   });
 
   it('lists invoices filtered by office', async () => {
@@ -177,12 +221,12 @@ describe('PgInvoiceRepository', () => {
     const invoice = makeDraftInvoice();
     await repo().save(invoice);
 
-    const parisResults = await repo().list({ officeId: PARIS, limit: 10, offset: 0 });
+    const parisResults = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
     expect(parisResults).toHaveLength(1);
     expect(parisResults[0]!.id).toBe('invoice-1');
     expect(parisResults[0]!.billedToName).toBe('Banque Nord SA');
 
-    const lyonResults = await repo().list({ officeId: LYON, limit: 10, offset: 0 });
+    const lyonResults = await repo().list({ actor: lyonManager, limit: 10, offset: 0 });
     expect(lyonResults).toHaveLength(0);
   });
 
@@ -210,11 +254,11 @@ describe('PgInvoiceRepository', () => {
       FROM generate_series(1, 60) AS g
     `);
 
-    const capped = await repo().list({ officeId: PARIS, limit: 1000, offset: 0 });
+    const capped = await repo().list({ actor: parisManager, limit: 1000, offset: 0 });
     expect(capped).toHaveLength(50);
 
     // And a caller under the cap still gets what it asked for, so the fix is not "always 50".
-    const asked = await repo().list({ officeId: PARIS, limit: 10, offset: 0 });
+    const asked = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
     expect(asked).toHaveLength(10);
   });
 
@@ -224,7 +268,7 @@ describe('PgInvoiceRepository', () => {
     const invoice = makeDraftInvoice();
     await repo().save(invoice);
 
-    const items = await repo().list({ officeId: PARIS, limit: 10, offset: 0 });
+    const items = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
     const item = items[0]!;
 
     // Asserted as the WHOLE shape, not as four absent names. `tjm`, `cjm` and `margin` are
@@ -248,11 +292,11 @@ describe('PgInvoiceRepository', () => {
     invoice.issue({ by: 'claire', sequence: 42, issueDate: '2026-04-02' });
 
     await repo().save(invoice);
-    const found = await repo().findById('invoice-1', { officeId: PARIS });
+    const found = await repo().findById('invoice-1', parisManager);
 
     expect(found).not.toBeNull();
     expect(found!.status).toBe('issued');
-    expect(found!.number).toBe('SEC-2026-000042');
+    expect(found!.number).toBe('TST-2026-000042');
     expect(found!.issueDate).toBe('2026-04-02');
     expect(found!.series).toStrictEqual({ entityId: 'entity-fr', fiscalYear: 2026 });
     expect(found!.totals.totalExcludingVatCents).toBe(1_365_000);
@@ -347,15 +391,15 @@ describe('PgInvoiceRepository', () => {
     const invoice = makeDraftInvoice();
     await repo().save(invoice);
 
-    const found1 = await repo().findById('invoice-1', { officeId: PARIS });
+    const found1 = await repo().findById('invoice-1', parisManager);
     expect(found1!.status).toBe('draft');
 
     invoice.issue({ by: 'claire', sequence: 1, issueDate: '2026-04-02' });
     await repo().save(invoice);
 
-    const found2 = await repo().findById('invoice-1', { officeId: PARIS });
+    const found2 = await repo().findById('invoice-1', parisManager);
     expect(found2!.status).toBe('issued');
-    expect(found2!.number).toBe('SEC-2026-000001');
+    expect(found2!.number).toBe('TST-2026-000001');
   });
 
   it('round-trips the seller through the legal_entities table', async () => {
@@ -363,11 +407,11 @@ describe('PgInvoiceRepository', () => {
 
     const invoice = makeDraftInvoice();
     await repo().save(invoice);
-    const found = await repo().findById('invoice-1', { officeId: PARIS });
+    const found = await repo().findById('invoice-1', parisManager);
 
     expect(found!.seller.name).toBe('Sécurité & Conseil');
     expect(found!.seller.siren).toBe('493296529');
-    expect(found!.seller.numberPrefix).toBe('SEC');
+    expect(found!.seller.numberPrefix).toBe('TST');
     expect(found!.seller.shareCapitalCents).toBe(15_000_000);
   });
 
@@ -432,5 +476,114 @@ describe('PgInvoiceRepository', () => {
     });
 
     await expect(repo().saveDraft(forEnergie, 'cra-multi')).resolves.toBeUndefined();
+  });
+
+  // ---------------------------------------------------------------------------
+  // The four reads and writes Phase 5 added — ADR-0021, ADR-0037, ADR-0044
+  //
+  // Each gets a positive and a negative test, per `docs/BUILD-RULES.md` § Working discipline.
+  // Three of the four are office-scoped, and it is the refusal that carries the claim: for
+  // `findIssuedWithKey` ADR-0044 states it as security — an actor who may not read the invoice
+  // must not learn from the replay lookup whether their key was used on one.
+  // ---------------------------------------------------------------------------
+
+  it('findDraftedFrom answers the documents a validation drafted', async () => {
+    await seedReferenceData();
+
+    await repo().saveDraft(makeDraftInvoice('invoice-drafted'), 'cra-drafted');
+    const drafted = await repo().findDraftedFrom('cra-drafted', parisManager);
+
+    expect(drafted).toHaveLength(1);
+    expect(drafted[0]!.id).toBe('invoice-drafted');
+    expect(drafted[0]!.status).toBe('draft');
+  });
+
+  it('findDraftedFrom answers nothing for another office, and nothing for a consultant', async () => {
+    await seedReferenceData();
+
+    await repo().saveDraft(makeDraftInvoice('invoice-drafted'), 'cra-drafted');
+
+    expect(await repo().findDraftedFrom('cra-drafted', lyonManager)).toStrictEqual([]);
+    expect(await repo().findDraftedFrom('cra-drafted', parisConsultant)).toStrictEqual([]);
+    // And the Cra that drafted nothing is the same empty answer as the one out of reach, which is
+    // beat one of ADR-0003: an absence says nothing about why.
+    expect(await repo().findDraftedFrom('cra-never-validated', parisManager)).toStrictEqual([]);
+  });
+
+  it('saveDeclinedDays writes the days that produced no line, and findDeclinedDays reads them back', async () => {
+    await seedReferenceData();
+
+    await repo().saveDeclinedDays(PARIS, [
+      { craId: 'cra-1', missionId: 'mission-forfait', halfDays: 6, reason: 'notRegie' },
+      { craId: 'cra-1', missionId: 'mission-ghost', halfDays: 2, reason: 'unknownMission' },
+    ]);
+
+    const declined = await repo().findDeclinedDays('cra-1', parisManager);
+
+    expect(declined).toStrictEqual([
+      { craId: 'cra-1', missionId: 'mission-forfait', halfDays: 6, reason: 'notRegie' },
+      { craId: 'cra-1', missionId: 'mission-ghost', halfDays: 2, reason: 'unknownMission' },
+    ]);
+  });
+
+  it('saveDeclinedDays appends nothing on a replay — the claim migration 009 makes', async () => {
+    // `ON CONFLICT (cra_id, mission_id, reason) DO NOTHING`. ADR-0021's replay runs the whole
+    // subscriber again, so this write happens twice for one validation and must leave one row.
+    await seedReferenceData();
+
+    await repo().saveDeclinedDays(PARIS, [
+      { craId: 'cra-1', missionId: 'mission-forfait', halfDays: 6, reason: 'notRegie' },
+    ]);
+    // The replay does not throw — the unique index alone would make it throw — and it does not
+    // overwrite either: `DO NOTHING` rather than `DO UPDATE`, because a decline is a fact about a
+    // Cra that was validated once, and there is nothing about it that can legitimately change.
+    await repo().saveDeclinedDays(PARIS, [
+      { craId: 'cra-1', missionId: 'mission-forfait', halfDays: 999, reason: 'notRegie' },
+    ]);
+
+    const declined = await repo().findDeclinedDays('cra-1', parisManager);
+
+    expect(declined).toHaveLength(1);
+    expect(declined[0]!.halfDays).toBe(6);
+  });
+
+  it('findDeclinedDays answers nothing for another office, and nothing for a consultant', async () => {
+    await seedReferenceData();
+
+    await repo().saveDeclinedDays(PARIS, [
+      { craId: 'cra-1', missionId: 'mission-forfait', halfDays: 6, reason: 'notRegie' },
+    ]);
+
+    expect(await repo().findDeclinedDays('cra-1', lyonManager)).toStrictEqual([]);
+    expect(await repo().findDeclinedDays('cra-1', parisConsultant)).toStrictEqual([]);
+  });
+
+  it('findIssuedWithKey answers the document the key issued', async () => {
+    await seedReferenceData();
+
+    const invoice = makeDraftInvoice('invoice-keyed');
+    invoice.issue({ by: 'claire', sequence: 11, issueDate: '2026-04-02' });
+    await repo().save(invoice, { issuanceIdempotencyKey: 'key-abcdefgh' });
+
+    const found = await repo().findIssuedWithKey('key-abcdefgh', parisBilling);
+
+    expect(found).not.toBeNull();
+    expect(found!.id).toBe('invoice-keyed');
+    expect(found!.invoiceNumber).toBe('TST-2026-000011');
+  });
+
+  it('findIssuedWithKey tells an actor out of scope nothing — the ADR-0044 security claim', async () => {
+    // Not "answers null because there is no row": the row is there, and the answer must be the
+    // same one an unused key gets. A caller who may not read the invoice cannot use this route to
+    // discover that their key issued one.
+    await seedReferenceData();
+
+    const invoice = makeDraftInvoice('invoice-keyed');
+    invoice.issue({ by: 'claire', sequence: 12, issueDate: '2026-04-02' });
+    await repo().save(invoice, { issuanceIdempotencyKey: 'key-abcdefgh' });
+
+    expect(await repo().findIssuedWithKey('key-abcdefgh', lyonManager)).toBeNull();
+    expect(await repo().findIssuedWithKey('key-abcdefgh', parisConsultant)).toBeNull();
+    expect(await repo().findIssuedWithKey('key-never-used', parisBilling)).toBeNull();
   });
 });

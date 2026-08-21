@@ -10,6 +10,7 @@
 import pg from 'pg';
 import { z } from 'zod/v4';
 
+import { PgEventStore, uuidv7Deterministic } from '@erp/api';
 import {
   billingReference,
   client as clientFactory,
@@ -19,11 +20,13 @@ import {
   legalEntity as legalEntityFactory,
   legalMentions,
   paymentTerms,
+  PgInvoiceRepository,
   RECOVERY_INDEMNITY_CENTS,
 } from '@erp/billing';
 import {
   type Clock,
   periodFromIso,
+  ROLES,
   TechnicalFailure,
   TIMESHEET_VALIDATED,
   TIMESHEET_VALIDATED_VERSION,
@@ -36,6 +39,7 @@ import {
   hierarchy,
   type ManagerAttachment,
   type Mission as TimesheetMission,
+  PgCraRepository,
   timesheetReference,
   type TimesheetReference,
   workingCalendar,
@@ -58,11 +62,12 @@ import {
   missions,
   missionTjm,
   offices,
+  personas,
   practices,
   SEED_CLOCK_INSTANT,
   SEED_TIMESTAMP_MS,
+  SUBMITTED_NOT_VALIDATED_EMAIL,
 } from './lib/seed-data.ts';
-import { uuidv7Deterministic } from './lib/uuidv7.ts';
 
 const { Client: PgClient } = pg;
 
@@ -164,6 +169,82 @@ const ManagerAttachmentSchema = z.object({
   toDate: z.string().nullable(),
 });
 
+/**
+ * The money columns of migration 007. `.int()` is the half that matters: a `cjmCents` of 250.5
+ * otherwise skips the boundary entirely and surfaces as a raw Postgres `check constraint
+ * violated`, which names neither the field nor the file it came from.
+ *
+ * The multiple-of-100 rule is the schema's too, and not the database's alone: `docs/BUILD-RULES.md`
+ * § Money states it about every daily rate, and migration 007 doubles it — which is the order this
+ * repository wants, an invariant refused at the boundary and the constraint behind it as the net.
+ */
+const WholeEuroCents = z
+  .number()
+  .int()
+  .positive()
+  .refine((cents) => cents % 100 === 0, 'a daily rate is a whole number of euros');
+
+const IsoDateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+const AddressSchema = z.object({
+  line1: z.string(),
+  line2: z.string().nullable(),
+  postalCode: z.string(),
+  city: z.string(),
+  country: z.string(),
+});
+
+const LegalEntitySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  legalForm: z.string(),
+  shareCapitalCents: z.number().int().positive(),
+  siren: z.string().regex(/^\d{9}$/),
+  intraCommunityVatNumber: z.string(),
+  rcsRegistration: z.string(),
+  address: AddressSchema,
+  numberPrefix: z.string().min(1),
+});
+
+const ConsultantGradeSchema = z.object({
+  id: z.string(),
+  consultantId: z.string(),
+  gradeId: z.string(),
+  fromDate: IsoDateString,
+  toDate: IsoDateString.nullable(),
+  cjmCents: WholeEuroCents,
+});
+
+const GradeTjmDefaultSchema = z.object({
+  id: z.string(),
+  gradeId: z.string(),
+  fromDate: IsoDateString,
+  toDate: IsoDateString.nullable(),
+  tjmCents: WholeEuroCents,
+});
+
+const ConsultantHabilitationSchema = z.object({
+  id: z.string(),
+  consultantId: z.string(),
+  habilitationId: z.string(),
+  obtainedAt: IsoDateString,
+  expiresAt: IsoDateString.nullable(),
+});
+
+const MissionHabilitationSchema = z.object({
+  id: z.string(),
+  missionId: z.string(),
+  habilitationId: z.string(),
+});
+
+const PersonaSchema = z.object({
+  id: z.string(),
+  key: z.string().regex(/^[a-z][a-z0-9-]*$/),
+  role: z.enum(ROLES),
+  consultantId: z.string(),
+  displayOrder: z.number().int().positive(),
+});
+
 function validate<T>(schema: z.ZodType<T>, data: unknown, label: string): T {
   const result = schema.safeParse(data);
   if (!result.success) {
@@ -202,6 +283,28 @@ async function seed(): Promise<void> {
     managerAttachments,
     'managerAttachments',
   );
+  const validatedPersonas = validateArray(PersonaSchema, personas, 'personas');
+  const validatedLegalEntity = validate(LegalEntitySchema, legalEntityData, 'legalEntity');
+  const validatedConsultantGrades = validateArray(
+    ConsultantGradeSchema,
+    consultantGrades,
+    'consultantGrades',
+  );
+  const validatedGradeTjmDefaults = validateArray(
+    GradeTjmDefaultSchema,
+    gradeTjmDefaults,
+    'gradeTjmDefaults',
+  );
+  const validatedConsultantHabilitations = validateArray(
+    ConsultantHabilitationSchema,
+    consultantHabilitations,
+    'consultantHabilitations',
+  );
+  const validatedMissionHabilitations = validateArray(
+    MissionHabilitationSchema,
+    missionHabilitations,
+    'missionHabilitations',
+  );
 
   const client = new PgClient({ connectionString: url });
   await client.connect();
@@ -214,8 +317,8 @@ async function seed(): Promise<void> {
     await client.query('DELETE FROM billing.invoice_lines');
     await client.query('DELETE FROM billing.invoices');
     await client.query('DELETE FROM billing.numbering_series');
-    await client.query('DELETE FROM billing.declined_days WHERE FALSE'); // table exists, unused
-    await client.query('DELETE FROM billing.credit_notes WHERE FALSE'); // table exists, unused
+    await client.query('DELETE FROM billing.declined_days');
+    await client.query('DELETE FROM billing.credit_notes');
     await client.query('DELETE FROM public.domain_events');
     await client.query('DELETE FROM timesheet.cra_flags');
     await client.query('DELETE FROM timesheet.cra_lines');
@@ -227,6 +330,7 @@ async function seed(): Promise<void> {
     await client.query('DELETE FROM public.assignments');
     await client.query('DELETE FROM public.mission_tjm');
     await client.query('DELETE FROM public.missions');
+    await client.query('DELETE FROM public.personas');
     await client.query('DELETE FROM public.manager_attachments');
     await client.query('DELETE FROM public.clients');
     await client.query('DELETE FROM public.consultants');
@@ -270,7 +374,7 @@ async function seed(): Promise<void> {
     console.log(`Seeded ${String(validatedHabilitations.length)} habilitations.`);
 
     // Legal entity
-    const le = legalEntityData;
+    const le = validatedLegalEntity;
     await client.query(
       `INSERT INTO public.legal_entities (
         id, name, legal_form, share_capital_cents, siren, intra_community_vat_number,
@@ -303,32 +407,34 @@ async function seed(): Promise<void> {
     }
     console.log(`Seeded ${String(validatedConsultants.length)} consultants.`);
 
-    for (const cg of consultantGrades) {
+    for (const cg of validatedConsultantGrades) {
       await client.query(
         `INSERT INTO public.consultant_grades (id, consultant_id, grade_id, from_date, to_date, cjm_cents)
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [cg.id, cg.consultantId, cg.gradeId, cg.fromDate, cg.toDate, cg.cjmCents],
       );
     }
-    console.log(`Seeded ${String(consultantGrades.length)} consultant grades.`);
+    console.log(`Seeded ${String(validatedConsultantGrades.length)} consultant grades.`);
 
-    for (const gd of gradeTjmDefaults) {
+    for (const gd of validatedGradeTjmDefaults) {
       await client.query(
         `INSERT INTO public.grade_tjm_defaults (id, grade_id, from_date, to_date, tjm_cents)
          VALUES ($1, $2, $3, $4, $5)`,
         [gd.id, gd.gradeId, gd.fromDate, gd.toDate, gd.tjmCents],
       );
     }
-    console.log(`Seeded ${String(gradeTjmDefaults.length)} grade TJM defaults.`);
+    console.log(`Seeded ${String(validatedGradeTjmDefaults.length)} grade TJM defaults.`);
 
-    for (const ch of consultantHabilitations) {
+    for (const ch of validatedConsultantHabilitations) {
       await client.query(
         `INSERT INTO public.consultant_habilitations (id, consultant_id, habilitation_id, obtained_at, expires_at)
          VALUES ($1, $2, $3, $4, $5)`,
         [ch.id, ch.consultantId, ch.habilitationId, ch.obtainedAt, ch.expiresAt],
       );
     }
-    console.log(`Seeded ${String(consultantHabilitations.length)} consultant habilitations.`);
+    console.log(
+      `Seeded ${String(validatedConsultantHabilitations.length)} consultant habilitations.`,
+    );
 
     for (const cl of validatedClients) {
       await client.query(
@@ -365,13 +471,13 @@ async function seed(): Promise<void> {
     }
     console.log(`Seeded ${String(validatedMissions.length)} missions.`);
 
-    for (const mh of missionHabilitations) {
+    for (const mh of validatedMissionHabilitations) {
       await client.query(
         `INSERT INTO public.mission_habilitations (id, mission_id, habilitation_id) VALUES ($1, $2, $3)`,
         [mh.id, mh.missionId, mh.habilitationId],
       );
     }
-    console.log(`Seeded ${String(missionHabilitations.length)} mission habilitations.`);
+    console.log(`Seeded ${String(validatedMissionHabilitations.length)} mission habilitations.`);
 
     for (const mt of validatedMissionTjm) {
       await client.query(
@@ -399,6 +505,15 @@ async function seed(): Promise<void> {
       );
     }
     console.log(`Seeded ${String(validatedManagerAttachments.length)} manager attachments.`);
+
+    for (const persona of validatedPersonas) {
+      await client.query(
+        `INSERT INTO public.personas (id, key, role, consultant_id, display_order)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [persona.id, persona.key, persona.role, persona.consultantId, persona.displayOrder],
+      );
+    }
+    console.log(`Seeded ${String(validatedPersonas.length)} personas.`);
 
     // ── Drive domain aggregates ───────────────────────────────────────────
     //
@@ -457,7 +572,17 @@ async function seed(): Promise<void> {
       return hasAssignment && hasManager;
     });
 
-    let craIdCounter = 1000; // Start at an offset to avoid colliding with reference data ids
+    // One sequence for every id the write side mints — aggregate ids here, child-row ids inside
+    // the repositories, event ids inside the journal. Offset past the reference data's counter so
+    // the two never meet. The repositories and the event store take the factory rather than
+    // reaching for a generator, which is what makes the seed deterministic and the running system
+    // random from the same code (ADR-0041).
+    let writeIdCounter = 1000;
+    const nextWriteId = (): string => uuidv7Deterministic(SEED_TIMESTAMP_MS, writeIdCounter++);
+
+    const cras = new PgCraRepository(client, nextWriteId);
+    const invoices = new PgInvoiceRepository(client, nextWriteId);
+    const events = new PgEventStore(client, nextWriteId);
     const workableDays = calendar.workableDaysOf(period);
 
     const seededCras: {
@@ -466,7 +591,7 @@ async function seed(): Promise<void> {
     }[] = [];
 
     for (const consultant of consultantsWithCras) {
-      const craId = uuidv7Deterministic(SEED_TIMESTAMP_MS, craIdCounter++);
+      const craId = nextWriteId();
 
       const cra = Cra.open({
         id: craId,
@@ -501,7 +626,6 @@ async function seed(): Promise<void> {
         }
       }
 
-      // Submit and validate
       cra.submit({ clock, calendar, reference: tsRef });
 
       const manager = mgmtHierarchy.managerOf(consultant.id, period);
@@ -511,50 +635,16 @@ async function seed(): Promise<void> {
         );
       }
 
-      const payload = cra.validate({ by: manager, clock, hierarchy: mgmtHierarchy });
+      // One Cra stops at `submitted`, on purpose: a dataset where every month is already
+      // validated leaves the chain describable and not performable. This is the one the demo
+      // validates, and it is why an invoice appears while somebody is watching.
+      if (consultant.email !== SUBMITTED_NOT_VALIDATED_EMAIL) {
+        const payload = cra.validate({ by: manager, clock, hierarchy: mgmtHierarchy });
 
-      seededCras.push({ officeId: consultant.officeId, payload });
-
-      // Persist the CRA
-      await client.query(
-        `INSERT INTO timesheet.cras (
-          id, consultant_id, office_id, period, status,
-          submitted_at, validated_by, validated_at, refusal_by, refusal_at, refusal_reason
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [
-          cra.id,
-          cra.consultantId,
-          cra.officeId,
-          CRA_PERIOD,
-          cra.status,
-          cra.submittedAt,
-          cra.validatedBy,
-          cra.validatedAt,
-          null,
-          null,
-          null,
-        ],
-      );
-
-      // Persist CRA lines
-      for (const line of cra.lines) {
-        const lineId = uuidv7Deterministic(SEED_TIMESTAMP_MS, craIdCounter++);
-        await client.query(
-          `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [lineId, cra.id, line.day, line.dayType, line.missionId, line.halfDays],
-        );
+        seededCras.push({ officeId: consultant.officeId, payload });
       }
 
-      // Persist CRA flags
-      for (const flag of cra.flags) {
-        const flagId = uuidv7Deterministic(SEED_TIMESTAMP_MS, craIdCounter++);
-        await client.query(
-          `INSERT INTO timesheet.cra_flags (id, cra_id, day, reason)
-           VALUES ($1, $2, $3, $4)`,
-          [flagId, cra.id, flag.day, flag.reason],
-        );
-      }
+      await cras.save(cra);
     }
 
     console.log(`Seeded ${String(seededCras.length)} validated CRAs for ${CRA_PERIOD}.`);
@@ -644,7 +734,6 @@ async function seed(): Promise<void> {
       vatOnDebitsOption: false,
     });
 
-    let invoiceIdCounter = 2000;
     let totalInvoices = 0;
     let totalDeclined = 0;
 
@@ -654,7 +743,7 @@ async function seed(): Promise<void> {
         type: TIMESHEET_VALIDATED,
         version: TIMESHEET_VALIDATED_VERSION,
         occurredAt: SEED_CLOCK_INSTANT,
-        correlationId: uuidv7Deterministic(SEED_TIMESTAMP_MS, invoiceIdCounter++),
+        correlationId: nextWriteId(),
         causationId: null,
         payload,
       };
@@ -668,128 +757,31 @@ async function seed(): Promise<void> {
           const mission = validatedMissions.find((m) => m.id === missionId);
           return `Prestation ${mission?.name ?? missionId} — ${p}`;
         },
-        newInvoiceId: () => uuidv7Deterministic(SEED_TIMESTAMP_MS, invoiceIdCounter++),
+        newInvoiceId: nextWriteId,
       };
 
       const result = draftInvoicesFrom(dependencies, event);
 
-      // Persist each drafted invoice — column order matches pg-invoice-repository.ts
       for (const invoice of result.invoices) {
-        const mentionsData = invoice.mentions;
-        await client.query(
-          `INSERT INTO billing.invoices (
-            id, office_id, seller_id, status, supply_period,
-            billed_to_client_id, billed_to_name, billed_to_siren, billed_to_vat_number,
-            billed_to_billing_street, billed_to_billing_postal_code,
-            billed_to_billing_city, billed_to_billing_country,
-            billed_to_delivery_street, billed_to_delivery_postal_code,
-            billed_to_delivery_city, billed_to_delivery_country,
-            payment_terms_kind, payment_terms_days,
-            mentions_operation_category, mentions_early_payment_kind, mentions_early_payment_rate,
-            mentions_late_penalty_rate, mentions_recovery_indemnity, mentions_vat_on_debits,
-            validated_by, source_cra_ids
-          ) VALUES (
-            $1, $2, $3, $4, $5,
-            $6, $7, $8, $9,
-            $10, $11, $12, $13,
-            $14, $15, $16, $17,
-            $18, $19,
-            $20, $21, $22, $23, $24, $25,
-            $26, $27
-          )`,
-          [
-            invoice.id,
-            officeId,
-            invoice.seller.id,
-            invoice.status,
-            invoice.supplyPeriod,
-            invoice.billedTo.clientId,
-            invoice.billedTo.name,
-            invoice.billedTo.siren,
-            invoice.billedTo.intraCommunityVatNumber,
-            invoice.billedTo.billingAddress.line1,
-            invoice.billedTo.billingAddress.postalCode,
-            invoice.billedTo.billingAddress.city,
-            invoice.billedTo.billingAddress.country,
-            invoice.billedTo.deliveryAddress.line1,
-            invoice.billedTo.deliveryAddress.postalCode,
-            invoice.billedTo.deliveryAddress.city,
-            invoice.billedTo.deliveryAddress.country,
-            invoice.terms.kind,
-            invoice.terms.days,
-            mentionsData.operationCategory,
-            mentionsData.earlyPaymentDiscount.kind,
-            mentionsData.earlyPaymentDiscount.kind === 'rate'
-              ? mentionsData.earlyPaymentDiscount.basisPoints
-              : null,
-            mentionsData.latePaymentBasisPoints,
-            mentionsData.recoveryIndemnityCents,
-            mentionsData.vatOnDebitsOption,
-            `{${payload.validatedBy}}`,
-            `{${payload.craId}}`,
-          ],
-        );
-
-        // Persist invoice lines
-        for (const [lineIdx, line] of invoice.lines.entries()) {
-          const lineId = uuidv7Deterministic(SEED_TIMESTAMP_MS, invoiceIdCounter++);
-          await client.query(
-            `INSERT INTO billing.invoice_lines (
-              id, invoice_id, line_order, designation,
-              origin_kind, origin_mission_id, origin_cra_id, origin_period,
-              origin_half_days, origin_tjm_cents,
-              quantity_half_days, unit_price_cents, amount_cents,
-              vat_kind, vat_basis_points, vat_not_charged_reason
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
-            [
-              lineId,
-              invoice.id,
-              lineIdx,
-              line.designation,
-              line.origin.kind,
-              line.origin.missionId,
-              line.origin.craId,
-              line.origin.period,
-              line.origin.halfDays,
-              line.origin.tjmCents,
-              line.quantityHalfDays,
-              line.unitPriceCents,
-              line.amountCents,
-              line.vat.kind,
-              line.vat.kind === 'taxable' ? line.vat.basisPoints : null,
-              line.vat.kind === 'notCharged' ? line.vat.reason : null,
-            ],
-          );
-        }
-
-        // Persist VAT groups
-        for (const [_groupIdx, group] of invoice.vatBreakdown.entries()) {
-          const groupId = uuidv7Deterministic(SEED_TIMESTAMP_MS, invoiceIdCounter++);
-          await client.query(
-            `INSERT INTO billing.invoice_vat_groups (id, invoice_id, group_key, base_cents, tax_cents)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [groupId, invoice.id, group.key, group.baseCents, group.vatCents ?? 0],
-          );
-        }
-
+        await invoices.saveDraft(invoice, payload.craId);
         totalInvoices++;
       }
 
-      // Persist domain event
-      const eventId = uuidv7Deterministic(SEED_TIMESTAMP_MS, invoiceIdCounter++);
-      await client.query(
-        `INSERT INTO public.domain_events (id, type, version, occurred_at, correlation_id, causation_id, payload)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [
-          eventId,
-          event.type,
-          event.version,
-          event.occurredAt,
-          event.correlationId,
-          event.causationId,
-          JSON.stringify(event.payload),
-        ],
+      // The days the validation carried that produced no line, with the reason (ADR-0037). The
+      // seed wrote none of these until 21/08/2026, so a freshly seeded database showed an empty
+      // blocking-reason column for a concept the domain models — the drift ADR-0022 warned about,
+      // measured.
+      await invoices.saveDeclinedDays(
+        officeId,
+        result.declined.map((entry) => ({
+          craId: payload.craId,
+          missionId: entry.missionId,
+          halfDays: entry.halfDays,
+          reason: entry.reason,
+        })),
       );
+
+      await events.persist(event);
 
       totalDeclined += result.declined.length;
     }

@@ -1,12 +1,12 @@
 import {
   type EventHandler,
-  type HalfDays,
   lastDayOf,
   periodFromIso,
   type TimesheetValidated,
 } from '@erp/platform';
 
 import type { Client } from '../domain/client.ts';
+import type { DeclinedDays } from '../domain/declined-days.ts';
 import type { ClientId, InvoiceId, MissionId } from '../domain/ids.ts';
 import { type InvoiceLine, regieLine } from '../domain/invoice-line.ts';
 import { billedParty, Invoice } from '../domain/invoice.ts';
@@ -25,26 +25,6 @@ import { resolveVat } from '../domain/vat.ts';
  * Drafting is a pure function of the event and the reference snapshot. It performs no I/O, which
  * is the property ADR-0001 requires of a subscriber running inside the emitter's transaction.
  */
-
-export const DECLINE_REASONS = [
-  'notRegie',
-  'unknownMission',
-  'noAgreedRate',
-  'unknownClient',
-] as const;
-
-export type DeclineReason = (typeof DECLINE_REASONS)[number];
-
-/**
- * Half-days the event carried that did not become an invoice line, and why (ADR-0037). Returned
- * rather than skipped: days that vanish with no record leave a reader unable to tell whether they
- * were considered or dropped, and this is a build whose argument is that its claims are checkable.
- */
-export interface DeclinedDays {
-  readonly missionId: MissionId;
-  readonly halfDays: HalfDays;
-  readonly reason: DeclineReason;
-}
 
 export interface DraftInvoicesResult {
   /** One per client, because one validated Cra can span missions sold to different clients. */
