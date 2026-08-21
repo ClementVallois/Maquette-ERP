@@ -85,13 +85,15 @@ export async function validateCraAndDraftInvoices(
       };
     }
 
+    // Sequential, and not `Promise.all`: these four reads share **one** checked-out client — the
+    // chain's transaction is that client — and `pg` serialises concurrent queries on a single one
+    // anyway. Overlapping them bought nothing and cost the deprecation `pg` prints on every run,
+    // whose removal in pg@9 turns this into a throw on the route the whole mockup demonstrates.
     const reference = new PgReferenceReader(unit.client);
-    const [billingReference, seller, missionNames, hierarchy] = await Promise.all([
-      reference.billing(),
-      reference.seller(),
-      reference.missionNames(),
-      reference.hierarchy(),
-    ]);
+    const billingReference = await reference.billing();
+    const seller = await reference.seller();
+    const missionNames = await reference.missionNames();
+    const hierarchy = await reference.hierarchy();
 
     // The subscriber, running inside the emitter's transaction. It writes through `unit`, which
     // IS the ambient transaction — the one thing ADR-0001 forbids is I/O that leaves it.
