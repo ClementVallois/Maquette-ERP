@@ -618,8 +618,14 @@ A days × lines table with live totals. **No "copy last month"** — it copies l
 
 The central screen: what is billable, and for everything else the **explicit blocking reason**, plus
 the late-days counter. `Tjm` and margin are **never in the table**: each sits behind an explicit
-**reveal click** — a plain link to the logged single-record read of 5.3, no script — so the
-progressive-disclosure control is visible on screen, not only in the API.
+**reveal click**, no script, so the progressive-disclosure control is visible on screen and not only
+in the API.
+
+This paragraph used to say the reveal was "a plain link to the logged single-record read of 5.3".
+It cannot be: `representationOf` (task 6.1) serves everything under `/api/` as `problem+json`, so a
+browser following that link lands on a JSON document. **ADR-0052** makes the reveal a screen of its
+own and moves the disclosure log inside the read, so a second caller cannot exist without one.
+"Late days" was also specified nowhere — **ADR-0054** defines it before it becomes a column header.
 
 ### 6.5 — The invoice, and the printable Cra
 

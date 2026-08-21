@@ -178,7 +178,10 @@ export class SelfValidationForbiddenError extends BusinessError {
   readonly problemType = '/problems/self-validation-forbidden';
 
   constructor(craId: string, consultantId: string) {
-    super(`${consultantId} recorded ${craId} and cannot validate it`, { craId, consultantId });
+    // "answer" rather than "validate": since 21/08/2026 `refuse` is guarded by the same rule, and
+    // the message is what a log line shows. The problem type keeps its name — renaming a published
+    // identifier is a breaking change for a caller that branches on it (ADR-0016).
+    super(`${consultantId} recorded ${craId} and cannot answer it`, { craId, consultantId });
   }
 }
 
