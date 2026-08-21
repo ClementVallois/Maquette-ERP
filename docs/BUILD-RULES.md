@@ -98,8 +98,12 @@ ADR and moves to the README's "Ce que je ne construis pas" — never a silent om
 
 ## Authorization
 
-- Authorization lives in the **repository**, not in Postgres RLS (**ADR-0003**). It is never in a
-  controller and never duplicated: one rule, one source.
+- Authorization lives in the **repository**, not in Postgres RLS (**ADR-0003**). It is never
+  **decided** in a controller and never duplicated: one rule, one source. Since ADR-0023 there are
+  three loci and they answer different questions — the route **declares** which roles carry the
+  action, as data on the route and never as a comparison in a handler body; the repository decides
+  which of the records that exist this actor may see; the domain decides whether an actor may act
+  given who acted before them (**ADR-0006**). One decision each, and no handler compares a role.
 - Three roles × `Office` scope. A manager reads their own office, never another's.
 - Separation of duties, two rules only: whoever records a Cra does not validate it; whoever
   validates does not issue the invoice.
@@ -107,8 +111,13 @@ ADR and moves to the README's "Ce que je ne construis pas" — never a silent om
   protected is the **aggregate**, so the control is on collection in volume, not on single access.
 - Pagination is hard-capped, including through the API. There is no "show all".
 - A refusal says **why**: RFC 9457 `problem+json` with the business field (violated invariant,
-  missing scope, refusal reason). Validation → 400, violated invariant → 409, insufficient scope →
-  403 with a reason. Empty, error and permission-denied states are deliverables, not polish.
+  missing scope, refusal reason). **A business refusal takes one of three statuses and never
+  another** (**ADR-0042**): a value a domain rule refuses → 422, a state that refuses a fine value
+  → 409, a caller who may not → 403 with the rule that denied it. **400 belongs to the transport**
+  — a malformed body, a query the route cannot parse — and is decided before any module is called.
+  This line used to read "validation → 400", which collapsed the two and is what ADR-0042 settled;
+  the ADR wins and this file follows it, as the preamble requires. Empty, error and
+  permission-denied states are deliverables, not polish.
 
 ## Stack — decided, do not substitute
 
