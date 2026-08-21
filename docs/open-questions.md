@@ -719,3 +719,10 @@ merged and no pull request is opened**. The debt is recorded here rather than di
 merge: Phase 4's surface was data and a CI job, but Phase 5's is authorization, a transaction
 boundary, a public HTTP surface and a README claim rewritten — every category the two reviewers
 exist for.
+
+**Superseded 21/08/2026.** All three passes have now run — `rules-auditor` on Phase 5, the same
+retroactively on Phase 4, and `cold-reader` on the tree. The paragraph above stands as the record of
+what was true when it was written; the debt it describes is discharged. What the reviewers found,
+and what each finding owes before Phase 6 starts, is in
+[`PHASE-4-5-CLOSURE.md`](./PHASE-4-5-CLOSURE.md). The branch remains unmerged until that file's
+Blocking column is empty.
