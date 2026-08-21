@@ -90,6 +90,35 @@ export const LABELS = {
     },
   },
 
+  craPrint: {
+    heading: 'Relevé d’activité',
+    open: 'Version imprimable',
+    notValidated:
+      'Ce relevé n’est pas signable : le CRA n’a pas encore été validé par le manager, et son contenu peut encore changer.',
+    consultant: 'Consultant',
+    office: 'Implantation',
+    period: 'Mois',
+    status: 'Statut',
+    validatedBy: 'Validé par',
+    validatedOn: 'Validé le',
+    day: 'Jour',
+    mission: 'Mission / absence',
+    quantity: 'Quantité',
+    totals: 'Totaux du mois',
+    total: 'Total',
+    flagged: 'Jours signalés',
+    flaggedNote:
+      'Jours saisis alors que le calendrier ne les dit pas ouvrés. Ils ne sont pas refusés : le manager les a acceptés en validant.',
+    signature: 'Bon pour accord',
+    signatureNote:
+      'Ce relevé couvre le mois entier du consultant, missions confondues (ADR-0056). Le nom du signataire n’est pas pré-imprimé : il dépend du destinataire, pas du relevé.',
+    signatureName: 'Nom et qualité',
+    signatureDate: 'Date',
+    signatureMark: 'Signature',
+    nothingRecorded: 'Aucun jour saisi sur ce mois.',
+    back: 'Revenir au CRA',
+  },
+
   preFacturier: {
     heading: 'Pré-facturier',
     nav: 'Pré-facturier',

@@ -10,7 +10,7 @@ import { inMemoryPersonas } from '../personas/testing/catalogue.ts';
 import { buildServer } from '../server.ts';
 import { savepointTransactionally } from '../testing/transaction.ts';
 
-import { frenchEuros } from './format.ts';
+import { frenchDays, frenchEuros } from './format.ts';
 import { LABELS } from './labels.ts';
 import { PATHS } from './paths.ts';
 
@@ -434,6 +434,84 @@ describe('the invoice as a printable document', () => {
 
     // ADR-0003's second beat: the record exists and is refused by name, rather than being hidden
     // behind an absence that would say nothing about why.
+    expect(response.statusCode).toBe(403);
+    expect(response.body).toContain('/problems/out-of-scope');
+  });
+});
+
+describe('the Cra as a printable record', () => {
+  it('shows the whole month, absences and non-billable days included', async () => {
+    await validateAliceJune();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `${PATHS.craPrint}/${CRA_VALIDATED}`,
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('Alice Martin');
+    expect(response.body).toContain('Paris');
+    // The Forfait day is on the record even though it reaches no invoice: a record of working
+    // time with the inconvenient rows removed is not one (ADR-0056).
+    expect(response.body).toContain('Refonte SOC');
+    expect(response.body).toContain('Audit DORA');
+    expect(response.body).toContain(frenchDays(42));
+  });
+
+  it('carries a signature block that names nobody', async () => {
+    await validateAliceJune();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `${PATHS.craPrint}/${CRA_VALIDATED}`,
+      headers: as('manager-paris'),
+    });
+
+    expect(response.body).toContain(LABELS.craPrint.signature);
+    expect(response.body).toContain(LABELS.craPrint.signatureMark);
+    // A month is worked across missions and therefore across clients, so no client is printed
+    // into the block — the argument and its threshold are in ADR-0056.
+    expect(response.body).not.toContain('Banque Nationale de Test');
+  });
+
+  it('says an unvalidated month is not signable, rather than refusing to render it', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `${PATHS.craPrint}/${CRA_SUBMITTED}`,
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain(LABELS.craPrint.notValidated);
+  });
+
+  it('lets the consultant print their own, and refuses them a colleague’s', async () => {
+    const own = await app.inject({
+      method: 'GET',
+      url: `${PATHS.craPrint}/${CRA_VALIDATED}`,
+      headers: as('consultant-paris'),
+    });
+    expect(own.statusCode).toBe(200);
+
+    // Same office, same role, another person: `cra: 'own'` narrows to the actor (ADR-0023), and
+    // the refusal names the rule rather than hiding the record behind a 404.
+    const colleague = await app.inject({
+      method: 'GET',
+      url: `${PATHS.craPrint}/${CRA_SUBMITTED}`,
+      headers: as('consultant-paris'),
+    });
+    expect(colleague.statusCode).toBe(403);
+    expect(colleague.body).toContain('/problems/out-of-scope');
+  });
+
+  it('refuses a manager of another office', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `${PATHS.craPrint}/${CRA_VALIDATED}`,
+      headers: as('manager-lyon'),
+    });
+
     expect(response.statusCode).toBe(403);
     expect(response.body).toContain('/problems/out-of-scope');
   });

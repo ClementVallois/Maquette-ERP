@@ -176,6 +176,7 @@ function craTable(view: PreFacturierView, period: string): Html {
         <th scope="col">${LABELS.preFacturier.craStatus}</th>
         <th scope="col" class="num">${LABELS.preFacturier.recorded}</th>
         <th scope="col">${LABELS.preFacturier.blocking}</th>
+        <th scope="col"><span class="sr-only">${LABELS.craPrint.open}</span></th>
         <th scope="col"><span class="sr-only">${LABELS.preFacturier.reveal}</span></th>
       </tr>
     </thead>
@@ -194,6 +195,9 @@ function craTable(view: PreFacturierView, period: string): Html {
             </td>
             <td class="num">${frenchDays(row.recordedHalfDays)}</td>
             <td>${blockingCell(row)}</td>
+            <td class="no-print">
+              <a href="${`${PATHS.craPrint}/${row.craId}`}">${LABELS.craPrint.open}</a>
+            </td>
             <td class="no-print">
               <a
                 href="${`${PATHS.margin}/${row.consultantId}?periode=${period}`}"

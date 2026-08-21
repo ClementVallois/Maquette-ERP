@@ -237,6 +237,15 @@ export class PgReferenceReader {
     return new Map(rows.map((row) => [row.id, `${row.first_name} ${row.last_name}`]));
   }
 
+  /** Office names, for the record a printable Cra carries. Presentation, not a rule. */
+  async officeNames(): Promise<ReadonlyMap<string, string>> {
+    const { rows } = await this.#client.query<{ id: string; name: string }>(
+      `SELECT id, name FROM public.offices`,
+    );
+
+    return new Map(rows.map((row) => [row.id, row.name]));
+  }
+
   /** Mission names, for the designation a line prints. Presentation, not a rule. */
   async missionNames(): Promise<ReadonlyMap<string, string>> {
     const { rows } = await this.#client.query<{ id: string; name: string }>(

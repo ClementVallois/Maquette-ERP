@@ -26,4 +26,6 @@ export const PATHS = {
   margin: '/marge',
   /** One invoice, draft or issued, as the printable document of ADR-0055. */
   invoice: '/facture',
+  /** One Cra as the printable record of ADR-0056. An id appended to it names the month. */
+  craPrint: '/releve',
 } as const;

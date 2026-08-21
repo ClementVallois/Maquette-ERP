@@ -43,6 +43,8 @@ export interface GridMission {
 
 export interface CraGridView {
   readonly period: string;
+  /** `null` until the month has been saved once: there is no record to print yet. */
+  readonly craId: string | null;
   readonly status: CraStatus | null;
   readonly days: readonly GridDay[];
   readonly missions: readonly GridMission[];
@@ -196,7 +198,14 @@ export function craGridPage(view: CraGridView, persona: Persona | undefined): Ht
             : null
         }
       </form>
-      ${totals(view)}`,
+      ${totals(view)}
+      ${
+        view.craId === null
+          ? null
+          : html`<p class="actions no-print">
+            <a href="${`${PATHS.craPrint}/${view.craId}`}">${LABELS.craPrint.open}</a>
+          </p>`
+      }`,
   );
 }
 

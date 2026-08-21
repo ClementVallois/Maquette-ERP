@@ -544,3 +544,28 @@ table.vat {
     max-width: none;
   }
 }
+
+/* The countersignature block. The rules are `dd` borders rather than input fields: nothing here
+   is submitted, and a form control that goes nowhere is a promise the page cannot keep. */
+dl.signature-fields {
+  display: grid;
+  grid-template-columns: minmax(8rem, max-content) 1fr;
+  gap: 0.4rem 1rem;
+  align-items: end;
+  max-width: 34rem;
+}
+
+dl.signature-fields dt {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+dl.signature-fields dd {
+  margin: 0;
+  border-bottom: 1px solid var(--ink-soft);
+  min-height: 1.4rem;
+}
+
+dl.signature-fields dd.tall {
+  min-height: 4rem;
+}

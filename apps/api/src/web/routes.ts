@@ -1,6 +1,12 @@
 import type { DeclineReason } from '@erp/billing';
 import { API_PROBLEM_TYPES } from '@erp/contracts';
-import { daysOf, isoDateInFirmTimeZone, lastDayOf, periodFromIso } from '@erp/platform';
+import {
+  daysOf,
+  isoDateInFirmTimeZone,
+  lastDayOf,
+  periodFromIso,
+  periodToIso,
+} from '@erp/platform';
 import { type CraLine, type CraStatus, workingCalendar } from '@erp/timesheet';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -18,6 +24,7 @@ import { malformed, parseInput } from '../validation.ts';
 import { STYLESHEET } from './assets.ts';
 import { craGridPage, type GridDay, type SlotValue, totalsOf } from './pages/cra-grid.ts';
 import { craListPage } from './pages/cra-list.ts';
+import { craPrintPage } from './pages/cra-print.ts';
 import { invoicePage } from './pages/invoice.ts';
 import { marginPage } from './pages/margin.ts';
 import { personaSelectorPage } from './pages/persona-selector.ts';
@@ -283,6 +290,7 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
 
         return {
           period: params.value.period,
+          craId: cra?.id ?? null,
           status: cra?.status ?? null,
           days: gridDays(params.value.period, cra?.lines ?? []),
           missions,
@@ -431,6 +439,57 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
       });
 
       return sendPage(reply, preFacturierPage(view, personaFor(request)));
+    },
+  );
+
+  /**
+   * The month as a printable record (ADR-0056). All three roles may attempt it; the repository is
+   * what narrows it — a consultant to their own month, a manager and billing to their office's.
+   */
+  app.get(
+    `${PATHS.craPrint}/:id`,
+    { config: { access: forRoles('consultant', 'manager', 'billing') } },
+    async (request, reply) => {
+      const params = parseInput(IdParam, request.params);
+      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
+
+      const actor = requireActor(request);
+
+      const view = await dependencies.transactionally(async (unit) => {
+        const cra = await unit.cras.findById(params.value.id, actor);
+        if (cra === null) return null;
+
+        const reference = new PgReferenceReader(unit.client);
+
+        return {
+          craId: cra.id,
+          consultantName:
+            (await reference.consultantNames()).get(cra.consultantId) ?? cra.consultantId,
+          officeName: (await reference.officeNames()).get(cra.officeId) ?? cra.officeId,
+          period: periodToIso(cra.period),
+          status: cra.status,
+          lines: cra.lines,
+          flags: cra.flags,
+          validatedBy: cra.validatedBy,
+          // A `timestamptz` read as the day it fell on in `Europe/Paris`. A record signed by a
+          // client carries a date, not an instant, and the conversion belongs where the timezone
+          // is known rather than in the formatter.
+          validatedAt: cra.validatedAt === null ? null : isoDateInFirmTimeZone(cra.validatedAt),
+          missionNames: await reference.missionNames(),
+        };
+      });
+
+      if (view === null) {
+        return sendProblem(reply, {
+          type: API_PROBLEM_TYPES.notFound,
+          title: 'No such Cra',
+          status: NOT_FOUND,
+          detail: "Ce CRA n'existe pas, ou n'a jamais existé.",
+          ...contextOf(request),
+        });
+      }
+
+      return sendPage(reply, craPrintPage(view, personaFor(request)));
     },
   );
 
