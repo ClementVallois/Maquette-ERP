@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
+import { LABELS } from './labels.ts';
 import { html, type Html, renderToString } from './render/html.ts';
 
 export const HTML = 'text/html; charset=utf-8';
@@ -70,5 +71,5 @@ export function redirectTo(reply: FastifyReply, path: string): FastifyReply {
     .code(SEE_OTHER)
     .header('location', path)
     .type(HTML)
-    .send(renderToString(html`<p><a href="${path}">Continuer</a></p>`));
+    .send(renderToString(html`<p><a href="${path}">${LABELS.action.continue}</a></p>`));
 }

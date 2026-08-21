@@ -58,6 +58,10 @@ export const LABELS = {
     back: 'Revenir à l’accueil',
   },
 
+  action: {
+    continue: 'Continuer',
+  },
+
   footer: {
     mockup:
       'Maquette de démonstration. Données synthétiques, aucun client réel, aucun taux réel. Le sélecteur de persona remplace une authentification et ne doit pas être présenté comme telle.',

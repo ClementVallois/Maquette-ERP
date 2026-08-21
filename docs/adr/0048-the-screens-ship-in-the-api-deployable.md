@@ -89,11 +89,17 @@ the same refusal. `fastify.inject` tests the screens exactly as it tests the rou
 harness. Phase 8 ships one image.
 
 **Expensive.** `apps/api` grows: it now holds the composition root, the API, the renderer and the
-screens, and it is the largest directory in the repository. The mitigation is that `src/web/` is
-sealed by convention in one direction — nothing under `src/routes/` imports from `src/web/` — and
-the phase checkpoint says whether the convention held. Convention is the honest word: it is not
-machine-enforced, because dependency-cruiser rules here are between **packages**, and an
-intra-package rule would be the first of its kind.
+screens, and it is the largest directory in the repository. The internal shape that keeps that
+legible is three directories with one direction of flow: `src/http/` is the shared edge and knows
+both representations, `src/routes/` writes JSON, `src/web/` writes HTML, and **neither of the last
+two imports the other**. `src/routes/` does reach the renderer transitively, through
+`http/reply.ts` — that is not a leak but the design: the representation switch is the one place
+that decides whether a refusal becomes `problem+json` or a page, and it belongs on the shared edge
+rather than duplicated on each side.
+
+The direction is a convention, and convention is the honest word: it is not machine-enforced,
+because dependency-cruiser's rules here are between **packages**, and an intra-package rule would
+be the first of its kind. The phase checkpoint says whether it held.
 
 The second cost is the naming one, carried deliberately: a cold reader meets a directory called
 `api` that serves HTML. `docs/adr/README.md` and the package description are where they find out
