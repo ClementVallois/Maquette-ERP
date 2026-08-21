@@ -1,5 +1,5 @@
 import { PgNumberingCounter } from '@erp/billing';
-import { type Actor, type Clock, isoDateOf } from '@erp/platform';
+import { type Actor, type Clock, isoDateInFirmTimeZone } from '@erp/platform';
 
 import type { Transactionally } from '../persistence/unit-of-work.ts';
 
@@ -79,7 +79,7 @@ export async function issueInvoice(
       };
     }
 
-    const issueDate = isoDateOf(dependencies.clock.now().toISOString().slice(0, 10));
+    const issueDate = isoDateInFirmTimeZone(dependencies.clock.now());
     const counter = new PgNumberingCounter(unit.client);
     const fiscalYear = Number.parseInt(issueDate.slice(0, 4), 10);
 

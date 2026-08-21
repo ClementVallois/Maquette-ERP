@@ -9,6 +9,7 @@ import {
   fromDayNumber,
   isLeapYear,
   isoDate,
+  isoDateInFirmTimeZone,
   isoDateOf,
   MONDAY,
   partsOf,
@@ -171,5 +172,31 @@ describe('isoDateOf', () => {
     // Europe/Paris moves on the last Sunday of March and October.
     expect(isoDateOf(new Date(2026, 2, 29))).toBe('2026-03-29');
     expect(isoDateOf(new Date(2026, 9, 25))).toBe('2026-10-25');
+  });
+});
+
+describe('isoDateInFirmTimeZone', () => {
+  it('answers the day the firm is on, not the day UTC is on', () => {
+    // 00:30 in Paris on 2 July is 22:30 UTC on 1 July. `toISOString().slice(0, 10)` answers the
+    // 1st for a document issued on the 2nd.
+    expect(isoDateInFirmTimeZone(new Date('2026-07-01T22:30:00.000Z'))).toBe('2026-07-02');
+  });
+
+  it('does not send a new year back into the previous fiscal year', () => {
+    // The one that matters: 00:30 in Paris on 1 January 2027 is 23:30 UTC on 31 December 2026,
+    // and the fiscal year is half the key the invoice series is numbered by (ADR-0007).
+    expect(isoDateInFirmTimeZone(new Date('2026-12-31T23:30:00.000Z'))).toBe('2027-01-01');
+  });
+
+  it('reads the offset from the zone, which is +1 in winter and +2 in summer', () => {
+    // 22:30 UTC is already the next day in Paris in summer (+2) and not yet in winter (+1). The
+    // same instant-of-day therefore answers two different calendar days depending on the month,
+    // which is what a hand-written offset cannot do.
+    expect(isoDateInFirmTimeZone(new Date('2026-07-15T22:30:00.000Z'))).toBe('2026-07-16');
+    expect(isoDateInFirmTimeZone(new Date('2026-01-15T22:30:00.000Z'))).toBe('2026-01-15');
+  });
+
+  it('is unmoved by mid-day, which is why the test clock hid this', () => {
+    expect(isoDateInFirmTimeZone(new Date('2026-07-02T09:00:00.000Z'))).toBe('2026-07-02');
   });
 });
