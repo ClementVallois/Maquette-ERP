@@ -569,3 +569,19 @@ dl.signature-fields dd {
 dl.signature-fields dd.tall {
   min-height: 4rem;
 }
+
+/* The manager's two answers, side by side in one cell. The refusal keeps its reason field in the
+   same form as its button: a two-step flow is a step at which the reason gets skipped. */
+form.refusal {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+  margin-top: 0.3rem;
+}
+
+form.refusal input[type='text'] {
+  font: inherit;
+  padding: 0.15rem 0.3rem;
+  min-width: 12rem;
+  flex: 1 1 auto;
+}

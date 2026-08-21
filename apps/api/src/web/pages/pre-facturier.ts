@@ -47,6 +47,11 @@ export interface CraRow {
   readonly blocking: readonly { readonly halfDays: number; readonly why: Blocking }[];
 }
 
+/**
+ * Whether this actor may answer a submitted month. `false` for `billing`, which reads the same
+ * table and decides nothing on it — the route refuses either way (ADR-0023), and this is only the
+ * navigational echo of that, exactly like `NAV_BY_ROLE`.
+ */
 export interface PreFacturierView {
   /** `null` when this office has no Cra at all — an empty state, not a refusal. */
   readonly period: string | null;
@@ -56,6 +61,7 @@ export interface PreFacturierView {
   /** ADR-0054: half-days of a **closed** month that have not reached `Validated`. */
   readonly lateHalfDays: number;
   readonly periodClosed: boolean;
+  readonly mayDecide: boolean;
 }
 
 function filterForm(view: PreFacturierView): Html {
@@ -157,6 +163,39 @@ function blockingCell(row: CraRow): Html {
   </ul>`;
 }
 
+/**
+ * The manager's two answers to a submitted month. Both are ordinary form posts answered with a 303
+ * — no key and no hidden field, because validation is idempotent by ADR-0021 and a refusal is a
+ * transition that refuses from any state but `submitted` (ADR-0059 says why issuance is different).
+ *
+ * The refusal carries a required reason in the same form as the button, so there is no state
+ * between "I want to refuse" and "here is why": ADR-0005 makes the reason the whole value of a
+ * refusal, and a two-step flow is a step at which it can be skipped.
+ */
+function decideCell(row: CraRow): Html {
+  if (row.status !== 'submitted') {
+    return html`<td class="no-print">${LABELS.cra.nothing}</td>`;
+  }
+
+  return html`<td class="no-print">
+    <form class="inline" method="post" action="${`${PATHS.validateCra}/${row.craId}`}">
+      <button type="submit">${LABELS.preFacturier.validate}</button>
+    </form>
+    <form class="refusal" method="post" action="${`${PATHS.refuseCra}/${row.craId}`}">
+      <label class="sr-only" for="${`refus-${row.craId}`}">${LABELS.preFacturier.refusalReason}</label>
+      <input
+        id="${`refus-${row.craId}`}"
+        name="reason"
+        type="text"
+        required="required"
+        maxlength="500"
+        placeholder="${LABELS.preFacturier.refusalPlaceholder}"
+      />
+      <button class="quiet" type="submit">${LABELS.preFacturier.refuse}</button>
+    </form>
+  </td>`;
+}
+
 function craTable(view: PreFacturierView, period: string): Html {
   if (view.cras.length === 0) {
     return html`<div class="note">
@@ -176,6 +215,7 @@ function craTable(view: PreFacturierView, period: string): Html {
         <th scope="col">${LABELS.preFacturier.craStatus}</th>
         <th scope="col" class="num">${LABELS.preFacturier.recorded}</th>
         <th scope="col">${LABELS.preFacturier.blocking}</th>
+        ${view.mayDecide ? html`<th scope="col">${LABELS.preFacturier.decide}</th>` : null}
         <th scope="col"><span class="sr-only">${LABELS.craPrint.open}</span></th>
         <th scope="col"><span class="sr-only">${LABELS.preFacturier.reveal}</span></th>
       </tr>
@@ -195,6 +235,7 @@ function craTable(view: PreFacturierView, period: string): Html {
             </td>
             <td class="num">${frenchDays(row.recordedHalfDays)}</td>
             <td>${blockingCell(row)}</td>
+            ${view.mayDecide ? decideCell(row) : null}
             <td class="no-print">
               <a href="${`${PATHS.craPrint}/${row.craId}`}">${LABELS.craPrint.open}</a>
             </td>

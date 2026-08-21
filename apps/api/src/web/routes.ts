@@ -1,5 +1,5 @@
 import type { DeclineReason } from '@erp/billing';
-import { API_PROBLEM_TYPES } from '@erp/contracts';
+import { API_PROBLEM_TYPES, type ProblemDetails } from '@erp/contracts';
 import {
   daysOf,
   isoDateInFirmTimeZone,
@@ -8,10 +8,13 @@ import {
   periodToIso,
 } from '@erp/platform';
 import { type CraLine, type CraStatus, workingCalendar } from '@erp/timesheet';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
+import { issueInvoice } from '../chain/issue-invoice.ts';
 import { type HalfDayEntry, recordMonth } from '../chain/record-month.ts';
+import { refuseCra } from '../chain/refuse-cra.ts';
+import { validateCraAndDraftInvoices } from '../chain/validate-cra.ts';
 import type { ServerDependencies } from '../dependencies.ts';
 import { consultantEconomics } from '../economics/consultant-economics.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
@@ -42,6 +45,7 @@ import { redirectTo, sendPage } from './reply.ts';
  */
 
 const NOT_FOUND = 404;
+const CONFLICT = 409;
 const NOT_MODIFIED = 304;
 /** A consultant's whole history fits well inside the repository's hard cap of fifty. */
 const MAX_MONTHS = 50;
@@ -49,6 +53,16 @@ const SLOTS = [0, 1] as const;
 
 const ConsultantParam = z.object({ consultantId: z.string().min(1).max(64) });
 const IdParam = z.object({ id: z.string().min(1).max(64) });
+
+/**
+ * The manager's refusal. The reason is required by the domain too (`RefusalReasonRequiredError`),
+ * and both checks exist on purpose: this one answers "is this a request", the domain's answers
+ * "is this a legitimate refusal" — a whitespace-only reason passes the first and not the second.
+ */
+const Refusal = z.object({ reason: z.string().min(1).max(500) });
+
+/** The key the form minted when it rendered (ADR-0059), in the shape ADR-0044 requires. */
+const Issuance = z.object({ idempotencyKey: z.string().min(8).max(200) });
 
 const SelectPersona = z.object({ key: z.string().min(1).max(64) });
 const PeriodParam = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u) });
@@ -177,6 +191,17 @@ function blockingOf(
         missionName: missionNames.get(record.missionId) ?? record.missionId,
       },
     }));
+}
+
+/** The one refusal both manager verbs can produce that is an absence rather than a rule. */
+function craNotFound(request: FastifyRequest): ProblemDetails {
+  return {
+    type: API_PROBLEM_TYPES.notFound,
+    title: 'No such Cra',
+    status: NOT_FOUND,
+    detail: "Ce CRA n'existe pas, ou n'a jamais existé.",
+    ...contextOf(request),
+  };
 }
 
 export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDependencies): void {
@@ -369,6 +394,7 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
             cras: [],
             lateHalfDays: 0,
             periodClosed: false,
+            mayDecide: actor.role === 'manager',
           };
         }
 
@@ -435,6 +461,9 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
                 .reduce((total, row) => total + row.recordedHalfDays, 0)
             : 0,
           periodClosed,
+          // The navigational echo of the route's own declaration, never its source: `billing`
+          // reads this table and decides nothing on it, and `POST` refuses it whatever renders.
+          mayDecide: actor.role === 'manager',
         };
       });
 
@@ -531,6 +560,10 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
             // A draft has no issue date, so it has no due date: the term runs from the date the
             // document leaves, and a draft has not left.
             dueDate: invoice.issueDate === null ? null : invoice.dueDateFrom(invoice.issueDate),
+            // Minted here rather than on the form's own route, because the key has to exist
+            // before the submission it identifies (ADR-0059). `null` for a manager, who may read
+            // this document and not issue it.
+            issuanceKey: actor.role === 'billing' ? dependencies.newId() : null,
           },
           personaFor(request),
         ),
@@ -581,6 +614,111 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
       }
 
       return sendPage(reply, marginPage(economics, personaFor(request)));
+    },
+  );
+
+  // ── The three verbs of the chain, on screen (ADR-0059) ────────────────────
+
+  app.post(
+    `${PATHS.validateCra}/:id`,
+    { config: { access: forRoles('manager') } },
+    async (request, reply) => {
+      const params = parseInput(IdParam, request.params);
+      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
+
+      // The same function `/api/v1` calls, so the transaction, the event and the drafted invoices
+      // are the same ones — there is no second validation to keep in step. A replay answers with
+      // the first result (ADR-0021), which is why no key is needed here.
+      const outcome = await validateCraAndDraftInvoices(
+        {
+          transactionally: dependencies.transactionally,
+          clock: dependencies.clock,
+          newId: dependencies.newId,
+        },
+        { craId: params.value.id, actor: requireActor(request), correlationId: request.id },
+      );
+
+      if (outcome.kind === 'notFound') return sendProblem(reply, craNotFound(request));
+
+      return redirectTo(reply, PATHS.preFacturier);
+    },
+  );
+
+  app.post(
+    `${PATHS.refuseCra}/:id`,
+    { config: { access: forRoles('manager') } },
+    async (request, reply) => {
+      const params = parseInput(IdParam, request.params);
+      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
+
+      const body = parseInput(Refusal, request.body);
+      if (!body.ok) return sendProblem(reply, malformed(body.errors, contextOf(request)));
+
+      const outcome = await refuseCra(
+        { transactionally: dependencies.transactionally, clock: dependencies.clock },
+        {
+          craId: params.value.id,
+          actor: requireActor(request),
+          reason: body.value.reason,
+        },
+      );
+
+      if (outcome.kind === 'notFound') return sendProblem(reply, craNotFound(request));
+
+      return redirectTo(reply, PATHS.preFacturier);
+    },
+  );
+
+  /**
+   * Issuance, from the invoice page. The `Idempotency-Key` that `/api/v1` takes as a header
+   * travels here as a hidden field, because a form cannot set a header and ADR-0009 leaves no
+   * script to set one (ADR-0059). It reaches the same `issueInvoice` either way.
+   */
+  app.post(
+    `${PATHS.issueInvoice}/:id`,
+    { config: { access: forRoles('billing') } },
+    async (request, reply) => {
+      const params = parseInput(IdParam, request.params);
+      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
+
+      const body = parseInput(Issuance, request.body);
+      if (!body.ok) return sendProblem(reply, malformed(body.errors, contextOf(request)));
+
+      const outcome = await issueInvoice(
+        { transactionally: dependencies.transactionally, clock: dependencies.clock },
+        {
+          invoiceId: params.value.id,
+          actor: requireActor(request),
+          idempotencyKey: body.value.idempotencyKey,
+        },
+      );
+
+      if (outcome.kind === 'notFound') {
+        return sendProblem(reply, {
+          type: API_PROBLEM_TYPES.notFound,
+          title: 'No such invoice',
+          status: NOT_FOUND,
+          detail: "Cette facture n'existe pas, ou n'a jamais existé.",
+          ...contextOf(request),
+        });
+      }
+
+      if (outcome.kind === 'keyReused') {
+        return sendProblem(reply, {
+          type: API_PROBLEM_TYPES.idempotencyKeyReused,
+          title: 'Idempotency-Key already used on another invoice',
+          status: CONFLICT,
+          invariant: API_PROBLEM_TYPES.idempotencyKeyReused,
+          detail:
+            'Cette clé a déjà émis un autre document. Rechargez la facture pour en obtenir une ' +
+            'nouvelle.',
+          deniedBy: API_PROBLEM_TYPES.idempotencyKeyReused,
+          ...contextOf(request),
+        });
+      }
+
+      // Back to the document, which now carries its number and its date.
+      return redirectTo(reply, `${PATHS.invoice}/${params.value.id}`);
     },
   );
 

@@ -28,4 +28,9 @@ export const PATHS = {
   invoice: '/facture',
   /** One Cra as the printable record of ADR-0056. An id appended to it names the month. */
   craPrint: '/releve',
+  /** The manager's two answers to a submitted month. A Cra id is appended to each. */
+  validateCra: '/pre-facturier/validation',
+  refuseCra: '/pre-facturier/refus',
+  /** Billing's one write: an invoice id appended to it is issued (ADR-0059). */
+  issueInvoice: '/facture/emission',
 } as const;

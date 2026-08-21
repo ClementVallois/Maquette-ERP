@@ -276,13 +276,36 @@ export class Cra {
       .sort((left, right) => left.missionId.localeCompare(right.missionId));
   }
 
-  refuse(input: { by: ConsultantId; reason: string; clock: Clock }): void {
+  /**
+   * Sends the record back, with a reason the consultant can act on.
+   *
+   * It is guarded exactly like `validate`, and the symmetry is the point: refusing a month is an
+   * act on someone's record of working time by someone with authority over it, and "who may act"
+   * has one answer per Cra (ADR-0006), not one per verb. Until 21/08/2026 this method checked only
+   * the status and the reason, so any manager of the office could send back a month they do not
+   * manage — the gap surfaced when the screen gained the button.
+   */
+  refuse(input: { by: ConsultantId; reason: string; clock: Clock; hierarchy: Hierarchy }): void {
     this.#assertNotValidated('refuse');
     if (this.#status !== 'submitted') {
       throw new CraTransitionError(this.#id, this.#status, 'refused');
     }
     if (input.reason.trim() === '') {
       throw new RefusalReasonRequiredError(this.#id);
+    }
+    if (input.by === this.#consultantId) {
+      throw new SelfValidationForbiddenError(this.#id, this.#consultantId);
+    }
+
+    const manager = input.hierarchy.managerOf(this.#consultantId, this.#period);
+    if (input.by !== manager) {
+      throw new NotTheManagerError({
+        craId: this.#id,
+        consultantId: this.#consultantId,
+        period: periodToIso(this.#period),
+        attempted: input.by,
+        manager,
+      });
     }
 
     this.#status = 'refused';

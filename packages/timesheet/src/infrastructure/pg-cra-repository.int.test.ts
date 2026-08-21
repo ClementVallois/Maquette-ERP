@@ -271,6 +271,7 @@ describe('PgCraRepository', () => {
       by: 'manager-1',
       reason: 'mission-1 was not staffed that week',
       clock: fixedClock,
+      hierarchy: juneHierarchy,
     });
 
     await repo().save(cra);

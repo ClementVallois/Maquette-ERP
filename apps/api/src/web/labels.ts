@@ -144,6 +144,11 @@ export const LABELS = {
     crasEmpty: 'Aucun CRA sur ce mois dans cette implantation.',
     crasEmptyHint:
       'Ce n’est pas un refus : la liste est bien celle de votre implantation, elle ne contient rien pour ce mois.',
+    validate: 'Valider',
+    refuse: 'Refuser',
+    refusalReason: 'Motif du refus',
+    refusalPlaceholder: 'Ce que le consultant doit corriger',
+    decide: 'Décision',
     reveal: 'Marge',
     revealTitle: 'Ouvrir le CJM, le TJM et la marge — cet accès est journalisé',
     summaryBillable: 'Facturable ce mois',
@@ -218,6 +223,11 @@ export const LABELS = {
       'Chaque ligne porte le CRA dont elle vient : c’est ce lien, et non une déclaration, qui matérialise la piste d’audit fiable (art. 289-VII du CGI).',
     validatedBy: 'Validé par',
     notCharged: 'Non soumis à TVA',
+    issue: 'Émettre la facture',
+    issueNote:
+      'L’émission alloue un numéro dans une série sans trou et fige le document : rien n’y bouge ensuite. Le formulaire porte sa clé d’idempotence, pour qu’un renvoi ne brûle pas un second numéro (ADR-0059).',
+    cannotIssue:
+      'Cette facture est déjà émise : elle porte un numéro et une date, et une facture émise ne se modifie pas.',
   },
 
   margin: {

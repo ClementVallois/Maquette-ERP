@@ -11,6 +11,7 @@ import {
   MissionRequiredError,
   NotTheManagerError,
   RefusalReasonRequiredError,
+  SelfValidationForbiddenError,
   ValidatedCraIsImmutableError,
 } from './errors.ts';
 import { hierarchy } from './hierarchy.ts';
@@ -165,6 +166,7 @@ describe('the Cra lifecycle', () => {
       by: MANAGER,
       reason: 'the 12th is a mission that ended in February',
       clock: fixedClock(),
+      hierarchy: managers,
     });
 
     expect(cra.status).toBe('refused');
@@ -174,7 +176,12 @@ describe('the Cra lifecycle', () => {
 
   it('lets a refused Cra be corrected and resubmitted, and drops the stale refusal', () => {
     const cra = submittedCra();
-    cra.refuse({ by: MANAGER, reason: 'the 3rd was leave, not a worked day', clock: fixedClock() });
+    cra.refuse({
+      by: MANAGER,
+      reason: 'the 3rd was leave, not a worked day',
+      clock: fixedClock(),
+      hierarchy: managers,
+    });
 
     cra.clearDay('2026-03-03');
     cra.recordDay({ day: '2026-03-03', dayType: 'absence', missionId: null, halfDays: 2 });
@@ -188,7 +195,7 @@ describe('the Cra lifecycle', () => {
     const cra = submittedCra();
 
     expect(() => {
-      cra.refuse({ by: MANAGER, reason: '   ', clock: fixedClock() });
+      cra.refuse({ by: MANAGER, reason: '   ', clock: fixedClock(), hierarchy: managers });
     }).toThrow(RefusalReasonRequiredError);
   });
 
@@ -214,11 +221,40 @@ describe('the Cra lifecycle', () => {
     }).toThrow(CraTransitionError);
   });
 
+  it('refuses a refusal from a manager who is not this consultant’s manager', () => {
+    // The symmetry with `validate`: who may act on a Cra has one answer per record (ADR-0006),
+    // not one per verb. Until 21/08/2026 any manager of the office could send back a month they
+    // do not manage, because only `validate` consulted the dated attachment (ADR-0034).
+    const cra = submittedCra();
+
+    expect(() => {
+      cra.refuse({
+        by: 'another-manager',
+        reason: 'not mine to judge',
+        clock: fixedClock(),
+        hierarchy: managers,
+      });
+    }).toThrow(NotTheManagerError);
+  });
+
+  it('refuses a consultant refusing their own month', () => {
+    const cra = submittedCra();
+
+    expect(() => {
+      cra.refuse({
+        by: CONSULTANT,
+        reason: 'I changed my mind',
+        clock: fixedClock(),
+        hierarchy: managers,
+      });
+    }).toThrow(SelfValidationForbiddenError);
+  });
+
   it('refuses to refuse a Cra that is not submitted', () => {
     const cra = emptyCra();
 
     expect(() => {
-      cra.refuse({ by: MANAGER, reason: 'no', clock: fixedClock() });
+      cra.refuse({ by: MANAGER, reason: 'no', clock: fixedClock(), hierarchy: managers });
     }).toThrow(CraTransitionError);
   });
 });
@@ -240,7 +276,12 @@ describe('a validated Cra', () => {
         cra.submit({ clock: fixedClock(), calendar, reference });
       },
       () => {
-        cra.refuse({ by: MANAGER, reason: 'changed my mind', clock: fixedClock() });
+        cra.refuse({
+          by: MANAGER,
+          reason: 'changed my mind',
+          clock: fixedClock(),
+          hierarchy: managers,
+        });
       },
       () => {
         cra.validate({ by: MANAGER, clock: fixedClock(), hierarchy: managers });
