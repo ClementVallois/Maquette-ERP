@@ -116,6 +116,17 @@ module.exports = {
     // harness outside of any package. The harness files also import each other.
     { from: { path: '\\.int\\.test\\.ts$' }, to: { path: '^tests/' } },
     { from: { path: '^tests/' }, to: { path: '^tests/' } },
+    // `scripts/` is a composition root that carries no manifest: `seed.ts` drives both modules'
+    // aggregates, so it composes exactly as an app does and gets exactly an app's grant — a
+    // module's public entry point, and nothing behind it. It also composes `apps/api`'s public
+    // index, for the deterministic id factory ADR-0041 put there.
+    //
+    // These four entries do not relax the boundary; they are what brings `scripts/` under it.
+    // Until this commit the globs did not reach the directory at all, so a deep import written
+    // here would have cruised clean rather than been refused.
+    { from: { path: '^scripts/' }, to: { path: '^packages/[^/]+/src/index\\.ts$' } },
+    { from: { path: '^scripts/' }, to: { path: '^apps/[^/]+/src/index\\.ts$' } },
+    { from: { path: '^scripts/' }, to: { path: '^scripts/' } },
   ],
 
   options: {

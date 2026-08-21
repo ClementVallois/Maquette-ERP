@@ -2,8 +2,20 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-const GLOBS = ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts'];
+// `scripts/` is in this list because `scripts/seed.ts` is the first file in the repository to
+// import `@erp/timesheet` **and** `@erp/billing` — a composition root that lives outside `apps/`.
+// Its imports are package-root and correct today; the point is that the gate the README calls
+// "la moitié la plus facile à perdre" was not looking at them, so a deep import added there would
+// have cruised clean.
+const GLOBS = ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts', 'scripts/**/*.ts'];
 const TIERS = ['packages', 'apps'];
+
+/**
+ * Directories that are cruised but carry no manifest, so `workspaceMembers()` cannot assert them.
+ * Without this they would be covered by a glob that could stop matching — a rename, a move to
+ * `tools/` — while `totalCruised` stays comfortably non-zero on the strength of `packages/`.
+ */
+const CRUISED_WITHOUT_A_MANIFEST = ['scripts'];
 const CONFIG = '.dependency-cruiser.cjs';
 
 interface CruiseResult {
@@ -65,6 +77,18 @@ if (members.length === 0) {
   process.exit(1);
 }
 
+const unreached = CRUISED_WITHOUT_A_MANIFEST.filter(
+  (directory) => !modules.some(({ source }) => source.startsWith(`${directory}/`)),
+);
+if (unreached.length > 0) {
+  console.error(
+    `These directories are meant to be cruised and were reached in no file:\n` +
+      unreached.map((directory) => `  ✖ ${directory}`).join('\n') +
+      `\nThey carry no manifest, so the per-member check below cannot see them either.`,
+  );
+  process.exit(1);
+}
+
 const uncruised = members.filter(
   (member) => !modules.some(({ source }) => source.startsWith(`${member}/`)),
 );
@@ -85,5 +109,6 @@ if (summary.violations.length > 0) {
 
 console.log(
   `✔ boundaries: ${String(summary.totalCruised)} modules across ${String(members.length)} ` +
-    `workspace members, ${String(summary.totalDependenciesCruised)} dependencies, no violation.`,
+    `workspace members and ${String(CRUISED_WITHOUT_A_MANIFEST.length)} unmanifested ` +
+    `directories, ${String(summary.totalDependenciesCruised)} dependencies, no violation.`,
 );
