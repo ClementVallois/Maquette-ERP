@@ -1,0 +1,301 @@
+/*
+ * The one stylesheet (ADR-0009). Hand-written, no build step, no framework.
+ *
+ * It is deliberately small and deliberately boring: this repository is judged on its boundaries,
+ * its invariants and its refusals, and a screen that looks designed but reads a margin it should
+ * not have proves nothing. What it does spend effort on is the part CLAUDE.md calls a deliverable
+ * — the empty, error and permission-denied states — and contrast, which is the accessibility
+ * criterion of BUILD-PLAN 6.7 that a stylesheet can actually hold.
+ */
+
+:root {
+  --ink: #1b1f24;
+  --ink-soft: #4a5560;
+  --paper: #fbfbfa;
+  --panel: #ffffff;
+  --rule: #d8dce1;
+  --accent: #1f4d7a;
+  --accent-soft: #eaf1f8;
+  --refused: #8a1c1c;
+  --refused-soft: #fbeceb;
+  --held: #7a5a10;
+  --held-soft: #fdf4e0;
+  --settled: #1d5c33;
+  --settled-soft: #e9f4ec;
+
+  --space: 1rem;
+  --radius: 4px;
+  --measure: 68ch;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    sans-serif;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+/* Visible only once focused: a keyboard user needs to get past the header, a mouse user does not
+   need to see the link. `clip` alone would hide it from assistive technology too. */
+.skip {
+  position: absolute;
+  left: -999px;
+  top: 0;
+  z-index: 10;
+  padding: 0.5rem 1rem;
+  background: var(--accent);
+  color: #fff;
+}
+
+.skip:focus {
+  left: 0;
+}
+
+/* One focus ring, everywhere, and it is never removed. BUILD-PLAN 6.7 asks for full keyboard
+   navigation, and an invisible focus ring is the single most common way to lose it. */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+header.site {
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space);
+  justify-content: space-between;
+  margin: 0 auto;
+  max-width: 72rem;
+  padding: 0.75rem var(--space);
+}
+
+.wordmark {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.wordmark small {
+  display: block;
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  letter-spacing: 0;
+}
+
+.who {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.who strong {
+  color: var(--ink);
+}
+
+main {
+  margin: 0 auto;
+  max-width: 72rem;
+  padding: calc(var(--space) * 1.5) var(--space) calc(var(--space) * 3);
+}
+
+h1 {
+  font-size: 1.5rem;
+  line-height: 1.25;
+  margin: 0 0 0.25rem;
+}
+
+h2 {
+  font-size: 1.125rem;
+  margin: calc(var(--space) * 1.5) 0 0.5rem;
+}
+
+.lead {
+  color: var(--ink-soft);
+  max-width: var(--measure);
+  margin: 0 0 var(--space);
+}
+
+a {
+  color: var(--accent);
+}
+
+nav.bar {
+  padding-top: 0;
+  padding-bottom: 0.5rem;
+}
+
+ul.navlist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.9375rem;
+}
+
+ul.navlist a[aria-current='page'] {
+  font-weight: 600;
+  text-decoration-thickness: 2px;
+}
+
+/* Panels ------------------------------------------------------------------ */
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: var(--space);
+}
+
+.grid {
+  display: grid;
+  gap: var(--space);
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.note {
+  border-left: 3px solid var(--held);
+  background: var(--held-soft);
+  padding: 0.75rem var(--space);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  max-width: var(--measure);
+}
+
+.note.refused {
+  border-left-color: var(--refused);
+  background: var(--refused-soft);
+}
+
+/* Forms and actions ------------------------------------------------------- */
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #fff;
+  padding: 0.4rem 0.9rem;
+}
+
+button.quiet {
+  background: transparent;
+  color: var(--accent);
+}
+
+form.inline {
+  display: inline;
+}
+
+/* Tags -------------------------------------------------------------------- */
+
+.tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  border: 1px solid currentcolor;
+}
+
+.tag.role-consultant {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.tag.role-manager {
+  color: var(--held);
+  background: var(--held-soft);
+}
+
+.tag.role-billing {
+  color: var(--settled);
+  background: var(--settled-soft);
+}
+
+/* Definition lists, used by the problem page and every record header ------- */
+
+dl.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  margin: var(--space) 0 0;
+}
+
+dl.facts dt {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+dl.facts dd {
+  margin: 0;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+footer.site {
+  border-top: 1px solid var(--rule);
+  background: var(--panel);
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+}
+
+footer.site div {
+  margin: 0 auto;
+  max-width: 72rem;
+  padding: var(--space);
+}
+
+footer.site p {
+  margin: 0 0 0.25rem;
+  max-width: var(--measure);
+}
+
+@media print {
+  header.site,
+  footer.site,
+  .no-print {
+    display: none;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  main {
+    padding: 0;
+    max-width: none;
+  }
+}
