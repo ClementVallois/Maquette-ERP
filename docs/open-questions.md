@@ -696,6 +696,15 @@ promise about the composition root was executed rather than re-decided.
     a consultant's cost inside the billing module, which is worse for a reason that would have been
     much harder to see later.
 
+    **Corrected 21/08/2026.** "Read-only, `public.*` only, two files" was false when written, in
+    all three of its parts. `apps/api/src/persistence/pg-event-store.ts` writes —
+    `INSERT INTO public.domain_events` — and it is a third file. The **code** is right: ADR-0020
+    promised that promotion and `eslint.config.js` names the file by hand in the rule that permits
+    it. What was wrong is this row, which described a narrower shape than the one that shipped.
+    ADR-0043 § Consequences carries the same three claims and is not rewritten — an ADR never is —
+    so it owes a superseding note, which is the row for it in
+    [`PHASE-4-5-CLOSURE.md`](./PHASE-4-5-CLOSURE.md).
+
 **Deferred, named rather than dropped:**
 
 - **No credit-note route, and no correction of an issued invoice.** By decision (ADR-0036 holds the
