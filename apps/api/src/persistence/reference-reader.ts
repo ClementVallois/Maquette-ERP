@@ -226,6 +226,17 @@ export class PgReferenceReader {
     });
   }
 
+  /** Consultant names, for the rows the pré-facturier lists. Presentation, not a rule. */
+  async consultantNames(): Promise<ReadonlyMap<string, string>> {
+    const { rows } = await this.#client.query<{
+      id: string;
+      first_name: string;
+      last_name: string;
+    }>(`SELECT id, first_name, last_name FROM public.consultants`);
+
+    return new Map(rows.map((row) => [row.id, `${row.first_name} ${row.last_name}`]));
+  }
+
   /** Mission names, for the designation a line prints. Presentation, not a rule. */
   async missionNames(): Promise<ReadonlyMap<string, string>> {
     const { rows } = await this.#client.query<{ id: string; name: string }>(

@@ -36,8 +36,8 @@ export interface NavItem {
  */
 const NAV_BY_ROLE: Readonly<Record<Role, readonly NavItem[]>> = {
   consultant: [{ href: PATHS.consultantCra, label: LABELS.cra.nav }],
-  manager: [],
-  billing: [],
+  manager: [{ href: PATHS.preFacturier, label: LABELS.preFacturier.nav }],
+  billing: [{ href: PATHS.preFacturier, label: LABELS.preFacturier.nav }],
 };
 
 export function navFor(persona: Persona | undefined): readonly NavItem[] {

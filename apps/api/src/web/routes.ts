@@ -1,11 +1,13 @@
+import type { DeclineReason } from '@erp/billing';
 import { API_PROBLEM_TYPES } from '@erp/contracts';
-import { daysOf, periodFromIso } from '@erp/platform';
-import { type CraLine, workingCalendar } from '@erp/timesheet';
+import { daysOf, isoDateInFirmTimeZone, lastDayOf, periodFromIso } from '@erp/platform';
+import { type CraLine, type CraStatus, workingCalendar } from '@erp/timesheet';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { type HalfDayEntry, recordMonth } from '../chain/record-month.ts';
 import type { ServerDependencies } from '../dependencies.ts';
+import { consultantEconomics } from '../economics/consultant-economics.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
 import { PgReferenceReader } from '../persistence/reference-reader.ts';
 import { forRoles, PUBLIC, requireActor } from '../personas/access.ts';
@@ -16,7 +18,9 @@ import { malformed, parseInput } from '../validation.ts';
 import { STYLESHEET } from './assets.ts';
 import { craGridPage, type GridDay, type SlotValue, totalsOf } from './pages/cra-grid.ts';
 import { craListPage } from './pages/cra-list.ts';
+import { marginPage } from './pages/margin.ts';
 import { personaSelectorPage } from './pages/persona-selector.ts';
+import { type CraRow, preFacturierPage } from './pages/pre-facturier.ts';
 import { PATHS } from './paths.ts';
 import { redirectTo, sendPage } from './reply.ts';
 
@@ -34,6 +38,8 @@ const NOT_MODIFIED = 304;
 /** A consultant's whole history fits well inside the repository's hard cap of fifty. */
 const MAX_MONTHS = 50;
 const SLOTS = [0, 1] as const;
+
+const ConsultantParam = z.object({ consultantId: z.string().min(1).max(64) });
 
 const SelectPersona = z.object({ key: z.string().min(1).max(64) });
 const PeriodParam = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u) });
@@ -113,11 +119,55 @@ function gridDays(periodIso: string, lines: readonly CraLine[]): GridDay[] {
   });
 }
 
-/** The months this consultant has a Cra for, newest first, for the filter dropdown. */
+/**
+ * The months the period picker offers.
+ *
+ * Read off a page of Cras ordered by period descending, so it can omit an old month and never a
+ * recent one — which is the behaviour a period picker wants. The selected month's rows come from
+ * a second, period-filtered query (ADR-0053), so what the dropdown offers never bounds what the
+ * table shows.
+ */
 function offeredPeriods(cras: readonly { period: string }[]): string[] {
   return [...new Set(cras.map((cra) => cra.period))].sort((left, right) =>
     right.localeCompare(left),
   );
+}
+
+/**
+ * Why the half-days of one `Cra` are not on an invoice — two shapes, and they differ in kind
+ * (ADR-0037 for the first, `CraStatus` for the second).
+ *
+ * A `Validated` Cra has been through the chain, so everything not billed has a typed decline
+ * reason. A Cra in any other status has not reached `billing` at all, and the block is the
+ * workflow rather than a rule of billing: saying "no reason recorded" there would be false.
+ */
+function blockingOf(
+  cra: { readonly id: string; readonly recordedHalfDays: number },
+  status: CraStatus,
+  declined: readonly {
+    craId: string;
+    missionId: string;
+    halfDays: number;
+    reason: DeclineReason;
+  }[],
+  missionNames: ReadonlyMap<string, string>,
+): CraRow['blocking'] {
+  if (status !== 'validated') {
+    return cra.recordedHalfDays === 0
+      ? []
+      : [{ halfDays: cra.recordedHalfDays, why: { kind: 'notValidated', status } }];
+  }
+
+  return declined
+    .filter((record) => record.craId === cra.id)
+    .map((record) => ({
+      halfDays: record.halfDays,
+      why: {
+        kind: 'declined',
+        reason: record.reason,
+        missionName: missionNames.get(record.missionId) ?? record.missionId,
+      },
+    }));
 }
 
 export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDependencies): void {
@@ -276,6 +326,155 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
       // reaches here: it is thrown, and `sendProblem` renders it as a page carrying the same
       // typed reason the API would have returned.
       return redirectTo(reply, `${PATHS.consultantCra}/${params.value.period}`);
+    },
+  );
+
+  // ── The pré-facturier, and the reveal behind it ───────────────────────────
+
+  app.get(
+    PATHS.preFacturier,
+    { config: { access: forRoles('manager', 'billing') } },
+    async (request, reply) => {
+      const query = parseInput(PeriodFilter, request.query);
+      if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
+
+      const actor = requireActor(request);
+      // One question for the clock, and only one: has the month ended? (ADR-0054.) An IsoDate
+      // compares lexicographically, which is why no Date arithmetic appears here.
+      const today = isoDateInFirmTimeZone(dependencies.clock.now());
+
+      const view = await dependencies.transactionally(async (unit) => {
+        const recent = await unit.cras.list({ actor, limit: MAX_MONTHS, offset: 0 });
+        const period = query.value.periode ?? offeredPeriods(recent)[0] ?? null;
+        // The month asked for is offered even when this office has no Cra in it. A picker that
+        // dropped the current selection would answer a shared link by silently showing another
+        // month, and BUILD-PLAN 6.6 makes every view shareable by URL.
+        const offered = offeredPeriods(period === null ? recent : [...recent, { period }]);
+
+        if (period === null) {
+          return {
+            period: null,
+            offeredPeriods: [],
+            billable: [],
+            cras: [],
+            lateHalfDays: 0,
+            periodClosed: false,
+          };
+        }
+
+        const cras = await unit.cras.list({ actor, limit: MAX_MONTHS, offset: 0, period });
+        const declined = await unit.invoices.findDeclinedDays(
+          cras.map((cra) => cra.id),
+          actor,
+        );
+        const invoices = await unit.invoices.list({
+          actor,
+          limit: MAX_MONTHS,
+          offset: 0,
+          period,
+        });
+
+        const reference = new PgReferenceReader(unit.client);
+        const consultantNames = await reference.consultantNames();
+        const missionNames = await reference.missionNames();
+
+        // One read per invoice, and the totals come off the aggregate rather than out of a `SUM`
+        // (ADR-0053): a draft's `total_ttc_cents` column is NULL by design, and VAT is rounded
+        // once per rate in the domain — a total assembled in SQL would be a different number.
+        const billable = [];
+        for (const item of invoices) {
+          const invoice = await unit.invoices.findById(item.id, actor);
+          if (invoice === null) continue;
+
+          billable.push({
+            invoiceId: invoice.id,
+            clientName: invoice.billedTo.name,
+            status: invoice.status,
+            invoiceNumber: invoice.number,
+            totalExcludingVatCents: invoice.totals.totalExcludingVatCents,
+            totalIncludingVatCents: invoice.totals.totalIncludingVatCents,
+          });
+        }
+
+        const periodClosed = lastDayOf(periodFromIso(period)) < today;
+
+        const rows: CraRow[] = cras.map((cra) => {
+          const status = cra.status as CraStatus;
+
+          return {
+            craId: cra.id,
+            consultantId: cra.consultantId,
+            consultantName: consultantNames.get(cra.consultantId) ?? cra.consultantId,
+            status,
+            recordedHalfDays: cra.recordedHalfDays,
+            blocking: blockingOf(cra, status, declined, missionNames),
+          };
+        });
+
+        return {
+          period,
+          offeredPeriods: offered,
+          billable,
+          cras: rows,
+          // ADR-0054: half-days of a closed month that have not reached `Validated`. Summed over
+          // the rows the repository already scoped, so there is no second place the office rule
+          // could be forgotten.
+          lateHalfDays: periodClosed
+            ? rows
+                .filter((row) => row.status !== 'validated')
+                .reduce((total, row) => total + row.recordedHalfDays, 0)
+            : 0,
+          periodClosed,
+        };
+      });
+
+      return sendPage(reply, preFacturierPage(view, personaFor(request)));
+    },
+  );
+
+  /**
+   * The reveal (ADR-0052). A screen and not a link into `/api/v1`, because `representationOf`
+   * serves everything under `/api/` as `problem+json`.
+   *
+   * It is declared for `manager` alone, and the pré-facturier links to it for `billing` too. That
+   * is deliberate: `economics` is `none` for billing (ADR-0023), so following the link is a 403
+   * naming the rule, rendered as a page. BUILD-PLAN's phase-6 row asks for exactly that — "the
+   * refusal reason shown, not a greyed-out button".
+   */
+  app.get(
+    `${PATHS.margin}/:consultantId`,
+    { config: { access: forRoles('manager') } },
+    async (request, reply) => {
+      const params = parseInput(ConsultantParam, request.params);
+      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
+
+      const query = parseInput(PeriodFilter, request.query);
+      if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
+
+      const periode = query.value.periode;
+      if (periode === undefined) {
+        return sendProblem(reply, malformed({ periode: ['required'] }, contextOf(request)));
+      }
+
+      const actor = requireActor(request);
+      const economics = await dependencies.transactionally((unit) =>
+        consultantEconomics(
+          { client: unit.client, cras: unit.cras, log: request.log },
+          { consultantId: params.value.consultantId, period: periodFromIso(periode), actor },
+        ),
+      );
+
+      if (economics === null) {
+        return sendProblem(reply, {
+          type: API_PROBLEM_TYPES.notFound,
+          title: 'No such economics record',
+          status: NOT_FOUND,
+          detail: "Ce consultant n'a pas de CRA sur ce mois.",
+          ...contextOf(request),
+        });
+      }
+
+      return sendPage(reply, marginPage(economics, personaFor(request)));
     },
   );
 

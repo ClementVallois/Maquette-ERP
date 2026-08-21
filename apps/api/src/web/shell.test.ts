@@ -54,10 +54,22 @@ describe('the shell', () => {
 
   it('navigates a persona only to the screens their role actually has', () => {
     // The rule `NAV_BY_ROLE` exists for: a link to a route that does not exist yet is a 404 the
-    // reader meets before the feature does. The consultant has the entry grid; the other two roles
-    // have nothing yet, and their header says so by being empty rather than by linking to a stub.
-    expect(rendered(alice)).toContain(LABELS.cra.nav);
-    expect(rendered({ ...alice, role: 'billing' })).not.toContain('navlist');
+    // reader meets before the feature does, and a link to a route the role may not reach is a 403
+    // the reader meets instead of a screen. The consultant has the entry grid; the manager and
+    // billing have the pré-facturier; nobody has the other's.
+    const consultant = rendered(alice);
+    expect(consultant).toContain(LABELS.cra.nav);
+    expect(consultant).not.toContain(LABELS.preFacturier.nav);
+
+    for (const role of ['manager', 'billing'] as const) {
+      const page = rendered({ ...alice, role });
+      expect(page).toContain(LABELS.preFacturier.nav);
+      expect(page).not.toContain(LABELS.cra.nav);
+    }
+
+    // And with no persona there is no navigation at all, rather than a bar of links that all
+    // refuse — the selector is the only thing to do at that point.
+    expect(rendered(undefined)).not.toContain('navlist');
   });
 
   it('escapes a persona name, because a name is data', () => {

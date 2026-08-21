@@ -16,4 +16,12 @@ export const PATHS = {
   clearPersona: '/persona/retrait',
   /** The consultant's own months. A period appended to it is one month's grid. */
   consultantCra: '/consultant/cra',
+  /** The pré-facturier, for a month given as `?periode=YYYY-MM`. */
+  preFacturier: '/pre-facturier',
+  /**
+   * The reveal of `Tjm`, `Cjm` and margin for one consultant and one month (ADR-0052). A screen
+   * rather than a link into `/api/v1`, because `representationOf` sends everything under `/api/`
+   * to `problem+json` and a browser following that link would land on a JSON document.
+   */
+  margin: '/marge',
 } as const;

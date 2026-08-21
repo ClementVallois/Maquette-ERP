@@ -73,9 +73,10 @@ export class PgInvoiceRepository implements InvoiceRepository {
       `SELECT id, status, supply_period, billed_to_name, invoice_number, issue_date, total_ttc_cents
        FROM billing.invoices
        WHERE office_id = $1
+         AND ($4::text IS NULL OR supply_period = $4)
        ORDER BY supply_period DESC, billed_to_name
        LIMIT $2 OFFSET $3`,
-      [actor.officeId, limit, query.offset],
+      [actor.officeId, limit, query.offset, query.period ?? null],
     );
 
     return rows.map(toListItem);
@@ -134,15 +135,21 @@ export class PgInvoiceRepository implements InvoiceRepository {
     }
   }
 
-  async findDeclinedDays(craId: string, actor: Actor): Promise<readonly DeclinedDaysRecord[]> {
+  async findDeclinedDays(
+    craIds: readonly string[],
+    actor: Actor,
+  ): Promise<readonly DeclinedDaysRecord[]> {
     if (readScope(actor, 'invoice') === 'none') return [];
 
     const { rows } = await this.#client.query<DeclinedDaysRow>(
+      // `= ANY($1)` rather than a built `IN (…)` list: an empty array matches nothing, where a
+      // hand-assembled `IN ()` is a syntax error and the usual repair for it — dropping the
+      // clause when the list is empty — returns the whole office.
       `SELECT cra_id, mission_id, half_days, reason
        FROM billing.declined_days
-       WHERE cra_id = $1 AND office_id = $2
-       ORDER BY mission_id`,
-      [craId, actor.officeId],
+       WHERE cra_id = ANY($1) AND office_id = $2
+       ORDER BY cra_id, mission_id`,
+      [craIds, actor.officeId],
     );
 
     return rows.map((row) => ({

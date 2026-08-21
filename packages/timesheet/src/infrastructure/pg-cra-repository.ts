@@ -82,13 +82,25 @@ export class PgCraRepository implements CraRepository {
     if (scope === 'none') return [];
 
     const { rows } = await this.#client.query<CraListRow>(
-      `SELECT id, consultant_id, office_id, period, status
-       FROM timesheet.cras
-       WHERE office_id = $1
-         AND ($2::text IS NULL OR consultant_id = $2)
-       ORDER BY period DESC, consultant_id
+      // LEFT JOIN, and the `COALESCE` with it: a month opened and never filled is precisely the
+      // row the pré-facturier exists to show, and an inner join would drop it.
+      `SELECT c.id, c.consultant_id, c.office_id, c.period, c.status,
+              COALESCE(SUM(l.half_days), 0)::int AS recorded_half_days
+       FROM timesheet.cras c
+       LEFT JOIN timesheet.cra_lines l ON l.cra_id = c.id
+       WHERE c.office_id = $1
+         AND ($2::text IS NULL OR c.consultant_id = $2)
+         AND ($5::text IS NULL OR c.period = $5)
+       GROUP BY c.id, c.consultant_id, c.office_id, c.period, c.status
+       ORDER BY c.period DESC, c.consultant_id
        LIMIT $3 OFFSET $4`,
-      [actor.officeId, scope === 'own' ? actor.consultantId : null, limit, query.offset],
+      [
+        actor.officeId,
+        scope === 'own' ? actor.consultantId : null,
+        limit,
+        query.offset,
+        query.period ?? null,
+      ],
     );
 
     return rows.map((row) => ({
@@ -97,6 +109,11 @@ export class PgCraRepository implements CraRepository {
       officeId: row.office_id,
       period: row.period,
       status: row.status,
+      // `::int` in the query rather than a string-to-integer helper here: `SUM` is `bigint` and
+      // `pg` hands a `bigint` back as a string, while an `int` arrives as a number. A month of
+      // half-days cannot approach the 32-bit bound, and `halfDays` refuses anything that is not a
+      // whole non-negative count if the cast ever stops holding.
+      recordedHalfDays: halfDays(row.recorded_half_days),
     }));
   }
 
@@ -214,6 +231,7 @@ interface CraListRow {
   office_id: string;
   period: string;
   status: string;
+  recorded_half_days: number;
 }
 
 interface CraLineRow {

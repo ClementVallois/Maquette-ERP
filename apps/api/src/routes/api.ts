@@ -208,9 +208,12 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
 
       const actor = requireActor(request);
+      // The disclosure log lives inside `consultantEconomics` (ADR-0052), not here: this route and
+      // the `/marge` screen serve the same record, and a control written once per handler is a
+      // control the second handler forgets.
       const economics = await dependencies.transactionally((unit) =>
         consultantEconomics(
-          { client: unit.client, cras: unit.cras },
+          { client: unit.client, cras: unit.cras, log: request.log },
           {
             consultantId: params.value.consultantId,
             period: periodFromIso(query.value.period),
@@ -220,23 +223,6 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       );
 
       if (economics === null) return sendProblem(reply, notFound(request, 'economics record'));
-
-      // The log line that makes the disclosure attributable: **who** read **which fields** about
-      // **whom**. It names the fields and never their values — ADR-0024's allowlist is what keeps
-      // a `cjmCents` out of the log, and a disclosure record that published the amount would be
-      // the very leak this control exists to make expensive.
-      request.log.info(
-        {
-          disclosure: {
-            actor: actor.consultantId,
-            role: actor.role,
-            target: params.value.consultantId,
-            period: query.value.period,
-            fields: ['cjmCents', 'tjmCents', 'marginCents'],
-          },
-        },
-        'sensitive fields disclosed',
-      );
 
       return economics;
     },

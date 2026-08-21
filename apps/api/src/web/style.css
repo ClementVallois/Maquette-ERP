@@ -412,3 +412,65 @@ caption .hint {
   color: var(--ink-soft);
   max-width: var(--measure);
 }
+
+/* The pré-facturier's three figures. A description list rather than divs with headings: each one
+   is a term and its value, which is what a `dl` is for and what a screen reader announces. */
+dl.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space);
+  margin: var(--space) 0 calc(var(--space) * 1.5);
+  padding: 0;
+}
+
+dl.summary > div {
+  flex: 1 1 12rem;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+}
+
+dl.summary dt {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+dl.summary dd {
+  margin: 0.2rem 0 0;
+  font-size: 1.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+dl.summary dd .hint {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+/* The base of the three `.hint` rules. The two scoped ones above only add `display: block`;
+   without this, a hint outside a caption or a summary would inherit its neighbour's weight. */
+.hint {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+/* The blocking-reason cell. A list because a Cra can be blocked for several reasons at once —
+   two missions declined for two different reasons is the ordinary case, not the exception. */
+ul.reasons {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+ul.reasons li + li {
+  margin-top: 0.2rem;
+}
+
+tfoot th,
+tfoot td {
+  border-top: 2px solid var(--rule);
+  font-weight: 600;
+}

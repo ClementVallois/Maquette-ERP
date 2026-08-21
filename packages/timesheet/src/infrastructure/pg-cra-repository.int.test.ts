@@ -183,6 +183,64 @@ describe('PgCraRepository', () => {
     expect(lyonResults).toHaveLength(0);
   });
 
+  it('carries the half-days recorded, so a caller need not fetch each Cra to count them', async () => {
+    // ADR-0053: the pré-facturier's late-days counter is a sum over this column. It is a
+    // quantity and not a rate — `Cjm`, `Tjm` and margin stay out of every list view.
+    await seedOffices();
+    await repo().save(makeCra());
+
+    const listed = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
+
+    expect(listed[0]!.recordedHalfDays).toBe(
+      makeCra().lines.reduce((sum, line) => sum + line.halfDays, 0),
+    );
+  });
+
+  it('carries zero half-days for a Cra with no line, rather than dropping the row', async () => {
+    // A LEFT JOIN, not an inner one: a month that was opened and never filled is exactly the row
+    // the pré-facturier has to show, and an inner join would hide it.
+    await seedOffices();
+    await tx.client.query(
+      `INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+       VALUES ('cra-empty', 'consultant-1', 'office-paris', '2026-05', 'draft')`,
+    );
+
+    const listed = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
+    const empty = listed.find((row) => row.id === 'cra-empty');
+
+    expect(empty).toBeDefined();
+    expect(empty!.recordedHalfDays).toBe(0);
+  });
+
+  it('narrows to one period when asked, and to every period when not', async () => {
+    // The pré-facturier reads one month (ADR-0053). Filtering a capped page in memory would
+    // truncate the month itself the moment an office holds more than a page across all months.
+    await seedOffices();
+    await repo().save(makeCra());
+    await tx.client.query(
+      `INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+       VALUES ('cra-may', 'consultant-1', 'office-paris', '2026-05', 'draft')`,
+    );
+
+    const june = await repo().list({
+      actor: parisManager,
+      limit: 10,
+      offset: 0,
+      period: '2026-06',
+    });
+    expect(june.map((row) => row.id)).toStrictEqual(['cra-001']);
+
+    const july = await repo().list({
+      actor: parisManager,
+      limit: 10,
+      offset: 0,
+      period: '2026-07',
+    });
+    expect(july).toStrictEqual([]);
+
+    expect(await repo().list({ actor: parisManager, limit: 10, offset: 0 })).toHaveLength(2);
+  });
+
   it('caps pagination at MAX_PAGE_SIZE, however large the caller asks', async () => {
     // Seeded past the cap on purpose. Asking for 1000 against an empty table also returns "no
     // more than 50" and proves nothing — the cap has to be the reason the answer is short.
@@ -285,6 +343,10 @@ describe('PgCraRepository', () => {
       'id',
       'officeId',
       'period',
+      // A quantity, added by ADR-0053 for the late-days counter. It is listed here rather than
+      // exempted: this assertion exists so that widening the projection is a decision somebody
+      // took, and the only way to take it is to come and write the new name down.
+      'recordedHalfDays',
       'status',
     ]);
   });

@@ -90,6 +90,71 @@ export const LABELS = {
     },
   },
 
+  preFacturier: {
+    heading: 'Pré-facturier',
+    nav: 'Pré-facturier',
+    lead: 'Ce qui est facturable sur le mois, et pour tout le reste la raison qui bloque. Rien ne se décide ici : l’écran ne fait qu’assembler ce que les deux modules savent (ADR-0053).',
+    noPeriod: 'Aucun CRA dans cette implantation, sur aucun mois.',
+    noPeriodHint:
+      'Ce n’est pas un refus : la liste est bien celle de votre implantation, elle est vide.',
+    billable: 'À facturer',
+    billableEmpty:
+      'Aucune facture en brouillon sur ce mois : soit aucun CRA n’a été validé, soit les jours validés ne sont pas facturables. Le tableau ci-dessous dit lequel des deux.',
+    client: 'Client',
+    invoiceStatus: 'Statut',
+    invoiceNumber: 'N° de facture',
+    totalExcludingVat: 'Total HT',
+    totalIncludingVat: 'Total TTC',
+    notNumberedYet: '—',
+    cras: 'Les CRA du mois',
+    consultant: 'Consultant',
+    craStatus: 'Statut du CRA',
+    recorded: 'Jours saisis',
+    blocking: 'Ce qui n’est pas facturable',
+    nothingBlocking: 'Rien : tous les jours validés sont partis en facture.',
+    crasEmpty: 'Aucun CRA sur ce mois dans cette implantation.',
+    crasEmptyHint:
+      'Ce n’est pas un refus : la liste est bien celle de votre implantation, elle ne contient rien pour ce mois.',
+    reveal: 'Marge',
+    revealTitle: 'Ouvrir le CJM, le TJM et la marge — cet accès est journalisé',
+    summaryBillable: 'Facturable ce mois',
+    summaryLate: 'Jours en retard',
+    summaryCras: 'CRA du mois',
+    lateNote:
+      'Jours saisis sur un mois clos dont le CRA n’est pas encore validé (ADR-0054). Le mois en cours affiche zéro : rien n’y est en retard, puisque rien n’y est encore dû.',
+    lateNoneYet: 'Mois en cours — rien n’est encore dû.',
+    lateTag: 'En retard',
+    awaitingManager: 'En attente de validation par le manager',
+    awaitingConsultant: 'En attente du consultant',
+    invoiceStatuses: {
+      draft: 'Brouillon',
+      issued: 'Émise',
+      cancelledByCreditNote: 'Annulée par un avoir',
+    },
+    declineReasons: {
+      notRegie: 'Hors régie — mission au forfait ou interne',
+      unknownMission: 'Mission inconnue de la facturation',
+      noAgreedRate: 'Aucun TJM en vigueur à cette date',
+      unknownClient: 'Client inconnu',
+    },
+  },
+
+  margin: {
+    heading: 'Marge',
+    lead: 'Ces trois valeurs ne figurent dans aucune liste. Elles ne s’obtiennent que par cette lecture, et chaque ouverture est journalisée : qui a lu, quels champs, sur qui.',
+    back: 'Revenir au pré-facturier',
+    mission: 'Mission',
+    quantity: 'Quantité',
+    tjm: 'TJM',
+    cjm: 'CJM',
+    revenue: 'Chiffre d’affaires',
+    cost: 'Coût',
+    margin: 'Marge',
+    total: 'Total du mois',
+    noMission:
+      'Aucune mission en régie sur ce mois : une mission au forfait n’a pas de TJM daté, et elle est écartée plutôt que comptée à zéro.',
+  },
+
   problem: {
     heading: {
       denied: 'Accès refusé',

@@ -18,6 +18,12 @@ export interface InvoiceListQuery {
   readonly actor: Actor;
   readonly limit: number;
   readonly offset: number;
+  /**
+   * One supply period, or every one. Pushed into the query rather than applied to a capped page
+   * (ADR-0053): filtering after the cap silently drops rows the moment an office holds more than
+   * a page of invoices across all months.
+   */
+  readonly period?: string;
 }
 
 /** A row of the pré-facturier's blocking-reason column: days that produced no line (ADR-0037). */
@@ -57,5 +63,11 @@ export interface InvoiceRepository {
   findDraftedFrom(craId: string, actor: Actor): Promise<readonly InvoiceListItem[]>;
   /** Idempotent by `(craId, missionId, reason)`: replaying a validation appends no second copy. */
   saveDeclinedDays(officeId: OfficeId, declined: readonly DeclinedDaysRecord[]): Promise<void>;
-  findDeclinedDays(craId: string, actor: Actor): Promise<readonly DeclinedDaysRecord[]>;
+  /**
+   * Several `Cra`s at once, because the pré-facturier asks about a month and a month is not
+   * `billing`'s to know (ADR-0053): the composition root resolves the period into ids and hands
+   * them over. Each record names its own `craId`, so one query answers the whole page. An empty
+   * set answers nothing — never everything.
+   */
+  findDeclinedDays(craIds: readonly string[], actor: Actor): Promise<readonly DeclinedDaysRecord[]>;
 }

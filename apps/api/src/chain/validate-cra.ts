@@ -81,7 +81,7 @@ export async function validateCraAndDraftInvoices(
         kind: 'replayed',
         craId: command.craId,
         invoices: await unit.invoices.findDraftedFrom(command.craId, command.actor),
-        declined: await unit.invoices.findDeclinedDays(command.craId, command.actor),
+        declined: await unit.invoices.findDeclinedDays([command.craId], command.actor),
       };
     }
 
@@ -152,7 +152,7 @@ export async function validateCraAndDraftInvoices(
       kind: 'validated',
       craId: event.payload.craId,
       invoices: await unit.invoices.findDraftedFrom(command.craId, command.actor),
-      declined: await unit.invoices.findDeclinedDays(command.craId, command.actor),
+      declined: await unit.invoices.findDeclinedDays([command.craId], command.actor),
     };
   });
 }
