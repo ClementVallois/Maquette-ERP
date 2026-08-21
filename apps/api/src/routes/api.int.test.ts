@@ -31,6 +31,7 @@ const BRUNO = 'api-bruno';
 const EMMA = 'api-emma';
 const HENRI = 'api-henri';
 const CHLOE = 'api-chloe';
+const GRADE = 'api-grade';
 const MISSION = 'api-mission';
 const CLIENT = 'api-client';
 const CRA = 'api-cra';
@@ -142,10 +143,17 @@ beforeEach(async () => {
             ($7, 'Chloé', 'Dubois', 'api-c@t', $5, 'api-practice', 'consultant')`,
     [ALICE, BRUNO, EMMA, HENRI, PARIS, LYON, CHLOE],
   );
+  // The grade is created here and not borrowed from `public.grades` with a `SELECT … LIMIT 1`.
+  // The integration job migrates and does **not** seed, so that table is empty in CI: the INSERT
+  // matched no row, Alice had no `Cjm`, and the economics route answered 500 — while the same test
+  // passed on any machine whose development database happened to be seeded.
+  await client.query(`INSERT INTO public.grades (id, name, rank) VALUES ($1, 'Confirmé', 500)`, [
+    GRADE,
+  ]);
   await client.query(
     `INSERT INTO public.consultant_grades (id, consultant_id, grade_id, from_date, to_date, cjm_cents)
-     SELECT $1, $2, id, '2024-01-01', NULL, 25000 FROM public.grades ORDER BY rank LIMIT 1`,
-    [uuidv7(), ALICE],
+     VALUES ($1, $2, $3, '2024-01-01', NULL, 25000)`,
+    [uuidv7(), ALICE, GRADE],
   );
   await client.query(
     `INSERT INTO public.clients (id, name, siren, territoriality, billing_address_street,
