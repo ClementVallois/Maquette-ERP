@@ -609,6 +609,26 @@ cold-reader's surface is unchanged and the rules-auditor's is the seed script an
 Both should run retroactively before Phase 5 merges — or at the latest before Phase 9, which owns
 the final review.
 
+**Corrected 21/08/2026, by the retroactive passes this paragraph asked for.** Three sentences above
+are wrong, and the middle one is wrong in the way that matters.
+
+"Phase 4 is data and a CI job, not domain code or a README change, so the cold-reader's surface is
+unchanged" — **that sentence is itself the reason the cold-reader was needed.** Phase 4 shipped
+`pnpm run seed`, and `README.md` went on telling a reader it "n'existe pas encore"; and it added a
+ninth CI job to a README table that presents eight as exhaustive. Both falsehoods reached `main`
+because that sentence was believed. The surface a cold reader walks is not the set of files a phase
+edited — it is everything the README claims, and any phase can falsify any of it.
+
+"Every new domain term enters `CONTEXT.md` in the same commit that first uses it" is stated as an
+achievement in the points below. **The order was the other way round for `Grade` and `Cjm`**: both
+were used in code at `c066693` and `5e07a3a` and entered the glossary at `7db6a4b`, three commits
+later. `docs/BUILD-PLAN.md` pre-names those two terms specifically and pre-declares the outcome —
+"a defect, not a shortcut". The terms are in the glossary now; what was wrong is the record of how
+they got there.
+
+What the retroactive `rules-auditor` pass found in the seed and migration 007 is in
+[`PHASE-4-5-CLOSURE.md`](./PHASE-4-5-CLOSURE.md), with its resolution.
+
 ### Phase 5 — `feat/api`, 19/08/2026
 
 **Every task of the phase ran**: 5.1 the server shell and its validated configuration, 5.2 the
