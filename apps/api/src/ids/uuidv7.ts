@@ -76,8 +76,16 @@ export function uuidv7(): string {
 /** Deterministic UUIDv7: frozen timestamp, counter-based suffix. Same inputs → same output. */
 export function uuidv7Deterministic(timestampMs: number, counter: number): string {
   const suffix = new Uint8Array(10);
-  // Write the counter as a big-endian 64-bit value across the 10 bytes (top 2 bytes stay 0,
-  // which is fine — the version and variant bits overwrite bytes 0 and 2 of the suffix anyway).
+  // These eight assignments do **not** write a 64-bit counter, whatever they look like. A JS
+  // bitwise shift coerces to int32 and takes its count mod 32, so `counter >> 56` evaluates as
+  // `counter >> 24`: `suffix[2..5]` and `suffix[6..9]` receive the same four bytes, and only the
+  // low 32 bits of the counter reach the id at all.
+  //
+  // The consequence is the real limit: two counters that agree modulo 2**32 produce the **same**
+  // id. Nothing here approaches it — the seed's counters reach about 2040 — and the duplicated
+  // bytes cost nothing, so the code stands as written; the arithmetic is what needed saying.
+  // `suffix[0]` and `suffix[1]` are left at zero, which is free: the version and variant nibbles
+  // overwrite bytes 0 and 2 of the suffix anyway.
   suffix[2] = (counter >> 56) & 0xff;
   suffix[3] = (counter >> 48) & 0xff;
   suffix[4] = (counter >> 40) & 0xff;

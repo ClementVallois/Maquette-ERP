@@ -31,6 +31,14 @@ describe('uuidv7Deterministic', () => {
     expect(uuidv7Deterministic(INSTANT, 7)).toBe(uuidv7Deterministic(INSTANT, 7));
   });
 
+  it('repeats itself once the counter passes 2**32, the real limit of this generator', () => {
+    // Not a defect: the shifts above are mod 32, so only the low 32 bits of the counter reach the
+    // id. It is pinned here because the comment in the source used to claim a 64-bit counter, and
+    // a claim nothing tests is how the next reader budgets for a range that does not exist. The
+    // seed's counters reach about 2040.
+    expect(uuidv7Deterministic(INSTANT, 1)).toBe(uuidv7Deterministic(INSTANT, 2 ** 32 + 1));
+  });
+
   it('answers a different value for a different counter', () => {
     expect(uuidv7Deterministic(INSTANT, 7)).not.toBe(uuidv7Deterministic(INSTANT, 8));
   });
