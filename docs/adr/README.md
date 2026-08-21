@@ -115,6 +115,11 @@ code: three ADRs were found to contain statements that were never true, and the 
 now whether the **decision** moved — if it did, supersede; if only its description was wrong, fix
 the sentence, because these files are decisions and not logs.
 
+0046 is a promotion rather than a new decision: intercontrat as an internal non-billable mission
+was settled on 18/08/2026 and recorded as a row in `docs/open-questions.md`, which was the wrong
+place for something that shapes the completeness rule and interacts with ADR-0037. It gains the
+reconsideration threshold `CLAUDE.md` requires, and `CONTEXT.md` stops contradicting it.
+
 ## Identified, not yet decided
 
 Numbers are reserved so that what is **known and unsettled** is visible rather than implied.

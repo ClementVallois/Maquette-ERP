@@ -121,7 +121,7 @@ _Coût journalier moyen_ — the average daily cost of a consultant to the firm.
 _Avoid_: DailyCost, CostRate, InternalRate
 
 **Intercontrat** (🇫🇷 kept):
-A consultant currently staffed on no mission. Kept in French: "bench" describes a different employment reality and has no French-law equivalent.
+A consultant currently on no **client** mission. Kept in French: "bench" describes a different employment reality and has no French-law equivalent. **Modelled as an internal `Forfait` mission named `Intercontrat`**, sold by the firm to itself, that the consultant is assigned to (ADR-0046) — so their days are recorded like anyone's, the completeness rule stays absolute, and the days are declined as `notRegie` by ADR-0037 instead of being billed. There is no `DayType` for it and no consultant with no assignment: "staffed on nothing" is a fact about staffing, and the mission dimension is where it lives.
 _Avoid_: Bench, Idle, Unassigned, Available
 
 **Habilitation** (🇫🇷 kept):
