@@ -34,7 +34,16 @@ export default defineConfig({
       // controllers, which proves nothing this mockup claims. `@erp/platform` is included whole
       // because it holds domain-grade code that belongs to no module — typed errors, dated
       // resolution, the Tjm — and it has no `domain/` directory to match the first glob.
-      include: ['packages/*/src/domain/**/*.ts', 'packages/platform/src/**/*.ts'],
+      // `apps/api/src/web/render/**` is the third entry and is not an application directory
+      // being smuggled in: it is the escaping machinery of ADR-0025, and it is the only code in
+      // this repository whose failure is an XSS. The rest of `apps/` stays out — a route handler
+      // proves nothing by being executed — and ADR-0025 says so rather than leaving the shape of
+      // this glob to be inferred.
+      include: [
+        'packages/*/src/domain/**/*.ts',
+        'packages/platform/src/**/*.ts',
+        'apps/api/src/web/render/**/*.ts',
+      ],
       // Deliberate violations, never imported by anything shipped, and test scaffolding: neither
       // is code the domain runs, and a threshold that measures its own fixtures is measuring the
       // wrong surface.

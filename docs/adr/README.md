@@ -59,6 +59,7 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0022](./0022-deterministic-seed-is-a-deliverable.md)                          | The seed is a deliverable, not a fixture: deterministic, Zod-validated           | accepted |
 | [0041](./0041-deterministic-uuidv7-for-all-identifiers.md)                     | Deterministic UUIDv7 for all identifiers, including child rows                   | accepted |
 | [0024](./0024-structured-logging-redacted-by-allowlist.md)                     | Structured logging, redacted by allowlist in the serialiser                      | accepted |
+| [0025](./0025-html-rendered-without-a-template-engine.md)                      | HTML from a tag that refuses the holes it cannot escape, and no engine           | accepted |
 | [0042](./0042-which-status-a-business-refusal-takes.md)                        | Which HTTP status a business refusal takes, and what it may publish              | accepted |
 | [0023](./0023-persona-selector-instead-of-authentication.md)                   | A persona selector instead of authentication, and where authorization is decided | accepted |
 | [0043](./0043-economics-is-read-at-the-composition-root.md)                    | Margin is read at the composition root, because it belongs to neither module     | accepted |
