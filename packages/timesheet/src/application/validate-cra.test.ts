@@ -82,9 +82,15 @@ describe('validating a Cra', () => {
       clock,
       calendar,
       reference: {
-        mission: (id) => ({ id, startDate: '2026-01-05', endDate: null }),
+        mission: (id) => ({
+          id,
+          startDate: '2026-01-05',
+          endDate: null,
+          requiredHabilitations: [],
+        }),
         runsOn: () => true,
         isAssigned: () => true,
+        missingHabilitations: () => [],
       },
     });
 

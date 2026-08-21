@@ -62,7 +62,9 @@ describe('PgCraRepository', () => {
   const fixedClock = { now: () => new Date('2026-07-02T09:00:00.000Z') };
   const juneCalendar = workingCalendar();
   const juneReference = timesheetReference({
-    missions: [{ id: 'mission-1', startDate: '2026-01-01', endDate: null }],
+    missions: [
+      { id: 'mission-1', startDate: '2026-01-01', endDate: null, requiredHabilitations: [] },
+    ],
     assignments: [
       { consultantId: 'consultant-1', missionId: 'mission-1', from: '2026-01-01', to: null },
     ],

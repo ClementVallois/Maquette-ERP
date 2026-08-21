@@ -532,12 +532,21 @@ async function seed(): Promise<void> {
         id: m.id,
         startDate: m.startDate,
         endDate: m.endDate,
+        requiredHabilitations: validatedMissionHabilitations
+          .filter((mh) => mh.missionId === m.id)
+          .map((mh) => mh.habilitationId),
       })),
       assignments: validatedAssignments.map((a): TimesheetAssignment => ({
         consultantId: a.consultantId,
         missionId: a.missionId,
         from: a.fromDate,
         to: a.toDate,
+      })),
+      held: validatedConsultantHabilitations.map((ch) => ({
+        consultantId: ch.consultantId,
+        habilitationId: ch.habilitationId,
+        from: ch.obtainedAt,
+        to: ch.expiresAt,
       })),
     });
 

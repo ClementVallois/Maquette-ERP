@@ -4,8 +4,13 @@ import { timesheetReference } from './reference.ts';
 
 const reference = timesheetReference({
   missions: [
-    { id: 'audit-passi', startDate: '2026-01-05', endDate: '2026-03-13' },
-    { id: 'soc-run', startDate: '2026-02-01', endDate: null },
+    {
+      id: 'audit-passi',
+      startDate: '2026-01-05',
+      endDate: '2026-03-13',
+      requiredHabilitations: [],
+    },
+    { id: 'soc-run', startDate: '2026-02-01', endDate: null, requiredHabilitations: [] },
   ],
   assignments: [
     { consultantId: 'nadia', missionId: 'audit-passi', from: '2026-01-05', to: '2026-03-13' },

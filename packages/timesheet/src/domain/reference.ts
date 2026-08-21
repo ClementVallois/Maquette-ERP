@@ -1,6 +1,6 @@
 import type { IsoDate } from '@erp/platform';
 
-import type { ConsultantId, MissionId } from './ids.ts';
+import type { ConsultantId, HabilitationId, MissionId } from './ids.ts';
 
 /**
  * What `timesheet` knows about a mission: when it runs. Not what it costs, not who the client is,
@@ -12,6 +12,26 @@ export interface Mission {
   readonly startDate: IsoDate;
   /** Open-ended while the mission is running. */
   readonly endDate: IsoDate | null;
+  /**
+   * The `Habilitation`s a consultant must hold to be staffed on this mission — a PASSI-qualified
+   * audit is the seeded case. Usually empty. It is here rather than in `billing` because it
+   * constrains *who may record a day*, which is a timesheet rule; what the mission is worth is the
+   * other module's projection (ADR-0031).
+   */
+  readonly requiredHabilitations: readonly HabilitationId[];
+}
+
+/**
+ * An `Habilitation` a consultant holds, with its validity. Dated for the same reason the `Tjm` and
+ * the manager attachment are: a qualification expires, and a day worked in June is judged against
+ * June's certificate, not against today's.
+ */
+export interface HeldHabilitation {
+  readonly consultantId: ConsultantId;
+  readonly habilitationId: HabilitationId;
+  readonly from: IsoDate;
+  /** Open-ended for a qualification with no expiry date. */
+  readonly to: IsoDate | null;
 }
 
 /**
@@ -36,11 +56,24 @@ export interface TimesheetReference {
   mission(id: MissionId): Mission | null;
   runsOn(id: MissionId, date: IsoDate): boolean;
   isAssigned(consultantId: ConsultantId, missionId: MissionId, date: IsoDate): boolean;
+  /**
+   * The `Habilitation`s the mission requires and the consultant does not hold on that day.
+   *
+   * It returns the missing ones rather than a boolean, and that is the whole reason it is shaped
+   * this way: a refusal has to name what is missing, or the consultant is told "no" and left to
+   * guess which certificate to go and get.
+   */
+  missingHabilitations(
+    consultantId: ConsultantId,
+    missionId: MissionId,
+    date: IsoDate,
+  ): readonly HabilitationId[];
 }
 
 export function timesheetReference(input: {
   missions: readonly Mission[];
   assignments: readonly Assignment[];
+  held?: readonly HeldHabilitation[];
 }): TimesheetReference {
   const missions = new Map(input.missions.map((mission) => [mission.id, mission]));
 
@@ -62,6 +95,21 @@ export function timesheetReference(input: {
           assignment.consultantId === consultantId &&
           assignment.missionId === missionId &&
           covers(assignment, date),
+      );
+    },
+
+    missingHabilitations(consultantId, missionId, date) {
+      const required = missions.get(missionId)?.requiredHabilitations ?? [];
+      if (required.length === 0) return [];
+
+      return required.filter(
+        (habilitationId) =>
+          !(input.held ?? []).some(
+            (holding) =>
+              holding.consultantId === consultantId &&
+              holding.habilitationId === habilitationId &&
+              covers(holding, date),
+          ),
       );
     },
   };

@@ -130,6 +130,25 @@ export class NotAssignedError extends BusinessError {
 }
 
 /**
+ * A day recorded on a mission that requires an `Habilitation` the consultant did not hold on that
+ * day. It is a 409 and not a 422 for the reason ADR-0042 gives: the day and the mission are both
+ * perfectly good values, and what refuses them is the state of the world on that date.
+ *
+ * The missing clearances are named. A refusal that says only "not qualified" leaves the consultant
+ * to guess which certificate to go and get, and the manager to guess what to chase.
+ */
+export class MissingHabilitationError extends BusinessError {
+  readonly problemType = '/problems/missing-habilitation';
+
+  constructor(day: string, consultantId: string, missionId: string, missing: readonly string[]) {
+    super(
+      `${consultantId} does not hold ${missing.join(', ')} on ${day}, which mission ${missionId} requires`,
+      { day, consultantId, missionId, missing },
+    );
+  }
+}
+
+/**
  * The month does not add up against the working calendar. Every workable day is accounted for —
  * worked or absent — or the Cra is not a record of the month, and the days nobody can explain are
  * the ones that quietly never get billed.

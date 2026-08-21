@@ -4,6 +4,7 @@ import type { CraLine } from './cra-line.ts';
 import type { NonWorkableDay } from './day-type.ts';
 import {
   IncompleteCraError,
+  MissingHabilitationError,
   MissionNotRunningError,
   NotAssignedError,
   UnknownMissionError,
@@ -57,6 +58,15 @@ export function runSubmissionChecks(input: {
 
     if (!reference.isAssigned(input.consultantId, line.missionId, line.day)) {
       throw new NotAssignedError(line.day, input.consultantId, line.missionId);
+    }
+
+    // Last of the four, and deliberately after the assignment check: being staffed on a mission is
+    // what makes "are you qualified for it" a question at all, and reporting the clearance first
+    // would tell a consultant which certificates a mission needs before establishing that they
+    // have any business asking.
+    const missing = reference.missingHabilitations(input.consultantId, line.missionId, line.day);
+    if (missing.length > 0) {
+      throw new MissingHabilitationError(line.day, input.consultantId, line.missionId, missing);
     }
   }
 

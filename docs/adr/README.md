@@ -70,6 +70,7 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0047](./0047-what-counts-as-a-second-implementation.md)                       | What counts as a second implementation, and what is not a port at all            | accepted |
 | [0048](./0048-the-screens-ship-in-the-api-deployable.md)                       | The screens ship inside the API deployable; `apps/api` keeps its name            | accepted |
 | [0049](./0049-the-application-declares-its-own-content-security-policy.md)     | The application declares its own CSP, and it says there is no script             | accepted |
+| [0051](./0051-an-habilitation-constrains-a-day-at-submission.md)               | An `Habilitation` constrains a recorded day, checked at submission               | accepted |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
