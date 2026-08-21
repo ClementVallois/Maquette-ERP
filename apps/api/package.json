@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The composition root: HTTP boundary, persona selector, and the transaction that binds the chain",
+  "description": "The composition root and the HTTP edge: /api/v1 in JSON, the screens in HTML, the persona selector, and the transaction that binds the chain (ADR-0048)",
   "exports": {
     ".": "./src/index.ts"
   },
