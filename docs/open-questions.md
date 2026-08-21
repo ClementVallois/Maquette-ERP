@@ -15,6 +15,117 @@ moves down to "Settled" with its answer, so the record shows it was known rather
 | 19/08/2026 | **ADR-0003 rejected Postgres RLS on testability, and every authorization test written since needs a live Postgres.** The ADR's argument against RLS is that "every authorization test then needs a live Postgres … At the repository, the same proof runs in milliseconds without a database". All of Phase 3's scope tests are `.int.test.ts`.                                                                            | The decision is not wrong — the port carries the scope, so an in-memory proof is available — but the cost the ADR used to reject the alternative was incurred anyway, and an ADR whose stated advantage is not taken reads as reasoning fitted to a conclusion.                                  | Resolve **in Phase 7, task 7.1** with **ADR-0027**, alongside the integration-suite question above: both are the same question — what belongs in which suite. Either an in-memory `CraRepository` carries the scope proof at unit speed, or ADR-0027 states that the proof is worth a database and ADR-0003's argument is narrowed to what actually held.                                                                                                                                            |
 | 19/08/2026 | **ADR-0019's reconsideration threshold is reached in the phase that wrote it.** It names "~12 integration tests per module, or the first test whose setup exceeds its assertion in complexity", at which point "a shared fixture or a test-database-per-suite model is cheaper than per-test rollback". `billing` ends Phase 3 with **22** (15 on the invoice repository, 7 on the numbering counter); `timesheet` has 10. | A threshold that is crossed and not looked at is a threshold that was decorative. The cost is not correctness — the suite is green and fast (39 tests, ~1 s) — it is that every one of those 22 tests rebuilds its own offices, clients and missions inline, so a schema change edits 22 setups. | Not decided in Phase 3: the threshold asks whether a shared fixture is cheaper than per-test rollback, and that depends on what Phase 5's route tests need, which do not exist yet. Resolve **in Phase 7, task 7.1**, with **ADR-0027** — the task that decides what the PR pipeline runs and what it never does, which is where the shape of the integration suite belongs.                                                                                                                         |
 
+---
+
+## Phase 6 checkpoint — `feat/web`, 21/08/2026
+
+The two questions `CLAUDE.md` requires, asked of tasks 6.4 to 6.7. Every point resolves to exactly
+one of the four outcomes — **fix now**, **new ADR**, **a row in the README's "Ce que je ne construis
+pas"**, **a row in this file with the phase that will decide it named**.
+
+**Which tasks ran.** All seven. 6.1 to 6.3 landed earlier on this branch; 6.4 (the pré-facturier and
+the reveal), 6.5 (the printable invoice and the printable Cra, plus the two debt rows this file had
+assigned to it), 6.6 (empty, error and permission-denied states) and 6.7 (accessibility, reduced and
+stated) landed on 21/08/2026. Nothing in the phase was skipped.
+
+**One task ran that the plan's prose did not name**, and it is stated here rather than left to be
+noticed: **the three verbs of the chain on screen** — validate, refuse, issue. BUILD-PLAN § 6 names
+the screens and none of the actions, so at the end of 6.5 the `manager` and `billing` personas could
+read everything on the instance and do nothing, and both separation-of-duties rules could only be
+demonstrated in `curl`. There is no later phase that would have taken it (6.6 is states, 6.7 is
+accessibility, 7 is CI, 8 is deploy, 9 is docs), so deferring it would have been a deferral with no
+home. It landed here, with **ADR-0059** for the one part of it that is a decision rather than
+plumbing.
+
+**Ten ADRs were written in this phase**: 0052 (the margin reveal is a screen, and the disclosure log
+moves inside the read), 0053 (the pré-facturier is a composition, not a query), 0054 (what a late
+day is), 0055 (the invoice is a printable page, no PDF engine), 0056 (the printable Cra is one
+document for the month), 0057 (a credit note is a domain rule, not a stored document), 0058
+(child-row identity is not made stable), 0059 (a screen carries its idempotency key in a hidden
+field), 0060 (the screens name a refusal in French, keyed by its type), 0061 (accessibility is held
+mechanically and not audited).
+
+### Where I am least confident, and what it resolved to
+
+1. **BUILD-PLAN 6.4 specified something that could not be built.** "A plain link to the logged
+   single-record read of 5.3" lands a browser on a JSON document, because `representationOf` serves
+   everything under `/api/` as `problem+json` — deliberately. Found by reading the two decisions
+   together, not by running anything. → **New ADR** (0052), and the plan's paragraph **fixed now**
+   so it stops describing a screen that does not exist.
+
+2. **"Late days" was defined nowhere** — not in `CONTEXT.md`, not in an ADR, and four readings of
+   the phrase produce four different numbers from the same data. The one the phrase most naturally
+   carries (days elapsed past a submission deadline) is **not computable here**: no table holds a
+   deadline and inventing one would put a fabricated obligation on a screen. → **New ADR** (0054),
+   with `LateDays` and `Pré-facturier` entering `CONTEXT.md` in the same commit.
+
+3. **The pré-facturier had the strongest reason yet to break the module boundary.** `declined_days`
+   is keyed on `cra_id` and carries no period, so selecting a month's declines means joining
+   `timesheet.cras` from inside `billing` — and dependency-cruiser does not police SQL strings.
+   Separately, a draft's `total_ttc_cents` is `NULL` by design, so a `SUM` would have produced a
+   number, and the wrong one. → **New ADR** (0053): the screen is a composition, the declined-days
+   read takes a set of Cra ids, and the totals come off the aggregate.
+
+4. **The screen issues one query per invoice for its totals.** An N+1, deliberately, bounded by the
+   same fifty-row cap as every other list. → Covered by **ADR-0053**'s threshold, and the page cap
+   itself is now **a row in the README** so the limit is public rather than discoverable.
+
+5. **A form cannot send the header `POST /api/v1/invoices/:id/issuance` requires.** The same shape
+   as point 1: an API decision meeting a screen decision. → **New ADR** (0059), and the ADR is
+   explicit that the key guards a _submission_ while the state machine guards the _invoice_ — two
+   guarantees, not one described twice.
+
+6. **`Cra.refuse` was guarded less than `Cra.validate`.** Any manager of the office could send back
+   a month they do not manage: only `validate` consulted the dated attachment (ADR-0034) and the
+   self-validation rule. It surfaced when the screen gained the button, which is exactly how a gap
+   in a verb nobody could reach stays invisible. → **Fixed now**, with the two negative tests
+   BUILD-RULES requires of every guard, and the two French sentences broadened in the same pass
+   because they said "valider" about a rule that covers both verbs.
+
+7. **The denied page rendered an English `title` under a French heading**, on the page this
+   repository's third claim is checked on. → **New ADR** (0060), and the exhaustiveness test now
+   runs in both directions: every `problemType` under `packages/` and every `API_PROBLEM_TYPES`
+   value has a French sentence, and the table holds nothing no code raises.
+
+8. **Accessibility was mostly right and entirely unasserted.** The shell had the language, the skip
+   link, the focus ring and the `sr-only` labels since 6.2, and nothing would have failed if one of
+   them regressed. → **New ADR** (0061) plus `accessibility.test.ts`; what is _not_ held is **a row
+   in the README**, because "mostly right and unstated" is indistinguishable from "unconsidered".
+
+### In three months, what breaks if I leave it as it is
+
+9. **`billing.credit_notes` — a table nothing writes, under a README claiming otherwise in the
+   present tense, and two `UNIQUE` indexes contradicting ADR-0018's single series.** This file had
+   assigned it to task 6.5. → **New ADR** (0057) and **a row in the README**: the credit note stays
+   a rule of the domain, migration 010 drops the table, and the ADR argues the bounded exception to
+   the additive-migration rule rather than waving past it.
+
+10. **ADR-0041's undelivered consequence about stable child ids.** Assigned to 6.5 alongside the row
+    above because the two shared a cause. → **New ADR** (0058): identity stays unstable, with three
+    thresholds any one of which reopens it. The cause is gone with 0057, so the answer is a decision
+    rather than another deferral.
+
+11. **Two seeded offices show no blocking reason at all.** Paris has nothing declined; the
+    `Intercontrat` case (ADR-0046) is Lyon's and Bordeaux's. Verified live: `manager-lyon` sees
+    "Intercontrat : hors régie". → **No action, and it stays.** The dataset is right and the screen
+    reports it accurately; making Paris fail would be seeding a defect to demonstrate a feature.
+
+12. **The whole chain was walked on the running instance, not only in tests** — a manager validated
+    June's submitted Cra from the pré-facturier, billing opened the draft and issued it, and the
+    same key posted twice left `billing.numbering_series.last_sequence` at 1 with one
+    `SEC-2026-000001`. → **No action**: this is the evidence for the claims above, recorded so the
+    checkpoint is not asserting them from the test suite alone.
+
+### Owed, and not discharged here
+
+**The two reviewers have not run on this branch.** `rules-auditor` (a blind audit of the diff
+against `docs/BUILD-RULES.md`) and `cold-reader` (the no-brief reader) are required by `CLAUDE.md`
+before every merge to `main` and at every phase checkpoint. Neither has run on `feat/web`, and this
+branch is the phase's whole surface: a new module-boundary argument (ADR-0053), a dropped table, a
+domain guard added, ten ADRs, and a README with three new rows. **The branch is therefore not merged
+and no pull request is opened**, exactly as Phase 5 recorded the same debt rather than discovering
+it at the merge.
+
 ## Settled
 
 | Settled    | Question                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
