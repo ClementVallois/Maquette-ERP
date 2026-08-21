@@ -58,8 +58,16 @@ ADR and moves to the README's "Ce que je ne construis pas" — never a silent om
   imports the test runner — and that exemption is what lets the rule stay absolute everywhere else.
 - One `index.ts` per package is the only public surface.
 - Layers per module: `domain` → `application` → `infrastructure`. Dependencies point inward only.
-- A port is introduced only at the **second real implementation**. Three exist:
-  `Clock`, `CraRepository`, `InvoiceRepository`. There is no email, storage or LLM port.
+- A port is introduced only at the **second real implementation**, never in anticipation of one.
+  There is no email, storage or LLM port. **"Real" does not mean "in production"** (**ADR-0047**):
+  a substitute a test must inject to prove something otherwise unprovable counts, and `Clock` is
+  the precedent — it has one production implementation and exists so a fake one can be injected.
+  The discriminator is whether the second implementation makes a test possible that could not
+  otherwise be written; a mock that only records that it was called does not.
+  **Not a port, and not held to this**: a structural narrowing of a third-party type, such as the
+  `PgReadClient` slice of `pg`'s `query` declared once per tier instead of in every reader.
+  This rule used to enumerate the ports that existed. It does not any more: the list was a second
+  source of truth for something `grep` answers exactly, and it went stale within one phase.
 - Time in the domain comes from the injected `Clock`. Building a `Date` at all is a lint error
   there — literal argument or not, and in `@erp/platform` as well as in each `domain/` — because
   the fake clock is what makes dated invariants deterministic. In a **test** the ban narrows to the

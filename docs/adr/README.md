@@ -120,6 +120,12 @@ was settled on 18/08/2026 and recorded as a row in `docs/open-questions.md`, whi
 place for something that shapes the completeness rule and interacts with ADR-0037. It gains the
 reconsideration threshold `CLAUDE.md` requires, and `CONTEXT.md` stops contradicting it.
 
+0047 settles a rule that had gone quietly unapplied: Phase 5 added four ports to a BUILD-RULES line
+that enumerated three, and no ADR said whether four exceptions had been taken or the rule had
+lapsed. Neither, as it turned out — three of the four meet the criterion once "real implementation"
+is read the way `Clock` has always been read, and the fourth is not a port. The enumeration is what
+goes.
+
 ## Identified, not yet decided
 
 Numbers are reserved so that what is **known and unsettled** is visible rather than implied.
