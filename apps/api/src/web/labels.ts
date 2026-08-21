@@ -93,6 +93,7 @@ export const LABELS = {
   craPrint: {
     heading: 'Relevé d’activité',
     open: 'Version imprimable',
+    openFor: 'du CRA de {name}',
     notValidated:
       'Ce relevé n’est pas signable : le CRA n’a pas encore été validé par le manager, et son contenu peut encore changer.',
     consultant: 'Consultant',
@@ -150,7 +151,10 @@ export const LABELS = {
     refusalPlaceholder: 'Ce que le consultant doit corriger',
     decide: 'Décision',
     reveal: 'Marge',
-    revealTitle: 'Ouvrir le CJM, le TJM et la marge — cet accès est journalisé',
+    /** Appended to the visible link text, `sr-only`, so nine identical links are nine distinct ones. */
+    revealFor: 'de {name}',
+    revealNote:
+      'Ouvrir une marge affiche le CJM, le TJM et la marge du consultant, et chaque ouverture est journalisée.',
     summaryBillable: 'Facturable ce mois',
     summaryLate: 'Jours en retard',
     summaryCras: 'CRA du mois',
@@ -178,6 +182,7 @@ export const LABELS = {
     draftHeading: 'Facture en brouillon',
     nav: 'Factures',
     open: 'Ouvrir la facture',
+    openFor: 'de {name}',
     draftNotice:
       'Ce document n’est pas une facture : il n’a ni numéro ni date d’émission, et il changera si le CRA qui l’a produit change. Il devient une facture à l’émission, et plus rien n’y bouge ensuite.',
     seller: 'Émetteur',

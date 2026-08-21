@@ -2,6 +2,7 @@ import type { DeclineReason, InvoiceStatus } from '@erp/billing';
 import type { CraStatus } from '@erp/timesheet';
 
 import type { Persona } from '../../personas/catalogue.ts';
+import { fill } from '../fill.ts';
 import { frenchDays, frenchEuros, frenchMonth } from '../format.ts';
 import { LABELS } from '../labels.ts';
 import { PATHS } from '../paths.ts';
@@ -131,7 +132,11 @@ function billableTable(view: PreFacturierView): Html {
             <td class="num">${frenchEuros(row.totalExcludingVatCents)}</td>
             <td class="num">${frenchEuros(row.totalIncludingVatCents)}</td>
             <td class="no-print">
-              <a href="${`${PATHS.invoice}/${row.invoiceId}`}">${LABELS.invoice.open}</a>
+              <a href="${`${PATHS.invoice}/${row.invoiceId}`}"
+                >${LABELS.invoice.open}<span class="sr-only">
+                  ${fill(LABELS.invoice.openFor, { name: row.clientName })}</span
+                ></a
+              >
             </td>
           </tr>`,
       )}
@@ -208,6 +213,7 @@ function craTable(view: PreFacturierView, period: string): Html {
     <caption>
       ${LABELS.preFacturier.cras}
       <span class="hint">${LABELS.preFacturier.lateNote}</span>
+      <span class="hint">${LABELS.preFacturier.revealNote}</span>
     </caption>
     <thead>
       <tr>
@@ -237,13 +243,17 @@ function craTable(view: PreFacturierView, period: string): Html {
             <td>${blockingCell(row)}</td>
             ${view.mayDecide ? decideCell(row) : null}
             <td class="no-print">
-              <a href="${`${PATHS.craPrint}/${row.craId}`}">${LABELS.craPrint.open}</a>
+              <a href="${`${PATHS.craPrint}/${row.craId}`}"
+                >${LABELS.craPrint.open}<span class="sr-only">
+                  ${fill(LABELS.craPrint.openFor, { name: row.consultantName })}</span
+                ></a
+              >
             </td>
             <td class="no-print">
-              <a
-                href="${`${PATHS.margin}/${row.consultantId}?periode=${period}`}"
-                title="${LABELS.preFacturier.revealTitle}"
-                >${LABELS.preFacturier.reveal}</a
+              <a href="${`${PATHS.margin}/${row.consultantId}?periode=${period}`}"
+                >${LABELS.preFacturier.reveal}<span class="sr-only">
+                  ${fill(LABELS.preFacturier.revealFor, { name: row.consultantName })}</span
+                ></a
               >
             </td>
           </tr>`,

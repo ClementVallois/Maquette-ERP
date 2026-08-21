@@ -1,6 +1,7 @@
 import type { Invoice, InvoiceLine, LegalEntity, PostalAddress, VatGroup } from '@erp/billing';
 
 import type { Persona } from '../../personas/catalogue.ts';
+import { fill } from '../fill.ts';
 import { frenchDate, frenchDays, frenchEuros, frenchMonth, frenchPercent } from '../format.ts';
 import { LABELS } from '../labels.ts';
 import { PATHS } from '../paths.ts';
@@ -175,11 +176,6 @@ function vatTable(groups: readonly VatGroup[], invoice: Invoice): Html {
       </tr>
     </tfoot>
   </table>`;
-}
-
-/** `{name}` filled from the model. The number never lives in the label (ADR-0017). */
-function fill(template: string, values: Readonly<Record<string, string>>): string {
-  return template.replace(/\{(\w+)\}/gu, (whole, key: string) => values[key] ?? whole);
 }
 
 function mentionsBlock(invoice: Invoice): Html {
