@@ -226,8 +226,8 @@ async function seed(): Promise<void> {
     await client.query('DELETE FROM billing.invoice_lines');
     await client.query('DELETE FROM billing.invoices');
     await client.query('DELETE FROM billing.numbering_series');
-    await client.query('DELETE FROM billing.declined_days WHERE FALSE'); // table exists, unused
-    await client.query('DELETE FROM billing.credit_notes WHERE FALSE'); // table exists, unused
+    await client.query('DELETE FROM billing.declined_days');
+    await client.query('DELETE FROM billing.credit_notes');
     await client.query('DELETE FROM public.domain_events');
     await client.query('DELETE FROM timesheet.cra_flags');
     await client.query('DELETE FROM timesheet.cra_lines');
