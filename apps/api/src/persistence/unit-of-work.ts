@@ -49,7 +49,7 @@ export function unitOfWorkOver(client: pg.PoolClient, newId: () => string): Unit
   return {
     cras: new PgCraRepository(client, newId),
     invoices: new PgInvoiceRepository(client, newId),
-    events: new PgEventStore(client),
+    events: new PgEventStore(client, newId),
     client,
   };
 }

@@ -27,13 +27,15 @@ export interface EventStore {
  */
 export class PgEventStore implements EventStore {
   readonly #client: PgClient;
+  readonly #newId: () => string;
 
-  constructor(client: PgClient) {
+  constructor(client: PgClient, newId: () => string = uuidv7) {
     this.#client = client;
+    this.#newId = newId;
   }
 
   async persist(event: PersistableEvent): Promise<string> {
-    const id = uuidv7();
+    const id = this.#newId();
 
     await this.#client.query(
       `INSERT INTO public.domain_events (id, type, version, occurred_at, correlation_id, causation_id, payload)

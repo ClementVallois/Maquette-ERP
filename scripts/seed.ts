@@ -10,7 +10,7 @@
 import pg from 'pg';
 import { z } from 'zod/v4';
 
-import { uuidv7Deterministic } from '@erp/api';
+import { PgEventStore, uuidv7Deterministic } from '@erp/api';
 import {
   billingReference,
   client as clientFactory,
@@ -20,6 +20,7 @@ import {
   legalEntity as legalEntityFactory,
   legalMentions,
   paymentTerms,
+  PgInvoiceRepository,
   RECOVERY_INDEMNITY_CENTS,
 } from '@erp/billing';
 import {
@@ -38,6 +39,7 @@ import {
   hierarchy,
   type ManagerAttachment,
   type Mission as TimesheetMission,
+  PgCraRepository,
   timesheetReference,
   type TimesheetReference,
   workingCalendar,
@@ -570,7 +572,17 @@ async function seed(): Promise<void> {
       return hasAssignment && hasManager;
     });
 
-    let craIdCounter = 1000; // Start at an offset to avoid colliding with reference data ids
+    // One sequence for every id the write side mints — aggregate ids here, child-row ids inside
+    // the repositories, event ids inside the journal. Offset past the reference data's counter so
+    // the two never meet. The repositories and the event store take the factory rather than
+    // reaching for a generator, which is what makes the seed deterministic and the running system
+    // random from the same code (ADR-0041).
+    let writeIdCounter = 1000;
+    const nextWriteId = (): string => uuidv7Deterministic(SEED_TIMESTAMP_MS, writeIdCounter++);
+
+    const cras = new PgCraRepository(client, nextWriteId);
+    const invoices = new PgInvoiceRepository(client, nextWriteId);
+    const events = new PgEventStore(client, nextWriteId);
     const workableDays = calendar.workableDaysOf(period);
 
     const seededCras: {
@@ -579,7 +591,7 @@ async function seed(): Promise<void> {
     }[] = [];
 
     for (const consultant of consultantsWithCras) {
-      const craId = uuidv7Deterministic(SEED_TIMESTAMP_MS, craIdCounter++);
+      const craId = nextWriteId();
 
       const cra = Cra.open({
         id: craId,
@@ -632,46 +644,7 @@ async function seed(): Promise<void> {
         seededCras.push({ officeId: consultant.officeId, payload });
       }
 
-      // Persist the CRA
-      await client.query(
-        `INSERT INTO timesheet.cras (
-          id, consultant_id, office_id, period, status,
-          submitted_at, validated_by, validated_at, refusal_by, refusal_at, refusal_reason
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [
-          cra.id,
-          cra.consultantId,
-          cra.officeId,
-          CRA_PERIOD,
-          cra.status,
-          cra.submittedAt,
-          cra.validatedBy,
-          cra.validatedAt,
-          null,
-          null,
-          null,
-        ],
-      );
-
-      // Persist CRA lines
-      for (const line of cra.lines) {
-        const lineId = uuidv7Deterministic(SEED_TIMESTAMP_MS, craIdCounter++);
-        await client.query(
-          `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [lineId, cra.id, line.day, line.dayType, line.missionId, line.halfDays],
-        );
-      }
-
-      // Persist CRA flags
-      for (const flag of cra.flags) {
-        const flagId = uuidv7Deterministic(SEED_TIMESTAMP_MS, craIdCounter++);
-        await client.query(
-          `INSERT INTO timesheet.cra_flags (id, cra_id, day, reason)
-           VALUES ($1, $2, $3, $4)`,
-          [flagId, cra.id, flag.day, flag.reason],
-        );
-      }
+      await cras.save(cra);
     }
 
     console.log(`Seeded ${String(seededCras.length)} validated CRAs for ${CRA_PERIOD}.`);
@@ -761,7 +734,6 @@ async function seed(): Promise<void> {
       vatOnDebitsOption: false,
     });
 
-    let invoiceIdCounter = 2000;
     let totalInvoices = 0;
     let totalDeclined = 0;
 
@@ -771,7 +743,7 @@ async function seed(): Promise<void> {
         type: TIMESHEET_VALIDATED,
         version: TIMESHEET_VALIDATED_VERSION,
         occurredAt: SEED_CLOCK_INSTANT,
-        correlationId: uuidv7Deterministic(SEED_TIMESTAMP_MS, invoiceIdCounter++),
+        correlationId: nextWriteId(),
         causationId: null,
         payload,
       };
@@ -785,128 +757,31 @@ async function seed(): Promise<void> {
           const mission = validatedMissions.find((m) => m.id === missionId);
           return `Prestation ${mission?.name ?? missionId} — ${p}`;
         },
-        newInvoiceId: () => uuidv7Deterministic(SEED_TIMESTAMP_MS, invoiceIdCounter++),
+        newInvoiceId: nextWriteId,
       };
 
       const result = draftInvoicesFrom(dependencies, event);
 
-      // Persist each drafted invoice — column order matches pg-invoice-repository.ts
       for (const invoice of result.invoices) {
-        const mentionsData = invoice.mentions;
-        await client.query(
-          `INSERT INTO billing.invoices (
-            id, office_id, seller_id, status, supply_period,
-            billed_to_client_id, billed_to_name, billed_to_siren, billed_to_vat_number,
-            billed_to_billing_street, billed_to_billing_postal_code,
-            billed_to_billing_city, billed_to_billing_country,
-            billed_to_delivery_street, billed_to_delivery_postal_code,
-            billed_to_delivery_city, billed_to_delivery_country,
-            payment_terms_kind, payment_terms_days,
-            mentions_operation_category, mentions_early_payment_kind, mentions_early_payment_rate,
-            mentions_late_penalty_rate, mentions_recovery_indemnity, mentions_vat_on_debits,
-            validated_by, source_cra_ids
-          ) VALUES (
-            $1, $2, $3, $4, $5,
-            $6, $7, $8, $9,
-            $10, $11, $12, $13,
-            $14, $15, $16, $17,
-            $18, $19,
-            $20, $21, $22, $23, $24, $25,
-            $26, $27
-          )`,
-          [
-            invoice.id,
-            officeId,
-            invoice.seller.id,
-            invoice.status,
-            invoice.supplyPeriod,
-            invoice.billedTo.clientId,
-            invoice.billedTo.name,
-            invoice.billedTo.siren,
-            invoice.billedTo.intraCommunityVatNumber,
-            invoice.billedTo.billingAddress.line1,
-            invoice.billedTo.billingAddress.postalCode,
-            invoice.billedTo.billingAddress.city,
-            invoice.billedTo.billingAddress.country,
-            invoice.billedTo.deliveryAddress.line1,
-            invoice.billedTo.deliveryAddress.postalCode,
-            invoice.billedTo.deliveryAddress.city,
-            invoice.billedTo.deliveryAddress.country,
-            invoice.terms.kind,
-            invoice.terms.days,
-            mentionsData.operationCategory,
-            mentionsData.earlyPaymentDiscount.kind,
-            mentionsData.earlyPaymentDiscount.kind === 'rate'
-              ? mentionsData.earlyPaymentDiscount.basisPoints
-              : null,
-            mentionsData.latePaymentBasisPoints,
-            mentionsData.recoveryIndemnityCents,
-            mentionsData.vatOnDebitsOption,
-            `{${payload.validatedBy}}`,
-            `{${payload.craId}}`,
-          ],
-        );
-
-        // Persist invoice lines
-        for (const [lineIdx, line] of invoice.lines.entries()) {
-          const lineId = uuidv7Deterministic(SEED_TIMESTAMP_MS, invoiceIdCounter++);
-          await client.query(
-            `INSERT INTO billing.invoice_lines (
-              id, invoice_id, line_order, designation,
-              origin_kind, origin_mission_id, origin_cra_id, origin_period,
-              origin_half_days, origin_tjm_cents,
-              quantity_half_days, unit_price_cents, amount_cents,
-              vat_kind, vat_basis_points, vat_not_charged_reason
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
-            [
-              lineId,
-              invoice.id,
-              lineIdx,
-              line.designation,
-              line.origin.kind,
-              line.origin.missionId,
-              line.origin.craId,
-              line.origin.period,
-              line.origin.halfDays,
-              line.origin.tjmCents,
-              line.quantityHalfDays,
-              line.unitPriceCents,
-              line.amountCents,
-              line.vat.kind,
-              line.vat.kind === 'taxable' ? line.vat.basisPoints : null,
-              line.vat.kind === 'notCharged' ? line.vat.reason : null,
-            ],
-          );
-        }
-
-        // Persist VAT groups
-        for (const [_groupIdx, group] of invoice.vatBreakdown.entries()) {
-          const groupId = uuidv7Deterministic(SEED_TIMESTAMP_MS, invoiceIdCounter++);
-          await client.query(
-            `INSERT INTO billing.invoice_vat_groups (id, invoice_id, group_key, base_cents, tax_cents)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [groupId, invoice.id, group.key, group.baseCents, group.vatCents ?? 0],
-          );
-        }
-
+        await invoices.saveDraft(invoice, payload.craId);
         totalInvoices++;
       }
 
-      // Persist domain event
-      const eventId = uuidv7Deterministic(SEED_TIMESTAMP_MS, invoiceIdCounter++);
-      await client.query(
-        `INSERT INTO public.domain_events (id, type, version, occurred_at, correlation_id, causation_id, payload)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [
-          eventId,
-          event.type,
-          event.version,
-          event.occurredAt,
-          event.correlationId,
-          event.causationId,
-          JSON.stringify(event.payload),
-        ],
+      // The days the validation carried that produced no line, with the reason (ADR-0037). The
+      // seed wrote none of these until 21/08/2026, so a freshly seeded database showed an empty
+      // blocking-reason column for a concept the domain models — the drift ADR-0022 warned about,
+      // measured.
+      await invoices.saveDeclinedDays(
+        officeId,
+        result.declined.map((entry) => ({
+          craId: payload.craId,
+          missionId: entry.missionId,
+          halfDays: entry.halfDays,
+          reason: entry.reason,
+        })),
       );
+
+      await events.persist(event);
 
       totalDeclined += result.declined.length;
     }
