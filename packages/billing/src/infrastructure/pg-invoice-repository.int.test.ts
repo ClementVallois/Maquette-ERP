@@ -52,7 +52,13 @@ describe('PgInvoiceRepository', () => {
       city: 'Paris',
       country: 'FR',
     },
-    numberPrefix: 'SEC',
+    // **Not** the seed's `SEC`. `billing.invoices.invoice_number` is `TEXT UNIQUE` across the
+    // whole table, and the harness rolls back what a test writes without isolating it from rows
+    // that are already committed. A test that mints `SEC-2026-000001` therefore passes until
+    // somebody walks the demo and issues the real one — which happened, during the review that
+    // found this. A prefix no seed and no demo uses makes the collision impossible rather than
+    // unlikely.
+    numberPrefix: 'TST',
   });
 
   const TERMS = paymentTerms({ kind: 'net', days: 30 });
@@ -119,7 +125,7 @@ describe('PgInvoiceRepository', () => {
     `);
     await tx.client.query(`
       INSERT INTO public.legal_entities (id, name, legal_form, share_capital_cents, siren, intra_community_vat_number, rcs_registration, address_street, address_postal_code, address_city, address_country, number_prefix)
-      VALUES ('entity-fr', 'Sécurité & Conseil', 'SAS', 15000000, '493296529', 'FR23493296529', 'RCS Paris 493 296 529', '12 rue de la Boétie', '75008', 'Paris', 'FR', 'SEC');
+      VALUES ('entity-fr', 'Sécurité & Conseil', 'SAS', 15000000, '493296529', 'FR23493296529', 'RCS Paris 493 296 529', '12 rue de la Boétie', '75008', 'Paris', 'FR', 'TST');
     `);
   }
 
@@ -290,7 +296,7 @@ describe('PgInvoiceRepository', () => {
 
     expect(found).not.toBeNull();
     expect(found!.status).toBe('issued');
-    expect(found!.number).toBe('SEC-2026-000042');
+    expect(found!.number).toBe('TST-2026-000042');
     expect(found!.issueDate).toBe('2026-04-02');
     expect(found!.series).toStrictEqual({ entityId: 'entity-fr', fiscalYear: 2026 });
     expect(found!.totals.totalExcludingVatCents).toBe(1_365_000);
@@ -393,7 +399,7 @@ describe('PgInvoiceRepository', () => {
 
     const found2 = await repo().findById('invoice-1', parisManager);
     expect(found2!.status).toBe('issued');
-    expect(found2!.number).toBe('SEC-2026-000001');
+    expect(found2!.number).toBe('TST-2026-000001');
   });
 
   it('round-trips the seller through the legal_entities table', async () => {
@@ -405,7 +411,7 @@ describe('PgInvoiceRepository', () => {
 
     expect(found!.seller.name).toBe('Sécurité & Conseil');
     expect(found!.seller.siren).toBe('493296529');
-    expect(found!.seller.numberPrefix).toBe('SEC');
+    expect(found!.seller.numberPrefix).toBe('TST');
     expect(found!.seller.shareCapitalCents).toBe(15_000_000);
   });
 
