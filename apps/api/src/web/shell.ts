@@ -35,7 +35,7 @@ export interface NavItem {
  * missing here hides a screen; only the route's declaration refuses it.
  */
 const NAV_BY_ROLE: Readonly<Record<Role, readonly NavItem[]>> = {
-  consultant: [],
+  consultant: [{ href: PATHS.consultantCra, label: LABELS.cra.nav }],
   manager: [],
   billing: [],
 };

@@ -41,6 +41,53 @@ export const LABELS = {
     billing: 'Facturation',
   },
 
+  cra: {
+    heading: 'Mon CRA',
+    listHeading: 'Mes CRA',
+    nav: 'Mes CRA',
+    day: 'Jour',
+    morning: 'Matin',
+    afternoon: 'Après-midi',
+    mission: 'Mission',
+    quantity: 'Quantité',
+    totals: 'Totaux du mois',
+    totalsAsOf:
+      'Totaux calculés côté serveur, à jour du dernier enregistrement — pas à chaque frappe (ADR-0050).',
+    nothing: '—',
+    absence: 'Absence',
+    flagged: 'Signalé',
+    save: 'Enregistrer',
+    submit: 'Soumettre au manager',
+    period: 'Mois',
+    status: 'Statut',
+    show: 'Ouvrir',
+    notStartedYet: 'Ce mois n’a pas encore été commencé. Remplissez-le, puis enregistrez.',
+    nothingRecorded: 'Rien n’est encore saisi sur ce mois.',
+    refused: 'Ce CRA a été refusé par le manager. Corrigez-le, puis soumettez-le à nouveau.',
+    emptyList: 'Aucun CRA sur cette période.',
+    emptyListHint:
+      'Ce n’est pas un refus : la liste est bien la vôtre, elle ne contient simplement rien pour ce mois.',
+    filter: 'Filtrer par mois',
+    apply: 'Filtrer',
+    allPeriods: 'Tous les mois',
+    nonWorkable: {
+      weekend: 'Week-end',
+      publicHoliday: 'Férié',
+    },
+    readOnly: {
+      submitted: 'CRA soumis : il est entre les mains du manager et n’est plus modifiable.',
+      validated: 'CRA validé : un relevé de temps validé est immuable (ADR-0005).',
+      draft: '',
+      refused: '',
+    },
+    statuses: {
+      draft: 'Brouillon',
+      submitted: 'Soumis',
+      validated: 'Validé',
+      refused: 'Refusé',
+    },
+  },
+
   problem: {
     heading: {
       denied: 'Accès refusé',

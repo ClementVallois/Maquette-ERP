@@ -128,6 +128,10 @@ _Avoid_: Bench, Idle, Unassigned, Available
 A certification-backed clearance a consultant must hold to be staffed on a given mission. Kept in French: distinct from both _role_ and _permission_, and the word used in the firm's own audit vocabulary.
 _Avoid_: Clearance, Certification, Qualification
 
+**HalfDaySlot** (screen only):
+The morning box or the afternoon box of the entry grid. It exists **only on the form** (ADR-0050): the domain has no morning, and `timesheet.cra_lines` stores no slot — two slots on the same mission are folded into one `CraLine` of two half-days on the way in, and split back out on the way to the screen. It is listed here because a reader meets it in the markup and would otherwise look for it in the model.
+_Avoid_: Session, Period (already taken), AmPm, TimeSlot
+
 **Passi** (🇫🇷 kept):
 _Prestataire d'audit de la sécurité des systèmes d'information_ — an ANSSI qualification. A proper noun; never translated.
 _Avoid_: SecurityAuditQualification

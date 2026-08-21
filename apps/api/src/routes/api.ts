@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { issueInvoice } from '../chain/issue-invoice.ts';
+import { recordMonth } from '../chain/record-month.ts';
 import { validateCraAndDraftInvoices } from '../chain/validate-cra.ts';
 import type { ServerDependencies } from '../dependencies.ts';
 import { consultantEconomics } from '../economics/consultant-economics.ts';
@@ -47,6 +48,32 @@ const PeriodQuery = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$
 
 const IdParam = z.object({ id: z.string().min(1).max(64) });
 const ConsultantParams = z.object({ consultantId: z.string().min(1).max(64) });
+
+/**
+ * The month, as a body. One entry per **half-day slot** (ADR-0012 makes the half-day the unit, and
+ * ADR-0050 makes the whole month the unit of write), so a day split across two missions is two
+ * entries and needs no special case.
+ *
+ * The cap is 62 rather than 31×2 exactly: a month has at most 31 days, each has two slots, and a
+ * body longer than that is not a month however it is spelled.
+ */
+const MAX_ENTRIES = 62;
+
+const MonthEntries = z.object({
+  submit: z.boolean().default(false),
+  entries: z
+    .array(
+      z.object({
+        day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+        slot: z.union([z.literal(0), z.literal(1)]),
+        dayType: z.union([z.literal('worked'), z.literal('absence')]),
+        missionId: z.string().min(1).max(64).nullable().default(null),
+      }),
+    )
+    .max(MAX_ENTRIES),
+});
+
+const PeriodParam = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u) });
 
 const IDEMPOTENCY_KEY_HEADER = 'idempotency-key';
 const IdempotencyKey = z.string().min(8).max(200);
@@ -215,6 +242,41 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
   );
 
   // ── Writes ────────────────────────────────────────────────────────────────
+
+  /**
+   * Replaces the month, and submits it if asked (ADR-0050). `PUT` and not `POST`: sending the same
+   * body twice leaves the same month, which is what `PUT` means and what a form resubmission does.
+   *
+   * The path names the **period**, never a consultant: the consultant is the actor. There is no
+   * "someone else's month" to reach, so there is no check here that could be forgotten.
+   */
+  app.put(
+    '/api/v1/cras/:period/entries',
+    { config: { access: forRoles('consultant') } },
+    async (request, reply) => {
+      const params = parseInput(PeriodParam, request.params);
+      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
+
+      const body = parseInput(MonthEntries, request.body);
+      if (!body.ok) return sendProblem(reply, malformed(body.errors, contextOf(request)));
+
+      const outcome = await recordMonth(
+        {
+          transactionally: dependencies.transactionally,
+          clock: dependencies.clock,
+          newId: dependencies.newId,
+        },
+        {
+          actor: requireActor(request),
+          period: periodFromIso(params.value.period),
+          entries: body.value.entries,
+          submit: body.value.submit,
+        },
+      );
+
+      return reply.code(200).send(outcome);
+    },
+  );
 
   app.post(
     '/api/v1/cras/:id/validation',

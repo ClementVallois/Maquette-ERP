@@ -70,6 +70,7 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0047](./0047-what-counts-as-a-second-implementation.md)                       | What counts as a second implementation, and what is not a port at all            | accepted |
 | [0048](./0048-the-screens-ship-in-the-api-deployable.md)                       | The screens ship inside the API deployable; `apps/api` keeps its name            | accepted |
 | [0049](./0049-the-application-declares-its-own-content-security-policy.md)     | The application declares its own CSP, and it says there is no script             | accepted |
+| [0050](./0050-the-grid-posts-the-whole-month.md)                               | The entry grid posts the whole month, in half-day slots, totals server-side      | accepted |
 | [0051](./0051-an-habilitation-constrains-a-day-at-submission.md)               | An `Habilitation` constrains a recorded day, checked at submission               | accepted |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
@@ -148,6 +149,17 @@ development, in the tests, and in CI — for two whole phases. It is also the on
 existing decisions become checkable from outside the repository: `default-src 'none'` is ADR-0009's
 "no client framework" and ADR-0025's refusal to interpolate into a `<script>` body, restated in a
 form a browser enforces.
+
+0050 and 0051 are Phase 6's task-level decisions, and both come from rows the open-questions file
+had been holding for the phase that would need them. 0050 answers the question the 19/08 row
+explicitly refused to guess — what the grid posts — and, in the same breath, records a **narrowing
+of BUILD-PLAN's own wording**: "live totals" becomes "current as of the last save", because
+ADR-0049 forbids script and ADR-0009's threshold names this exact grid as the case that would
+reopen the no-framework decision. One grid is not ten screens, and a threshold spent on the
+cheapest interactivity is a threshold that was never a threshold. 0051 gives three seeded-but-unread
+tables a reader, and says out loud that its refusal is demonstrated in a unit test rather than in
+the demo — because a dataset that violated the rule would not seed, and one that complies never
+shows the rule work.
 
 ## Identified, not yet decided
 

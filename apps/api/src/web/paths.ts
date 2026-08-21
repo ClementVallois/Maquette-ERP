@@ -14,4 +14,6 @@ export const PATHS = {
   home: '/',
   choosePersona: '/persona',
   clearPersona: '/persona/retrait',
+  /** The consultant's own months. A period appended to it is one month's grid. */
+  consultantCra: '/consultant/cra',
 } as const;

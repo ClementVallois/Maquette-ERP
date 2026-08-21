@@ -117,6 +117,18 @@ function workedDaysOfJune(): string[] {
   return days;
 }
 
+/** July 2026, for the month the write tests create: the seeded Cra above is June's. */
+function workedDaysOfJuly(): string[] {
+  const days: string[] = [];
+  for (let day = 1; day <= 31; day += 1) {
+    const iso = `2026-07-${String(day).padStart(2, '0')}`;
+    const weekday = new Date(`${iso}T00:00:00.000Z`).getUTCDay();
+    if (weekday !== 0 && weekday !== 6 && iso !== '2026-07-14') days.push(iso);
+  }
+
+  return days;
+}
+
 beforeEach(async () => {
   const { client } = transaction;
 
@@ -536,5 +548,141 @@ describe('pagination', () => {
     });
 
     expect(response.statusCode).toBe(200);
+  });
+});
+
+/**
+ * The write half of the chain, which did not exist until Phase 6. The open-questions row of
+ * 19/08 named the gap precisely: "the consultant persona can therefore see its own month and
+ * change nothing about it; the seeded `submitted` Cra exists because the seed wrote it, not
+ * because anyone could."
+ */
+describe('recording a month through the API (ADR-0050)', () => {
+  const JULY = workedDaysOfJuly();
+
+  function entries(mission = MISSION): { day: string; slot: 0 | 1; dayType: 'worked' }[] {
+    return JULY.flatMap((day) => [
+      { day, slot: 0 as const, dayType: 'worked' as const },
+      { day, slot: 1 as const, dayType: 'worked' as const },
+    ]).map((entry) => ({ ...entry, missionId: mission }));
+  }
+
+  it('replaces the month and reports the status it left it in', async () => {
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: { submit: false, entries: entries() },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ status: string }>().status).toBe('draft');
+  });
+
+  it('is the same operation the screen performs, so sending it twice leaves one month', async () => {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await app.inject({
+        method: 'PUT',
+        url: '/api/v1/cras/2026-07/entries',
+        headers: writingAs('consultant-paris'),
+        payload: { submit: false, entries: entries() },
+      });
+    }
+
+    const { rows } = await transaction.client.query<{ count: string }>(
+      `SELECT count(*) FROM timesheet.cras WHERE consultant_id = $1 AND period = '2026-07'`,
+      [ALICE],
+    );
+
+    expect(rows[0]?.count).toBe('1');
+  });
+
+  it('names the period and never a consultant: there is no other month to reach', async () => {
+    // The path carries `2026-07` and nothing else. `?consultantId=` and a body field are both
+    // ignored, because neither is read — the actor is the consultant, always.
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/cras/2026-07/entries?consultantId=${CHLOE}`,
+      headers: writingAs('consultant-paris'),
+      payload: { submit: false, entries: entries(), consultantId: CHLOE },
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    const { rows } = await transaction.client.query(
+      `SELECT 1 FROM timesheet.cras WHERE consultant_id = $1 AND period = '2026-07'`,
+      [CHLOE],
+    );
+
+    expect(rows).toHaveLength(0);
+  });
+
+  it('does not carry the action for a manager', async () => {
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('manager-paris'),
+      payload: { submit: false, entries: [] },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ deniedBy: '/problems/insufficient-role' });
+  });
+
+  it('refuses a body longer than a month can be', async () => {
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: {
+        submit: false,
+        entries: Array.from({ length: 63 }, () => ({
+          day: '2026-07-01',
+          slot: 0,
+          dayType: 'worked',
+          missionId: MISSION,
+        })),
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('submits the month, and the flags come back with it', async () => {
+    const saturday = '2026-07-04';
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: {
+        submit: true,
+        entries: [
+          ...entries(),
+          { day: saturday, slot: 0, dayType: 'worked', missionId: MISSION },
+          { day: saturday, slot: 1, dayType: 'worked', missionId: MISSION },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ status: string }>().status).toBe('submitted');
+    expect(response.json<{ flags: { day: string }[] }>().flags).toStrictEqual([
+      { day: saturday, reason: 'weekend' },
+    ]);
+  });
+
+  it('refuses an incomplete month with the invariant that refused it', async () => {
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: {
+        submit: true,
+        entries: [{ day: '2026-07-01', slot: 0, dayType: 'worked', missionId: MISSION }],
+      },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ invariant: '/problems/cra-incomplete' });
   });
 });

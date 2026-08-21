@@ -52,10 +52,12 @@ describe('the shell', () => {
     expect(page).toContain('id="contenu"');
   });
 
-  it('renders no navigation while no role has screens to navigate to', () => {
-    // Deliberate, and it is the reason `NAV_BY_ROLE` starts empty: a link to a route that does not
-    // exist yet is a 404 the reader meets before the feature does.
-    expect(rendered(alice)).not.toContain('navlist');
+  it('navigates a persona only to the screens their role actually has', () => {
+    // The rule `NAV_BY_ROLE` exists for: a link to a route that does not exist yet is a 404 the
+    // reader meets before the feature does. The consultant has the entry grid; the other two roles
+    // have nothing yet, and their header says so by being empty rather than by linking to a stub.
+    expect(rendered(alice)).toContain(LABELS.cra.nav);
+    expect(rendered({ ...alice, role: 'billing' })).not.toContain('navlist');
   });
 
   it('escapes a persona name, because a name is data', () => {

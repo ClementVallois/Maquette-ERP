@@ -299,3 +299,116 @@ footer.site p {
     max-width: none;
   }
 }
+
+/* Tables ------------------------------------------------------------------ */
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+caption {
+  text-align: left;
+  font-weight: 600;
+  padding: 0.5rem 0;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: baseline;
+}
+
+thead th {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+tbody tr:last-child th,
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+td.num,
+th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+table.grid-days tr.off {
+  background: color-mix(in srgb, var(--rule) 25%, transparent);
+}
+
+table.grid-days th[scope='row'] {
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.weekday {
+  display: inline-block;
+  min-width: 5.5em;
+  color: var(--ink-soft);
+}
+
+.tag.off-tag {
+  color: var(--ink-soft);
+}
+
+.tag.flagged {
+  color: var(--held);
+  background: var(--held-soft);
+}
+
+select {
+  font: inherit;
+  padding: 0.15rem 0.25rem;
+  max-width: 22ch;
+}
+
+table.totals {
+  max-width: 32rem;
+  margin-top: calc(var(--space) * 1.5);
+}
+
+p.actions {
+  display: flex;
+  gap: 0.5rem;
+  margin: var(--space) 0;
+}
+
+form.filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem;
+  margin-bottom: var(--space);
+}
+
+/* Present to assistive technology, absent from the page. Every select in the entry grid needs a
+   label, and 62 visible ones would drown the grid the labels exist to explain. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+caption .hint {
+  display: block;
+  font-weight: 400;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  max-width: var(--measure);
+}
