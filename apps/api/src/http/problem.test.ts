@@ -5,6 +5,8 @@ import { API_PROBLEM_TYPES } from '@erp/contracts';
 import { BusinessError } from '@erp/platform';
 import { describe, expect, it } from 'vitest';
 
+import { LABELS } from '../web/labels.ts';
+
 import {
   internalProblem,
   isMappedBusinessError,
@@ -181,5 +183,42 @@ describe('isMappedBusinessError', () => {
   it('refuses anything that is not a business error', () => {
     expect(isMappedBusinessError(new RangeError('boom'))).toBe(false);
     expect(isMappedBusinessError('not an error')).toBe(false);
+  });
+});
+
+describe('the French sentence table of ADR-0060', () => {
+  // Widened for lookup, exactly as `problem-page.ts` does it: `LABELS` stays `as const` so every
+  // string it holds is readable at the declaration.
+  const sentences: Readonly<Record<string, string | undefined>> = LABELS.problem.sentences;
+
+  it('names every refusal a module can raise', () => {
+    // Same source as the status table above: the literals are read out of `packages/`, so an error
+    // added in a later phase is found here on the day it is written rather than rendered as the
+    // English `title` on a French page — which is the defect ADR-0060 removes.
+    const missing = declaredProblemTypes()
+      .filter(({ type }) => sentences[type] === undefined)
+      .map(({ type, file }) => `${type} (${file})`);
+
+    expect(missing).toStrictEqual([]);
+  });
+
+  it('names every refusal the API itself can raise', () => {
+    const missing = Object.values(API_PROBLEM_TYPES).filter(
+      (type) => sentences[type] === undefined,
+    );
+
+    expect(missing).toStrictEqual([]);
+  });
+
+  it('names nothing that is not a refusal, so the table cannot rot quietly', () => {
+    // The other direction. A sentence for a type nothing raises is a sentence nobody will ever
+    // see, and the first sign that the table has drifted from the errors it describes.
+    const known = new Set([
+      ...declaredProblemTypes().map(({ type }) => type),
+      ...Object.values(API_PROBLEM_TYPES),
+    ]);
+    const orphaned = Object.keys(sentences).filter((type) => !known.has(type));
+
+    expect(orphaned).toStrictEqual([]);
   });
 });

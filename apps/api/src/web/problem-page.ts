@@ -36,6 +36,22 @@ function headingFor(problem: ProblemDetails): string {
   return LABELS.problem.heading.malformed;
 }
 
+/**
+ * What the page says happened, in French, keyed by `type` (ADR-0060).
+ *
+ * `problem.title` is deliberately not rendered — it is the API's field, English by BUILD-RULES,
+ * and right where it lives. `problem.detail` is not rendered either: it is `error.message` for
+ * every domain refusal, written for a developer reading a log, and French only where somebody
+ * happened to write French.
+ */
+function sentenceFor(problem: ProblemDetails, heading: string): string {
+  // Widened here rather than at the declaration: `LABELS` is `as const` so a reader can see every
+  // string it holds, and an index signature on the table would take that away for one lookup.
+  const sentences: Readonly<Record<string, string>> = LABELS.problem.sentences;
+
+  return sentences[problem.type] ?? heading;
+}
+
 function fieldErrors(errors: ProblemDetails['errors']): Html | null {
   if (errors === undefined) return null;
 
@@ -55,8 +71,7 @@ export function problemPage(problem: ProblemDetails, persona: Persona | undefine
     { title: heading, persona },
     html`<h1>${heading}</h1>
       <div class="note refused">
-        <p><strong>${problem.title}</strong></p>
-        ${problem.detail === undefined ? null : html`<p>${problem.detail}</p>`}
+        <p><strong>${sentenceFor(problem, heading)}</strong></p>
       </div>
       <dl class="facts">
         <dt>type</dt>

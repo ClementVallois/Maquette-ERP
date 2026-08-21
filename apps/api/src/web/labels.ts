@@ -255,6 +255,83 @@ export const LABELS = {
       malformed: 'Requête invalide',
       internal: 'Erreur interne',
     },
+    /**
+     * What each refusal says, in French, keyed by its `type` (ADR-0060). The page never renders
+     * `ProblemDetails.title`: that field is the API's, it is English by BUILD-RULES, and it is
+     * right where it lives. A type missing from here falls back to the heading for its status —
+     * never to the English title, which is the defect this table removes.
+     *
+     * `problem.test.ts` asserts this table covers every `problemType` declared under `packages/`
+     * plus every `API_PROBLEM_TYPES` value, so a refusal added later is found the day it is
+     * written.
+     */
+    sentences: {
+      // The API's own — facts about the request, not about the business.
+      '/problems/malformed-request': 'La requête n’est pas exploitable en l’état.',
+      '/problems/no-persona': 'Aucun persona n’est sélectionné : choisissez une identité d’abord.',
+      '/problems/unknown-persona':
+        'Le cookie de persona ne désigne aucune identité proposée par cette instance.',
+      '/problems/forbidden-origin':
+        'Une action modifiante doit venir de cette instance. L’origine de la requête ne correspond pas.',
+      '/problems/insufficient-role': 'Votre rôle ne porte pas cette action.',
+      '/problems/not-found': 'Cette page ou cet enregistrement n’existe pas.',
+      '/problems/idempotency-key-required':
+        'Cette action alloue un numéro dans une série sans trou : elle exige une clé d’idempotence.',
+      '/problems/idempotency-key-reused':
+        'Cette clé d’idempotence a déjà émis un autre document. Rechargez la page pour en obtenir une nouvelle.',
+      '/problems/database-unavailable': 'La base de données ne répond pas.',
+      '/problems/internal':
+        'L’action n’a pas pu aboutir. Citez l’identifiant de corrélation ci-dessous.',
+
+      // @erp/platform
+      '/problems/invalid-value': 'Cette valeur n’est pas acceptable.',
+      '/problems/out-of-scope':
+        'Cet enregistrement existe et il est hors de votre périmètre : votre rôle et votre implantation ne le couvrent pas.',
+
+      // @erp/timesheet
+      '/problems/unknown-calendar-year':
+        'Le calendrier ouvré ne couvre pas cette année : les jours fériés n’y sont pas connus.',
+      '/problems/mission-required': 'Un jour travaillé doit porter une mission.',
+      '/problems/mission-not-allowed': 'Une absence ne porte pas de mission.',
+      '/problems/day-outside-period': 'Ce jour n’appartient pas au mois saisi.',
+      '/problems/refusal-reason-required': 'Un refus doit dire ce qu’il faut corriger.',
+      '/problems/unknown-mission': 'Cette mission n’existe pas.',
+      '/problems/day-overbooked':
+        'Une journée compte deux demi-journées : celle-ci est déjà complète.',
+      '/problems/validated-cra-is-immutable':
+        'Ce CRA est validé : un relevé de temps validé ne se modifie plus (ADR-0005).',
+      '/problems/cra-transition-not-allowed':
+        'Le CRA n’est pas dans un état qui permet cette action.',
+      '/problems/mission-not-running': 'La mission ne tourne pas à cette date.',
+      '/problems/not-assigned': 'Le consultant n’est pas affecté à cette mission à cette date.',
+      '/problems/missing-habilitation':
+        'La mission exige une habilitation que le consultant ne détenait pas ce jour-là.',
+      '/problems/cra-incomplete': 'Le mois n’est pas complet au regard du calendrier ouvré.',
+      '/problems/self-validation-forbidden':
+        'Qui saisit un CRA ne le valide pas : c’est la première règle de séparation des tâches (ADR-0006).',
+      '/problems/not-the-manager':
+        'Le CRA d’un mois se répond par le manager de ce mois-là, pas par un autre (ADR-0034).',
+
+      // @erp/billing
+      '/problems/payment-terms-too-long':
+        'Un délai de règlement au-delà du plafond légal est nul, pas inhabituel (art. L441-10).',
+      '/problems/invalid-payment-term': 'Ce délai de règlement n’est pas une forme autorisée.',
+      '/problems/no-vat-rate': 'Aucun taux de TVA ne se résout pour cette opération à cette date.',
+      '/problems/empty-invoice': 'Une facture sans ligne n’est pas une facture.',
+      '/problems/line-outside-invoice-period':
+        'Une ligne porte sur un mois qui n’est pas la période d’exécution du document.',
+      '/problems/invalid-sequence': 'Le numéro alloué ne suit pas la série.',
+      '/problems/invoice-transition-not-allowed':
+        'La facture n’est pas dans un état qui permet cette action.',
+      '/problems/document-does-not-add-up':
+        'Le document ne s’additionne pas : totaux et lignes divergent, il ne part pas.',
+      '/problems/cra-already-processed':
+        'Ce CRA a déjà produit une facture pour ce client : il n’en produira pas une seconde (ADR-0021).',
+      '/problems/not-an-issued-invoice': 'Seule une facture émise peut être corrigée par un avoir.',
+      '/problems/validator-cannot-issue':
+        'Qui valide un CRA n’émet pas la facture qui en découle : c’est la seconde règle de séparation des tâches (ADR-0006).',
+    },
+
     deniedBy: 'Règle qui a refusé',
     invariant: 'Invariant violé',
     correlationId: 'Identifiant de corrélation',
