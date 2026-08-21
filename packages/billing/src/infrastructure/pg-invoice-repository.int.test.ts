@@ -477,4 +477,113 @@ describe('PgInvoiceRepository', () => {
 
     await expect(repo().saveDraft(forEnergie, 'cra-multi')).resolves.toBeUndefined();
   });
+
+  // ---------------------------------------------------------------------------
+  // The four reads and writes Phase 5 added — ADR-0021, ADR-0037, ADR-0044
+  //
+  // Each gets a positive and a negative test, per `docs/BUILD-RULES.md` § Working discipline.
+  // Three of the four are office-scoped, and it is the refusal that carries the claim: for
+  // `findIssuedWithKey` ADR-0044 states it as security — an actor who may not read the invoice
+  // must not learn from the replay lookup whether their key was used on one.
+  // ---------------------------------------------------------------------------
+
+  it('findDraftedFrom answers the documents a validation drafted', async () => {
+    await seedReferenceData();
+
+    await repo().saveDraft(makeDraftInvoice('invoice-drafted'), 'cra-drafted');
+    const drafted = await repo().findDraftedFrom('cra-drafted', parisManager);
+
+    expect(drafted).toHaveLength(1);
+    expect(drafted[0]!.id).toBe('invoice-drafted');
+    expect(drafted[0]!.status).toBe('draft');
+  });
+
+  it('findDraftedFrom answers nothing for another office, and nothing for a consultant', async () => {
+    await seedReferenceData();
+
+    await repo().saveDraft(makeDraftInvoice('invoice-drafted'), 'cra-drafted');
+
+    expect(await repo().findDraftedFrom('cra-drafted', lyonManager)).toStrictEqual([]);
+    expect(await repo().findDraftedFrom('cra-drafted', parisConsultant)).toStrictEqual([]);
+    // And the Cra that drafted nothing is the same empty answer as the one out of reach, which is
+    // beat one of ADR-0003: an absence says nothing about why.
+    expect(await repo().findDraftedFrom('cra-never-validated', parisManager)).toStrictEqual([]);
+  });
+
+  it('saveDeclinedDays writes the days that produced no line, and findDeclinedDays reads them back', async () => {
+    await seedReferenceData();
+
+    await repo().saveDeclinedDays(PARIS, [
+      { craId: 'cra-1', missionId: 'mission-forfait', halfDays: 6, reason: 'notRegie' },
+      { craId: 'cra-1', missionId: 'mission-ghost', halfDays: 2, reason: 'unknownMission' },
+    ]);
+
+    const declined = await repo().findDeclinedDays('cra-1', parisManager);
+
+    expect(declined).toStrictEqual([
+      { craId: 'cra-1', missionId: 'mission-forfait', halfDays: 6, reason: 'notRegie' },
+      { craId: 'cra-1', missionId: 'mission-ghost', halfDays: 2, reason: 'unknownMission' },
+    ]);
+  });
+
+  it('saveDeclinedDays appends nothing on a replay — the claim migration 009 makes', async () => {
+    // `ON CONFLICT (cra_id, mission_id, reason) DO NOTHING`. ADR-0021's replay runs the whole
+    // subscriber again, so this write happens twice for one validation and must leave one row.
+    await seedReferenceData();
+
+    await repo().saveDeclinedDays(PARIS, [
+      { craId: 'cra-1', missionId: 'mission-forfait', halfDays: 6, reason: 'notRegie' },
+    ]);
+    // The replay does not throw — the unique index alone would make it throw — and it does not
+    // overwrite either: `DO NOTHING` rather than `DO UPDATE`, because a decline is a fact about a
+    // Cra that was validated once, and there is nothing about it that can legitimately change.
+    await repo().saveDeclinedDays(PARIS, [
+      { craId: 'cra-1', missionId: 'mission-forfait', halfDays: 999, reason: 'notRegie' },
+    ]);
+
+    const declined = await repo().findDeclinedDays('cra-1', parisManager);
+
+    expect(declined).toHaveLength(1);
+    expect(declined[0]!.halfDays).toBe(6);
+  });
+
+  it('findDeclinedDays answers nothing for another office, and nothing for a consultant', async () => {
+    await seedReferenceData();
+
+    await repo().saveDeclinedDays(PARIS, [
+      { craId: 'cra-1', missionId: 'mission-forfait', halfDays: 6, reason: 'notRegie' },
+    ]);
+
+    expect(await repo().findDeclinedDays('cra-1', lyonManager)).toStrictEqual([]);
+    expect(await repo().findDeclinedDays('cra-1', parisConsultant)).toStrictEqual([]);
+  });
+
+  it('findIssuedWithKey answers the document the key issued', async () => {
+    await seedReferenceData();
+
+    const invoice = makeDraftInvoice('invoice-keyed');
+    invoice.issue({ by: 'claire', sequence: 11, issueDate: '2026-04-02' });
+    await repo().save(invoice, { issuanceIdempotencyKey: 'key-abcdefgh' });
+
+    const found = await repo().findIssuedWithKey('key-abcdefgh', parisBilling);
+
+    expect(found).not.toBeNull();
+    expect(found!.id).toBe('invoice-keyed');
+    expect(found!.invoiceNumber).toBe('TST-2026-000011');
+  });
+
+  it('findIssuedWithKey tells an actor out of scope nothing — the ADR-0044 security claim', async () => {
+    // Not "answers null because there is no row": the row is there, and the answer must be the
+    // same one an unused key gets. A caller who may not read the invoice cannot use this route to
+    // discover that their key issued one.
+    await seedReferenceData();
+
+    const invoice = makeDraftInvoice('invoice-keyed');
+    invoice.issue({ by: 'claire', sequence: 12, issueDate: '2026-04-02' });
+    await repo().save(invoice, { issuanceIdempotencyKey: 'key-abcdefgh' });
+
+    expect(await repo().findIssuedWithKey('key-abcdefgh', lyonManager)).toBeNull();
+    expect(await repo().findIssuedWithKey('key-abcdefgh', parisConsultant)).toBeNull();
+    expect(await repo().findIssuedWithKey('key-never-used', parisBilling)).toBeNull();
+  });
 });
