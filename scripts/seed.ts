@@ -167,6 +167,74 @@ const ManagerAttachmentSchema = z.object({
   toDate: z.string().nullable(),
 });
 
+/**
+ * The money columns of migration 007. `.int()` is the half that matters: a `cjmCents` of 250.5
+ * otherwise skips the boundary entirely and surfaces as a raw Postgres `check constraint
+ * violated`, which names neither the field nor the file it came from.
+ *
+ * The multiple-of-100 rule is the schema's too, and not the database's alone: `docs/BUILD-RULES.md`
+ * § Money states it about every daily rate, and migration 007 doubles it — which is the order this
+ * repository wants, an invariant refused at the boundary and the constraint behind it as the net.
+ */
+const WholeEuroCents = z
+  .number()
+  .int()
+  .positive()
+  .refine((cents) => cents % 100 === 0, 'a daily rate is a whole number of euros');
+
+const IsoDateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+const AddressSchema = z.object({
+  line1: z.string(),
+  line2: z.string().nullable(),
+  postalCode: z.string(),
+  city: z.string(),
+  country: z.string(),
+});
+
+const LegalEntitySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  legalForm: z.string(),
+  shareCapitalCents: z.number().int().positive(),
+  siren: z.string().regex(/^\d{9}$/),
+  intraCommunityVatNumber: z.string(),
+  rcsRegistration: z.string(),
+  address: AddressSchema,
+  numberPrefix: z.string().min(1),
+});
+
+const ConsultantGradeSchema = z.object({
+  id: z.string(),
+  consultantId: z.string(),
+  gradeId: z.string(),
+  fromDate: IsoDateString,
+  toDate: IsoDateString.nullable(),
+  cjmCents: WholeEuroCents,
+});
+
+const GradeTjmDefaultSchema = z.object({
+  id: z.string(),
+  gradeId: z.string(),
+  fromDate: IsoDateString,
+  toDate: IsoDateString.nullable(),
+  tjmCents: WholeEuroCents,
+});
+
+const ConsultantHabilitationSchema = z.object({
+  id: z.string(),
+  consultantId: z.string(),
+  habilitationId: z.string(),
+  obtainedAt: IsoDateString,
+  expiresAt: IsoDateString.nullable(),
+});
+
+const MissionHabilitationSchema = z.object({
+  id: z.string(),
+  missionId: z.string(),
+  habilitationId: z.string(),
+});
+
 const PersonaSchema = z.object({
   id: z.string(),
   key: z.string().regex(/^[a-z][a-z0-9-]*$/),
@@ -214,6 +282,27 @@ async function seed(): Promise<void> {
     'managerAttachments',
   );
   const validatedPersonas = validateArray(PersonaSchema, personas, 'personas');
+  const validatedLegalEntity = validate(LegalEntitySchema, legalEntityData, 'legalEntity');
+  const validatedConsultantGrades = validateArray(
+    ConsultantGradeSchema,
+    consultantGrades,
+    'consultantGrades',
+  );
+  const validatedGradeTjmDefaults = validateArray(
+    GradeTjmDefaultSchema,
+    gradeTjmDefaults,
+    'gradeTjmDefaults',
+  );
+  const validatedConsultantHabilitations = validateArray(
+    ConsultantHabilitationSchema,
+    consultantHabilitations,
+    'consultantHabilitations',
+  );
+  const validatedMissionHabilitations = validateArray(
+    MissionHabilitationSchema,
+    missionHabilitations,
+    'missionHabilitations',
+  );
 
   const client = new PgClient({ connectionString: url });
   await client.connect();
@@ -283,7 +372,7 @@ async function seed(): Promise<void> {
     console.log(`Seeded ${String(validatedHabilitations.length)} habilitations.`);
 
     // Legal entity
-    const le = legalEntityData;
+    const le = validatedLegalEntity;
     await client.query(
       `INSERT INTO public.legal_entities (
         id, name, legal_form, share_capital_cents, siren, intra_community_vat_number,
@@ -316,32 +405,34 @@ async function seed(): Promise<void> {
     }
     console.log(`Seeded ${String(validatedConsultants.length)} consultants.`);
 
-    for (const cg of consultantGrades) {
+    for (const cg of validatedConsultantGrades) {
       await client.query(
         `INSERT INTO public.consultant_grades (id, consultant_id, grade_id, from_date, to_date, cjm_cents)
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [cg.id, cg.consultantId, cg.gradeId, cg.fromDate, cg.toDate, cg.cjmCents],
       );
     }
-    console.log(`Seeded ${String(consultantGrades.length)} consultant grades.`);
+    console.log(`Seeded ${String(validatedConsultantGrades.length)} consultant grades.`);
 
-    for (const gd of gradeTjmDefaults) {
+    for (const gd of validatedGradeTjmDefaults) {
       await client.query(
         `INSERT INTO public.grade_tjm_defaults (id, grade_id, from_date, to_date, tjm_cents)
          VALUES ($1, $2, $3, $4, $5)`,
         [gd.id, gd.gradeId, gd.fromDate, gd.toDate, gd.tjmCents],
       );
     }
-    console.log(`Seeded ${String(gradeTjmDefaults.length)} grade TJM defaults.`);
+    console.log(`Seeded ${String(validatedGradeTjmDefaults.length)} grade TJM defaults.`);
 
-    for (const ch of consultantHabilitations) {
+    for (const ch of validatedConsultantHabilitations) {
       await client.query(
         `INSERT INTO public.consultant_habilitations (id, consultant_id, habilitation_id, obtained_at, expires_at)
          VALUES ($1, $2, $3, $4, $5)`,
         [ch.id, ch.consultantId, ch.habilitationId, ch.obtainedAt, ch.expiresAt],
       );
     }
-    console.log(`Seeded ${String(consultantHabilitations.length)} consultant habilitations.`);
+    console.log(
+      `Seeded ${String(validatedConsultantHabilitations.length)} consultant habilitations.`,
+    );
 
     for (const cl of validatedClients) {
       await client.query(
@@ -378,13 +469,13 @@ async function seed(): Promise<void> {
     }
     console.log(`Seeded ${String(validatedMissions.length)} missions.`);
 
-    for (const mh of missionHabilitations) {
+    for (const mh of validatedMissionHabilitations) {
       await client.query(
         `INSERT INTO public.mission_habilitations (id, mission_id, habilitation_id) VALUES ($1, $2, $3)`,
         [mh.id, mh.missionId, mh.habilitationId],
       );
     }
-    console.log(`Seeded ${String(missionHabilitations.length)} mission habilitations.`);
+    console.log(`Seeded ${String(validatedMissionHabilitations.length)} mission habilitations.`);
 
     for (const mt of validatedMissionTjm) {
       await client.query(
