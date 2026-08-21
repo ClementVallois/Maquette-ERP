@@ -1,3 +1,4 @@
+import { API_PROBLEM_TYPES } from '@erp/contracts';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -70,7 +71,7 @@ export function registerSessionRoutes(
         // A key that does not exist is a 404 and not a 403: nothing is being refused, the thing
         // asked for is not there, and the catalogue that lists what is there is public.
         return sendProblem(reply, {
-          type: '/problems/not-found',
+          type: API_PROBLEM_TYPES.notFound,
           title: 'No such persona',
           status: NOT_FOUND,
           detail: 'GET /api/v1/personas lists the personas this instance offers.',

@@ -288,6 +288,9 @@ describe('the session routes', () => {
     });
 
     expect(response.statusCode).toBe(404);
+    // A key that does not exist is a 404 and not a 403: nothing is being refused, and the
+    // catalogue that lists what is on offer is public.
+    expect(response.json()).toMatchObject({ type: '/problems/not-found' });
   });
 
   it('answers 400 with the field for a body that is not a selection', async () => {
