@@ -173,6 +173,7 @@ export function craGridPage(view: CraGridView, persona: Persona | undefined): Ht
     { title: heading, persona },
     html`<h1>${heading}</h1>
       ${statusNote(view)}
+      <p class="lead">${LABELS.cra.slotsNote}</p>
       <form method="post" action="${`${PATHS.consultantCra}/${view.period}`}">
         <table class="grid-days">
           <thead>

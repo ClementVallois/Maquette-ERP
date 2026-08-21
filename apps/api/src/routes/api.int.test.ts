@@ -560,10 +560,10 @@ describe('pagination', () => {
 describe('recording a month through the API (ADR-0050)', () => {
   const JULY = workedDaysOfJuly();
 
-  function entries(mission = MISSION): { day: string; slot: 0 | 1; dayType: 'worked' }[] {
+  function entries(mission = MISSION): { day: string; dayType: 'worked' }[] {
     return JULY.flatMap((day) => [
-      { day, slot: 0 as const, dayType: 'worked' as const },
-      { day, slot: 1 as const, dayType: 'worked' as const },
+      { day, dayType: 'worked' as const },
+      { day, dayType: 'worked' as const },
     ]).map((entry) => ({ ...entry, missionId: mission }));
   }
 
@@ -638,7 +638,6 @@ describe('recording a month through the API (ADR-0050)', () => {
         submit: false,
         entries: Array.from({ length: 63 }, () => ({
           day: '2026-07-01',
-          slot: 0,
           dayType: 'worked',
           missionId: MISSION,
         })),
@@ -658,8 +657,8 @@ describe('recording a month through the API (ADR-0050)', () => {
         submit: true,
         entries: [
           ...entries(),
-          { day: saturday, slot: 0, dayType: 'worked', missionId: MISSION },
-          { day: saturday, slot: 1, dayType: 'worked', missionId: MISSION },
+          { day: saturday, dayType: 'worked', missionId: MISSION },
+          { day: saturday, dayType: 'worked', missionId: MISSION },
         ],
       },
     });
@@ -678,11 +677,58 @@ describe('recording a month through the API (ADR-0050)', () => {
       headers: writingAs('consultant-paris'),
       payload: {
         submit: true,
-        entries: [{ day: '2026-07-01', slot: 0, dayType: 'worked', missionId: MISSION }],
+        entries: [{ day: '2026-07-01', dayType: 'worked', missionId: MISSION }],
       },
     });
 
     expect(response.statusCode).toBe(409);
     expect(response.json()).toMatchObject({ invariant: '/problems/cra-incomplete' });
+  });
+});
+
+describe('the edges of the write route', () => {
+  it('refuses a month whose year the working calendar does not cover', async () => {
+    // The holiday table is dated (ADR-0004) and holds 2026 alone. 2030 is a perfectly good
+    // `Period` — the value object's own floor is the year 2000, and `1999-01` is refused one layer
+    // earlier as `/problems/invalid-value` — so this is the case that reaches the calendar. Refused
+    // before anything is written, and not only at submission: a month the firm has no calendar for
+    // is a month no rule can judge, so a draft in it would be a row nothing could ever validate.
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2030-01/entries',
+      headers: writingAs('consultant-paris'),
+      payload: { submit: false, entries: [] },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toMatchObject({ type: '/problems/unknown-calendar-year' });
+  });
+
+  it('refuses a replay of a submission, which is the one body PUT is not idempotent for', async () => {
+    const july = workedDaysOfJuly().flatMap((day) => [
+      { day, dayType: 'worked' as const, missionId: MISSION },
+      { day, dayType: 'worked' as const, missionId: MISSION },
+    ]);
+
+    const first = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: { submit: true, entries: july },
+    });
+    expect(first.statusCode).toBe(200);
+
+    // ADR-0050 says a repeated body leaves the same month. That holds while the month is a draft
+    // and stops holding the moment it is submitted, because ADR-0005 takes the Cra out of the
+    // consultant's hands — the ADR says so rather than claiming an idempotency it does not have.
+    const again = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: { submit: true, entries: july },
+    });
+
+    expect(again.statusCode).toBe(409);
+    expect(again.json()).toMatchObject({ invariant: '/problems/cra-transition-not-allowed' });
   });
 });

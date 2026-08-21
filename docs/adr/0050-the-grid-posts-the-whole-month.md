@@ -29,7 +29,11 @@ carry every filled slot of the month, and the month is **replaced**, not merged.
   checked against the rule the month will be judged by — it would report success on each of
   twenty-two saves and fail on the twenty-third.
 - **`PUT`, not `POST`**, on the API: sending the same body twice leaves the same month, which is
-  what `PUT` means and what a form resubmission does anyway.
+  what `PUT` means and what a form resubmission does anyway. **With one bound, stated rather than
+  glossed**: that holds while the month is a draft, and stops holding the moment it is submitted,
+  because ADR-0005 takes the Cra out of the consultant's hands — a replayed `submit: true` is a 409
+  naming the transition, and there is a test for it. `PUT` describes the _representation_ being
+  replaced, not an unconditional idempotency the aggregate does not offer.
 
 One transaction covers save-and-submit. A save that half succeeded would leave a Cra that is
 neither last month's record nor this one's.
@@ -47,8 +51,17 @@ rather than on the day. A form whose shape contradicts the model's justification
 will be argued with.
 
 The slot is a fact about the **form**, never about the record: the domain has no morning, the
-database stores no slot, and the grouping happens in `chain/record-month.ts` on the way in and in
-`gridDays()` on the way out.
+database stores no slot, and **the command carries no slot number either**. Which of the two boxes
+a half-day came from changes nothing — not the invoice, not the totals, not a rule — so it is not
+recorded and does not travel. A `slot` field on `HalfDayEntry` was written and then removed for
+exactly that reason: a value the code declares and never reads is a defect in a repository whose
+thesis is that declared things are enforced.
+
+The visible consequence, which a reader will meet before they meet this ADR: **a split day may come
+back with its two missions in the other box.** The record says "half a day on A and half a day on B
+on the 11th", and the grid renders that in a stable order — the repository reads
+`ORDER BY day, mission_id` — rather than in the order it was typed. That is the truthful rendering
+of what is stored, and preserving the typed order would mean a column carrying no rule.
 
 ### 3. "Live totals" means **current**, not per-keystroke — and that is a narrowing
 

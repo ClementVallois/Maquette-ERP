@@ -54,8 +54,10 @@ const ConsultantParams = z.object({ consultantId: z.string().min(1).max(64) });
  * ADR-0050 makes the whole month the unit of write), so a day split across two missions is two
  * entries and needs no special case.
  *
- * The cap is 62 rather than 31×2 exactly: a month has at most 31 days, each has two slots, and a
- * body longer than that is not a month however it is spelled.
+ * The cap is 62 — the longest month, twice — so a body longer than it is not a month however it is
+ * spelled. It is enforced here and, on the web path, by the domain instead: `DayOverbookedError`
+ * refuses a third half-day on a day, which is the same bound reached by the rule rather than by the
+ * schema.
  */
 const MAX_ENTRIES = 62;
 
@@ -65,7 +67,6 @@ const MonthEntries = z.object({
     .array(
       z.object({
         day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
-        slot: z.union([z.literal(0), z.literal(1)]),
         dayType: z.union([z.literal('worked'), z.literal('absence')]),
         missionId: z.string().min(1).max(64).nullable().default(null),
       }),

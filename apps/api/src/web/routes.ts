@@ -75,11 +75,11 @@ function entriesOf(body: Record<string, unknown>): HalfDayEntry[] {
     const match = SLOT_FIELD.exec(name);
     if (match === null || typeof raw !== 'string' || raw === '') continue;
 
-    const [, day = '', slot = '0'] = match;
+    const [, day = ''] = match;
     entries.push(
       raw === 'absence'
-        ? { day, slot: slot === '0' ? 0 : 1, dayType: 'absence', missionId: null }
-        : { day, slot: slot === '0' ? 0 : 1, dayType: 'worked', missionId: raw },
+        ? { day, dayType: 'absence', missionId: null }
+        : { day, dayType: 'worked', missionId: raw },
     );
   }
 

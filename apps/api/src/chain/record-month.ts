@@ -18,11 +18,15 @@ import type { Transactionally } from '../persistence/unit-of-work.ts';
  * adding one.
  */
 
-/** One half-day slot: what the consultant put in the morning box, or the afternoon box. */
+/**
+ * One half-day of one day. There is deliberately **no slot number**: the grid has a morning box and
+ * an afternoon box because that is how a timesheet is filled in, but which of the two a half-day
+ * came from changes nothing — not the invoice, not the totals, not a rule — so it is not recorded
+ * and does not travel. A `slot` field here would be a value the code declares and never reads,
+ * which in this repository is a defect rather than a nicety (ADR-0050 § 2).
+ */
 export interface HalfDayEntry {
   readonly day: IsoDate;
-  /** `0` is the morning, `1` the afternoon. Only the pairing matters, never which is which. */
-  readonly slot: 0 | 1;
   readonly dayType: RecordedDayType;
   /** `null` for an absence — `craLine` refuses a mission on a day that was not worked. */
   readonly missionId: string | null;
@@ -49,12 +53,13 @@ export interface RecordMonthOutcome {
 }
 
 /**
- * Two adjacent half-days on the same mission are **one line of two half-days**, not two lines of
- * one. The domain permits either — `craLine` accepts one or two — and the difference is visible on
- * the invoice, where two lines of one half-day would print the same mission twice for the same day.
+ * Two half-days of the same day on the same mission are **one line of two half-days**, not two
+ * lines of one. The domain permits either — `craLine` accepts one or two — and the difference is
+ * visible on the invoice, where two lines of one half-day would print the same mission twice for
+ * the same day.
  *
  * Grouping happens here, at the edge, because it is a fact about the *form* the screen posts and
- * not about the record. The domain never sees a slot.
+ * not about the record.
  */
 function linesOf(entries: readonly HalfDayEntry[]): {
   day: IsoDate;
@@ -109,6 +114,13 @@ export async function recordMonth(
   dependencies: RecordMonthDependencies,
   command: RecordMonthCommand,
 ): Promise<RecordMonthOutcome> {
+  // Before anything is written, and not only before a submission: the holiday table is dated
+  // (ADR-0004) and a month the firm has no calendar for is a month no rule can judge. This throws
+  // `UnknownCalendarYearError` — the existing typed refusal, not a second copy of the rule — so a
+  // hand-crafted `PUT` for 1999 is refused where the grid for 1999 already refuses to render.
+  const calendar = workingCalendar();
+  calendar.workableDaysOf(command.period);
+
   return dependencies.transactionally(async (unit) => {
     const existing = await unit.cras.findByConsultantAndPeriod(
       command.actor.consultantId,
@@ -138,7 +150,7 @@ export async function recordMonth(
       const reference = new PgReferenceReader(unit.client);
       cra.submit({
         clock: dependencies.clock,
-        calendar: workingCalendar(),
+        calendar,
         reference: await reference.timesheet(),
       });
     }

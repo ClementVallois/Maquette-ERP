@@ -51,6 +51,8 @@ export const LABELS = {
     mission: 'Mission',
     quantity: 'Quantité',
     totals: 'Totaux du mois',
+    slotsNote:
+      'Les deux colonnes sont deux demi-journées. Le CRA enregistre « une demi-journée sur A, une demi-journée sur B » : l’ordre matin/après-midi n’est pas conservé, parce qu’il ne change ni la facture ni les totaux.',
     totalsAsOf:
       'Totaux calculés côté serveur, à jour du dernier enregistrement — pas à chaque frappe (ADR-0050).',
     nothing: '—',
