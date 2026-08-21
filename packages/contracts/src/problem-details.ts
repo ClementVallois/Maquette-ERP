@@ -54,6 +54,12 @@ export const API_PROBLEM_TYPES = {
   notFound: '/problems/not-found',
   /** A POST that allocates a numbered document arrived without `Idempotency-Key` (ADR-0021). */
   idempotencyKeyRequired: '/problems/idempotency-key-required',
+  /**
+   * The `Idempotency-Key` presented already issued a **different** document. ADR-0044's contract
+   * is "same key, same invoice"; a key reused across two invoices is not a retry, and replaying
+   * the first one would report a number for a document that was never issued.
+   */
+  idempotencyKeyReused: '/problems/idempotency-key-reused',
   databaseUnavailable: '/problems/database-unavailable',
   /** Nothing about it is published beyond the correlation id: it says nothing the caller can act on. */
   internal: '/problems/internal',

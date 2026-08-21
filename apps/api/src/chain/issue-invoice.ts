@@ -12,6 +12,10 @@ import type { Transactionally } from '../persistence/unit-of-work.ts';
  * `Idempotency-Key` (ADR-0044) is the caller's half of the same guarantee. Without it, a client
  * that retries after a timeout it never saw the answer to issues a second document and burns a
  * second number; with it, the retry is recognised and the first document comes back.
+ *
+ * A retry is the *same request* arriving twice, which is why the key alone is not enough to
+ * recognise one: a key that already issued a different document is a client bug, and answering it
+ * with the first document's number would report success for a document that was never issued.
  */
 
 export interface IssueInvoiceDependencies {
@@ -26,7 +30,7 @@ export interface IssueInvoiceCommand {
 }
 
 export interface IssueInvoiceOutcome {
-  readonly kind: 'issued' | 'replayed' | 'notFound';
+  readonly kind: 'issued' | 'replayed' | 'keyReused' | 'notFound';
   readonly invoiceId: string;
   readonly invoiceNumber: string | null;
   readonly issueDate: string | null;
@@ -44,6 +48,16 @@ export async function issueInvoice(
       command.idempotencyKey,
       command.actor,
     );
+    if (alreadyIssued !== null && alreadyIssued.id !== command.invoiceId) {
+      return {
+        kind: 'keyReused',
+        invoiceId: command.invoiceId,
+        invoiceNumber: null,
+        issueDate: null,
+        totalTtcCents: null,
+      };
+    }
+
     if (alreadyIssued !== null) {
       return {
         kind: 'replayed',

@@ -30,6 +30,7 @@ const MAX_PAGE_SIZE = 50;
 const DEFAULT_PAGE_SIZE = 20;
 const NOT_FOUND = 404;
 const BAD_REQUEST = 400;
+const CONFLICT = 409;
 
 /**
  * The cap is here **and** in the repository. Not duplication of a rule: the repository's
@@ -281,6 +282,19 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       );
 
       if (outcome.kind === 'notFound') return sendProblem(reply, notFound(request, 'invoice'));
+
+      if (outcome.kind === 'keyReused') {
+        return sendProblem(reply, {
+          type: API_PROBLEM_TYPES.idempotencyKeyReused,
+          title: 'Idempotency-Key already used on another invoice',
+          status: CONFLICT,
+          invariant: API_PROBLEM_TYPES.idempotencyKeyReused,
+          detail:
+            'This Idempotency-Key issued a different invoice. A retry must carry the key of the ' +
+            'request it retries; a new issuance needs a new key.',
+          ...contextOf(request),
+        });
+      }
 
       return reply.code(200).send({
         invoiceId: outcome.invoiceId,

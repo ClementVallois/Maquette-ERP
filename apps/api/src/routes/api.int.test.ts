@@ -393,6 +393,53 @@ describe('the chain, through the API', () => {
     );
   });
 
+  it('refuses a key that already issued a different invoice, and leaves that one a draft', async () => {
+    // ADR-0044's contract is "same key, **same invoice**". A key that has already issued another
+    // document is a client bug, not a retry: replaying the first document's number here would
+    // report success for an invoice that was never issued, and it would never be issued after.
+    for (const cra of [CRA, CRA_TWO]) {
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/cras/${cra}/validation`,
+        headers: writingAs('manager-paris'),
+      });
+    }
+    const listed = await app.inject({
+      method: 'GET',
+      url: '/api/v1/invoices',
+      headers: as('billing-paris'),
+    });
+    const [first, second] = listed.json<{ invoices: { id: string }[] }>().invoices;
+    const headers = { ...writingAs('billing-paris'), 'idempotency-key': 'issuance-key-0004' };
+
+    const issued = await app.inject({
+      method: 'POST',
+      url: `/api/v1/invoices/${first!.id}/issuance`,
+      headers,
+    });
+    expect(issued.statusCode).toBe(200);
+
+    const reused = await app.inject({
+      method: 'POST',
+      url: `/api/v1/invoices/${second!.id}/issuance`,
+      headers,
+    });
+
+    expect(reused.statusCode).toBe(409);
+    expect(reused.json()).toMatchObject({ type: '/problems/idempotency-key-reused' });
+    // Not the first invoice's number under the second invoice's id, which is the silent failure.
+    expect(reused.json<{ invoiceNumber?: string }>().invoiceNumber).toBeUndefined();
+
+    const untouched = await app.inject({
+      method: 'GET',
+      url: `/api/v1/invoices/${second!.id}`,
+      headers: as('billing-paris'),
+    });
+
+    expect(untouched.json<{ status: string }>().status).toBe('draft');
+    expect(untouched.json<{ invoiceNumber: string | null }>().invoiceNumber).toBeNull();
+  });
+
   it('refuses an issuance with no Idempotency-Key', async () => {
     const response = await app.inject({
       method: 'POST',
