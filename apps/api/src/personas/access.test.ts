@@ -7,8 +7,9 @@ import { ApiFailure } from '../errors.ts';
 import type { Transactionally } from '../persistence/unit-of-work.ts';
 import { buildServer } from '../server.ts';
 
-import { forRoles, personaFor, PUBLIC } from './access.ts';
+import { forRoles, PUBLIC } from './access.ts';
 import { PERSONA_COOKIE, signPersonaKey } from './cookie.ts';
+import { personaFor } from './resolved.ts';
 import { inMemoryPersonas } from './testing/catalogue.ts';
 
 const ORIGIN = 'http://localhost:3000';
@@ -50,19 +51,21 @@ afterEach(async () => {
 function serverWithGuardedRoutes(): FastifyInstance {
   const server = buildServer(dependencies);
 
-  server.get('/managers-only', { config: { access: forRoles('manager') } }, (request) => ({
+  server.get('/api/v1/managers-only', { config: { access: forRoles('manager') } }, (request) => ({
     seenBy: personaFor(request)?.key,
     office: personaFor(request)?.officeId,
   }));
   server.get(
-    '/anyone-signed-in',
+    '/api/v1/anyone-signed-in',
     {
       config: { access: forRoles('consultant', 'manager', 'billing') },
     },
     () => ({ ok: true }),
   );
-  server.post('/managers-write', { config: { access: forRoles('manager') } }, () => ({ ok: true }));
-  server.get('/open', { config: { access: PUBLIC('a fixture') } }, (request) => ({
+  server.post('/api/v1/managers-write', { config: { access: forRoles('manager') } }, () => ({
+    ok: true,
+  }));
+  server.get('/api/v1/open', { config: { access: PUBLIC('a fixture') } }, (request) => ({
     persona: personaFor(request)?.key ?? null,
   }));
 
@@ -76,7 +79,7 @@ describe('a route that declares no Access', () => {
     // ADR-0023: "a route registered without a declaration fails to register". This is that,
     // literally — the throw happens while the server is being built, so it never serves.
     expect(() => {
-      app.get('/undeclared', () => ({ ok: true }));
+      app.get('/api/v1/undeclared', () => ({ ok: true }));
     }).toThrow(/declares no Access/u);
   });
 });
@@ -85,7 +88,7 @@ describe('resolving the persona', () => {
   it('refuses a guarded route with 401 when no persona is selected', async () => {
     app = serverWithGuardedRoutes();
 
-    const response = await app.inject({ method: 'GET', url: '/managers-only' });
+    const response = await app.inject({ method: 'GET', url: '/api/v1/managers-only' });
 
     expect(response.statusCode).toBe(401);
     expect(response.json()).toMatchObject({ type: '/problems/no-persona' });
@@ -97,7 +100,7 @@ describe('resolving the persona', () => {
     const forged = `${PERSONA_COOKIE}=manager-paris.${signPersonaKey('manager-paris', 'wrong-secret-entirely')}`;
     const response = await app.inject({
       method: 'GET',
-      url: '/managers-only',
+      url: '/api/v1/managers-only',
       headers: { cookie: forged },
     });
 
@@ -111,12 +114,12 @@ describe('resolving the persona', () => {
 
     const forged = await app.inject({
       method: 'GET',
-      url: '/managers-only',
+      url: '/api/v1/managers-only',
       headers: { cookie: `${PERSONA_COOKIE}=manager-paris.tampered-signature-of-the-right-len` },
     });
     const unknown = await app.inject({
       method: 'GET',
-      url: '/managers-only',
+      url: '/api/v1/managers-only',
       headers: { cookie: cookieFor('manager-marseille') },
     });
 
@@ -130,7 +133,7 @@ describe('resolving the persona', () => {
 
     const response = await app.inject({
       method: 'GET',
-      url: '/managers-only',
+      url: '/api/v1/managers-only',
       headers: { cookie: cookieFor('manager-lyon') },
     });
 
@@ -143,7 +146,7 @@ describe('resolving the persona', () => {
 
     const response = await app.inject({
       method: 'GET',
-      url: '/managers-only',
+      url: '/api/v1/managers-only',
       headers: { cookie: cookieFor('consultant-paris') },
     });
 
@@ -161,12 +164,12 @@ describe('resolving the persona', () => {
 
     const signedIn = await app.inject({
       method: 'GET',
-      url: '/open',
+      url: '/api/v1/open',
       headers: { cookie: cookieFor('billing-paris') },
     });
     const broken = await app.inject({
       method: 'GET',
-      url: '/open',
+      url: '/api/v1/open',
       headers: { cookie: `${PERSONA_COOKIE}=nonsense` },
     });
 
@@ -182,7 +185,7 @@ describe('the origin check', () => {
 
     const response = await app.inject({
       method: 'GET',
-      url: '/anyone-signed-in',
+      url: '/api/v1/anyone-signed-in',
       headers: { cookie: cookieFor('consultant-paris') },
     });
 
@@ -194,7 +197,7 @@ describe('the origin check', () => {
 
     const response = await app.inject({
       method: 'POST',
-      url: '/managers-write',
+      url: '/api/v1/managers-write',
       headers: { cookie: cookieFor('manager-paris'), origin: 'https://evil.example' },
     });
 
@@ -207,7 +210,7 @@ describe('the origin check', () => {
 
     const response = await app.inject({
       method: 'POST',
-      url: '/managers-write',
+      url: '/api/v1/managers-write',
       headers: { cookie: cookieFor('manager-paris') },
     });
 
@@ -218,7 +221,7 @@ describe('the origin check', () => {
   it('runs before the persona is resolved, so an unauthenticated write is refused on origin first', async () => {
     app = serverWithGuardedRoutes();
 
-    const response = await app.inject({ method: 'POST', url: '/managers-write' });
+    const response = await app.inject({ method: 'POST', url: '/api/v1/managers-write' });
 
     expect(response.json()).toMatchObject({ type: '/problems/forbidden-origin' });
   });
@@ -228,7 +231,7 @@ describe('the origin check', () => {
 
     const response = await app.inject({
       method: 'POST',
-      url: '/managers-write',
+      url: '/api/v1/managers-write',
       headers: { cookie: cookieFor('manager-paris'), origin: ORIGIN },
     });
 

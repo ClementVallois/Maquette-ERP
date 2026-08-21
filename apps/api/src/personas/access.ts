@@ -6,8 +6,9 @@ import type { ServerDependencies } from '../dependencies.ts';
 import { ApiFailure } from '../errors.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
 
-import { actorOf, type Persona } from './catalogue.ts';
+import { actorOf } from './catalogue.ts';
 import { PERSONA_COOKIE, readCookie, unsignPersonaKey } from './cookie.ts';
+import { personaFor, rememberPersona } from './resolved.ts';
 
 /**
  * The third locus of authorization (ADR-0023): **does this actor's role carry this action at
@@ -34,17 +35,6 @@ declare module 'fastify' {
   }
 }
 
-/**
- * The resolved persona, associated with the request rather than written onto it. A `WeakMap`
- * keeps the request object exactly as the framework built it — nothing downstream can mistake a
- * decoration for something the client sent — and the entry disappears with the request.
- */
-const resolved = new WeakMap<FastifyRequest, Persona>();
-
-export function personaFor(request: FastifyRequest): Persona | undefined {
-  return resolved.get(request);
-}
-
 const UNAUTHORIZED = 401;
 const FORBIDDEN = 403;
 
@@ -54,7 +44,7 @@ const FORBIDDEN = 403;
  * is a wiring fault, not a request the caller can fix.
  */
 export function requireActor(request: FastifyRequest): Actor {
-  const persona = resolved.get(request);
+  const persona = personaFor(request);
   if (persona === undefined) {
     throw new ApiFailure(`${request.url} ran without a persona; its Access declaration is wrong`);
   }
@@ -88,7 +78,7 @@ export function registerAccessControl(
       signed === null ? null : unsignPersonaKey(signed, dependencies.config.sessionSigningKey);
     const persona = key === null ? null : await dependencies.personas.byKey(key);
 
-    if (persona !== null) resolved.set(request, persona);
+    if (persona !== null) rememberPersona(request, persona);
 
     if (access === undefined || access.kind === 'public') return;
 

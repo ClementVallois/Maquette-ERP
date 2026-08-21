@@ -1,0 +1,311 @@
+import type { FastifyInstance } from 'fastify';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import type { ApiConfig } from '../config.ts';
+import { ApiFailure } from '../errors.ts';
+import type { Transactionally } from '../persistence/unit-of-work.ts';
+import { forRoles } from '../personas/access.ts';
+import { PERSONA_COOKIE, signPersonaKey } from '../personas/cookie.ts';
+import { inMemoryPersonas } from '../personas/testing/catalogue.ts';
+import { buildServer } from '../server.ts';
+
+import { STYLESHEET } from './assets.ts';
+import { LABELS } from './labels.ts';
+import { PATHS } from './paths.ts';
+import { CONTENT_SECURITY_POLICY } from './reply.ts';
+
+/**
+ * The screens through `fastify.inject`, with no database: the persona catalogue is the in-memory
+ * one, which is enough for everything this task decides — the selector, the cookie round trip, and
+ * the fact that a refusal on a screen path is a **page** carrying the same `ProblemDetails` the API
+ * would have returned.
+ */
+
+const ORIGIN = 'http://localhost:3000';
+const SECRET = 'k'.repeat(40);
+
+const config: ApiConfig = {
+  databaseUrl: 'unused: no route in this file touches the database',
+  host: '127.0.0.1',
+  port: 0,
+  publicOrigin: ORIGIN,
+  sessionSigningKey: SECRET,
+  logLevel: 'silent',
+};
+
+const noDatabase: Transactionally = () => {
+  throw new ApiFailure('this test builds no unit of work');
+};
+
+function as(key: string): { cookie: string } {
+  return { cookie: `${PERSONA_COOKIE}=${key}.${signPersonaKey(key, SECRET)}` };
+}
+
+let app: FastifyInstance;
+
+beforeEach(() => {
+  app = buildServer({
+    config,
+    clock: { now: () => new Date('2026-06-15T09:00:00.000Z') },
+    probeDatabase: () => Promise.resolve(),
+    personas: inMemoryPersonas(),
+    transactionally: noDatabase,
+    newId: () => 'unused',
+  });
+});
+
+afterEach(async () => {
+  await app.close();
+});
+
+describe('the persona selector', () => {
+  it('is the entry point, and it renders before any identity exists', async () => {
+    const response = await app.inject({ method: 'GET', url: PATHS.home });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['content-type']).toContain('text/html');
+    expect(response.body).toContain(LABELS.persona.heading);
+  });
+
+  it('says on the page that this is not authentication', async () => {
+    const response = await app.inject({ method: 'GET', url: PATHS.home });
+
+    expect(response.body).toContain(LABELS.persona.warning);
+  });
+
+  it('offers every seeded persona, including the two managers of different offices', async () => {
+    const response = await app.inject({ method: 'GET', url: PATHS.home });
+
+    expect(response.body).toContain('Bruno Leroy');
+    expect(response.body).toContain('Emma Robert');
+    expect(response.body).toContain('Lyon');
+  });
+
+  it('sets a signed cookie and redirects, so a refresh does not repost the choice', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: PATHS.choosePersona,
+      headers: { origin: ORIGIN, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'key=manager-lyon',
+    });
+
+    expect(response.statusCode).toBe(303);
+    expect(response.headers.location).toBe(PATHS.home);
+    expect(response.headers['set-cookie']).toContain(`${PERSONA_COOKIE}=manager-lyon.`);
+    expect(response.headers['set-cookie']).toContain('HttpOnly');
+    expect(response.headers['set-cookie']).toContain('SameSite=Strict');
+  });
+
+  it('shows the chosen persona in the header of the next page', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: PATHS.home,
+      headers: as('manager-lyon'),
+    });
+
+    expect(response.body).toContain('Emma Robert');
+    expect(response.body).toContain(LABELS.persona.current);
+  });
+
+  it('clears the persona through a POST, because a form cannot DELETE', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: PATHS.clearPersona,
+      headers: { origin: ORIGIN, ...as('manager-lyon') },
+    });
+
+    expect(response.statusCode).toBe(303);
+    expect(response.headers['set-cookie']).toContain('Max-Age=0');
+  });
+
+  it('refuses a persona this instance does not offer, as a page and not as JSON', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: PATHS.choosePersona,
+      headers: { origin: ORIGIN, 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'key=admin-root',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.headers['content-type']).toContain('text/html');
+    expect(response.body).toContain(LABELS.problem.heading.notFound);
+  });
+});
+
+describe('the origin check, met by a browser for the first time', () => {
+  it('refuses a form post that carries no Origin', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: PATHS.choosePersona,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'key=manager-lyon',
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.body).toContain('/problems/forbidden-origin');
+  });
+
+  it('refuses a form post from another origin, and says so on a page', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: PATHS.choosePersona,
+      headers: {
+        origin: 'https://evil.test',
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      payload: 'key=manager-lyon',
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.headers['content-type']).toContain('text/html');
+    expect(response.body).toContain(LABELS.problem.heading.denied);
+  });
+});
+
+describe('a refusal on a screen path is the API refusal, rendered', () => {
+  it('renders a role refusal as a page naming the rule that denied it', async () => {
+    app.get('/interdit', { config: { access: forRoles('manager') } }, () => ({ ok: true }));
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/interdit',
+      headers: as('consultant-paris'),
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.headers['content-type']).toContain('text/html');
+    // The same `deniedBy` the JSON carries, on the page, so the demonstration is reproducible
+    // from either side.
+    expect(response.body).toContain('/problems/insufficient-role');
+    expect(response.body).toContain(LABELS.problem.deniedBy);
+  });
+
+  it('still shows who the refused visitor is, which is half the demonstration', async () => {
+    app.get('/interdit', { config: { access: forRoles('manager') } }, () => ({ ok: true }));
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/interdit',
+      headers: as('consultant-paris'),
+    });
+
+    expect(response.body).toContain('Alice Martin');
+  });
+
+  it('renders an unknown screen path as a page and an unknown API path as JSON', async () => {
+    const page = await app.inject({ method: 'GET', url: '/pas-de-page' });
+    const json = await app.inject({ method: 'GET', url: '/api/v1/nothing' });
+
+    expect(page.headers['content-type']).toContain('text/html');
+    expect(json.headers['content-type']).toContain('application/problem+json');
+    expect(json.json()).toMatchObject({ type: '/problems/not-found' });
+  });
+
+  it('publishes no business detail on a technical failure, on a page either', async () => {
+    app.get('/casse', { config: { access: forRoles('consultant') } }, () => {
+      throw new ApiFailure('connection string: postgres://user:hunter2@host/db');
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/casse',
+      headers: as('consultant-paris'),
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.body).not.toContain('hunter2');
+    expect(response.body).toContain(LABELS.problem.heading.internal);
+  });
+});
+
+describe('the stylesheet', () => {
+  it('is served from the path that carries its content hash', async () => {
+    const response = await app.inject({ method: 'GET', url: STYLESHEET.path });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['content-type']).toContain('text/css');
+    expect(response.headers['cache-control']).toContain('immutable');
+  });
+
+  it('answers 304 to a browser that already holds it', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: STYLESHEET.path,
+      headers: { 'if-none-match': STYLESHEET.etag },
+    });
+
+    expect(response.statusCode).toBe(304);
+  });
+
+  it('has no path parameter to traverse', async () => {
+    // Not a hardened path join: there is no join. The route is one literal string computed at
+    // boot, so anything else is simply not a route.
+    for (const attempt of ['/assets/style.css', '/assets/../config.ts', '/assets/']) {
+      expect((await app.inject({ method: 'GET', url: attempt })).statusCode).toBe(404);
+    }
+  });
+});
+
+describe('security headers', () => {
+  it('states that this application has no script, in a form a browser enforces', async () => {
+    const response = await app.inject({ method: 'GET', url: PATHS.home });
+
+    expect(response.headers['content-security-policy']).toBe(CONTENT_SECURITY_POLICY);
+    expect(CONTENT_SECURITY_POLICY).toContain("default-src 'none'");
+    expect(CONTENT_SECURITY_POLICY).toContain("form-action 'self'");
+  });
+
+  it('carries them on the API too, so the list has no exception to remember', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/v1/personas' });
+
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers['referrer-policy']).toBe('no-referrer');
+  });
+});
+
+describe('the form body parser', () => {
+  it('collects repeated field names into an array, which the Cra grid will post', async () => {
+    let seen: unknown;
+    app.post('/formulaire', { config: { access: forRoles('consultant') } }, (request) => {
+      seen = request.body;
+
+      return { ok: true };
+    });
+
+    await app.inject({
+      method: 'POST',
+      url: '/formulaire',
+      headers: {
+        origin: ORIGIN,
+        'content-type': 'application/x-www-form-urlencoded',
+        ...as('consultant-paris'),
+      },
+      payload: 'jour=2026-06-01&jour=2026-06-02&mois=2026-06',
+    });
+
+    expect(seen).toEqual({ jour: ['2026-06-01', '2026-06-02'], mois: '2026-06' });
+  });
+
+  it('cannot reach Object.prototype through a field name', async () => {
+    let seen: Record<string, unknown> = {};
+    app.post('/formulaire', { config: { access: forRoles('consultant') } }, (request) => {
+      seen = request.body as Record<string, unknown>;
+
+      return { ok: true };
+    });
+
+    await app.inject({
+      method: 'POST',
+      url: '/formulaire',
+      headers: {
+        origin: ORIGIN,
+        'content-type': 'application/x-www-form-urlencoded',
+        ...as('consultant-paris'),
+      },
+      payload: '__proto__=polluted',
+    });
+
+    expect(Object.getPrototypeOf(seen)).toBeNull();
+    expect({}).not.toHaveProperty('polluted');
+  });
+});

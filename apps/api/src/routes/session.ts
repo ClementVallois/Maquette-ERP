@@ -4,9 +4,10 @@ import { z } from 'zod';
 
 import type { ServerDependencies } from '../dependencies.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
-import { personaFor, PUBLIC } from '../personas/access.ts';
+import { PUBLIC } from '../personas/access.ts';
 import type { Persona } from '../personas/catalogue.ts';
 import { clearedPersonaCookie, personaCookie } from '../personas/cookie.ts';
+import { personaFor } from '../personas/resolved.ts';
 import { malformed, parseInput } from '../validation.ts';
 
 /**

@@ -69,6 +69,7 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0046](./0046-intercontrat-is-modelled-as-an-internal-non-billable-mission.md) | `Intercontrat` is modelled as an internal non-billable mission                   | accepted |
 | [0047](./0047-what-counts-as-a-second-implementation.md)                       | What counts as a second implementation, and what is not a port at all            | accepted |
 | [0048](./0048-the-screens-ship-in-the-api-deployable.md)                       | The screens ship inside the API deployable; `apps/api` keeps its name            | accepted |
+| [0049](./0049-the-application-declares-its-own-content-security-policy.md)     | The application declares its own CSP, and it says there is no script             | accepted |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
@@ -139,6 +140,13 @@ Dockerfile all say the opposite. It also does something the other ADRs here do n
 it accepts a name that is wrong. `apps/api` serves HTML from this phase onward, and the cost of
 renaming it across eleven files mid-phase is higher than the cost of a directory whose inaccuracy
 is written at the top of the log that names it.
+
+0049 is the second unplanned number of Phase 6 and comes from a gap rather than a question: 8.3
+schedules security headers on the nginx vhost, which leaves the screens with no policy at all in
+development, in the tests, and in CI — for two whole phases. It is also the only place where two
+existing decisions become checkable from outside the repository: `default-src 'none'` is ADR-0009's
+"no client framework" and ADR-0025's refusal to interpolate into a `<script>` body, restated in a
+form a browser enforces.
 
 ## Identified, not yet decided
 

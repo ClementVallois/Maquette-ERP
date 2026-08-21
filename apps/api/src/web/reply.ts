@@ -1,0 +1,74 @@
+import type { FastifyInstance, FastifyReply } from 'fastify';
+
+import { html, type Html, renderToString } from './render/html.ts';
+
+export const HTML = 'text/html; charset=utf-8';
+
+const OK = 200;
+const SEE_OTHER = 303;
+
+/**
+ * The Content-Security-Policy this application can honestly claim, which is the strictest one there
+ * is: `default-src 'none'` and then exactly two allowances.
+ *
+ * It is worth having as a header even though BUILD-PLAN 8.3 puts security headers on the nginx
+ * vhost, and the reason is not defence in depth. It is that **this policy is a statement about the
+ * code**, not about the deployment: ADR-0009 decided there is no client framework and no script,
+ * ADR-0025 decided nothing may be interpolated into a `<script>` body, and `script-src 'none'`
+ * is those two decisions made checkable by a browser and by `curl -I`. A policy that lived only in
+ * the reverse proxy would be absent in development, absent in the tests, and true by accident.
+ *
+ * `form-action 'self'` is the one that matters most in a mockup whose every write is a form post:
+ * it means an injected `<form action="https://…">` cannot exfiltrate a submission even if the
+ * escaping of ADR-0025 were defeated.
+ */
+export const CONTENT_SECURITY_POLICY = [
+  "default-src 'none'",
+  "style-src 'self'",
+  "img-src 'self'",
+  "form-action 'self'",
+  "base-uri 'none'",
+  "frame-ancestors 'none'",
+].join('; ');
+
+/**
+ * Applied to every response, JSON included. A `Content-Security-Policy` on a JSON body does
+ * nothing and costs nothing; a header list with an exception in it is a header list someone has to
+ * remember, which is the failure mode this whole repository is arranged against.
+ */
+export function registerSecurityHeaders(app: FastifyInstance): void {
+  app.addHook('onSend', (_request, reply, payload, done) => {
+    void reply.headers({
+      'content-security-policy': CONTENT_SECURITY_POLICY,
+      // The renderer of ADR-0025 sets a content type on everything it sends; this is what stops a
+      // browser from deciding it knows better and sniffing a response into a script.
+      'x-content-type-options': 'nosniff',
+      // No `Referer` leaves this instance. A Cra URL carries a consultant id and a period, and a
+      // referrer is the classic way an internal identifier reaches a third party's log.
+      'referrer-policy': 'no-referrer',
+      'x-frame-options': 'DENY',
+    });
+    done(null, payload);
+  });
+}
+
+export function sendPage(reply: FastifyReply, page: Html, status: number = OK): FastifyReply {
+  return reply.code(status).type(HTML).send(renderToString(page));
+}
+
+/**
+ * POST-then-redirect. Every write in these screens is a form submission, and answering one with a
+ * page means the browser re-submits it on refresh — a second validation, a second issuance. 303
+ * (rather than 302) is what makes the follow-up request a GET on every client, which is the whole
+ * point of using it here.
+ *
+ * The location is always a path this application owns: it comes from `PATHS`, never from a query
+ * parameter or a `Referer`, so there is no open redirect to close.
+ */
+export function redirectTo(reply: FastifyReply, path: string): FastifyReply {
+  return reply
+    .code(SEE_OTHER)
+    .header('location', path)
+    .type(HTML)
+    .send(renderToString(html`<p><a href="${path}">Continuer</a></p>`));
+}

@@ -8,10 +8,14 @@
  *
  * The keys are English because they are code; the values are French because they are the screen.
  * That split is the whole of ADR-0026.
+ *
+ * The apostrophes are typographic (`’`, U+2019), and not out of fussiness: a straight `'` is one of
+ * the five characters the renderer escapes, so it reaches the page as `&#39;` — correct, and ugly
+ * in the one file whose job is to be read.
  */
 export const LABELS = {
   appName: 'CRA → Facture',
-  appTagline: "Maquette d'un module ERP interne",
+  appTagline: 'Maquette d’un module ERP interne',
 
   nav: {
     skipToContent: 'Aller au contenu',
@@ -20,9 +24,9 @@ export const LABELS = {
 
   persona: {
     heading: 'Choisir un persona',
-    lead: "Cette maquette n'a pas d'authentification : on choisit une identité, et tout le monde peut choisir n'importe laquelle.",
+    lead: 'Cette maquette n’a pas d’authentification : on choisit une identité, et tout le monde peut choisir n’importe laquelle.',
     warning:
-      "Ce n'est pas une connexion. Aucun mot de passe n'est demandé, aucune identité n'est vérifiée, et le sélecteur remplace un fournisseur d'identité pour rendre les règles d'autorisation démontrables en trois clics.",
+      'Ce n’est pas une connexion. Aucun mot de passe n’est demandé, aucune identité n’est vérifiée, et le sélecteur remplace un fournisseur d’identité pour rendre les règles d’autorisation démontrables en trois clics.',
     choose: 'Prendre ce rôle',
     current: 'Persona en cours',
     change: 'Changer de persona',
@@ -51,7 +55,7 @@ export const LABELS = {
     correlationId: 'Identifiant de corrélation',
     correlationHint:
       'À citer en cas de signalement : il relie cette page à la ligne de journal qui la décrit.',
-    back: "Revenir à l'accueil",
+    back: 'Revenir à l’accueil',
   },
 
   footer: {

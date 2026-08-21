@@ -13,6 +13,9 @@ import { registerAccessControl, registerOriginCheck } from './personas/access.ts
 import { registerApiRoutes } from './routes/api.ts';
 import { registerOpsRoutes } from './routes/ops.ts';
 import { registerSessionRoutes } from './routes/session.ts';
+import { registerFormBodyParser } from './web/form-body.ts';
+import { registerSecurityHeaders } from './web/reply.ts';
+import { registerWebRoutes } from './web/routes.ts';
 
 /**
  * The HTTP edge. Everything it knows how to do with a failure is turn it into RFC 9457
@@ -100,12 +103,15 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
   // Order matters and is not incidental: `registerAccessControl` installs an `onRoute` hook, and
   // Fastify fires that hook only for routes registered after it. Registering a route first would
   // make it exempt from the declaration check — silently.
+  registerSecurityHeaders(app);
+  registerFormBodyParser(app);
   registerOriginCheck(app, dependencies);
   registerAccessControl(app, dependencies);
 
   registerOpsRoutes(app, dependencies);
   registerSessionRoutes(app, dependencies);
   registerApiRoutes(app, dependencies);
+  registerWebRoutes(app, dependencies);
 
   return app;
 }
