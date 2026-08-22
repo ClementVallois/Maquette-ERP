@@ -1,10 +1,11 @@
+import { ROLES } from '@erp/platform';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { ApiConfig } from '../config.ts';
 import { ApiFailure } from '../errors.ts';
 import type { Transactionally } from '../persistence/unit-of-work.ts';
-import { forRoles } from '../personas/access.ts';
+import { carries, forRoles } from '../personas/access.ts';
 import { PERSONA_COOKIE, signPersonaKey } from '../personas/cookie.ts';
 import { inMemoryPersonas } from '../personas/testing/catalogue.ts';
 import { buildServer } from '../server.ts';
@@ -13,6 +14,7 @@ import { STYLESHEET } from './assets.ts';
 import { LABELS } from './labels.ts';
 import { PATHS } from './paths.ts';
 import { CONTENT_SECURITY_POLICY } from './reply.ts';
+import { DECIDES_CRA, ISSUES_INVOICE } from './routes.ts';
 
 /**
  * The screens through `fastify.inject`, with no database: the persona catalogue is the in-memory
@@ -308,4 +310,103 @@ describe('the form body parser', () => {
     expect(Object.getPrototypeOf(seen)).toBeNull();
     expect({}).not.toHaveProperty('polluted');
   });
+
+  it('refuses a parameter flood, and the handler never runs', async () => {
+    let reached = false;
+    app.post('/formulaire', { config: { access: forRoles('consultant') } }, () => {
+      reached = true;
+
+      return { ok: true };
+    });
+
+    // The body limit caps the bytes; this caps the *shape*. 501 one-character fields are a few
+    // kilobytes, so only the field count can be what refuses them.
+    const flood = Array.from({ length: 501 }, (_, index) => `f${String(index)}=1`).join('&');
+    const response = await app.inject({
+      method: 'POST',
+      url: '/formulaire',
+      headers: {
+        origin: ORIGIN,
+        'content-type': 'application/x-www-form-urlencoded',
+        ...as('consultant-paris'),
+      },
+      payload: flood,
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(reached).toBe(false);
+  });
+
+  it('accepts a body that sits exactly on the cap', async () => {
+    let count = 0;
+    app.post('/formulaire', { config: { access: forRoles('consultant') } }, (request) => {
+      count = Object.keys(request.body as Record<string, unknown>).length;
+
+      return { ok: true };
+    });
+
+    const atCap = Array.from({ length: 500 }, (_, index) => `f${String(index)}=1`).join('&');
+    const response = await app.inject({
+      method: 'POST',
+      url: '/formulaire',
+      headers: {
+        origin: ORIGIN,
+        'content-type': 'application/x-www-form-urlencoded',
+        ...as('consultant-paris'),
+      },
+      payload: atCap,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(count).toBe(500);
+  });
+});
+
+/**
+ * The offer and the refusal come off one declaration (ADR-0023). A screen decides whether to draw
+ * the button by asking the verb's own `Access` through `carries`; these tests drive the same roles
+ * at the verb itself and assert the two answers agree for **every** role — so moving a verb between
+ * roles cannot leave a button behind, which a hand-written table of roles would have allowed.
+ */
+describe('a verb and the button that offers it', () => {
+  const personaByRole = {
+    consultant: 'consultant-paris',
+    manager: 'manager-paris',
+    billing: 'billing-paris',
+  } as const;
+
+  async function refusedOnRole(url: string, role: (typeof ROLES)[number]): Promise<boolean> {
+    const response = await app.inject({
+      method: 'POST',
+      url,
+      headers: {
+        origin: ORIGIN,
+        'content-type': 'application/x-www-form-urlencoded',
+        ...as(personaByRole[role]),
+      },
+      payload: '',
+    });
+
+    // A role that carries the verb gets past the check and fails later on the absent database;
+    // only this problem type means the role itself was refused. These are screen paths, so the
+    // refusal arrives as a rendered page that prints its `type` (ADR-0026), never as JSON.
+    return response.statusCode === 403 && response.body.includes('/problems/insufficient-role');
+  }
+
+  for (const role of ROLES) {
+    it(`offers the Cra decision to ${role} exactly when the route carries it`, async () => {
+      expect(await refusedOnRole(`${PATHS.validateCra}/some-id`, role)).toBe(
+        !carries(DECIDES_CRA, role),
+      );
+      expect(await refusedOnRole(`${PATHS.refuseCra}/some-id`, role)).toBe(
+        !carries(DECIDES_CRA, role),
+      );
+    });
+
+    it(`mints an issuance key for ${role} exactly when the route carries it`, async () => {
+      expect(await refusedOnRole(`${PATHS.issueInvoice}/some-id`, role)).toBe(
+        !carries(ISSUES_INVOICE, role),
+      );
+    });
+  }
 });

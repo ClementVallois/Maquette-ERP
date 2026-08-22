@@ -19,7 +19,7 @@ import type { ServerDependencies } from '../dependencies.ts';
 import { consultantEconomics } from '../economics/consultant-economics.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
 import { PgReferenceReader } from '../persistence/reference-reader.ts';
-import { forRoles, PUBLIC, requireActor } from '../personas/access.ts';
+import { carries, forRoles, PUBLIC, requireActor } from '../personas/access.ts';
 import { clearedPersonaCookie, personaCookie } from '../personas/cookie.ts';
 import { personaFor } from '../personas/resolved.ts';
 import { malformed, parseInput } from '../validation.ts';
@@ -50,6 +50,16 @@ const NOT_MODIFIED = 304;
 /** A consultant's whole history fits well inside the repository's hard cap of fifty. */
 const MAX_MONTHS = 50;
 const SLOTS = [0, 1] as const;
+
+/**
+ * The declarations the verbs are registered with, named because a **screen reads them too**
+ * (ADR-0023). A button that offers an action asks the action's own `Access` whether this role
+ * carries it, through `carries` — so the offer cannot drift from the refusal, and moving a verb
+ * between roles moves its button in the same edit. `routes.test.ts` proves the route each one is
+ * registered on is the route the screen asks about.
+ */
+export const DECIDES_CRA = forRoles('manager');
+export const ISSUES_INVOICE = forRoles('billing');
 
 const ConsultantParam = z.object({ consultantId: z.string().min(1).max(64) });
 const IdParam = z.object({ id: z.string().min(1).max(64) });
@@ -210,7 +220,7 @@ function craNotFound(request: FastifyRequest): ProblemDetails {
     type: API_PROBLEM_TYPES.notFound,
     title: 'No such Cra',
     status: NOT_FOUND,
-    detail: "Ce CRA n'existe pas, ou n'a jamais existé.",
+    detail: 'This Cra does not exist, or has never existed.',
     ...contextOf(request),
   };
 }
@@ -254,7 +264,7 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
           type: API_PROBLEM_TYPES.notFound,
           title: 'No such persona',
           status: NOT_FOUND,
-          detail: "Ce persona n'existe pas sur cette instance.",
+          detail: 'This persona does not exist on this instance.',
           ...contextOf(request),
         });
       }
@@ -405,7 +415,7 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
             cras: [],
             lateHalfDays: 0,
             periodClosed: false,
-            mayDecide: actor.role === 'manager',
+            mayDecide: carries(DECIDES_CRA, actor.role),
           };
         }
 
@@ -472,9 +482,10 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
                 .reduce((total, row) => total + row.recordedHalfDays, 0)
             : 0,
           periodClosed,
-          // The navigational echo of the route's own declaration, never its source: `billing`
-          // reads this table and decides nothing on it, and `POST` refuses it whatever renders.
-          mayDecide: actor.role === 'manager',
+          // The navigational echo of the route's own declaration, and now literally that
+          // declaration: `billing` reads this table and decides nothing on it, and `POST` refuses
+          // it whatever renders.
+          mayDecide: carries(DECIDES_CRA, actor.role),
         };
       });
 
@@ -524,7 +535,7 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
           type: API_PROBLEM_TYPES.notFound,
           title: 'No such Cra',
           status: NOT_FOUND,
-          detail: "Ce CRA n'existe pas, ou n'a jamais existé.",
+          detail: 'This Cra does not exist, or has never existed.',
           ...contextOf(request),
         });
       }
@@ -558,7 +569,7 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
           type: API_PROBLEM_TYPES.notFound,
           title: 'No such invoice',
           status: NOT_FOUND,
-          detail: "Cette facture n'existe pas, ou n'a jamais existé.",
+          detail: 'This invoice does not exist, or has never existed.',
           ...contextOf(request),
         });
       }
@@ -574,7 +585,7 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
             // Minted here rather than on the form's own route, because the key has to exist
             // before the submission it identifies (ADR-0059). `null` for a manager, who may read
             // this document and not issue it.
-            issuanceKey: actor.role === 'billing' ? dependencies.newId() : null,
+            issuanceKey: carries(ISSUES_INVOICE, actor.role) ? dependencies.newId() : null,
           },
           personaFor(request),
         ),
@@ -619,7 +630,7 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
           type: API_PROBLEM_TYPES.notFound,
           title: 'No such economics record',
           status: NOT_FOUND,
-          detail: "Ce consultant n'a pas de CRA sur ce mois.",
+          detail: 'This consultant has no Cra for this month.',
           ...contextOf(request),
         });
       }
@@ -632,7 +643,7 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
 
   app.post(
     `${PATHS.validateCra}/:id`,
-    { config: { access: forRoles('manager') } },
+    { config: { access: DECIDES_CRA } },
     async (request, reply) => {
       const params = parseInput(IdParam, request.params);
       if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
@@ -660,7 +671,7 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
 
   app.post(
     `${PATHS.refuseCra}/:id`,
-    { config: { access: forRoles('manager') } },
+    { config: { access: DECIDES_CRA } },
     async (request, reply) => {
       const params = parseInput(IdParam, request.params);
       if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
@@ -690,7 +701,7 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
    */
   app.post(
     `${PATHS.issueInvoice}/:id`,
-    { config: { access: forRoles('billing') } },
+    { config: { access: ISSUES_INVOICE } },
     async (request, reply) => {
       const params = parseInput(IdParam, request.params);
       if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
@@ -712,7 +723,7 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
           type: API_PROBLEM_TYPES.notFound,
           title: 'No such invoice',
           status: NOT_FOUND,
-          detail: "Cette facture n'existe pas, ou n'a jamais existé.",
+          detail: 'This invoice does not exist, or has never existed.',
           ...contextOf(request),
         });
       }
@@ -724,8 +735,8 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
           status: CONFLICT,
           invariant: API_PROBLEM_TYPES.idempotencyKeyReused,
           detail:
-            'Cette clé a déjà émis un autre document. Rechargez la facture pour en obtenir une ' +
-            'nouvelle.',
+            'This key has already issued a different document. Reload the invoice to obtain a ' +
+            'fresh one.',
           deniedBy: API_PROBLEM_TYPES.idempotencyKeyReused,
           ...contextOf(request),
         });

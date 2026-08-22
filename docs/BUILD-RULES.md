@@ -172,7 +172,10 @@ React, Vue, PDF generation, OpenTelemetry, Testcontainers.
   a directory reached by a relative path. `rootDir` is `src` in every package, and a climb out of it
   fails the per-package `tsc --noEmit` — which the `quality` CI job runs.
 - Every foreign key is indexed in the migration that creates it. Migrations are additive and are
-  replayed twice in CI.
+  replayed twice in CI. **One bounded exception exists** (**ADR-0057**, migration 010): a table that
+  was created, never read and never held a row may be dropped, because leaving it would make the
+  schema state a rule the domain does not. The exception is the ADR's, not a licence — a table
+  holding data is migrated, never dropped.
 - A worked day is a `date`; an event is a `timestamptz`. Never a bare `timestamp`.
 - Ids are UUIDv7 generated in the application, so an aggregate can be built without touching the
   database. The legal invoice number is a **separate** field from the internal id.

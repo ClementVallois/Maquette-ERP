@@ -1,15 +1,15 @@
 # CRA → facture : maquette d'un module d'ERP interne
 
-> ⚠️ Coquille initialisée le 07/08/2026. Ce README se remplit **au fil de la construction**, pas à
+> ⚠️ Ossature initialisée le 07/08/2026. Ce README se remplit **au fil de la construction**, pas à
 > la fin : une section décrit ce qui existe le jour où elle est écrite, et une section absente est
 > une chose non construite. Les chiffres portent leur date ou la commande qui les recompte — un
 > nombre écrit une fois est faux quelques commits plus tard, et ce README en a porté quatre.
 
 ## Où en est cette maquette
 
-**Phases 1 à 5 terminées** — le plan en compte onze, numérotées 0 à 10
+**Phases 1 à 6 terminées** — le plan en compte onze, numérotées 0 à 10
 ([`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md)). Les phases 1 à 3 datent du 19/08/2026, la 4 et la 5
-du 21/08/2026.
+du 21/08/2026, la 6 du 22/08/2026.
 
 Les **domaines**, en TypeScript pur et sans base de données : `timesheet` — CRA, cycle de vie,
 calendrier ouvré, règles de soumission, validation et événement de domaine — et `billing` —
@@ -30,8 +30,8 @@ authentification (ADR-0023), et la chaîne complète CRA → facture en une tran
 lancer : section « Démarrer » plus bas.
 
 Les compteurs de tests se recomptent plutôt qu'ils ne se croient : `pnpm run test` pour les tests
-unitaires, `pnpm run test:int` pour ceux qui tournent contre un vrai PostgreSQL. Au **21/08/2026**,
-395 et 93.
+unitaires, `pnpm run test:int` pour ceux qui tournent contre un vrai PostgreSQL. Au **22/08/2026**,
+511 et 167.
 
 **La chaîne franchit déjà la frontière** : `billing` réagit à `timesheet.TimesheetValidated` et
 produit un projet de facture par client. **Aucun fichier livré de `billing` — tests compris —
@@ -46,9 +46,16 @@ méritent d'être nommés : `packages/billing/src/__boundary-fixture__/` viole l
 qu'aucune règle ne mentionne — il prouve que la liste `allowed` **refuse par défaut**, ce qui est la
 moitié la plus facile à perdre.
 
-Ce qui n'existe **pas encore** : les écrans (phase 6), le durcissement de la CI (phase 7),
-l'instance hébergée (phase 8). Il n'y a donc **aucune interface web** : tout se voit en HTTP, et la
-section « Démarrer » dit comment.
+Les **écrans** existent depuis la phase 6. Sept pages rendues par le serveur — sélecteur de
+persona, mois d'un consultant, grille de saisie, pré-facturier, marge, facture imprimable, relevé de
+CRA imprimable — plus la page qui rend un refus. Aucune étape de build front, aucun script envoyé au
+navigateur (ADR-0009, ADR-0025, ADR-0049). **Le point d'entrée est `http://127.0.0.1:3000/`**, le
+sélecteur de persona : tout le reste s'atteint en cliquant depuis là. La section « Démarrer » dit
+comment lancer l'instance, et la même chaîne se voit en HTTP ou à l'écran, au choix.
+
+Ce qui n'existe **pas encore** : le durcissement de la CI (phase 7), l'instance hébergée
+(phase 8), la passe de relecture documentaire (phase 9) et le gel (phase 10). La phase 0 —
+outillage, CI, règles d'écriture — précède les autres et est faite.
 
 Quatre fichiers répondent aux questions qu'on se pose en arrivant.
 [`CONTEXT.md`](CONTEXT.md) définit le vocabulaire — métier (`Tjm`, `régie`, `intercontrat`, `avoir`,
@@ -78,6 +85,12 @@ pnpm run boundaries # la frontière de modules seule
 s'arrête s'il n'existe pas. Aucune de ces trois commandes ne demande Docker. Pour la base de
 données et les tests d'intégration, voir « Démarrer » plus bas.
 
+ℹ️ **Le conteneur PostgreSQL publie `POSTGRES_PORT`, `5433` par défaut** — et non `5432`, pour ne
+pas entrer en conflit avec une instance déjà installée. Si `pnpm run setup` échoue sur
+`Bind for 0.0.0.0:5433 failed: port is already allocated`, c'est qu'autre chose l'occupe : changez
+`POSTGRES_PORT` dans `.env`, `DATABASE_URL` porte le même port et `pnpm run env:check` vérifie que
+les deux concordent.
+
 ## Le problème métier
 
 Le cabinet modélisé ici est une **société de conseil en cybersécurité** — audit, SOC, GRC, IAM,
@@ -85,15 +98,27 @@ sécurité offensive — d'environ 300 consultants, répartis en 5 pôles et 4 i
 n'est pas décoratif : c'est lui qui porte les contraintes que l'argumentaire de fin de page oppose
 à un ERP du marché (habilitation PASSI, indépendance auditeur/remédiation, export SIEM).
 
-Dans une société de conseil, le **compte rendu d'activité** (CRA) est le pivot : le même relevé de jours alimente le suivi d'avancement d'une mission, le staffing, et la facturation du client. Tant qu'il vit dans un tableur ou dans trois outils qui ne se parlent pas, chaque fin de mois est une ressaisie — et chaque ressaisie est une source d'écart entre ce qui a été produit et ce qui est facturé.
+Dans une société de conseil, le **compte rendu d'activité** (CRA) est le pivot : le même relevé de
+jours alimente le suivi d'avancement d'une mission, le staffing, et la facturation du client. Tant
+qu'il vit dans un tableur ou dans trois outils qui ne se parlent pas, chaque fin de mois est une
+ressaisie — et chaque ressaisie est une source d'écart entre ce qui a été produit et ce qui est
+facturé.
 
-Cette maquette prend **une seule chaîne, de bout en bout** : un consultant saisit son CRA, son manager le valide, et cette validation **déclenche la génération des projets de facture en régie** — au pluriel, parce qu'un mois se travaille sur plusieurs missions et que deux missions peuvent être vendues à deux clients différents. Une facture s'adresse à un client et tire sa TVA de la territorialité de celui-ci ; il n'existe donc pas de facture pour deux clients (**ADR-0038**).
+Cette maquette prend **une seule chaîne, de bout en bout** : un consultant saisit son CRA, son
+manager le valide, et cette validation **déclenche la génération des projets de facture en régie** —
+au pluriel, parce qu'un mois se travaille sur plusieurs missions et que deux missions peuvent être
+vendues à deux clients différents. Une facture s'adresse à un client et tire sa TVA de la
+territorialité de celui-ci ; il n'existe donc pas de facture pour deux clients (**ADR-0038**).
 
 Périmètre volontairement étroit : deux modules, et **une seule flèche qui franchit la frontière** entre eux.
 
 ## Ce que la maquette cherche à démontrer
 
-1. **Une frontière de module réelle, et vérifiée par la CI** — pas une convention de nommage. Le module de facturation (`packages/billing`) ne peut pas importer l'intérieur du module de saisie des temps (`packages/timesheet`) ; il réagit à un événement publié par celui-ci, dont le contrat vit dans un noyau partagé (`packages/platform`). Casser la frontière fait **échouer le job**, pas produire un warning. Où le vérifier sans me
+1. **Une frontière de module réelle, et vérifiée par la CI** — pas une convention de nommage. Le
+   module de facturation (`packages/billing`) ne peut pas importer l'intérieur du module de saisie des
+   temps (`packages/timesheet`) ; il réagit à un événement publié par celui-ci, dont le contrat vit
+   dans un noyau partagé (`packages/platform`). Casser la frontière fait **échouer le job**, pas
+   produire un warning. Où le vérifier sans me
    croire : la règle est dans [`.dependency-cruiser.cjs`](.dependency-cruiser.cjs) — dont la liste
    `allowed` est ce qui fait échouer aussi une flèche que personne n'a pensé à interdire — et
    [`tests/boundary-rule.test.ts`](tests/boundary-rule.test.ts) prouve, sur des fichiers de violation
@@ -116,7 +141,24 @@ UPDATE` sur la ligne de compteur, dans la transaction d'émission. Jamais une `S
      (**ADR-0010**). ⚠️ Les taux, seuils et mentions obligatoires retenus sont ceux connus au
      **17/08/2026** et **n'ont pas été validés par un expert-comptable** : cette maquette n'émet
      rien à un vrai client, et rien ici ne doit être repris en production sans cette validation.
-3. **L'autorisation est construite et testée par rôle _et_ par périmètre.** Le filtrage vit dans le dépôt de données (**ADR-0003**), au seul endroit par où les données entrent, et la règle est écrite **une fois** dans le noyau partagé (`readScope`) parce que les deux modules l'appliquent. Trois rôles — `consultant`, `manager`, `billing` (**ADR-0023**) — croisés avec l'implantation : un consultant ne voit que ses propres mois, un manager ceux de son implantation, personne d'autre qu'un manager ne voit une marge. La démonstration a **les deux temps** que l'ADR-0003 exige, et elle se rejoue en trois requêtes (section « Démarrer ») : la même URL répond `200` sous `manager-paris` et **`403` sous `manager-lyon`, en nommant la règle qui a refusé** (`deniedBy`), et un enregistrement qui n'existe pas répond `404` — trois faits différents, trois réponses différentes. `manager-paris` et `manager-lyon` sont deux **personas** : des identités sélectionnables au lieu d'une authentification, chacune un rôle exercé dans une implantation (`Persona` et `Role` dans [`CONTEXT.md`](CONTEXT.md), 🇬🇧). Deux d'entre elles partagent le rôle `manager` dans deux implantations différentes, et c'est précisément ce qui rend le refus reproductible en trois clics au lieu d'être affirmé. Le 403 ne publie **rien** de ce qu'il cache (**ADR-0042**), et un test l'assure. `Cjm`, `Tjm` et marge n'apparaissent dans aucune projection de liste : ils ne sont servis que par une **lecture unitaire dédiée dont chaque accès est journalisé** — acteur, rôle, cible, et le **nom** des champs lus, jamais leur valeur (**ADR-0043**, **ADR-0024**). La pagination est plafonnée dans la route _et_ dans le dépôt.
+3. **L'autorisation est construite et testée par rôle _et_ par périmètre.** Le filtrage vit dans le
+   dépôt de données (**ADR-0003**), au seul endroit par où les données entrent, et la règle est écrite
+   **une fois** dans le noyau partagé (`readScope`) parce que les deux modules l'appliquent. Trois
+   rôles — `consultant`, `manager`, `billing` (**ADR-0023**) — croisés avec l'implantation : un
+   consultant ne voit que ses propres mois, un manager ceux de son implantation, personne d'autre qu'un
+   manager ne voit une marge. La démonstration a **les deux temps** que l'ADR-0003 exige, et elle se
+   rejoue en trois requêtes (section « Démarrer ») : la même URL répond `200` sous `manager-paris` et
+   **`403` sous `manager-lyon`, en nommant la règle qui a refusé** (`deniedBy`), et un enregistrement
+   qui n'existe pas répond `404` — trois faits différents, trois réponses différentes. `manager-paris`
+   et `manager-lyon` sont deux **personas** : des identités sélectionnables au lieu d'une
+   authentification, chacune un rôle exercé dans une implantation (`Persona` et `Role` dans
+   [`CONTEXT.md`](CONTEXT.md), 🇬🇧). Deux d'entre elles partagent le rôle `manager` dans deux
+   implantations différentes, et c'est précisément ce qui rend le refus reproductible en trois clics au
+   lieu d'être affirmé. Le 403 ne publie **rien** de ce qu'il cache (**ADR-0042**), et un test
+   l'assure. `Cjm`, `Tjm` et marge n'apparaissent dans aucune projection de liste : ils ne sont servis
+   que par une **lecture unitaire dédiée dont chaque accès est journalisé** — acteur, rôle, cible, et
+   le **nom** des champs lus, jamais leur valeur (**ADR-0043**, **ADR-0024**). La pagination est
+   plafonnée dans la route _et_ dans le dépôt.
 
 4. **Des arbitrages écrits au moment où ils sont pris** → `docs/adr/`. Chaque ADR nomme l'option écartée et le seuil auquel on changerait d'avis.
 
@@ -141,7 +183,7 @@ décision.
 | Read model, cache, file de jobs, outbox                                       | Deux modules, aucune requête lourde, aucun consommateur hors du processus. Postgres tient le verrou                                                                                                                                                                                                                                                                                                                                                                                                                                         | Le premier abonné qui fait un appel réseau (outbox) · un écran qui joint plus de trois tables (read model)                                                                                                               |
 | Redis, Kafka, RabbitMQ, Elasticsearch, Terraform, Kubernetes, microservices   | Aucun n'est justifié par le besoin. **Ne pas ajouter est un choix d'architecture**, pas une lacune                                                                                                                                                                                                                                                                                                                                                                                                                                          | Un besoin mesuré, pas anticipé                                                                                                                                                                                           |
 | ORM (Drizzle, Prisma, Kysely, TypeORM)                                        | `FOR UPDATE`, schémas par module et types Postgres doivent être exprimables sans échappatoire, et aucun ORM ne doit pouvoir remonter dans le domaine                                                                                                                                                                                                                                                                                                                                                                                        | —                                                                                                                                                                                                                        |
-| Framework front (React, Vue), design system, thème sombre                     | Quatre écrans : aucun ne s'amortit. 640 combinaisons visuelles sur un outil de facturation, c'est de l'effort qui ne produit rien                                                                                                                                                                                                                                                                                                                                                                                                           | —                                                                                                                                                                                                                        |
+| Framework front (React, Vue), design system, thème sombre                     | Sept écrans : aucun ne s'amortit. 640 combinaisons visuelles sur un outil de facturation, c'est de l'effort qui ne produit rien                                                                                                                                                                                                                                                                                                                                                                                                             | —                                                                                                                                                                                                                        |
 | Avoir partiel                                                                 | Une réduction partielle d'une facture émise est arithmétiquement indiscernable d'une remise, et la remise réintroduit un montant à répartir avant arrondi — donc casse l'exactitude entière. Seule l'annulation totale est construite                                                                                                                                                                                                                                                                                                       | Voir ADR-0002 et ADR-0036                                                                                                                                                                                                |
 | Client hors Union européenne                                                  | Quatre territorialités sont modélisées (métropole, DOM avec TVA, DOM hors champ, UE), parce que chacune porte une mention obligatoire différente. Un client suisse ou britannique en porterait une cinquième, non vérifiée ici                                                                                                                                                                                                                                                                                                              | Première mission vendue hors UE                                                                                                                                                                                          |
 | Undo sur une facture émise                                                    | **Et c'est la démonstration** : une facture émise ne se modifie pas, et le domaine refuse la transition. La seule correction possible est un avoir                                                                                                                                                                                                                                                                                                                                                                                          | Jamais : c'est une règle légale                                                                                                                                                                                          |
@@ -216,7 +258,7 @@ Chaque ligne vient d'un arbitrage écrit, avec l'option écartée et le seuil de
 | ------------------------------------------------------- | -------- | -------------------------------------------------------------------------------- |
 | **TypeScript** strict, **Node.js** ≥ 24.13.1            | —        | —                                                                                |
 | **Fastify**                                             | ADR-0008 | NestJS — un conteneur d'injection et des décorateurs pour une douzaine de routes |
-| **HTML rendu serveur**, aucun framework front           | ADR-0009 | React/Vue et une étape de build front pour quatre écrans                         |
+| **HTML rendu serveur**, aucun framework front           | ADR-0009 | React/Vue et une étape de build front pour sept écrans                           |
 | **PostgreSQL 18**, SQL écrit à la main                  | ADR-0011 | Un ORM — `FOR UPDATE` et les schémas par module doivent rester lisibles          |
 | Migrations : fichiers `.sql` numérotés + runner         | ADR-0011 | Un outil de migration tiers                                                      |
 | **Montants en centimes entiers**                        | ADR-0002 | Un objet `Money`, une bibliothèque décimale                                      |
@@ -260,8 +302,15 @@ demandent Docker.
 
 ### Voir la chaîne, et voir l'autorisation refuser
 
-Il n'y a **pas encore d'écrans** — ils arrivent en phase 6. Tout se voit en HTTP, sur
+Deux façons de voir la même chaîne : **à l'écran**, ou en HTTP. Les deux passent par
 `http://127.0.0.1:3000`.
+
+**À l'écran** — ouvrez **<http://127.0.0.1:3000/>** dans un navigateur. Vous arrivez sur le
+sélecteur de persona ; choisissez `manager-paris`, et la navigation mène au pré-facturier, d'où un
+mois se valide ou se refuse. `billing-paris` est la persona qui émet une facture ;
+`consultant-paris` est celle qui saisit un mois. Changer de persona se fait depuis l'en-tête de
+chaque page. Rien à installer côté navigateur : les pages sont du HTML rendu par le serveur, sans
+script.
 
 ⚠️ **`127.0.0.1` et non `localhost`.** Ce sont la même machine et **deux origines différentes** :
 une requête d'écriture venue d'une autre origine que `API_PUBLIC_ORIGIN` est refusée
@@ -299,8 +348,15 @@ apparaître les projets de facture **dans la même transaction**, et
 `POST /api/v1/invoices/{id}/issuance` — avec un en-tête `Idempotency-Key`, obligatoire parce que
 c'est la seule route qui consomme un numéro d'une série sans trou — émet le document.
 
-Les routes complètes sont dans [`apps/api/src/routes/`](apps/api/src/routes/), et chacune **déclare
-les rôles qui la portent** au lieu de les comparer dans son corps.
+⚠️ **L'émission est portée par `billing`, pas par `manager`.** Sous `manager-paris`, la dernière
+commande répond `403 /problems/insufficient-role` en nommant le rôle qui la porte — c'est le
+comportement attendu, pas une panne. Rejouez `POST /api/v1/session/persona` avec
+`{"key":"billing-paris"}` pour l'émettre. Pour trouver un `id` de facture :
+`curl -s -b jar.txt http://127.0.0.1:3000/api/v1/invoices`.
+
+Les routes complètes sont dans [`apps/api/src/routes/`](apps/api/src/routes/) pour l'API et dans
+[`apps/api/src/web/routes.ts`](apps/api/src/web/routes.ts) pour les écrans, et chacune **déclare les
+rôles qui la portent** au lieu de les comparer dans son corps.
 
 ## Jeu de données
 
@@ -351,7 +407,8 @@ plateforme. Ce README a affirmé le contraire — « cinq sont exigées » — d
 c'était faux : la bascule n'était pas en attente, elle était indisponible. Décision, option écartée
 et seuil → **[ADR-0040](docs/adr/0040-ci-gates-are-advisory-while-the-repository-is-private.md)**.
 La bascule est gratuite le jour où le dépôt devient public, et coûte alors une case à cocher par
-job (`grep -E '^  [a-z-]+:$' .github/workflows/ci.yml` les liste ; neuf au 21/08/2026).
+job (`sed -n '/^jobs:/,$p' .github/workflows/ci.yml | grep -E '^  [a-z-]+:$'` les liste ; neuf au
+22/08/2026 — la borne `/^jobs:/` compte, sans elle `on: push:` s'ajoute à la liste).
 
 | Porte (job CI)                  | Commande                                            | Ce qu'elle fait passer au rouge                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -378,7 +435,9 @@ job (`grep -E '^  [a-z-]+:$' .github/workflows/ci.yml` les liste ; neuf au 21/08
 > protection de branche n'est pas disponible sur ce plan. C'est une limite assumée et datée
 > (ADR-0040), pas une case oubliée.
 
-Les hooks locaux (lefthook) rejouent une partie de ces portes **avant** le commit et le push — et depuis ADR-0040 ils ne les doublent plus, ils sont **le seul arrêt mécanique** qui précède un merge, puisque aucun des neuf ne le bloque. ⚠️ Ils
+Les hooks locaux (lefthook) rejouent une partie de ces portes **avant** le commit et le push — et
+depuis ADR-0040 ils ne les doublent plus, ils sont **le seul arrêt mécanique** qui précède un merge,
+puisque aucun des neuf ne le bloque. ⚠️ Ils
 ne s'installent pas tout seuls : `ignore-scripts` est activé, donc un clone frais n'en a aucun tant
 qu'on n'a pas lancé `pnpm exec lefthook install`. Ce qu'ils font :
 gitleaks sur ce qui est indexé — le seul des deux qui empêche réellement la fuite, la CI ne scannant

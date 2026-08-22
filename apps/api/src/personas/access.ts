@@ -29,6 +29,16 @@ export type Access =
 export const PUBLIC = (why: string): Access => ({ kind: 'public', why });
 export const forRoles = (...roles: Role[]): Access => ({ kind: 'roles', roles });
 
+/**
+ * Does this declaration carry this role? The `preHandler` below asks it to refuse a request; a
+ * screen asks it to decide whether to offer the button at all. Both readings come off the **same**
+ * `Access` value, so a verb that moves between roles moves its button with it — a screen may never
+ * answer that question by comparing a role itself.
+ */
+export function carries(access: Access, role: Role): boolean {
+  return access.kind === 'public' || access.roles.includes(role);
+}
+
 declare module 'fastify' {
   interface FastifyContextConfig {
     access?: Access;

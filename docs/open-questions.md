@@ -116,15 +116,127 @@ mechanically and not audited).
     `SEC-2026-000001`. → **No action**: this is the evidence for the claims above, recorded so the
     checkpoint is not asserting them from the test suite alone.
 
-### Owed, and not discharged here
+### The two reviewers, run 22/08/2026 — the debt above is discharged
 
-**The two reviewers have not run on this branch.** `rules-auditor` (a blind audit of the diff
-against `docs/BUILD-RULES.md`) and `cold-reader` (the no-brief reader) are required by `CLAUDE.md`
-before every merge to `main` and at every phase checkpoint. Neither has run on `feat/web`, and this
-branch is the phase's whole surface: a new module-boundary argument (ADR-0053), a dropped table, a
-domain guard added, ten ADRs, and a README with three new rows. **The branch is therefore not merged
-and no pull request is opened**, exactly as Phase 5 recorded the same debt rather than discovering
-it at the merge.
+**Superseded.** The paragraph this section used to hold recorded that neither reviewer had run on
+`feat/web`, and that the branch was therefore not merged. Both have now run against the full
+`main...feat/web` diff, blind and in clean contexts. What they found is below, each point carrying
+one of the four outcomes.
+
+The two passes **corroborate each other on the same worst finding**, reached from opposite
+directions: the auditor found it as a rule violation (nothing in the README that isn't true), the
+cold reader found it by walking the repo and having to read TypeScript to learn the application has
+a user interface at all. That agreement is the reason it is ranked first.
+
+13. **The README told the reader, twice, that the screens do not exist.** `README.md` stated "Ce qui
+    n'existe **pas encore** : les écrans (phase 6) … il n'y a donc **aucune interface web**", and
+    « Démarrer » repeated it and routed the reader entirely to `curl` — while the _same file_
+    described those screens in detail three sections later, and no entry document named a single
+    browsable URL. → **Fix now.** The status section states what Phase 6 built and names
+    `http://127.0.0.1:3000/` as the entry point; « Démarrer » gained a screen path beside the HTTP
+    one. This is the phase's whole deliverable, denied by the first document anyone reads.
+
+14. **The ADR index stopped at 0051, omitting all ten of Phase 6's decisions** — 0052 to 0061,
+    including 0053 and 0057, which the README itself cites. A reader browsing `docs/adr/README.md`
+    had no way to learn they existed. → **Fix now.** Ten rows added and the closing narrative
+    extended; the index now holds 56 rows for 56 files, every link resolving.
+
+15. **`html.test.ts` contained a literal NUL byte**, so git treated the phase's 55-test escaping
+    suite as **binary** — undiffable, unblameable — and `grep` was blind to it, including the
+    `grep -rn 'trustedMarkup('` audit that `html.ts:52` documents as the way to enumerate every
+    place raw markup enters a page. → **Fix now.** The byte is now the `\u0000` escape its two
+    neighbours already used; the character under test is unchanged, git reads the file as text and
+    the documented audit command sees it again. This is a third instance of the family BUILD-RULES
+    calls "a green gate that stopped looking".
+
+16. **Three handler bodies compared a role**, which BUILD-RULES states as an absolute with no
+    exception clause. Two were defended in comments as "the navigational echo of the route's own
+    declaration"; the third minted an idempotency key, which is not navigational. → **Fix now, and
+    the drift is what mattered.** A table of roles would have satisfied the wording and preserved
+    the defect — two places to edit instead of two comparisons. Instead the verbs' `Access`
+    declarations are named (`DECIDES_CRA`, `ISSUES_INVOICE`), the routes register _with_ them and
+    the screens ask them through `carries(access, role)`. `routes.test.ts` drives every role at each
+    verb and asserts the offer and the refusal agree; reverting one route to a literal makes it
+    fail, which was checked rather than assumed.
+
+17. **Five French `detail` strings sat on refusals no screen renders.** `problem-page.ts` never
+    prints `detail`, and screen paths always render HTML — so they reached nobody, in the wrong
+    language, in the exact shape ADR-0060 diagnoses as "French where somebody happened to write
+    French, which is an accident wearing a decision's clothes". → **Fix now**: translated. The
+    accident the ADR named was left in place by the commit that named it.
+
+18. **`MAX_FIELDS = 500` was a guard with no negative test**, while both its siblings in the same
+    file have one. → **Fix now**: a 501-field body is refused `400` and the handler never runs, and
+    a 500-field body is accepted — the pair pins the cap rather than only its direction.
+
+19. **BUILD-RULES still stated "migrations are additive" without qualification**, while migration
+    010 drops `billing.credit_notes` under ADR-0057. The DROP is not the defect — the ADR argues it
+    as a bounded exception — the defect is that BUILD-RULES' own preamble says "if a rule and an ADR
+    disagree, the ADR wins and this file is wrong; **fix it**", and it was not fixed. → **Fix now**:
+    the rule names the exception, its ADR and its limit.
+
+20. **Stale counts and one command that disagreed with its own number.** Test counters said 395/93
+    (now 511/167); "quatre écrans" appeared twice against seven; `README.md` said phases 1-5 were
+    done; `CONTEXT.md` still said a `409` was coming "when Phase 5 puts an API in front of it",
+    which Phase 5 did. And the README's own verify-it-yourself command for CI jobs returned **ten**
+    lines while claiming nine — it caught `on: push:` too. → **Fix now**, all of them; the CI
+    command is now bounded by `/^jobs:/` and was run to confirm it returns nine.
+
+21. **The README named phases 6, 7 and 8 as outstanding and never mentioned 9, 10 or 0.** On the
+    repo's own three-way test — built / deliberately not built / still coming — the third bucket was
+    incomplete. → **Fix now**: all remaining phases named, phase 0 stated as done.
+
+22. **The chain's payoff step could not be run from the README alone.** It never mentions
+    `GET /api/v1/invoices`, so there was no documented way to obtain an invoice id; and the only
+    persona it ever selects is `manager-paris`, under which issuance correctly answers
+    `403 /problems/insufficient-role` — a reader following it verbatim hit a refusal at the climax
+    of the demonstration with nothing telling them it was expected. → **Fix now**: both documented,
+    with the refusal named as the expected answer rather than a fault.
+
+23. **Presentation defects in the document the cold reader is written for.** The authorization
+    argument — claim 3, the one a reviewer most wants to read — was a single unwrapped
+    1 740-character line; three more paragraphs ran past 400. The repo's first word, "Coquille",
+    reads to a French reader first as _typo_ rather than the intended _shell_. The published
+    database port is never named, so the collision the cold reader actually hit surfaced as a raw
+    Docker error. → **Fix now**: four paragraphs wrapped (tables left on one line, as they must be),
+    "Ossature" replaces "Coquille", and `POSTGRES_PORT` is documented with its failure mode.
+    ⚠️ **The opening word is a change to Clement's own voice in the README** and is the one item
+    here he may simply want to revert.
+
+24. **What both passes cleared, recorded because a checkpoint that lists only failures is not
+    evidence.** No floating-point value touches money anywhere in ~5 000 new lines — `frenchEuros`
+    does string surgery on the integer rather than dividing. The boundary holds in the half
+    dependency-cruiser cannot see: no production file under `apps/api/src` queries both
+    `timesheet.` and `billing.`, and ADR-0053 records the join it refused to write. Every new route
+    carries an `Access` declaration; `Cjm`, `Tjm` and margin appear in no list projection. No new
+    runtime dependency, no template engine, no build step. All 21 commits are conventional and
+    **none carries a `Co-Authored-By` trailer**. The cold reader ran the quickstart verbatim from a
+    fresh clone and it worked with no undocumented step — and found that _the screens explain
+    themselves better than the entry documents explain the screens_, the empty pré-facturier
+    distinguishing empty from denied in prose.
+
+### Still open after this pass
+
+25. **"No action" has been used as a fifth checkpoint outcome** — at points 11 and 12 above, and at
+    eight places in earlier phases. `CLAUDE.md` says every point resolves to exactly one of four,
+    "never a silent pass". The four have no slot for _"this was checked, it is correct, and it
+    stays"_, which is what those points record. → **A row in this file.** Naming a fifth outcome is
+    a structural decision about how this repository records its own work, so it is **Clement's to
+    make, not the agent's**, and inventing one while writing up the audit that found it would be the
+    same error twice. Resolve **in Phase 9, task 9.2** — the documentation pass — either as an ADR
+    admitting a fifth outcome with its rejected option, or by folding such points into "fix now"
+    with nothing to fix. Deliberately deferred past 24/08: it changes no code and no reader hits it.
+
+26. **Two items belong to Clement and are not the agent's to close.** The README speaks
+    first-person ("Ce que **je** ne construis pas") while `CLAUDE.md`, one click away and read by
+    any stranger browsing on GitHub, says "Clement owns the decisions; the agent writes the code" —
+    the two voices do not reconcile, and papering over it is worse than recording it. And the
+    repository still carries context from outside itself: "the 24/08 conversation" with no
+    antecedent, Clement's first name, a machine's `gh` auth state. → **Rows in this file**, the
+    second already open since 18/08 and assigned to **Phase 9, task 9.2**. ⚠️ **That schedule does
+    not hold for the second item**: Phase 9 lands _after_ 24/08, and if the repository link goes out
+    that day the reader meets exactly this. It needs deciding **before** the link is sent, which is
+    a decision about disclosure and therefore Clement's.
 
 ## Settled
 

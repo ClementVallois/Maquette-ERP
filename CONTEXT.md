@@ -212,7 +212,7 @@ One row of it — the half-days one `Mission` on one `Cra` declined, for one rea
 _Avoid_: Skipped, Ignored, Rejected, Errors
 
 **CraAlreadyProcessedError**:
-The refusal returned when a `Cra` that has already produced a draft invoice for a client is processed again. A **business** error and not a technical one: replaying a `timesheet.TimesheetValidated` event is expected — at-least-once delivery, a retried request, a manual replay — and the right answer is a named refusal, not a second invoice and not a crash. Enforced twice on purpose (ADR-0021): a unique constraint in the draft table, and the domain guard in front of it, so the invariant does not rest on the database alone. Destined for a `409 Conflict` when Phase 5 puts an API in front of it.
+The refusal returned when a `Cra` that has already produced a draft invoice for a client is processed again. A **business** error and not a technical one: replaying a `timesheet.TimesheetValidated` event is expected — at-least-once delivery, a retried request, a manual replay — and the right answer is a named refusal, not a second invoice and not a crash. Enforced twice on purpose (ADR-0021): a unique constraint in the draft table, and the domain guard in front of it, so the invariant does not rest on the database alone. Rendered as a `409 Conflict` since Phase 5 put an API in front of it (`apps/api/src/http/problem.ts`), and named in French on a screen since Phase 6 (ADR-0060).
 _Avoid_: DuplicateInvoice, AlreadyBilled, ConflictError
 
 **InvoiceNumber**:
