@@ -58,13 +58,21 @@ Ce qui n'existe **pas encore** : le durcissement de la CI (phase 7), l'instance 
 outillage, CI, règles d'écriture — précède les autres et est faite.
 
 Quatre fichiers répondent aux questions qu'on se pose en arrivant.
-[`CONTEXT.md`](CONTEXT.md) définit le vocabulaire — métier (`Tjm`, `régie`, `intercontrat`, `avoir`,
+[`CONTEXT.md`](CONTEXT.md) définit le vocabulaire — métier (`Tjm`, `Cjm`, `pré-facturier`, `régie`,
+`intercontrat`, `avoir`,
 `PASSI`…) et technique (`Persona`, `Role`, `Actor`) ; [`docs/adr/`](docs/adr/README.md) contient les
 arbitrages avec, pour chacun, l'option écartée et le seuil de réouverture ;
 [`docs/BUILD-RULES.md`](docs/BUILD-RULES.md) est la forme vérifiable de ces arbitrages — ce qu'on a
 le droit d'écrire dans ce dépôt et ce qu'on n'a pas le droit d'y écrire ; et
 [`docs/open-questions.md`](docs/open-questions.md) dit ce qui n'est **pas** tranché, avec la phase
 qui le tranchera.
+
+Le reste de `docs/` est du **journal de construction**, pas de la documentation d'arrivée :
+[`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md) est l'ordre et le calendrier des phases,
+[`docs/PHASE-4-5-CLOSURE.md`](docs/PHASE-4-5-CLOSURE.md) est le relevé des revues de ces deux
+phases-là (les suivantes sont closes dans `open-questions.md`, ce qui est une incohérence de forme
+assumée), et [`docs/agents/`](docs/agents/) décrit l'outillage d'agents utilisé pour construire le
+dépôt. Rien n'y est nécessaire pour comprendre la maquette.
 
 ⚠️ Ces quatre fichiers sont **en anglais**, ce README seul est en français. C'est délibéré et la
 règle est dans `CLAUDE.md` : le code, les commits et les arbitrages en anglais, le README dans la
@@ -148,7 +156,7 @@ UPDATE` sur la ligne de compteur, dans la transaction d'émission. Jamais une `S
    consultant ne voit que ses propres mois, un manager ceux de son implantation, personne d'autre qu'un
    manager ne voit une marge. La démonstration a **les deux temps** que l'ADR-0003 exige, et elle se
    rejoue en trois requêtes (section « Démarrer ») : la même URL répond `200` sous `manager-paris` et
-   **`403` sous `manager-lyon`, en nommant la règle qui a refusé** (`deniedBy`), et un enregistrement
+   **`403` sous `manager-lyon`, en nommant le refus dans un champ dédié** (`deniedBy`), et un enregistrement
    qui n'existe pas répond `404` — trois faits différents, trois réponses différentes. `manager-paris`
    et `manager-lyon` sont deux **personas** : des identités sélectionnables au lieu d'une
    authentification, chacune un rôle exercé dans une implantation (`Persona` et `Role` dans
@@ -288,7 +296,7 @@ si l'une échoue :
 ```sh
 pnpm run db:up      # PostgreSQL 18 via docker compose, attend qu'il soit healthy
 pnpm run migrate    # applique les migrations en attente, rejouable sans effet
-pnpm run seed       # le jeu de données déterministe (ADR-0022)
+pnpm run seed       # ⚠️ VIDE les deux schémas, puis réécrit le jeu déterministe (ADR-0022)
 pnpm run test:int   # les tests d'intégration contre ce PostgreSQL
 ```
 
@@ -312,7 +320,10 @@ mois se valide ou se refuse. `billing-paris` est la persona qui émet une factur
 chaque page. Rien à installer côté navigateur : les pages sont du HTML rendu par le serveur, sans
 script.
 
-⚠️ **`127.0.0.1` et non `localhost`.** Ce sont la même machine et **deux origines différentes** :
+⚠️ **`127.0.0.1` et non `localhost`.** La panne est trompeuse : sous `localhost` les pages
+s'affichent normalement (`200`), et seule la **première écriture** est refusée — un bouton qui ne
+fait rien sur une application qui a l'air de marcher. Ce sont la même machine et **deux origines
+différentes** :
 une requête d'écriture venue d'une autre origine que `API_PUBLIC_ORIGIN` est refusée
 `403 /problems/forbidden-origin`, ce qui est la posture CSRF assumée (ADR-0023). Les deux valeurs
 doivent coïncider dans `.env`, et l'API imprime au démarrage l'origine à ouvrir.
@@ -338,21 +349,39 @@ renvoyé ci-dessus :
 
 ```sh
 # 1. manager-paris le lit                       → 200
-# 2. la même URL sous manager-lyon              → 403, avec "deniedBy" qui nomme la règle
+# 2. la même URL sous manager-lyon              → 403, avec "deniedBy" qui porte le refus
 # 3. un id qui n'existe pas, sous manager-paris → 404
 ```
 
 Trois faits différents, trois réponses différentes — et le `403` ne publie **rien** de ce qu'il
-cache. Puis la chaîne elle-même : `POST /api/v1/cras/{id}/validation` valide le mois et fait
-apparaître les projets de facture **dans la même transaction**, et
-`POST /api/v1/invoices/{id}/issuance` — avec un en-tête `Idempotency-Key`, obligatoire parce que
-c'est la seule route qui consomme un numéro d'une série sans trou — émet le document.
+cache. Puis la chaîne elle-même, en deux écritures :
 
-⚠️ **L'émission est portée par `billing`, pas par `manager`.** Sous `manager-paris`, la dernière
-commande répond `403 /problems/insufficient-role` en nommant le rôle qui la porte — c'est le
-comportement attendu, pas une panne. Rejouez `POST /api/v1/session/persona` avec
-`{"key":"billing-paris"}` pour l'émettre. Pour trouver un `id` de facture :
-`curl -s -b jar.txt http://127.0.0.1:3000/api/v1/invoices`.
+```sh
+# 1. Le manager valide le mois. Les projets de facture apparaissent dans la MÊME transaction,
+#    un par client. `{cra-id}` est l'`id` d'un CRA `submitted` renvoyé par la commande précédente.
+curl -s -b jar.txt -X POST http://127.0.0.1:3000/api/v1/cras/{cra-id}/validation \
+  -H 'Origin: http://127.0.0.1:3000'
+
+# 2. Les projets ainsi créés, pour en prendre un `id`
+curl -s -b jar.txt http://127.0.0.1:3000/api/v1/invoices
+
+# 3. L'émission est portée par `billing`, pas par `manager` : il faut changer de persona
+curl -s -c jar.txt -X POST http://127.0.0.1:3000/api/v1/session/persona \
+  -H 'Origin: http://127.0.0.1:3000' -H 'Content-Type: application/json' \
+  -d '{"key":"billing-paris"}'
+
+# 4. Émission. L'en-tête `Idempotency-Key` est obligatoire — c'est la seule route qui consomme
+#    un numéro d'une série sans trou. Rejouez la commande telle quelle : même numéro, "replayed".
+curl -s -b jar.txt -X POST http://127.0.0.1:3000/api/v1/invoices/{invoice-id}/issuance \
+  -H 'Origin: http://127.0.0.1:3000' -H 'Idempotency-Key: demo-0001'
+```
+
+⚠️ **Deux en-têtes, et les oublier donne un refus qui ressemble à une panne.** `Origin` est
+obligatoire sur **toute** écriture (`403 /problems/forbidden-origin`, posture CSRF d'ADR-0023), et
+`Idempotency-Key` l'est sur l'émission (`400 /problems/idempotency-key-required`). Les deux refus
+nomment eux-mêmes leur correctif dans leur `detail` — mais ils sont attendus, pas cassés. De même,
+l'étape 4 sous `manager-paris` répond `403 /problems/insufficient-role` : c'est l'autorisation par
+rôle qui fonctionne, et c'est pour cela que l'étape 3 existe.
 
 Les routes complètes sont dans [`apps/api/src/routes/`](apps/api/src/routes/) pour l'API et dans
 [`apps/api/src/web/routes.ts`](apps/api/src/web/routes.ts) pour les écrans, et chacune **déclare les

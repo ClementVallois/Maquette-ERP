@@ -32,8 +32,10 @@ Eleven phases, 0 through 10, sequenced by dependency. Sized honestly, this is **
 implied finish is therefore **early September 2026**, not 21/08.
 
 What that means for the 24/08 conversation: phases 0–6 plus 8 constitute a **demonstrable chain in
-production** — the CRA-to-invoice chain, the enforced boundary, authorization by role and scope, the
-four screens, live at `https://erp.clementvallois.fr`. Phases 7, 9 and 10 harden and explain it.
+production** — the CRA-to-invoice chain, the enforced boundary, authorization by role and scope, and the
+**seven** screens Phase 6 shipped — which Phase 8 would put at `https://erp.clementvallois.fr`.
+**That host serves nothing yet**: Phase 8 has not landed, and this sentence describes the intended
+end state, not the present one. Phases 7, 9 and 10 harden and explain it.
 If a link has to go out on 24/08, it goes out at the end of Phase 8, with the README saying plainly
 what is finished and what is still being built. Nothing is cut; the reader is told where the work is.
 
@@ -612,7 +614,9 @@ screen language, as a written choice rather than an omission.
 
 ### 6.3 — The Cra entry grid
 
-A days × lines table with live totals. **No "copy last month"** — it copies last month's mistakes too.
+A days × lines table with totals **current as of the last save** — ADR-0050 narrowed "live totals"
+to that, because ADR-0049 forbids the script that would make them live. **No "copy last month"** —
+it copies last month's mistakes too.
 
 ### 6.4 — The _pré-facturier_
 
@@ -804,7 +808,7 @@ The **disclosure decision** — whether this repository becomes public, and what
 named here rather than in 9.2 because 9.2 is about a reading path, not about publication.
 
 If the answer is yes, two things follow in the same act and neither costs anything: branch
-protection becomes available, so the **eight required checks** are ticked (the step Phase 7 could
+protection becomes available, so the **nine required checks** are ticked (the step Phase 7 could
 not run — **ADR-0040**), and the Actions status becomes visible to anyone holding the link, so the
 README can carry a CI badge instead of asking to be believed. A superseding ADR records both.
 

@@ -36,8 +36,10 @@ export function contextOf(request: FastifyRequest): ProblemContext {
  * That is what lets the screens and the API answer with the **same object** rather than with two
  * error vocabularies (ADR-0009 § Consequences promised exactly this). A screen does not re-derive
  * a message from a status code: it renders the `ProblemDetails` the API would have returned, so a
- * refusal a reader sees on a page and the one a `curl` reproduces are the same refusal, down to the
- * `deniedBy` naming which of ADR-0023's three loci said no.
+ * refusal a reader sees on a page and the one a `curl` reproduces are the same refusal, down to
+ * `deniedBy`. That field marks a refusal as deliberate; it does **not** yet name which of
+ * ADR-0023's three loci said no — every call site sets it to the `type` — and
+ * `docs/open-questions.md` carries the question of whether it should.
  *
  * The representation is chosen from the path (`web/representation.ts`), never from `Accept`.
  */

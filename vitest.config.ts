@@ -11,8 +11,10 @@ export default defineConfig({
           // `apps/api` would have been collected by nothing and reported by nothing.
           include: ['packages/**/*.test.ts', 'apps/**/*.test.ts', 'tests/**/*.test.ts'],
           // `*.int.test.ts` also matches `*.test.ts`. Without this exclusion the unit run
-          // requires Docker. The fixtures include a `*.test.ts` that exists to be linted, not
-          // run — it holds deliberate violations and declares no test.
+          // requires Docker. The fixtures are excluded here and ignored by ESLint too
+          // (`eslint.config.js`), so they are neither run nor linted: `tests/boundary-rule.test.ts`
+          // is what exercises them, by running `depcruise` over them and asserting it reports the
+          // violation each one was written to trigger.
           exclude: [
             '**/*.int.test.ts',
             '**/node_modules/**',

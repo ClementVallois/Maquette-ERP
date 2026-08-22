@@ -17,8 +17,9 @@ import { shell } from './shell.ts';
  *
  * `CLAUDE.md` calls these states deliverables rather than polish, and the reason is on this page:
  * a denied view that says "403" proves nothing about the authorization model, while one that names
- * `deniedBy` shows which of the three loci refused and can be checked against the ADR that put it
- * there.
+ * `deniedBy` marks the answer as a *deliberate* refusal and can be checked against the ADR that put
+ * it there. It currently repeats `type` at every call site rather than naming which of ADR-0023's
+ * three loci said no — see `docs/open-questions.md`, row of 22/08/2026.
  */
 
 const FORBIDDEN = 403;
