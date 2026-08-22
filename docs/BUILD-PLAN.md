@@ -808,7 +808,7 @@ The **disclosure decision** — whether this repository becomes public, and what
 named here rather than in 9.2 because 9.2 is about a reading path, not about publication.
 
 If the answer is yes, two things follow in the same act and neither costs anything: branch
-protection becomes available, so the **nine required checks** are ticked (the step Phase 7 could
+protection becomes available, so the **nine CI jobs** can be ticked as required checks (the step Phase 7 could
 not run — **ADR-0040**), and the Actions status becomes visible to anyone holding the link, so the
 README can carry a CI badge instead of asking to be believed. A superseding ADR records both.
 

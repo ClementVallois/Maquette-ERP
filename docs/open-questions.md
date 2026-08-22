@@ -206,18 +206,20 @@ a user interface at all. That agreement is the reason it is ranked first.
     ⚠️ **The opening word is a change to Clement's own voice in the README** and is the one item
     here he may simply want to revert.
 
-24. **What both passes cleared, recorded because a checkpoint that lists only failures is not
-    evidence.** No floating-point value touches money anywhere in ~5 000 new lines — `frenchEuros`
-    does string surgery on the integer rather than dividing. The boundary holds in the half
-    dependency-cruiser cannot see: no production file under `apps/api/src` queries both
-    `timesheet.` and `billing.`, and ADR-0053 records the join it refused to write. Every new route
-    carries an `Access` declaration; `Cjm`, `Tjm` and margin appear in no list projection. No new
-    runtime dependency, no template engine, no build step. Every commit on the branch is conventional and
-    **none carries a `Co-Authored-By` trailer** — checked over the whole range rather than a
-    counted snapshot, because the commit publishing a count is one the count cannot include. The cold reader ran the quickstart verbatim from a
-    fresh clone and it worked with no undocumented step — and found that _the screens explain
-    themselves better than the entry documents explain the screens_, the empty pré-facturier
-    distinguishing empty from denied in prose.
+**Evidence, not a point.** The paragraph below carries no outcome because it raises nothing: it
+records what the two passes _cleared_, because a checkpoint that lists only failures is not
+evidence of a review. It is unnumbered for that reason — the numbered points are the ones the four
+outcomes apply to. No floating-point value touches money anywhere in ~5 000 new lines — `frenchEuros`
+does string surgery on the integer rather than dividing. The boundary holds in the half
+dependency-cruiser cannot see: no production file under `apps/api/src` queries both
+`timesheet.` and `billing.`, and ADR-0053 records the join it refused to write. Every new route
+carries an `Access` declaration; `Cjm`, `Tjm` and margin appear in no list projection. No new
+runtime dependency, no template engine, no build step. Every commit on the branch is conventional and
+**none carries a `Co-Authored-By` trailer** — checked over the whole range rather than a
+counted snapshot, because the commit publishing a count is one the count cannot include. The cold reader ran the quickstart verbatim from a
+fresh clone and it worked with no undocumented step — and found that _the screens explain
+themselves better than the entry documents explain the screens_, the empty pré-facturier
+distinguishing empty from denied in prose.
 
 ### The second pass, 22/08/2026
 
@@ -247,21 +249,31 @@ What the second pass found that the first had not, all fixed here:
     saying "live totals" although the ADR index records that ADR-0050 narrowed that very wording.
     → **Fix now**, all three.
 
-29. **`deniedBy` repeats `type` and never names a rule**, while its own comments promised it named
-    which of ADR-0023's three loci refused. → **Fix now** for the false statements — the README
-    claim is bounded to what the field does, and both code comments corrected — and **a row in this
-    file** for whether the field should carry a locus, which changes a published response field and
-    is therefore an ADR, resolved in Phase 7.
+29. **Three statements about `deniedBy` were false.** `reply.ts` said it names "which of ADR-0023's
+    three loci said no", `problem-page.ts` said it "shows which of the three loci refused", and the
+    README said the 403 names the rule _in that field_. All five call sites set it to the `type` the
+    response already carries. → **Fix now**: both comments and the README claim now describe what
+    the field does. ADR-0003 is **not** falsified by this — it promises "a 403 that names the rule
+    that denied it", and `type: /problems/out-of-scope` does name it; it never promised a second
+    field, which is why this is a wrong description and not a broken decision.
+
+29 bis. **Whether `deniedBy` should carry the locus rather than repeat `type`** is a separate
+question, and it is the one point 29 could not answer by correcting a sentence. → **A row in
+this file**, resolved in **Phase 7**: giving the field a vocabulary of loci changes a published
+response field, so it is an ADR with a rejected option — the obvious one being to drop the field
+altogether, since `type` already carries the refusal.
 
 30. **Three `## Open` rows named no phase**, which `CLAUDE.md` calls "a deferral pretending to be a
     record". → **Fix now**: each now names a phase or, where no phase decides it, the event that
     does — first production use, and the repository going public.
 
-31. **Smaller, all fixed now**: `pnpm run seed` empties both schemas and the README framed only
-    `db:reset` as destructive; the `localhost` warning did not say that pages render fine and only
-    the first _write_ fails; `pré-facturier` and `Cjm` were used before the vocabulary list that
-    omitted them; `vitest.config.ts` carried a stale comment about fixtures being linted when ESLint
-    ignores them; and `docs/` held three tracked paths no entry document mentioned.
+31. **Five smaller frictions.** → **Fix now**, all five: `pnpm run seed` empties all three schemas
+    (`billing`, `timesheet` and `public` — the first write of this row said "two", which was wrong about
+    a destructive command and is exactly the kind of claim this file exists to catch) and the README
+    framed only `db:reset` as destructive; the `localhost` warning did not say that pages render fine
+    and only the first _write_ fails; `pré-facturier` and `Cjm` were used before the vocabulary list
+    that omitted them; `vitest.config.ts` carried a stale comment about fixtures being linted when
+    ESLint ignores them; and `docs/` held three tracked paths no entry document mentioned.
 
 **Left standing, and named rather than fixed.** The repository is private and `main` still carries
 the pre-Phase-6 README, so until this branch merges a reader sees "aucune interface web" or nothing

@@ -57,9 +57,8 @@ Ce qui n'existe **pas encore** : le durcissement de la CI (phase 7), l'instance 
 (phase 8), la passe de relecture documentaire (phase 9) et le gel (phase 10). La phase 0 —
 outillage, CI, règles d'écriture — précède les autres et est faite.
 
-Quatre fichiers répondent aux questions qu'on se pose en arrivant.
-[`CONTEXT.md`](CONTEXT.md) définit le vocabulaire — métier (`Tjm`, `Cjm`, `pré-facturier`, `régie`,
-`intercontrat`, `avoir`,
+Quatre fichiers répondent aux questions qu'on se pose en arrivant. [`CONTEXT.md`](CONTEXT.md)
+définit le vocabulaire — métier (`Tjm`, `Cjm`, `pré-facturier`, `régie`, `intercontrat`, `avoir`,
 `PASSI`…) et technique (`Persona`, `Role`, `Actor`) ; [`docs/adr/`](docs/adr/README.md) contient les
 arbitrages avec, pour chacun, l'option écartée et le seuil de réouverture ;
 [`docs/BUILD-RULES.md`](docs/BUILD-RULES.md) est la forme vérifiable de ces arbitrages — ce qu'on a
@@ -67,16 +66,16 @@ le droit d'écrire dans ce dépôt et ce qu'on n'a pas le droit d'y écrire ; et
 [`docs/open-questions.md`](docs/open-questions.md) dit ce qui n'est **pas** tranché, avec la phase
 qui le tranchera.
 
+⚠️ Ces quatre fichiers sont **en anglais**, ce README seul est en français. C'est délibéré et la
+règle est dans `CLAUDE.md` : le code, les commits et les arbitrages en anglais, le README dans la
+langue du lecteur qui ouvre ce dépôt sans brief.
+
 Le reste de `docs/` est du **journal de construction**, pas de la documentation d'arrivée :
 [`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md) est l'ordre et le calendrier des phases,
 [`docs/PHASE-4-5-CLOSURE.md`](docs/PHASE-4-5-CLOSURE.md) est le relevé des revues de ces deux
 phases-là (les suivantes sont closes dans `open-questions.md`, ce qui est une incohérence de forme
 assumée), et [`docs/agents/`](docs/agents/) décrit l'outillage d'agents utilisé pour construire le
 dépôt. Rien n'y est nécessaire pour comprendre la maquette.
-
-⚠️ Ces quatre fichiers sont **en anglais**, ce README seul est en français. C'est délibéré et la
-règle est dans `CLAUDE.md` : le code, les commits et les arbitrages en anglais, le README dans la
-langue du lecteur qui ouvre ce dépôt sans brief.
 
 Pour vérifier soi-même plutôt que me croire. Les versions sont **strictes** (`engine-strict` est
 activé, donc la première commande échoue au lieu d'avertir) : **Node ≥ 24.13.1** — la version exacte
@@ -296,7 +295,7 @@ si l'une échoue :
 ```sh
 pnpm run db:up      # PostgreSQL 18 via docker compose, attend qu'il soit healthy
 pnpm run migrate    # applique les migrations en attente, rejouable sans effet
-pnpm run seed       # ⚠️ VIDE les deux schémas, puis réécrit le jeu déterministe (ADR-0022)
+pnpm run seed       # ⚠️ VIDE les trois schémas, puis réécrit le jeu déterministe (ADR-0022)
 pnpm run test:int   # les tests d'intégration contre ce PostgreSQL
 ```
 
