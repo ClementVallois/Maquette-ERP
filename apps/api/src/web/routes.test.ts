@@ -403,7 +403,7 @@ describe('a verb and the button that offers it', () => {
       );
     });
 
-    it(`mints an issuance key for ${role} exactly when the route carries it`, async () => {
+    it(`refuses issuance for ${role} exactly when the route does not carry it`, async () => {
       expect(await refusedOnRole(`${PATHS.issueInvoice}/some-id`, role)).toBe(
         !carries(ISSUES_INVOICE, role),
       );
