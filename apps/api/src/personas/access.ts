@@ -138,6 +138,30 @@ export function registerAccessControl(
 const STATE_CHANGING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
+ * A browser that has been told not to send `Origin` sends the literal string `null` rather than
+ * omitting the header — Firefox's `network.http.sendOriginHeader=0` does exactly this, on
+ * same-origin writes included. It is refused like any other non-matching origin; what this
+ * constant buys is that the refusal can *say* so.
+ */
+const ORIGIN_SUPPRESSED = 'null';
+
+/**
+ * Why the refusal happened, as three cases rather than one boolean, because the three have three
+ * different fixes: a client that forgot the header, a browser configured to withhold it, and a
+ * genuine cross-origin write. A `boolean` collapsed the first two — and `Origin: null` fell on the
+ * *present* side of it, so the log said the opposite of what was happening.
+ *
+ * It records the shape, never the value: `config.ts` states the convention that nothing read from
+ * the outside is echoed back, and a header is the outside.
+ */
+function originShape(origin: string | undefined): 'absent' | 'suppressed' | 'mismatched' {
+  if (origin === undefined) return 'absent';
+  if (origin === ORIGIN_SUPPRESSED) return 'suppressed';
+
+  return 'mismatched';
+}
+
+/**
  * CSRF, second control (ADR-0023). `SameSite=Strict` on the cookie is the first; this one closes
  * the gap for any client that does not honour it.
  *
@@ -154,7 +178,7 @@ export function registerOriginCheck(app: FastifyInstance, dependencies: ServerDe
     if (origin === dependencies.config.publicOrigin) return;
 
     request.log.warn(
-      { originPresent: origin !== undefined },
+      { origin: originShape(origin) },
       'a state-changing request was refused on its origin',
     );
 
