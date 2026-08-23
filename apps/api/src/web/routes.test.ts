@@ -261,7 +261,23 @@ describe('security headers', () => {
     const response = await app.inject({ method: 'GET', url: '/api/v1/personas' });
 
     expect(response.headers['x-content-type-options']).toBe('nosniff');
-    expect(response.headers['referrer-policy']).toBe('no-referrer');
+    expect(response.headers['referrer-policy']).toBe('same-origin');
+  });
+
+  /**
+   * The regression guard for 23/08/2026, when `no-referrer` made every screen unusable.
+   *
+   * Nothing in this suite can catch that bug by reproducing it: `app.inject()` sets `Origin`
+   * itself, so no test here has ever seen a browser-derived one, and the header the browser
+   * derives it *from* is the only observable this suite has. Fetch nulls a non-`GET` navigation's
+   * `Origin` under `no-referrer` — same-origin included — so this value and the origin check of
+   * `personas/access.ts` are one mechanism written in two files, and a future tightening back to
+   * `no-referrer` for privacy has to fail here rather than in a reader's browser.
+   */
+  it('does not send a referrer policy that nulls the Origin of its own form posts', async () => {
+    const response = await app.inject({ method: 'GET', url: PATHS.choosePersona });
+
+    expect(response.headers['referrer-policy']).not.toBe('no-referrer');
   });
 });
 

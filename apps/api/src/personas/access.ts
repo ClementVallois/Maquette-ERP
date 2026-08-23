@@ -138,10 +138,14 @@ export function registerAccessControl(
 const STATE_CHANGING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
- * A browser that has been told not to send `Origin` sends the literal string `null` rather than
- * omitting the header — Firefox's `network.http.sendOriginHeader=0` does exactly this, on
- * same-origin writes included. It is refused like any other non-matching origin; what this
- * constant buys is that the refusal can *say* so.
+ * A browser that has been told not to disclose its origin sends the literal string `null` rather
+ * than omitting the header. Fetch decides that from the **referrer policy** — under `no-referrer`
+ * every non-`GET` navigation gets `Origin: null`, same-origin submissions included — which is how
+ * this application spent 23/08/2026 refusing its own forms (`web/reply.ts` now sends
+ * `same-origin`). A profile-level `network.http.sendOriginHeader=0` produces the same string.
+ *
+ * It is refused like any other non-matching origin; what this constant buys is that the refusal
+ * can *say* so instead of reporting a header that is merely present.
  */
 const ORIGIN_SUPPRESSED = 'null';
 

@@ -46,7 +46,15 @@ export function registerSecurityHeaders(app: FastifyInstance): void {
       'x-content-type-options': 'nosniff',
       // No `Referer` leaves this instance. A Cra URL carries a consultant id and a period, and a
       // referrer is the classic way an internal identifier reaches a third party's log.
-      'referrer-policy': 'no-referrer',
+      //
+      // `same-origin` and NOT `no-referrer`, which is the value ADR-0049 named and which silently
+      // breaks every write in these screens. Fetch derives a form post's `Origin` from the
+      // referrer policy: under `no-referrer` the browser appends the literal string `null` — on a
+      // **same-origin** submission too — and `registerOriginCheck` then refuses its own forms. No
+      // test caught it because `app.inject()` sets `Origin` by hand, as do the README's `curl`
+      // examples. `same-origin` nulls the origin only when the request really is cross-origin, so
+      // the CSRF control is unchanged and no referrer still leaves this instance.
+      'referrer-policy': 'same-origin',
       'x-frame-options': 'DENY',
     });
     done(null, payload);
