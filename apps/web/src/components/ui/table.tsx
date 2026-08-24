@@ -15,7 +15,13 @@ function Table({ className, ...props }: React.ComponentProps<'table'>) {
 }
 
 function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
-  return <thead data-slot="table-header" className={cn('[&_tr]:border-b', className)} {...props} />;
+  return (
+    <thead
+      data-slot="table-header"
+      className={cn('bg-muted [&_tr]:border-b', className)}
+      {...props}
+    />
+  );
 }
 
 function TableBody({ className, ...props }: React.ComponentProps<'tbody'>) {
@@ -43,7 +49,9 @@ function TableRow({ className, ...props }: React.ComponentProps<'tr'>) {
     <tr
       data-slot="table-row"
       className={cn(
-        'border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted',
+        // Row hover is `--accent` (§6), the surface token shadcn reserves for exactly this and
+        // for menu hover — not the `--muted/50` the generator ships, which is the header's fill.
+        'border-b transition-colors hover:bg-accent has-aria-expanded:bg-accent data-[state=selected]:bg-accent',
         className,
       )}
       {...props}
@@ -55,8 +63,11 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
   return (
     <th
       data-slot="table-head"
+      // `text-table-header` carries §5's header spec (0.75rem, 600, 0.04em, uppercase,
+      // --muted-foreground); the generator's `font-medium text-foreground` would override it on
+      // specificity, so neither survives here. Height 36px and 16px side padding are §6's.
       className={cn(
-        'h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0',
+        'text-table-header h-9 px-4 text-left align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0',
         className,
       )}
       {...props}
@@ -68,7 +79,12 @@ function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
   return (
     <td
       data-slot="table-cell"
-      className={cn('p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0', className)}
+      // §6: 12px vertical / 16px horizontal. 12 + 12 + the 20px body line-height is the 44px row
+      // §6 asks for, so the row needs no explicit height.
+      className={cn(
+        'px-4 py-3 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0',
+        className,
+      )}
       {...props}
     />
   );

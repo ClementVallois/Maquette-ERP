@@ -24,7 +24,10 @@ export function StatCard({ label, value, helpText, className }: StatCardProps): 
   return (
     <div
       className={cn(
-        'flex flex-col gap-1 rounded-xl bg-card p-5 shadow-card ring-1 ring-foreground/10',
+        // `ring-border`, not an opacity-derived `ring-foreground/10`: §3.1 gives card edges their
+        // own token (`--border`), and deriving the same line from `--foreground` puts a second,
+        // slightly different edge colour in the system for no gain.
+        'flex flex-col gap-1 rounded-xl bg-card p-5 shadow-card ring-1 ring-border',
         className,
       )}
     >

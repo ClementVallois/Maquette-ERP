@@ -83,15 +83,28 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 interface SectionProps {
   readonly title: string;
   readonly children: ReactNode;
+  /**
+   * `row` lays specimens out side by side and is right for badges and buttons. `grid` is the
+   * KPI row of §6 — equal columns, equal heights, gap 16 — which a wrapping flex row cannot give
+   * (it sizes each card to its own content, so the one with sub-text ends up taller). `block`
+   * is for a specimen that owns the full width and stacks internally: Tabs, Table.
+   */
+  readonly layout?: 'row' | 'grid' | 'block';
 }
+
+const SECTION_LAYOUTS = {
+  row: 'flex flex-wrap items-start gap-3',
+  grid: 'grid grid-cols-[repeat(3,minmax(0,220px))] items-stretch gap-4',
+  block: 'w-full',
+} as const;
 
 // Local to this file on purpose: the kitchen sink is the one place that needs a repeated
 // "titled group" wrapper, and it is not part of the design system Phase 2 ships.
-function Section({ title, children }: SectionProps): ReactElement {
+function Section({ title, children, layout = 'row' }: SectionProps): ReactElement {
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-card-title">{title}</h2>
-      <div className="flex flex-wrap items-start gap-3">{children}</div>
+      <div className={SECTION_LAYOUTS[layout]}>{children}</div>
     </section>
   );
 }
@@ -116,7 +129,7 @@ export function KitchenSink(): ReactElement {
           <h1 className="text-page-title">Kitchen sink — design system</h1>
         </header>
 
-        <Section title="StatCard">
+        <Section title="StatCard" layout="grid">
           <StatCard label="€ facturable" value="12 400,00 €" />
           <StatCard label="Jours en retard" value="3" />
           <StatCard label="Cra" value="2" helpText="période 2026-06" />
@@ -146,14 +159,27 @@ export function KitchenSink(): ReactElement {
           <StatusBadge variant="declined-unknown-client" />
         </Section>
 
-        <Section title="Flags de jour dans la grille (teinte de ligne, pas un badge)">
-          <div className="flex w-72 items-center justify-between rounded-lg bg-flag-weekend-bg px-3 py-2">
-            <span className="text-flag-weekend-text text-sm">13</span>
-            <span className="text-flag-weekend-text text-xs">Week-end</span>
-          </div>
-          <div className="flex w-72 items-center justify-between rounded-lg bg-flag-holiday-bg px-3 py-2">
-            <span className="text-flag-weekend-text text-sm">14</span>
-            <span className="text-[11.5px] text-flag-holiday-text">Férié</span>
+        {/* On a `--card` ground, not on the page: `--flag-weekend-bg` is `#f4f6f8`, the same value
+            as `--background`, so a weekend row shown on the page ground is invisible and the
+            specimen proves nothing. §4.4 tints a row inside the grid's table, and that table is
+            white — this is the contrast the tint is actually designed against. */}
+        <Section
+          title="Flags de jour dans la grille (teinte de ligne, pas un badge)"
+          layout="block"
+        >
+          <div className="w-96 overflow-hidden rounded-xl bg-card shadow-card ring-1 ring-border">
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm tabular-nums">12</span>
+              <span className="text-xs text-muted-foreground">Jour ouvré</span>
+            </div>
+            <div className="flex items-center justify-between bg-flag-weekend-bg px-4 py-3">
+              <span className="text-flag-weekend-text text-sm tabular-nums">13</span>
+              <span className="text-flag-weekend-text text-xs">Week-end</span>
+            </div>
+            <div className="flex items-center justify-between bg-flag-holiday-bg px-4 py-3">
+              <span className="text-flag-weekend-text text-sm tabular-nums">14</span>
+              <span className="text-[11.5px] text-flag-holiday-text">Férié</span>
+            </div>
           </div>
         </Section>
 
@@ -212,7 +238,7 @@ export function KitchenSink(): ReactElement {
           </Card>
         </Section>
 
-        <Section title="Table">
+        <Section title="Table" layout="block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -240,7 +266,7 @@ export function KitchenSink(): ReactElement {
           </Table>
         </Section>
 
-        <Section title="Tabs">
+        <Section title="Tabs" layout="block">
           <Tabs defaultValue="a-facturer" className="w-full">
             <TabsList>
               <TabsTrigger value="a-facturer">À facturer</TabsTrigger>
