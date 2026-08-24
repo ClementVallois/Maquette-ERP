@@ -1,0 +1,139 @@
+import type { InvoiceListItem } from '@/features/cra/types';
+
+/**
+ * `Annexe A — Billing`. Shapes verified against the route handlers (`apps/api/src/routes/api.ts`,
+ * `GET /api/v1/invoices`, `GET /api/v1/invoices/:id`) and the domain types they compose
+ * (`packages/billing/src/domain/invoice.ts`, `invoice-line.ts`, `document.ts`, `vat.ts`,
+ * `mentions.ts`, `payment-terms.ts`, `seller.ts`, `client.ts`) rather than guessed from Annexe A's
+ * prose (rule 0bis.8). `InvoiceListItem` lives in `features/cra/types.ts`, not duplicated here: the
+ * pré-facturier and the invoice list both render it, and it is `billing`'s type either way.
+ *
+ * `dueDate` is deliberately absent: `Invoice.dueDateFrom(issueDate)` exists in the domain and
+ * `LABELS.invoice.dueDate` has a French label for it, but the route's response object literal does
+ * not return it. Left out here rather than guessed at — a real finding for whichever phase (8)
+ * first needs it on this screen, not a silent addition.
+ *
+ * Only `types.ts` exists for this feature in Phase 3 (task 3.7). `api.ts`/`hooks.ts` land in
+ * Phase 8 with the invoice list and detail screens; that is also where the optional zod parsing at
+ * the boundary belongs for `InvoiceDetail`, the second of the two "complex payloads" task 3.7
+ * names.
+ */
+
+export type InvoiceStatus = 'draft' | 'issued' | 'cancelledByCreditNote';
+
+export interface InvoiceListResponse {
+  readonly invoices: readonly InvoiceListItem[];
+}
+
+export interface PostalAddress {
+  readonly line1: string;
+  readonly line2: string | null;
+  readonly postalCode: string;
+  readonly city: string;
+  readonly country: string;
+}
+
+export interface BilledParty {
+  readonly clientId: string;
+  readonly name: string;
+  readonly siren: string | null;
+  readonly intraCommunityVatNumber: string | null;
+  readonly billingAddress: PostalAddress;
+  readonly deliveryAddress: PostalAddress;
+}
+
+export interface Seller {
+  readonly id: string;
+  readonly name: string;
+  readonly legalForm: string;
+  readonly shareCapitalCents: number;
+  readonly siren: string;
+  readonly intraCommunityVatNumber: string;
+  readonly rcsRegistration: string;
+  readonly address: PostalAddress;
+  readonly numberPrefix: string;
+}
+
+export type PaymentTerms =
+  | { readonly kind: 'net'; readonly days: number }
+  | { readonly kind: 'endOfMonth'; readonly days: number };
+
+export type OperationCategory = 'services' | 'goods' | 'mixed';
+
+export type EarlyPaymentDiscount =
+  { readonly kind: 'none' } | { readonly kind: 'rate'; readonly basisPoints: number };
+
+export interface LegalMentions {
+  readonly latePaymentBasisPoints: number;
+  readonly recoveryIndemnityCents: number;
+  readonly earlyPaymentDiscount: EarlyPaymentDiscount;
+  readonly operationCategory: OperationCategory;
+  readonly vatOnDebitsOption: boolean;
+}
+
+export type NotChargedReason = 'territoryOutsideVatScope' | 'reverseChargeEuB2b';
+
+export type VatTreatment =
+  | { readonly kind: 'taxable'; readonly basisPoints: number }
+  | { readonly kind: 'notCharged'; readonly reason: NotChargedReason };
+
+export interface RegieDaysOrigin {
+  readonly kind: 'RegieDays';
+  readonly missionId: string;
+  readonly craId: string;
+  readonly period: string;
+  readonly halfDays: number;
+  readonly tjmCents: number;
+}
+
+export interface InvoiceLine {
+  readonly designation: string;
+  readonly origin: RegieDaysOrigin;
+  readonly quantityHalfDays: number;
+  readonly unitPriceCents: number;
+  readonly amountCents: number;
+  readonly vat: VatTreatment;
+}
+
+export interface VatGroup {
+  readonly key: string;
+  readonly treatment: VatTreatment;
+  readonly baseCents: number;
+  readonly vatCents: number | null;
+  readonly mention: string | null;
+}
+
+export interface DocumentTotals {
+  readonly totalExcludingVatCents: number;
+  readonly vatTotalCents: number;
+  readonly totalIncludingVatCents: number;
+}
+
+/**
+ * The invoice detail (`GET /api/v1/invoices/:id`) — the second of the two "complex payloads"
+ * frontend-plan.md task 3.7 names for optional zod parsing at the fetch boundary. Not written
+ * here: the parser belongs in this feature's `api.ts`, which does not exist yet in Phase 3.
+ * `totals` is `null` until `status === 'issued'` (Annexe A, verbatim in the route).
+ */
+export interface InvoiceDetail {
+  readonly id: string;
+  readonly status: InvoiceStatus;
+  readonly supplyPeriod: string;
+  readonly invoiceNumber: string | null;
+  readonly issueDate: string | null;
+  readonly billedTo: BilledParty;
+  readonly seller: Seller;
+  readonly terms: PaymentTerms;
+  readonly mentions: LegalMentions;
+  readonly lines: readonly InvoiceLine[];
+  readonly vatBreakdown: readonly VatGroup[];
+  readonly totals: DocumentTotals | null;
+}
+
+export interface IssuanceResponse {
+  readonly invoiceId: string;
+  readonly replayed: boolean;
+  readonly invoiceNumber: string;
+  readonly issueDate: string;
+  readonly totalTtcCents: number;
+}
