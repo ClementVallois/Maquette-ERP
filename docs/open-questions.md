@@ -72,6 +72,106 @@ and typed-error guards do reach the app that will render money in Phase 3.4.
 
 ---
 
+## Front-end Phase 2 checkpoint — `feat/web`, 24/08/2026
+
+The two questions `CLAUDE.md` requires, asked of `docs/frontend-plan.md` Phase 2 (the design
+system). Every point resolves to exactly one of the four outcomes.
+
+**Which tasks ran.** 2.1 to 2.7, all seven. Tailwind v4 + shadcn initialised with the project
+palette; Inter self-hosted (`@fontsource-variable/inter`); all 22 components of task 2.3 vendored
+and hand-fixed for the repo's strict TS/lint rules; `StatusBadge` covering all 12 real
+status/tag/reason variants; `StatCard` with no delta prop (so a screen cannot pass one); the
+kitchen sink rendered from `App.tsx` with a baseline screenshot at 1440; the two motion tokens
+wired with `prefers-reduced-motion`. What did **not** run, and why:
+
+- **No dark mode, deliberately** — direction-visuelle.md §10 excludes it and no `.dark` block is
+  written. Not a gap; the exclusion is the spec.
+- **The kitchen sink was not screenshotted at the 768 viewport.** Task 2.6 names the 1440 baseline
+  only; 768 is Phase 1.5's shell-responsive concern, and there is no shell yet (Phase 4). The smoke
+  test still runs on both Playwright projects (`desktop`, `mobile-shell`), so 768 is proven not to
+  console-error, just not visually captured.
+- **No contrast ratio was computed or published**, on any of the new tokens. Direction-visuelle.md
+  §2 says explicitly that none is claimed, ever, consistent with ADR-0061 — not a task 2.x
+  omission.
+- **The `rules-auditor` and `cold-reader` subagents did not run** — Clement is holding both for a
+  single pass over the whole front-end plan (same deferral recorded in the Phase 1 checkpoint).
+
+**Least confident in.**
+
+1. **The two-tier radius remapping is reverse-engineered from this batch of 22 components, not
+   from a documented shadcn convention.** direction-visuelle.md §3.4 gives two numbers (8px
+   controls, 12px cards/panels/dialogs); the "radix-nova" style `shadcn add` generates is not
+   consistent about which Tailwind class name it reaches for at each tier (`button.tsx` and
+   `input.tsx` both use `rounded-lg` for a _control_; `card.tsx` uses `rounded-xl` for the
+   _card_ tier) — verified by grep, not assumed, and every mismatch found (`select.tsx`,
+   `popover.tsx`, `dropdown-menu.tsx` content panels generated at `rounded-lg`/8px when they are
+   panels that need 12px) was hand-fixed to `rounded-xl`. The risk is prospective: a component not
+   yet installed could reach for `rounded-md`/`rounded-sm` for something that is semantically a
+   panel, and the blanket `--radius-sm/md/lg` → 8px, `--radius-xl/2xl` → 12px mapping would render
+   it wrong silently, with no lint or type error to catch it. **Outcome: fix now** — the mitigation
+   is written at the decision point itself: `styles/globals.css`'s radius comment instructs
+   "verified against the generated source, not assumed — grep `rounded-(sm|md|lg|xl|2xl)` under
+   `src/components/ui/` before changing this," so the next person to `shadcn add` a component is
+   pointed at the check rather than inheriting a silent trap.
+2. **The dialog/sheet 180ms vs. popover/dropdown-menu/select-content/tooltip 120ms motion split is
+   my own extrapolation.** direction-visuelle.md §8 names "dialog, sheet, route transition" for
+   `--motion` (180ms) and "hover, focus, badge and button state" for `--motion-fast` (120ms); it
+   does not classify a popover, a dropdown menu or a select's open/close animation either way. I
+   grouped them with the fast bucket on the reasoning that they are click-triggered small menus,
+   closer in kind to a hover affordance than to a full-screen dialog. **Outcome: fix now, as a
+   documented judgement call** — each edited component carries a comment naming which bucket it
+   was assigned and why, so a reviewer can override the call by editing one `duration-*` class per
+   file rather than rediscovering the reasoning.
+3. **The `dark:` neutralization was verified, not just reasoned, after being flagged as a risk in
+   drafting.** `@custom-variant dark (&:is(.dark *))` was added to `styles/globals.css` because
+   Tailwind v4's default `dark:` variant is `prefers-color-scheme: dark`, and several vendored
+   components carry a `dark:` utility (e.g. `input.tsx`'s `dark:bg-input/30`) left over from the
+   generator's own dark-mode support. Checked directly in the built CSS
+   (`apps/web/dist/assets/index-*.css`): every `dark:` utility compiles to a `.dark *` class
+   selector, no `@media (prefers-color-scheme: dark)` block exists anywhere in the bundle, and
+   `grep` over `apps/web/src/` confirms no element ever applies a `dark` class — so every `dark:`
+   utility is permanently inert. **Outcome: fix now, done and verified.**
+4. **`sonner.tsx` and `checkbox.tsx`'s small unmapped radii (`rounded-[4px]`, the tooltip arrow's
+   `rounded-[2px]`) and the dialog/alert-dialog/sheet backdrop's `bg-black/10` scrim are generated
+   defaults direction-visuelle.md does not specify.** They pass the "no hard-coded colour" grep
+   gate (`black` is a Tailwind named colour, not a hex literal) and are conventional, low-stakes
+   choices (a modal scrim, a handful of micro-radii on elements too small for the 8px/12px scale to
+   read as either tier) rather than compliance gaps. **Outcome: fix now** — recorded here rather
+   than silently kept, on the view that a judgement call raised and left alone is still a judgement
+   call, not a silent pass.
+
+**In three months, what breaks.**
+
+1. **The dependency quarantine was still mechanically dead for this phase's installs** — the row
+   dated 24/08/2026 above, unchanged by this phase (not this agent's to fix, per the same row's
+   Owner line). Hand-verified instead, as Phase 1 did: every **direct** dependency this phase added
+   — `tailwindcss` 4.3.3 (2026-07-16), `@tailwindcss/vite` 4.3.3 (2026-07-16), `lucide-react`
+   1.31.0 (2026-08-09), `@fontsource-variable/inter` 5.3.0 (2026-07-19), `class-variance-authority`
+   0.7.1 (2024-11-26), `clsx` 2.1.1 (2024-04-23), `radix-ui` 1.6.7 (2026-07-24), `tailwind-merge`
+   3.6.0 (2026-05-10), `tw-animate-css` 1.4.0 (2025-09-24), `sonner` 2.0.8 (2026-08-09) — is at
+   least 15 days old against the 24/08/2026 cutoff (the youngest, `lucide-react` and `sonner`), well
+   past the 7-day quarantine. **Two were rejected rather than pinned**: `shadcn` (the `init`/`add`
+   CLI auto-added itself as a runtime dependency at `4.19.0`, published 2026-08-21 — 3 days old,
+   inside the window, and it has no import site in `src/` regardless — removed) and `next-themes`
+   (auto-added by the generated `sonner.tsx`, which reads it for a Next.js dark-mode provider this
+   Vite, light-only app does not have — the component was rewritten to a fixed `theme="light"` and
+   the dependency removed). **Every newly-added transitive package was checked, not assumed**, unlike
+   Phase 1 which "drifted three in silently": `jiti` bumped 2.6.1 → 2.7.0 as a side effect of the
+   dependency graph re-resolving around the new installs (2.7.0 published 2026-05-05, mature), and a
+   sweep of the `@radix-ui/react-*` family plus their own transitives (`@floating-ui/*`,
+   `aria-hidden`, `react-remove-scroll(-bar)`, `react-style-singleton`, `use-callback-ref`,
+   `use-sidecar`, `tslib`, `@standard-schema/spec`, `lightningcss` and its platform binaries) found
+   every one published between 2026-03-09 and 2026-07-24 — at least 31 days before this phase,
+   comfortably outside the window. **Outcome: a row in this file** — the existing row dated
+   24/08/2026 already covers the mechanism and the owner; this phase's finding (zero drift, unlike
+   Phase 1) is recorded here rather than duplicating that row.
+2. **The radius remapping risk of point 1 above** resolves to the same "fix now" outcome: the
+   guard is the comment in `styles/globals.css`, not a test, so it depends on being read. No
+   separate row — duplicating point 1 here would be the second source of truth `docs/BUILD-RULES.md`
+   warns against.
+
+---
+
 ## Phase 6 checkpoint — `feat/web`, 21/08/2026 (reviewers and their fixes, 22/08/2026)
 
 The two questions `CLAUDE.md` requires, asked of tasks 6.4 to 6.7. Every point resolves to exactly
