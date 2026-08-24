@@ -83,6 +83,18 @@ export interface RegieDaysOrigin {
   readonly craId: string;
   readonly period: string;
   readonly halfDays: number;
+  /**
+   * A `Tjm`, present here on purpose and not a violation of "`Cjm`, `Tjm` et la marge n'apparaissent
+   * jamais dans une vue de liste" (BUILD-RULES § Authorization) or Annexe C.12's own restatement of
+   * it: this field lives on `InvoiceDetail`, a **single-record** read (`GET /api/v1/invoices/:id`),
+   * never on `InvoiceListItem` — no list projection anywhere in this repository carries a `Tjm`.
+   * ADR-0034 requires it here specifically: "An invoice line **copies** its `Tjm` and rate; it does
+   * not reference them" — the frozen rate on the line **is** the audit trail, and the SSR printable
+   * invoice (`GET /facture/:id`) already prints it as `unitPriceCents` (`LABELS.invoice.unitPrice`).
+   * Whether the SPA's detail screen should also render `origin.tjmCents` itself (as opposed to only
+   * `unitPriceCents`, which is already derived from it) is not decided here — see
+   * `docs/open-questions.md`, row dated 2026-08-24, naming Phase 8.
+   */
   readonly tjmCents: number;
 }
 
