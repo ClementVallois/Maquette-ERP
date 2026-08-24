@@ -48,14 +48,24 @@ moitié la plus facile à perdre.
 
 Les **écrans** existent depuis la phase 6. Sept pages rendues par le serveur — sélecteur de
 persona, mois d'un consultant, grille de saisie, pré-facturier, marge, facture imprimable, relevé de
-CRA imprimable — plus la page qui rend un refus. Aucune étape de build front, aucun script envoyé au
-navigateur (ADR-0009, ADR-0025, ADR-0049). **Le point d'entrée est `http://127.0.0.1:3000/`**, le
-sélecteur de persona : tout le reste s'atteint en cliquant depuis là. La section « Démarrer » dit
-comment lancer l'instance, et la même chaîne se voit en HTTP ou à l'écran, au choix.
+CRA imprimable — plus la page qui rend un refus. Aucune étape de build front, aucun script envoyé
+au navigateur (ADR-0009, ADR-0025) : c'est vrai du code d'aujourd'hui, et **la décision a bougé le
+24/08/2026** — ADR-0062 remplace ADR-0009 et fait passer l'interface interactive en SPA React (les
+deux imprimables restent rendus par le serveur). Rien n'en est écrit ; voir « pas encore » juste en
+dessous. **Le point d'entrée est `http://127.0.0.1:3000/`**, le sélecteur de persona : tout le reste
+s'atteint en cliquant depuis là. La section « Démarrer » dit comment lancer l'instance, et la même
+chaîne se voit en HTTP ou à l'écran, au choix.
 
 Ce qui n'existe **pas encore** : le durcissement de la CI (phase 7), l'instance hébergée
 (phase 8), la passe de relecture documentaire (phase 9) et le gel (phase 10). La phase 0 —
 outillage, CI, règles d'écriture — précède les autres et est faite.
+
+N'existe pas encore non plus, et c'est la décision du 24/08/2026 : **l'interface interactive en
+SPA React**, dont aucune ligne n'est écrite. Elle a son propre plan de construction
+([`docs/frontend-plan.md`](docs/frontend-plan.md), en français comme ce README), sa direction
+visuelle ([`docs/direction-visuelle.md`](docs/direction-visuelle.md)) et ses trois arbitrages
+— ADR-0062 (React), ADR-0063 (servie par la même instance Fastify, même origine) et ADR-0064 (la
+CSP admet un script). Les deux documents imprimables, eux, ne bougent pas.
 
 Quatre fichiers répondent aux questions qu'on se pose en arrivant. [`CONTEXT.md`](CONTEXT.md)
 définit le vocabulaire — métier (`Tjm`, `Cjm`, `pré-facturier`, `régie`, `intercontrat`, `avoir`,
@@ -74,8 +84,10 @@ Le reste de `docs/` est du **journal de construction**, pas de la documentation 
 [`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md) est l'ordre et le calendrier des phases,
 [`docs/PHASE-4-5-CLOSURE.md`](docs/PHASE-4-5-CLOSURE.md) est le relevé des revues de ces deux
 phases-là (les suivantes sont closes dans `open-questions.md`, ce qui est une incohérence de forme
-assumée), et [`docs/agents/`](docs/agents/) décrit l'outillage d'agents utilisé pour construire le
-dépôt. Rien n'y est nécessaire pour comprendre la maquette.
+assumée), [`docs/frontend-plan.md`](docs/frontend-plan.md) et
+[`docs/direction-visuelle.md`](docs/direction-visuelle.md) sont le plan et la direction visuelle de
+la SPA à construire, et [`docs/agents/`](docs/agents/) décrit l'outillage d'agents utilisé pour
+construire le dépôt. Rien n'y est nécessaire pour comprendre la maquette.
 
 Pour vérifier soi-même plutôt que me croire. Les versions sont **strictes** (`engine-strict` est
 activé, donc la première commande échoue au lieu d'avertir) : **Node ≥ 24.13.1** — la version exacte
@@ -261,17 +273,17 @@ et le test négatif prouve qu'elle **refuse**.
 
 Chaque ligne vient d'un arbitrage écrit, avec l'option écartée et le seuil de réouverture.
 
-| Choix                                                                                                                                          | ADR                          | Option écartée                                                                   |
-| ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | -------------------------------------------------------------------------------- |
-| **TypeScript** strict, **Node.js** ≥ 24.13.1                                                                                                   | —                            | —                                                                                |
-| **Fastify**                                                                                                                                    | ADR-0008                     | NestJS — un conteneur d'injection et des décorateurs pour une douzaine de routes |
-| **HTML rendu serveur** pour les deux documents imprimables ; **React + TypeScript** en SPA pour l'interface interactive, pas encore construite | ADR-0062 (remplace ADR-0009) | Vue — portages shadcn/ui et TanStack moins complets                              |
-| **PostgreSQL 18**, SQL écrit à la main                                                                                                         | ADR-0011                     | Un ORM — `FOR UPDATE` et les schémas par module doivent rester lisibles          |
-| Migrations : fichiers `.sql` numérotés + runner                                                                                                | ADR-0011                     | Un outil de migration tiers                                                      |
-| **Montants en centimes entiers**                                                                                                               | ADR-0002                     | Un objet `Money`, une bibliothèque décimale                                      |
-| **Zod** aux frontières, et nulle part ailleurs                                                                                                 | ADR-0042                     | Une validation qui redescend dans le domaine                                     |
-| **Vitest** · **pino** · **pnpm** workspaces                                                                                                    | —                            | —                                                                                |
-| **Sélecteur de persona** au lieu d'une authentification                                                                                        | ADR-0023                     | Un vrai IdP, qui rendrait l'autorisation invisible en démonstration              |
+| Choix                                                                                                             | ADR                          | Option écartée                                                                                  |
+| ----------------------------------------------------------------------------------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------- |
+| **TypeScript** strict, **Node.js** ≥ 24.13.1                                                                      | —                            | —                                                                                               |
+| **Fastify**                                                                                                       | ADR-0008                     | NestJS — un conteneur d'injection et des décorateurs pour une douzaine de routes                |
+| **HTML rendu serveur** pour les deux imprimables ; **React + TypeScript** en SPA pour l'interactif (à construire) | ADR-0062 (remplace ADR-0009) | Vue — shadcn/ui n'y existe qu'en portage communautaire, et ce code-là est recopié dans le dépôt |
+| **PostgreSQL 18**, SQL écrit à la main                                                                            | ADR-0011                     | Un ORM — `FOR UPDATE` et les schémas par module doivent rester lisibles                         |
+| Migrations : fichiers `.sql` numérotés + runner                                                                   | ADR-0011                     | Un outil de migration tiers                                                                     |
+| **Montants en centimes entiers**                                                                                  | ADR-0002                     | Un objet `Money`, une bibliothèque décimale                                                     |
+| **Zod** aux frontières, et nulle part ailleurs                                                                    | ADR-0042                     | Une validation qui redescend dans le domaine                                                    |
+| **Vitest** · **pino** · **pnpm** workspaces                                                                       | —                            | —                                                                                               |
+| **Sélecteur de persona** au lieu d'une authentification                                                           | ADR-0023                     | Un vrai IdP, qui rendrait l'autorisation invisible en démonstration                             |
 
 **Absents, et c'est un choix** : Redis, Kafka, RabbitMQ, Elasticsearch, Terraform, Kubernetes,
 microservices, tout ORM, toute bibliothèque décimale, toute file de jobs, Vue, génération de

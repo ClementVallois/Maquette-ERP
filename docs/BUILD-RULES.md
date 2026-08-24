@@ -129,13 +129,13 @@ ADR and moves to the README's "Ce que je ne construis pas" — never a silent om
 
 ## Stack — decided, do not substitute
 
-Fastify · the two printable documents (`/facture/:id`, `/releve/:id`) server-rendered, no build
-step · the interactive UI a **React + TypeScript SPA**, built by **Vite** in `apps/web`, served by
-the same Fastify process, same origin, no CORS (ADR-0062, ADR-0063) — routing, data and forms on
-**TanStack** (Router, Query, Table, Form), the UI kit **Tailwind + shadcn/ui**, tested end-to-end
-with **Playwright + axe-core**, each pinned only as far as `docs/frontend-plan.md` §1 fixes it ·
-`pg` with hand-written SQL and numbered `.sql` migrations · Zod at the boundaries only · Vitest ·
-pino · pnpm workspaces · a persona selector instead of authentication, announced as such.
+Fastify · the two printable documents (`/facture/:id`, `/releve/:id`) server-rendered, with no
+build step · the interactive UI a **React + TypeScript SPA** built by **Vite** in `apps/web` and
+served by the same Fastify process, same origin, no CORS (ADR-0062, ADR-0063) — **TanStack** for
+routing, data, tables and forms, **Tailwind + shadcn/ui** for the kit, **Playwright + axe-core**
+for the end-to-end pass; `docs/frontend-plan.md` §1 is the authority on the exact list · `pg` with
+hand-written SQL and numbered `.sql` migrations · Zod at the boundaries only · Vitest · pino ·
+pnpm workspaces · a persona selector instead of authentication, announced as such.
 
 **Not in this repository**, and the choice is written with its threshold: Redis, Kafka, RabbitMQ,
 Elasticsearch, Terraform, Kubernetes, microservices, any ORM, any decimal library, any job queue,
