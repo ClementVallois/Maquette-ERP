@@ -81,8 +81,12 @@ system). Every point resolves to exactly one of the four outcomes.
 palette; Inter self-hosted (`@fontsource-variable/inter`); all 22 components of task 2.3 vendored
 and hand-fixed for the repo's strict TS/lint rules; `StatusBadge` covering all 12 real
 status/tag/reason variants; `StatCard` with no delta prop (so a screen cannot pass one); the
-kitchen sink rendered from `App.tsx` with a baseline screenshot at 1440; the two motion tokens
-wired with `prefers-reduced-motion`. What did **not** run, and why:
+kitchen sink rendered from `App.tsx` with a baseline screenshot at 1440 and a review screenshot of
+an open dialog (rule 0bis.10) showing the panel treatment the baseline's closed triggers cannot;
+the two motion values applied as Tailwind's numeric duration utilities (`duration-120`,
+`duration-180` — verified compiled: `.duration-120{transition-duration:.12s}`,
+`.duration-180{transition-duration:.18s}`), wrapped by `prefers-reduced-motion`. What did **not**
+run, and why:
 
 - **No dark mode, deliberately** — direction-visuelle.md §10 excludes it and no `.dark` block is
   written. Not a gap; the exclusion is the spec.
@@ -95,6 +99,12 @@ wired with `prefers-reduced-motion`. What did **not** run, and why:
   omission.
 - **The `rules-auditor` and `cold-reader` subagents did not run** — Clement is holding both for a
   single pass over the whole front-end plan (same deferral recorded in the Phase 1 checkpoint).
+- **No axe scan ran, and the Phase 1 checkpoint's own claim about this needs correcting.** It said
+  `@axe-core/playwright`'s "first real use: Phase 2.6" — checked against the actual task list
+  while writing this checkpoint, task 2.6 asks for a baseline screenshot, not an accessibility
+  scan; Phase 10.2 is where axe runs on every screen. The dependency stays installed and unused
+  since Phase 1 (still correctly pinned, still mature), and the claim that slipped is corrected
+  here rather than silently carried forward.
 
 **Least confident in.**
 
@@ -112,16 +122,29 @@ wired with `prefers-reduced-motion`. What did **not** run, and why:
    is written at the decision point itself: `styles/globals.css`'s radius comment instructs
    "verified against the generated source, not assumed — grep `rounded-(sm|md|lg|xl|2xl)` under
    `src/components/ui/` before changing this," so the next person to `shadcn add` a component is
-   pointed at the check rather than inheriting a silent trap.
+   pointed at the check rather than inheriting a silent trap. The fix itself is now double-checked
+   rather than merely applied: the baseline screenshot only shows closed triggers (Dialog,
+   AlertDialog, Sheet, Popover, DropdownMenu and Select's content are all closed in
+   `kitchen-sink.png`), so neither the radius nor the shadow change had any visual evidence behind
+   it until a second capture — `tests/visual/review/2.6-kitchen-sink-dialog-open.png` (rule
+   0bis.10) — was taken with the dialog open, and the compiled CSS was checked directly:
+   `.rounded-xl{border-radius:.75rem}`, `.shadow-card{...}` and `.shadow-overlay{...}` all emit
+   with the exact values direction-visuelle.md §3.4 specifies.
 2. **The dialog/sheet 180ms vs. popover/dropdown-menu/select-content/tooltip 120ms motion split is
    my own extrapolation.** direction-visuelle.md §8 names "dialog, sheet, route transition" for
    `--motion` (180ms) and "hover, focus, badge and button state" for `--motion-fast` (120ms); it
    does not classify a popover, a dropdown menu or a select's open/close animation either way. I
    grouped them with the fast bucket on the reasoning that they are click-triggered small menus,
-   closer in kind to a hover affordance than to a full-screen dialog. **Outcome: fix now, as a
-   documented judgement call** — each edited component carries a comment naming which bucket it
-   was assigned and why, so a reviewer can override the call by editing one `duration-*` class per
-   file rather than rediscovering the reasoning.
+   closer in kind to a hover affordance than to a full-screen dialog. Applied as the literal
+   Tailwind classes `duration-120`/`duration-180` (verified compiled, not assumed:
+   `.duration-120{transition-duration:.12s}`, `.duration-180{transition-duration:.18s}`) rather
+   than through the `--motion-fast`/`--motion` CSS variables — those stay in `:root` as the
+   documented source of the two numbers, but no component reads them via `var(...)`, so a future
+   edit to one of those variables would change nothing until the matching `duration-*` class is
+   also edited by hand. **Outcome: fix now, as a documented judgement call** — each edited
+   component carries a comment naming which bucket it was assigned and why, so a reviewer can
+   override the call by editing one `duration-*` class per file rather than rediscovering the
+   reasoning; the variable-vs-class gap is recorded here rather than implied by the word "wired".
 3. **The `dark:` neutralization was verified, not just reasoned, after being flagged as a risk in
    drafting.** `@custom-variant dark (&:is(.dark *))` was added to `styles/globals.css` because
    Tailwind v4's default `dark:` variant is `prefers-color-scheme: dark`, and several vendored
