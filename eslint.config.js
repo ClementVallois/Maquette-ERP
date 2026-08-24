@@ -204,6 +204,21 @@ export default tseslint.config(
   },
 
   {
+    // `reactHooks.configs.flat.recommended` is the first config in this repository to ship rules
+    // at `warn`: `exhaustive-deps`, `incompatible-library`, `unsupported-syntax`. CLAUDE.md holds
+    // that a rule left at `warn` severity is not a gate, and `pnpm run lint` now carries
+    // `--max-warnings=0` so that stays mechanically true. These three are raised here as well,
+    // and not left to the flag alone: the flag makes a warning fail the run, this makes the
+    // failure name a rule that was decided rather than a threshold that was crossed.
+    files: ['apps/web/**/*.ts', 'apps/web/**/*.tsx'],
+    rules: {
+      'react-hooks/exhaustive-deps': 'error',
+      'react-hooks/incompatible-library': 'error',
+      'react-hooks/unsupported-syntax': 'error',
+    },
+  },
+
+  {
     // The kernel is in this list for the reason ADR-0033 gives: it holds domain-grade code and
     // has no `domain/` directory to be matched by the first glob.
     files: ['packages/*/src/domain/**/*.ts', 'packages/platform/src/**/*.ts'],

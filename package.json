@@ -16,7 +16,7 @@
     "env:init": "node scripts/ensure-env.ts",
     "env:check": "node scripts/check-env.ts",
     "check": "pnpm run env:check && pnpm run lint && pnpm run boundaries && pnpm run format:check && pnpm run typecheck && pnpm run test:cov",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
