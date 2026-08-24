@@ -15,6 +15,19 @@
     // needed this override because it has no config files of its own inside its tsconfig's scope.
     "rootDir": ".",
     "types": ["node", "vite/client"],
+    // `baseUrl` is what makes dependency-cruiser resolve `@/*` at all. `tsc` itself does not need
+    // it — TypeScript's own `paths` resolution has worked baseUrl-less since 4.1 — but
+    // dependency-cruiser's `normalize.mjs` only lets `tsconfig-paths-webpack-plugin` use this
+    // file's own directory as its base when `ts.parseJsonConfigFileContent` reports a `baseUrl`;
+    // absent one, it forces the plugin's base to the cruise's CWD (the repo root) instead, so
+    // `@/lib/x` was looked up as `<repo-root>/src/lib/x` and silently failed to resolve
+    // (docs/open-questions.md, row dated 24/08/2026). `ignoreDeprecations` is TS's own prescribed
+    // escape for TS5101 ("baseUrl... will stop functioning in TypeScript 7.0"): this repository
+    // pins `typescript@6.0.3` exactly, so the deprecation is live today. **Revisit at the next
+    // TypeScript bump**: either dependency-cruiser has caught up to baseUrl-less `paths` by then,
+    // or this option and its comment need replacing with whatever TS 7 requires instead.
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "@/*": ["./src/*"]
     }
