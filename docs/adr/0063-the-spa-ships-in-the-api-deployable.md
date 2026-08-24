@@ -5,8 +5,12 @@
 
 ## Context
 
-ADR-0048 (21/08/2026) decided there is one deployable for this repository, ahead of Phase 6's
-screens: the dependency-cruiser whitelist grants an app only its own tier-mate directory
+> Phase numbers here come from two unrelated sequences: **BUILD-PLAN Phase N** is
+> `docs/BUILD-PLAN.md`, **front-end plan Phase N** is `docs/frontend-plan.md`. Both are cited
+> below and each is named.
+
+ADR-0048 (21/08/2026) decided there is one deployable for this repository, ahead of BUILD-PLAN
+Phase 6's screens: the dependency-cruiser whitelist grants an app only its own tier-mate directory
 (`{ from: '^apps/([^/]+)/', to: '^apps/$1/' }`, and no `apps/web → apps/api` entry existed or
 exists); `@erp/api`'s public surface was three exports, not the composition root itself; and
 ADR-0009 had already called the API and the screens "the same use cases, two representations."
@@ -22,7 +26,7 @@ something else?
 **It is something else, and there is still one deployable.** `apps/web` is a **build-time-only**
 workspace member: `vite build` produces static assets (`apps/web/dist`), and Fastify — the same
 process, the same composition root — serves them same-origin alongside `/api/v1` and the two
-printable routes (Phase 9.1, `@fastify/static` with a SPA fallback for any `GET` that is not
+printable routes (front-end plan Phase 9.1, `@fastify/static` with a SPA fallback for any `GET` that is not
 `/api/*`, `/facture/:id`, `/releve/:id`, `/healthz` or `/readyz`). `apps/web` has no runtime server
 of its own in production; in development it runs Vite's dev server as a second local process,
 proxying rather than serving. `apps/api` keeps composing everything, keeps its one health probe,
@@ -89,7 +93,7 @@ read is sent without the cookie.
   not the port Fastify actually listens on. Two terminals: `pnpm run api:dev` and
   `pnpm --filter @erp/web dev`.
 - **Prod/demo**: Fastify serves `apps/web/dist` on port 3000; `API_PUBLIC_ORIGIN=http://127.0.0.1:3000`
-  (or the public origin, e.g. `https://erp.clementvallois.fr`, once Phase 8 hosts it). One origin,
+  (or the public origin, e.g. `https://erp.clementvallois.fr`, once BUILD-PLAN Phase 8 hosts it). One origin,
   no CORS, the cookie unchanged.
 
 ## Rejected option
@@ -128,7 +132,7 @@ direction.
 
 ## Consequences
 
-**Easy.** One image, one health probe, one process to reason about in Phase 8 — unchanged from
+**Easy.** One image, one health probe, one process to reason about in BUILD-PLAN Phase 8 — unchanged from
 ADR-0048. Same-origin means no CORS configuration exists to get wrong, and the persona cookie's
 `SameSite=Strict` keeps doing its job without a second cookie-forwarding mechanism to audit.
 
@@ -136,6 +140,6 @@ ADR-0048. Same-origin means no CORS configuration exists to get wrong, and the p
 and the Vite proxy list (`/api`, `/facture`, `/releve`, `/healthz`, `/readyz`) is a second place
 that has to be kept in step with whatever routes Fastify actually serves — a proxied path Fastify
 stops serving, or a new one it starts serving, is a manual edit in `vite.config.ts` with nothing to
-catch a drift between the two. Phase 9.1 adds a SPA-fallback route to Fastify that has to stay
+catch a drift between the two. Front-end plan Phase 9.1 adds a SPA-fallback route to Fastify that has to stay
 correctly ordered ahead of the catch-all against the two printable, always-priority routes — a
 routing responsibility `apps/api` did not previously carry.

@@ -5,6 +5,9 @@
 
 ## Context
 
+> Phase numbers below are the **front-end plan**'s (`docs/frontend-plan.md`), not
+> `docs/BUILD-PLAN.md`'s; the two sequences are unrelated and each citation names its plan.
+
 ADR-0049 (21/08/2026) set the strictest CSP available at the time — `default-src 'none'` with
 `style-src 'self'`, `img-src 'self'`, `form-action 'self'`, `base-uri 'none'`,
 `frame-ancestors 'none'` — as a claim checkable from outside the repository: `script-src` fell to
@@ -24,14 +27,14 @@ might come, but a policy chosen because the script has now been decided, in the 
 header does not change in the same _commit_ as the code, because this repository's discipline puts
 the ADR before the code (`CLAUDE.md`, "Clement owns the decisions; the agent writes the code" — an
 ADR is written at the time a decision is made, not at the time it is implemented); it changes in
-the same _phase-0 record_, ahead of Phase 1's first line of `apps/web`, which is the same
-visibility ADR-0049 asked for, applied to a repository that writes its decisions down before its
-code.
+the same _Phase 0 record_, ahead of front-end plan Phase 1's first line of `apps/web`, which is
+the same visibility ADR-0049 asked for, applied to a repository that writes its decisions down
+before its code.
 
 ## Decision
 
 **The Content-Security-Policy admits `script-src 'self'`.** The exact string is frozen for
-Phase 9.2 and copied here so the two cannot drift:
+front-end plan Phase 9.2 and copied here so the two cannot drift:
 
 ```
 default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self';
@@ -45,9 +48,9 @@ ADR-0049's six:
 
 - **`script-src 'self'`** — the decision itself: the SPA's own bundle, self-hosted, and nothing
   else. No CDN, no inline `<script>`, no hash list.
-- **`font-src 'self'`** — Phase 2.2 self-hosts the interface font rather than pulling from a CDN,
-  matching the supply-chain posture ADR-0049 already argued for style and script ("a font loaded
-  from a CDN would be the one unaudited byte in the page").
+- **`font-src 'self'`** — front-end plan Phase 2.2 self-hosts the interface font rather than
+  pulling it from a CDN, matching the supply-chain posture ADR-0049 already argued for style and
+  script ("a font loaded from a CDN would be the one unaudited byte in the page").
 - **`connect-src 'self'`** — the SPA's own `fetch` calls to `/api/v1`, restricted to the one
   origin the SPA is architecturally confined to anyway: ADR-0063's `Origin` check and
   `SameSite=Strict` cookie already forbid a cross-origin call from succeeding, and
@@ -59,12 +62,12 @@ to interpolate into; `img-src 'self'`, `base-uri 'none'` and `frame-ancestors 'n
 to script and unaffected by it; `form-action 'self'` still closes the exfiltration route for every
 write, whether it arrives as a form post from the two printable pages or a `fetch` from the SPA.
 
-**This string is frozen in Phase 9.2, and no code changes here.**
+**This string is frozen in front-end plan Phase 9.2, and no code changes here.**
 `apps/api/src/web/reply.ts`'s `CONTENT_SECURITY_POLICY` constant still reads the ADR-0049 string
-today; Phase 9.2 replaces it with the string above, and `routes.test.ts`'s assertion on the exact
-header value changes in that phase, not this one. This ADR exists so the plan's copy
+today; that phase replaces it with the string above, and `routes.test.ts`'s assertion on the
+exact header value changes there, not here. This ADR exists so the plan's copy
 (`frontend-plan.md` §9.2) and the eventual code cannot drift apart between now and then — one
-frozen string, cited from two places, changed in one commit when Phase 9 lands.
+frozen string, cited from two places, changed in one commit when that phase lands.
 
 The three companion headers ADR-0049 set are unaffected by this decision and stay as
 `apps/api/src/web/reply.ts` currently sets them: `X-Content-Type-Options: nosniff`,
@@ -75,23 +78,26 @@ see it") found that `no-referrer` makes Fetch send `Origin: null` on every non-`
 same-origin submissions included, which `registerOriginCheck` then refused as a mismatch: the
 strictest referrer policy was silently breaking every write the screens made. `same-origin` keeps
 `no-referrer`'s actual goal — nothing crosses to a third party — while leaving same-origin
-submissions their real `Origin`, which is what the CSRF control in ADR-0063 depends on. That fix
-predates this ADR and this ADR does not change it (ADR-0045 governs whether ADR-0049's own text
-gets corrected, and that branch is already merged to `main`); it is recorded here so a reader
-checking this ADR against `reply.ts` finds the value that is actually running rather than the one
-ADR-0049 still names.
+submissions their real `Origin`, which is what the CSRF control in ADR-0063 depends on.
+
+That fix predates this ADR and this ADR does not change it. What this ADR does change is the
+record: the `docs/open-questions.md` row of 23/08/2026 that reported the defect closes with
+"⚠️ **ADR-0049 names `no-referrer` literally and is not rewritten** — it owes a superseding note".
+This is that note. ADR-0049 is superseded here in full, header list included, so the value a reader
+finds in this ADR is the value `reply.ts` actually sets; ADR-0049 keeps its own text, as an ADR
+always does, and the debt the 23/08 row recorded is discharged rather than carried forward.
 
 ## Rejected option
 
-**Leave the CSP as ADR-0049 wrote it, and let Phase 9 add `script-src 'self'` unilaterally when the
-code lands.** This is the option ADR-0049 itself rejected in advance, and rejecting it again here
+**Leave the CSP as ADR-0049 wrote it, and let front-end plan Phase 9 add `script-src 'self'`
+unilaterally when the code lands.** This is the option ADR-0049 itself rejected in advance, and rejecting it again here
 is not redundant: doing nothing now would mean two ADRs simultaneously accepted on `main` making
 contradictory claims about the same header the moment `apps/web`'s first commit lands and nobody
 has yet written the ADR that says why — precisely the gap ADR-0045 exists to close, arrived at by
 omission this time instead of error.
 
-**A hash list, or `'unsafe-inline'`, for convenience during Phase 1–8 while `apps/web` is being
-built.** Rejected for the reason ADR-0049 already gave and this ADR inherits unchanged: an
+**A hash list, or `'unsafe-inline'`, for convenience during front-end plan Phases 1 to 8 while
+`apps/web` is being built.** Rejected for the reason ADR-0049 already gave and this ADR inherits unchanged: an
 exception granted for temporary convenience outlives the reason it was granted for. `script-src
 'self'` is exactly as strict as ADR-0009's original claim was, applied to a stack that now
 legitimately ships a script instead of none.
@@ -119,5 +125,5 @@ the same checkability ADR-0049 built, carried forward to a codebase that ships a
 own bundle — an accidental analytics snippet, a debugging tag pasted into a template, a CDN import
 added in a hurry — stops rendering rather than shipping quietly. The SPA's dependencies (React,
 TanStack, shadcn/ui's generated components) must all resolve into the self-hosted bundle; none may
-be loaded from a CDN at runtime, and `font-src 'self'` extends the same rule to Phase 2.2's
+be loaded from a CDN at runtime, and `font-src 'self'` extends the same rule to the self-hosted
 interface font.

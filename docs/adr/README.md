@@ -24,6 +24,10 @@ Two record-keeping rules, because the point of this log is that it was not retou
 
 ## Accepted
 
+A superseded ADR keeps its row and its number, with `superseded` in the Status column and the
+superseding number in its own Status line: numbering is never reassigned and the log is not
+retouched, so what was decided stays visible next to what replaced it.
+
 | No.                                                                                          | Decision                                                                         | Status     |
 | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------- |
 | [0001](./0001-sealed-modules-and-in-process-domain-event.md)                                 | Two sealed modules, one arrow, verified mechanically                             | accepted   |
@@ -82,7 +86,7 @@ Two record-keeping rules, because the point of this log is that it was not retou
 | [0059](./0059-a-screen-carries-its-idempotency-key-in-a-hidden-field.md)                     | A screen carries its `Idempotency-Key` in a hidden field                         | accepted   |
 | [0060](./0060-the-screens-name-a-refusal-in-french-keyed-by-its-type.md)                     | The screens name a refusal in French, keyed by its `type`                        | accepted   |
 | [0061](./0061-accessibility-is-held-mechanically-and-not-audited.md)                         | Accessibility is held mechanically; it is not an RGAA conformance claim          | accepted   |
-| [0062](./0062-react-spa-for-the-interactive-screens.md)                                      | A React SPA for the interactive screens, Vue named down by name                  | accepted   |
+| [0062](./0062-react-spa-for-the-interactive-screens.md)                                      | A React SPA for the interactive screens                                          | accepted   |
 | [0063](./0063-the-spa-ships-in-the-api-deployable.md)                                        | The SPA ships in the API deployable, as build output, same-origin stays forced   | accepted   |
 | [0064](./0064-the-content-security-policy-admits-a-script.md)                                | The Content-Security-Policy admits a script, scoped to `'self'`                  | accepted   |
 
