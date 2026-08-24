@@ -19,10 +19,10 @@ const PROBLEM_JSON = 'application/problem+json';
 
 /**
  * `type` values this **client** invents, never sent by the API — the frontend-plan.md task 3.1
- * case Annexe A does not settle: what a non-2xx response becomes when its body is not
- * `application/problem+json` at all (a Vite proxy's own 502 page, an HTML error document from
- * somewhere in front of it) or when `fetch()` itself never got a response (offline, DNS failure,
- * connection refused). Both are facts about the **transport**, not a refusal the API made, so they
+ * case Annexe A does not settle: what a response becomes when its body is not the JSON its status
+ * implied — a non-2xx without `application/problem+json` (a Vite proxy's own 502 page, an HTML
+ * error document from somewhere in front of it), a 2xx that does not parse (Vite's SPA fallback) —
+ * or when `fetch()` itself never got a response (offline, DNS failure, connection refused). Both are facts about the **transport**, not a refusal the API made, so they
  * get their own namespace rather than being reported as `API_PROBLEM_TYPES.internal` — which would
  * claim the server said something it never had the chance to say. `lib/labels.ts` carries their
  * French sentences, clearly marked client-originated; `docs/open-questions.md` (row of
@@ -30,8 +30,8 @@ const PROBLEM_JSON = 'application/problem+json';
  * and the two cases have had a real screen to be wrong on.
  */
 export const CLIENT_PROBLEM_TYPES = {
-  /** A non-2xx response arrived but its body was not `application/problem+json` (or did not
-   * parse as JSON at all). */
+  /** A response arrived and its body was not the JSON its status implied: a non-2xx without
+   * `application/problem+json`, or a 2xx whose body does not parse. */
   unparsableResponse: '/problems/client-unparsable-response',
   /** `fetch()` itself rejected — no HTTP response ever existed to have a status. */
   networkFailure: '/problems/client-network-failure',
@@ -45,7 +45,7 @@ function unparsableResponseProblem(path: string, status: number): ProblemDetails
     type: CLIENT_PROBLEM_TYPES.unparsableResponse,
     title: 'Non-JSON error response',
     status,
-    detail: `The response from ${path} did not carry application/problem+json — most likely a proxy or transport failure rather than a refusal the API made.`,
+    detail: `The response from ${path} did not parse as the JSON its status implied — most likely a proxy or transport failure rather than a refusal the API made.`,
     instance: path,
   };
 }
@@ -99,7 +99,16 @@ export async function apiFetch<T>(path: string, request: ApiRequest = {}): Promi
   }
 
   if (response.ok) {
-    return { ok: true, value: await parseJson<T>(response) };
+    // Wrapped for the same reason the error path below is, and not only for symmetry: the module's
+    // contract above is "this module never throws", and a 2xx whose body is not JSON is reachable
+    // — Vite's SPA fallback answers **200** with `index.html` for any path missing from
+    // `PROXIED_PATHS` (`vite.config.ts`), so one endpoint added to the API and not to that list
+    // lands here with HTML and a success status.
+    try {
+      return { ok: true, value: await parseJson<T>(response) };
+    } catch {
+      return { ok: false, problem: unparsableResponseProblem(path, response.status) };
+    }
   }
 
   const contentType = response.headers.get('content-type') ?? '';

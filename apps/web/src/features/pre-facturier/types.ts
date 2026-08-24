@@ -1,16 +1,18 @@
-import type { InvoiceListItem } from '@/features/cra/types';
+import type { InvoiceListItem } from '@/features/factures/types';
 
 // Phase 5 (task 5.1) builds `GET /api/v1/pre-facturier?period=`.
 /**
- * The endpoint does not exist yet
- * (frontend-plan.md task 3.7: "do not build ahead of the endpoints"), so this shape is transcribed
- * from Annexe A's documented response only, marked here rather than verified against running
- * code. No `api.ts`/`hooks.ts` for this feature until Phase 7 first calls it.
+ * The endpoint does not exist yet (frontend-plan.md task 3.7: "do not build ahead of the
+ * endpoints"), so this shape is transcribed from the response block written out in **task 5.1**
+ * of the plan — Annexe A's Billing table only points at that task by name and documents no shape
+ * of its own. Transcribed, not verified against running code, and marked as such here. No
+ * `api.ts`/`hooks.ts` for this feature until Phase 7 first calls it.
  *
- * `CraSummary.blockingReasons` is `string[]` (Annexe A: "motifs bloquants en liste") rather than
- * the `DeclineReason` union `features/cra/types.ts` names, because the pré-facturier's summary row
- * has not been shown, by the API that does not exist yet, to carry the same closed vocabulary as a
- * `DeclinedDay` — narrowing it here would be a guess Annexe A does not make.
+ * `PreFacturierCraRow.blockingReasons` is kept as `string[]` — the literal type task 5.1 writes
+ * (`blockingReasons: [string]`) — rather than narrowed to the `DeclineReason` union
+ * `features/cra/types.ts` names: the API that would settle whether a pré-facturier row carries the
+ * same closed vocabulary as a `DeclinedDay` does not exist yet, so narrowing here would be a guess
+ * the plan does not make.
  */
 export interface PreFacturierSummary {
   readonly billableCents: number;

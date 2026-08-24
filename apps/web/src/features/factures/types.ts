@@ -1,12 +1,14 @@
-import type { InvoiceListItem } from '@/features/cra/types';
-
 /**
  * `Annexe A — Billing`. Shapes verified against the route handlers (`apps/api/src/routes/api.ts`,
  * `GET /api/v1/invoices`, `GET /api/v1/invoices/:id`) and the domain types they compose
  * (`packages/billing/src/domain/invoice.ts`, `invoice-line.ts`, `document.ts`, `vat.ts`,
  * `mentions.ts`, `payment-terms.ts`, `seller.ts`, `client.ts`) rather than guessed from Annexe A's
- * prose (rule 0bis.8). `InvoiceListItem` lives in `features/cra/types.ts`, not duplicated here: the
- * pré-facturier and the invoice list both render it, and it is `billing`'s type either way.
+ * prose (rule 0bis.8). `InvoiceListItem` is declared **here**, not in `features/cra/types.ts` where
+ * it first landed: the invoice is billing's record, three responses project it (the invoice list,
+ * the pré-facturier, and the validation response), and the feature that owns the record is the one
+ * that owns its shape. `features/cra` imports it from here for `ValidationResponse`; nothing here
+ * imports from `features/cra`, so the arrow the sealed packages forbid — billing reaching into
+ * timesheet — does not exist in the SPA either.
  *
  * `dueDate` is deliberately absent: `Invoice.dueDateFrom(issueDate)` exists in the domain and
  * `LABELS.invoice.dueDate` has a French label for it, but the route's response object literal does
@@ -20,6 +22,23 @@ import type { InvoiceListItem } from '@/features/cra/types';
  */
 
 export type InvoiceStatus = 'draft' | 'issued' | 'cancelledByCreditNote';
+
+/**
+ * The list projection of an invoice, shared by `GET /api/v1/invoices`, Phase 5.1's
+ * `GET /api/v1/pre-facturier` and `POST /api/v1/cras/:id/validation` (Annexe A gives all three the
+ * same shape). `totalTtcCents` is `null` until the invoice is issued, and so are `invoiceNumber`
+ * and `issueDate` — a draft has no number (ADR-0007's gapless sequence allocates one at issuance,
+ * never before).
+ */
+export interface InvoiceListItem {
+  readonly id: string;
+  readonly status: InvoiceStatus;
+  readonly supplyPeriod: string;
+  readonly billedToName: string;
+  readonly invoiceNumber: string | null;
+  readonly issueDate: string | null;
+  readonly totalTtcCents: number | null;
+}
 
 export interface InvoiceListResponse {
   readonly invoices: readonly InvoiceListItem[];

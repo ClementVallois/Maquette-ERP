@@ -15,10 +15,15 @@ const CONFLICT = 409;
 const UNPROCESSABLE = 422;
 
 /**
- * What a screen does with a refusal, per frontend-plan.md task 3.2's five branches. The two
- * session-cookie cases are checked by `type` first because both also carry `deniedBy` (they are
- * 403s at the wire) — a generic "has `deniedBy`" check would misclassify them as an ordinary
- * `DeniedState` and skip the cookie purge / redirect `unknown-persona` needs.
+ * What a screen does with a refusal, per frontend-plan.md task 3.2's five branches.
+ *
+ * The two session-cookie cases are checked by `type` before anything else, and only one of them
+ * needs it: `unknown-persona` is a **403 carrying `deniedBy`** (`apps/api/src/personas/access.ts`
+ * sets both to the same value), so a generic "has `deniedBy`" check reached first would
+ * misclassify it as an ordinary `DeniedState` and skip the cookie purge it needs. `no-persona` is
+ * a **401 with no `deniedBy` at all** and would fall through to `technical` rather than to
+ * `denied`; it is checked here beside its sibling because the two are one screen decision — go
+ * back to the selector — not because the fall-through would be a refusal.
  */
 export type ProblemAction =
   | { readonly kind: 'redirect-to-selector' }
