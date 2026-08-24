@@ -193,6 +193,39 @@ run, and why:
    separate row — duplicating point 1 here would be the second source of truth `docs/BUILD-RULES.md`
    warns against.
 
+**Added 24/08/2026, after the checkpoint above was written.** A human review pass over the
+baseline screenshot, read against `docs/direction-visuelle.md`, found **four defects that every
+gate passed** — `pnpm run check` was green through all of them, and none appears in the "least
+confident" list above, which is the honest measure of what that list was worth. All four are fixed
+in commit `0d8325e`; they are recorded here because the phase record is otherwise the version
+written before anyone looked at the picture.
+
+1. **Tabs never stacked.** The vendored root carried `data-horizontal:flex-col`, compiling to the
+   attribute selector `[data-horizontal]`; Radix renders `data-orientation`, so the class matched
+   nothing and a horizontal Tabs laid its list out beside its content. Every variant in the file
+   shared the shape. **Outcome: fix now** — rewritten to `data-[orientation=…]`, verified in the
+   compiled CSS (`[data-orientation=horizontal]{flex-direction:column}`).
+2. **The table header ignored §5 and §6.** `text-table-header` was authored in task 2.2 and then
+   used by nothing — dead CSS — while the generator's `font-medium text-foreground` shipped in its
+   place. **Outcome: fix now**, with §6's 36px header, `--muted` fill, 12/16 cell padding and the
+   `--accent` row hover, none of which had been applied either.
+3. **`StatCard` drew its edge from `ring-foreground/10`** rather than `--border` (§3.1).
+   **Outcome: fix now.**
+4. **The kitchen sink could not demonstrate two of its own specimens**: the KPI row was a wrapping
+   flex, so the card carrying sub-text was taller than its neighbours (§6 asks for equal columns);
+   and `--flag-weekend-bg` is `#f4f6f8`, the exact value of `--background`, so the weekend row was
+   invisible on the page ground it was drawn on. **Outcome: fix now** — the flag specimen now sits
+   on `--card`, the ground §4.4 designs it against.
+
+The transferable lesson, and the reason this is written down rather than folded into the commit:
+**three of the four are "specified in `direction-visuelle.md`, authored in `globals.css`, never
+wired into the component."** The type scale and the status tokens were built correctly and then
+only partly consumed. No gate in this repository can see that gap — `check` verifies that CSS
+compiles and that TypeScript is sound, not that a component reached for the token the design note
+wrote for it. Phases 4 and 6 vendor more components against the same note; **the check that
+catches this is reading the screenshot against the spec, and it belongs in every phase's exit, not
+only in Phase 10.1's polish pass.**
+
 ---
 
 ## Phase 6 checkpoint — `feat/web`, 21/08/2026 (reviewers and their fixes, 22/08/2026)
