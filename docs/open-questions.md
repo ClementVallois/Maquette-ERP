@@ -22,6 +22,56 @@ moves down to "Settled" with its answer, so the record shows it was known rather
 
 ---
 
+## Front-end Phase 1 checkpoint — `feat/web`, 24/08/2026
+
+The two questions `CLAUDE.md` requires, asked of `docs/frontend-plan.md` Phase 1 (the `apps/web`
+socle). Every point resolves to exactly one of the four outcomes.
+
+**Which tasks ran.** 1.1 to 1.6, all six. What did **not** run, and why:
+
+- **The dependency list of 1.1 is deliberately short.** React, Vite, `@vitejs/plugin-react`, the
+  React types, `eslint-plugin-react-hooks`, `@playwright/test` and `@axe-core/playwright` are in.
+  TanStack (Router/Query/Table/Form), Tailwind, the shadcn CLI and lucide are **not**: they have no
+  import site until Phase 2.1 installs the design system and Phase 3 writes the data layer, and a
+  dependency added a phase before its first use is one nobody can justify in the commit that adds
+  it. Deferred to the phase that uses each, not dropped.
+- **`@axe-core/playwright` was missed and added in review**, after the Gate had already passed
+  green — the Phase 1 smoke test runs no accessibility scan, so no gate here can see its absence.
+  First real use: Phase 2.6.
+- **CI was never observed running.** The branch is not pushed, by instruction. `pnpm run check`,
+  the web build, the Playwright run and `pnpm audit` were all run locally and are green; the
+  workflow YAML is read but unexecuted. First push proves it, and nothing before then does.
+- **The dev proxy of `vite.config.ts` is transcribed from ADR-0063 and never exercised** — no API
+  process was started, no proxied request made. Phase 3.6 (the persona fetch) is its first test.
+- **The two blind reviewers (`rules-auditor`, `cold-reader`) did not run.** Clement is holding both
+  for a single pass over the whole front-end plan rather than per phase. This is a deliberate
+  deferral of the review, not of the work, and it is recorded here so the gap is visible: Phase 1
+  is merged without the audit `CLAUDE.md` asks for at a phase checkpoint.
+
+**Least confident in.** The `.tsx` widening of `scripts/boundaries.ts` and `tests/boundary-rule.test.ts`
+— `apps/web` is the first member whose entry point is TSX, and both globs would have made it green
+by omission. Verified rather than reasoned: `pnpm run boundaries` now cruises 177 modules across 6
+members, and a scratch import of `apps/api` from `apps/web` fails it in both the package-name and
+relative-path forms. **Outcome: fix now, done.** Also verified rather than reasoned, because the
+`apps/web` ESLint block is new and this repository's history is mostly rules that had quietly
+stopped applying: a scratch file under `apps/web/src/` containing `Number('1.5')`,
+`throw new Error()` and `Math.round()` produces three `no-restricted-syntax` errors, so the money
+and typed-error guards do reach the app that will render money in Phase 3.4.
+
+**In three months, what breaks.** Three things, each already resolved:
+
+1. **The 7-day quarantine is a no-op** and has been since Phase 0 — the row above, with the
+   lockfile rebuild it actually needs and the timestamp that unblocks it. **Outcome: a row in this
+   file, owner named, due before Phase 2.1.**
+2. **The `@/` alias is invisible to dependency-cruiser** — the row above. **Outcome: a row in this
+   file, due at or before Phase 3.1.**
+3. **`eslint-plugin-react-hooks` ships three rules at `warn`**, in a repository whose `CLAUDE.md`
+   says a rule left at `warn` severity is not a gate, and whose lint script exited 0 on warnings.
+   **Outcome: fix now** — `--max-warnings=0` on `pnpm run lint`, plus the three rules raised to
+   `error` where they are used.
+
+---
+
 ## Phase 6 checkpoint — `feat/web`, 21/08/2026 (reviewers and their fixes, 22/08/2026)
 
 The two questions `CLAUDE.md` requires, asked of tasks 6.4 to 6.7. Every point resolves to exactly
