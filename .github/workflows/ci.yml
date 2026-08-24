@@ -58,9 +58,18 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
+      # `apps/web` needs no entry of its own above: `pnpm run lint` is `eslint .` (repo-wide) and
+      # `pnpm run typecheck` recurses into every workspace member's own `typecheck` script
+      # (package.json script) — both already cover apps/web as of frontend-plan.md Phase 1.2/1.3,
+      # the same way they cover every other member. `pnpm audit` (the `dependencies` job) is what
+      # actually changed shape by apps/web existing: a React+Vite+Playwright tree is new surface.
       - run: pnpm run lint
       - run: pnpm run format:check
       - run: pnpm run typecheck
+
+      # Neither lint nor typecheck runs a bundler. This is the only CI step that proves Vite can
+      # actually produce apps/web/dist — the thing Phase 9.1 will serve.
+      - run: pnpm --filter @erp/web build
 
       # `.env` is gitignored, so `env:init` copies the template first. That makes the
       # template-vs-`.env` half of the check trivially true here — the half this job exists for is
@@ -86,6 +95,42 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm run test:cov
+
+  web-e2e:
+    name: Playwright (apps/web)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # `.npmrc` sets `ignore-scripts=true`, so the browser download Playwright normally runs as
+      # a postinstall never happens on its own — this has to be an explicit step, here and
+      # locally, not an `allowBuilds` entry (a browser binary is not a native build artefact of
+      # the package, `pnpm-workspace.yaml`'s existing three entries all are).
+      - run: pnpm --filter @erp/web exec playwright install --with-deps chromium
+
+      # No Postgres service, no migrate, no seed: Phase 1's smoke test asserts only that the
+      # toolchain boots (frontend-plan.md Phase 1.5), and never calls the API. The real six
+      # journeys (Annexe B) start needing the database from Phase 6 onward, at which point this
+      # job grows the same services block `test-integration` already carries below.
+      - run: pnpm --filter @erp/web exec playwright test
+
+      - name: Upload the Playwright HTML report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-report
+          path: apps/web/tests/visual/report/
+          retention-days: 7
 
   test-integration:
     name: Integration tests
