@@ -1,7 +1,7 @@
 # ADR-0049 — The application declares its own Content-Security-Policy, and it says there is no script
 
 - **Date**: 2026-08-21
-- **Status**: accepted
+- **Status**: superseded by ADR-0064
 
 ## Context
 

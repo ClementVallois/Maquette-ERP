@@ -1,7 +1,7 @@
 # ADR-0048 — The screens ship inside the API deployable, and `apps/api` keeps its name
 
 - **Date**: 2026-08-21
-- **Status**: accepted
+- **Status**: superseded by ADR-0063
 
 ## Context
 
