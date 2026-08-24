@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
@@ -11,7 +12,9 @@ const API_ORIGIN = 'http://127.0.0.1:3000';
 const PROXIED_PATHS = ['/api', '/facture', '/releve', '/healthz', '/readyz'];
 
 export default defineConfig({
-  plugins: [react()],
+  // Tailwind v4 is CSS-first (no tailwind.config.*): the plugin reads `@import "tailwindcss"`
+  // from src/styles/globals.css and needs no options here.
+  plugins: [tailwindcss(), react()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

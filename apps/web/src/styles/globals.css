@@ -1,0 +1,356 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/*
+ * Tailwind v4's `dark:` variant defaults to `@media (prefers-color-scheme: dark)` unless told
+ * otherwise. This project has exactly one theme (direction-visuelle.md §10 — dark mode is
+ * excluded, no `.dark` block is emitted below); without this line, a vendored shadcn component
+ * carrying a `dark:` utility (several do, e.g. `dark:bg-input/30`) would still activate on a
+ * visitor whose OS is in dark mode, shifting colours nothing in this file defines. Redefining the
+ * variant to key off a `.dark` ancestor class — one that is never applied anywhere in this
+ * codebase — makes every `dark:` utility permanently inert instead, without having to strip the
+ * class from every generated component by hand.
+ */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design tokens — direction-visuelle.md §3 (surface/accent/sidebar/radii/elevation), §4 (status
+ * colours), §5 (type scale), §8 (motion). Every hex in that document lands here, once, as a named
+ * CSS variable; components read a Tailwind utility or `var(--…)`, never a literal hex
+ * (docs/frontend-plan.md Phase 2's exit gate — `grep -rnE '#[0-9a-fA-F]{3,8}' src/components/`
+ * must return nothing).
+ */
+:root {
+  /* §3.1 Surface and text */
+  --background: #f4f6f8;
+  --foreground: #1b1f24;
+  --card: #ffffff;
+  --card-foreground: #1b1f24;
+  --popover: #ffffff;
+  --popover-foreground: #1b1f24;
+  --muted: #eef1f4;
+  --muted-foreground: #4a5560;
+  --secondary: #e9edf2;
+  --secondary-foreground: #1b1f24;
+  /* `--border` separates content; `--input` is a control boundary. Never swap the two
+     (direction-visuelle.md §3.1) — using `--border` on an input is the mistake the split
+     exists to prevent. */
+  --border: #d8dce1;
+  --input: #7c8792;
+  --ring: #2f6ea8;
+
+  /* §3.2 Accent and destructive — blue is the only brand hue. */
+  --primary: #1f4d7a;
+  --primary-foreground: #ffffff;
+  /* Not a shadcn token; added per §3.2's explicit note. Hover/active of a primary button. */
+  --primary-hover: #17395a;
+  --accent: #eaf1f8;
+  --accent-foreground: #1f4d7a;
+  --destructive: #8a1c1c;
+  --destructive-foreground: #ffffff;
+
+  /* §3.3 Sidebar scale — near-black with a blue cast, not pure #000. */
+  --sidebar: #121821;
+  --sidebar-foreground: #c3cad4;
+  --sidebar-accent: #1a2230;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-primary: #1e2c3d;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-border: #232c39;
+  --sidebar-ring: #6aa5dd;
+  /* The active nav item's 3px left marker (§3.3) — fill alone is too quiet at icon-only width. */
+  --sidebar-active-marker: #4f8fce;
+
+  /* §3.4 Radii and elevation. The two shadow values are declared once, directly in the `@theme
+     inline` block below (not here) — see the comment there for why a `:root` copy under the same
+     name would self-reference. */
+  --radius: 0.75rem; /* 12px — the design's own reference value */
+
+  /*
+   * §4 — status colours. Five hue "tones" are declared once, and every real status/reason/flag
+   * aliases one of them by name. This is not decoration: direction-visuelle.md §4.2 and §4.3 both
+   * document a *reuse* as deliberate (an invoice `draft` is "the same word and the same neutral"
+   * as a Cra `draft`; `cancelledByCreditNote` "reuses the red of refused") — aliasing the tone
+   * variables encodes that intent in the token layer instead of repeating five hex triplets by
+   * hand and letting them drift apart.
+   */
+  --tone-neutral-text: #4a5560;
+  --tone-neutral-fill: #eef1f4;
+  --tone-neutral-dot: #6f7c8a;
+  --tone-blue-text: #1f4d7a;
+  --tone-blue-fill: #eaf1f8;
+  --tone-blue-dot: #2f6ea8;
+  --tone-green-text: #1d5c33;
+  --tone-green-fill: #e9f4ec;
+  --tone-green-dot: #2a7d47;
+  --tone-red-text: #8a1c1c;
+  --tone-red-fill: #fbeceb;
+  --tone-red-dot: #b23a3a;
+  --tone-amber-text: #7a5a10;
+  --tone-amber-fill: #fdf4e0;
+  --tone-amber-dot: #a97d16;
+
+  /* §4.1 Cra status */
+  --status-cra-draft-text: var(--tone-neutral-text);
+  --status-cra-draft-fill: var(--tone-neutral-fill);
+  --status-cra-draft-dot: var(--tone-neutral-dot);
+  --status-cra-submitted-text: var(--tone-blue-text);
+  --status-cra-submitted-fill: var(--tone-blue-fill);
+  --status-cra-submitted-dot: var(--tone-blue-dot);
+  --status-cra-validated-text: var(--tone-green-text);
+  --status-cra-validated-fill: var(--tone-green-fill);
+  --status-cra-validated-dot: var(--tone-green-dot);
+  --status-cra-refused-text: var(--tone-red-text);
+  --status-cra-refused-fill: var(--tone-red-fill);
+  --status-cra-refused-dot: var(--tone-red-dot);
+  /* "En retard" (lateTag) is a tag, not a status (ADR-0054) — amber, reserved for it because it
+     is the only one of the five that asks someone to act. */
+  --status-late-text: var(--tone-amber-text);
+  --status-late-fill: var(--tone-amber-fill);
+  --status-late-dot: var(--tone-amber-dot);
+
+  /* §4.2 Invoice status */
+  --status-invoice-draft-text: var(--tone-neutral-text);
+  --status-invoice-draft-fill: var(--tone-neutral-fill);
+  --status-invoice-draft-dot: var(--tone-neutral-dot);
+  --status-invoice-issued-text: var(--tone-green-text);
+  --status-invoice-issued-fill: var(--tone-green-fill);
+  --status-invoice-issued-dot: var(--tone-green-dot);
+  --status-invoice-cancelled-text: var(--tone-red-text);
+  --status-invoice-cancelled-fill: var(--tone-red-fill);
+  --status-invoice-cancelled-dot: var(--tone-red-dot);
+
+  /* §4.3 Declined-day reasons — the neutral/amber split IS the point (one reason is how the firm
+     sells, three are somebody's next task). Four colours would imply a severity order that does
+     not exist; one colour would hide the only distinction that matters. */
+  --status-declined-not-regie-text: var(--tone-neutral-text);
+  --status-declined-not-regie-fill: var(--tone-neutral-fill);
+  --status-declined-not-regie-dot: var(--tone-neutral-dot);
+  --status-declined-unknown-mission-text: var(--tone-amber-text);
+  --status-declined-unknown-mission-fill: var(--tone-amber-fill);
+  --status-declined-unknown-mission-dot: var(--tone-amber-dot);
+  --status-declined-no-agreed-rate-text: var(--tone-amber-text);
+  --status-declined-no-agreed-rate-fill: var(--tone-amber-fill);
+  --status-declined-no-agreed-rate-dot: var(--tone-amber-dot);
+  --status-declined-unknown-client-text: var(--tone-amber-text);
+  --status-declined-unknown-client-fill: var(--tone-amber-fill);
+  --status-declined-unknown-client-dot: var(--tone-amber-dot);
+
+  /* §4.4 Day flags in the grid — not badges, a row tint. `--flag-weekend-text` reuses
+     `--muted-foreground` verbatim (the note names it as such); `--flag-holiday-text` is the same
+     amber as the amber tone above, aliased rather than restated. */
+  --flag-weekend-bg: #f4f6f8;
+  --flag-weekend-text: var(--muted-foreground);
+  --flag-holiday-bg: #fdf9ef;
+  --flag-holiday-text: var(--tone-amber-text);
+
+  /* §4.5 Roles: the selector's role badge takes the primary tint (`--primary` on `--accent`,
+     already declared above). Everywhere else roles are neutral-outlined using existing tokens
+     (`--muted-foreground`, transparent fill, `--border`) — no new hex needed for that reading. */
+
+  /* §8 Motion — both `ease-out`. Applied via Tailwind's numeric duration utilities
+     (`duration-120`, `duration-180`) rather than a custom theme key so no bespoke utility name has
+     to be invented; these variables are the documented source of the two numbers. */
+  --motion-fast: 120ms;
+  --motion: 180ms;
+}
+
+/*
+ * Tailwind's theme layer: only variables that a component must reach as a utility class
+ * (`bg-primary`, `text-status-cra-validated-text`, `border-border`, …) need to be re-declared
+ * here under a `--color-*`/`--radius-*`/`--shadow-*` key — that namespace is what makes Tailwind
+ * generate the matching utility. `@theme inline` (not `@theme`) keeps each entry a live reference
+ * to the `:root` variable above it rather than a frozen copy, which matters the day a second
+ * theme is introduced (direction-visuelle.md §10 keeps that door open on purpose).
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-active-marker: var(--sidebar-active-marker);
+
+  --color-status-cra-draft-text: var(--status-cra-draft-text);
+  --color-status-cra-draft-fill: var(--status-cra-draft-fill);
+  --color-status-cra-draft-dot: var(--status-cra-draft-dot);
+  --color-status-cra-submitted-text: var(--status-cra-submitted-text);
+  --color-status-cra-submitted-fill: var(--status-cra-submitted-fill);
+  --color-status-cra-submitted-dot: var(--status-cra-submitted-dot);
+  --color-status-cra-validated-text: var(--status-cra-validated-text);
+  --color-status-cra-validated-fill: var(--status-cra-validated-fill);
+  --color-status-cra-validated-dot: var(--status-cra-validated-dot);
+  --color-status-cra-refused-text: var(--status-cra-refused-text);
+  --color-status-cra-refused-fill: var(--status-cra-refused-fill);
+  --color-status-cra-refused-dot: var(--status-cra-refused-dot);
+  --color-status-late-text: var(--status-late-text);
+  --color-status-late-fill: var(--status-late-fill);
+  --color-status-late-dot: var(--status-late-dot);
+
+  --color-status-invoice-draft-text: var(--status-invoice-draft-text);
+  --color-status-invoice-draft-fill: var(--status-invoice-draft-fill);
+  --color-status-invoice-draft-dot: var(--status-invoice-draft-dot);
+  --color-status-invoice-issued-text: var(--status-invoice-issued-text);
+  --color-status-invoice-issued-fill: var(--status-invoice-issued-fill);
+  --color-status-invoice-issued-dot: var(--status-invoice-issued-dot);
+  --color-status-invoice-cancelled-text: var(--status-invoice-cancelled-text);
+  --color-status-invoice-cancelled-fill: var(--status-invoice-cancelled-fill);
+  --color-status-invoice-cancelled-dot: var(--status-invoice-cancelled-dot);
+
+  --color-status-declined-not-regie-text: var(--status-declined-not-regie-text);
+  --color-status-declined-not-regie-fill: var(--status-declined-not-regie-fill);
+  --color-status-declined-not-regie-dot: var(--status-declined-not-regie-dot);
+  --color-status-declined-unknown-mission-text: var(--status-declined-unknown-mission-text);
+  --color-status-declined-unknown-mission-fill: var(--status-declined-unknown-mission-fill);
+  --color-status-declined-unknown-mission-dot: var(--status-declined-unknown-mission-dot);
+  --color-status-declined-no-agreed-rate-text: var(--status-declined-no-agreed-rate-text);
+  --color-status-declined-no-agreed-rate-fill: var(--status-declined-no-agreed-rate-fill);
+  --color-status-declined-no-agreed-rate-dot: var(--status-declined-no-agreed-rate-dot);
+  --color-status-declined-unknown-client-text: var(--status-declined-unknown-client-text);
+  --color-status-declined-unknown-client-fill: var(--status-declined-unknown-client-fill);
+  --color-status-declined-unknown-client-dot: var(--status-declined-unknown-client-dot);
+
+  --color-flag-weekend-bg: var(--flag-weekend-bg);
+  --color-flag-weekend-text: var(--flag-weekend-text);
+  --color-flag-holiday-bg: var(--flag-holiday-bg);
+  --color-flag-holiday-text: var(--flag-holiday-text);
+
+  /* Literal, not `var(--shadow-card)`: the raw value lives here and only here — a `:root`
+     re-declaration under the same name would self-reference once Tailwind merges the two blocks,
+     which resolves to the CSS-spec "guaranteed-invalid value" rather than an error, so it is
+     worth calling out. There is one theme, so nothing else needs to vary this by context. */
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+  --shadow-overlay: 0 8px 24px rgb(16 24 40 / 0.12), 0 2px 6px rgb(16 24 40 / 0.06);
+
+  /*
+   * direction-visuelle.md §3.4 gives two discrete radii — 8px for buttons/inputs/selects/menu
+   * items, 12px for cards/panels/dialogs — not the progressive sm→4xl scale Tailwind's default
+   * theme ships. The "radix-nova" style this repo's `shadcn add` generates is not consistent
+   * about which class name it reaches for at the control size (`button.tsx` and `input.tsx` both
+   * use `rounded-lg`, `button.tsx`'s xs/sm sizes instead read `var(--radius-md)` directly through
+   * an arbitrary value), so every key up to the one Card actually uses (`rounded-xl`) is pinned
+   * to 8px, and the container tier starts there. Verified against the generated source, not
+   * assumed — grep `rounded-(sm|md|lg|xl|2xl)` under `src/components/ui/` before changing this.
+   */
+  --radius-sm: 0.5rem; /* 8px */
+  --radius-md: 0.5rem; /* 8px — button.tsx xs/sm sizes read this directly via var() */
+  --radius-lg: 0.5rem; /* 8px — button.tsx and input.tsx's own default radius class */
+  --radius-xl: 0.75rem; /* 12px — card.tsx's own radius class */
+  --radius-2xl: 0.75rem; /* 12px — dialog/sheet/popover surfaces (Phase 2.3) */
+  /* Badge is the one `rounded-4xl` user (badge.tsx) and a badge is always short enough that any
+     radius past half its own height already renders as a full pill — but the design's own number
+     is 999px, so it is spelled out rather than left to that incidental clamping. */
+  --radius-4xl: 999px;
+
+  /* §5 Typography */
+  --font-sans: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+}
+
+/* §5 Typography — the recurring levels get a class each, per task 2.2, so a screen composes
+   these instead of repeating a size/weight/colour triplet. `font-variant-numeric: tabular-nums`
+   and the monospace stack are applied at point of use (money, half-days, invoice numbers), not
+   folded into these, since not every element at a given level is numeric. */
+@utility text-page-title {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+@utility text-card-title {
+  font-size: 0.9375rem;
+  line-height: 1.375rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* §5's table gives "Label, help text" one shared row (0.8125rem/1.125rem, 500,
+   --muted-foreground) — two class names, not two specs, kept separate because task 2.2 names
+   them as distinct recurring levels and a form label and a line of help text are different things
+   semantically even where they render identically today. */
+@utility text-label {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+@utility text-help {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+@utility text-table-header {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+@utility text-kpi-figure {
+  font-size: 1.75rem;
+  line-height: 2.125rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  /* `:root` (the `html` element) is left at the browser default so `rem` keeps meaning 16px
+     everywhere in the type scale above and a visitor's own font-size preference still scales the
+     whole app. The 14px/20px body base (direction-visuelle.md §5 — the density a nine-column
+     billing table needs) is a `body`-only override, in `rem` against that unchanged 16px root:
+     0.875rem × 16px = 14px, 1.25rem × 16px = 20px, matching the table's own "0.875rem / 1.25rem"
+     entry exactly. Overriding `html` instead would have moved the root itself and thrown off
+     every other `rem` value in this file. */
+  body {
+    @apply bg-background text-foreground font-sans text-[0.875rem] leading-[1.25rem];
+  }
+}
+
+/* §8 Motion — everything becomes instant, colour included, which is stricter than "keeps colour
+   changes instant" and satisfies it. The standard universal snippet: it does not distinguish
+   transform/opacity from colour because collapsing every duration to near-zero already removes
+   the transform/opacity motion the rule is about, without a second rule to keep in sync. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,10 +1,12 @@
+import '@fontsource-variable/inter';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-// A relative import, not `@/App`: a same-directory sibling is what the alias is not for — it
-// exists for the deeper imports Phase 3+ will write, and dependency-cruiser (`.dependency-cruiser.cjs`)
-// resolves against `tsconfig.base.json` at the repo root, which carries no `@/` mapping of its own.
+// A relative import, not `@/App`: a same-directory sibling is what the alias is not for — it is
+// for deeper imports (`@/lib/x`, `@/components/ui/x`). dependency-cruiser now resolves `@/`
+// (docs/open-questions.md, row dated 24/08/2026) but the shortest path for a sibling stays `./`.
 import { App } from './App';
+import './styles/globals.css';
 
 // Not a bare `new Error()` (BUILD-RULES § Working discipline, `no-restricted-syntax` in
 // eslint.config.js): a typed technical failure, thrown once, at the one place a missing
