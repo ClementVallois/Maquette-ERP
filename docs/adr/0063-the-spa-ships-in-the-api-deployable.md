@@ -29,6 +29,17 @@ proxying rather than serving. `apps/api` keeps composing everything, keeps its o
 and keeps its name — the naming-drift ADR-0048 accepted ("`apps/api` is now narrower than what it
 holds") widens rather than resolves: the directory now also serves HTML it did not itself render.
 
+**`apps/web` talks to the backend only over HTTP, on the same origin.** It never imports
+`apps/api`; the two claims below are separate and should not be read as one rule with two
+phrasings. First, mechanical: the whitelist's cross-tier grant (`^apps/` → any package's
+`^packages/[^/]+/src/index\.ts$`) is package-agnostic, so dependency-cruiser would let `apps/web`
+import the public index of `@erp/platform` or `@erp/api` just as readily as `@erp/contracts` — the
+rule does not single one out. Second, discipline: `@erp/contracts` (`ProblemDetails`,
+`API_PROBLEM_TYPES`) is the only package `apps/web` needs and will import, per `frontend-plan.md`
+§2 — a client that only ever talks HTTP has no reason to reach for `@erp/platform`'s domain
+vocabulary or `@erp/api`'s composition root, and nothing here stops a future import from doing so
+except the same discipline that already governs `scripts/`'s narrower reach.
+
 Of ADR-0048's three arguments against a second deployable:
 
 1. **"Buys a boundary this repository already has, paid twice" — retires as literally stated,

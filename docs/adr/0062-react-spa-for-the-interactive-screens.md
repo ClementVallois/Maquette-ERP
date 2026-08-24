@@ -27,7 +27,7 @@ instead. That reversal, not the fact that a framework is coming, is what this AD
 
 ## Decision
 
-**React 18+ with TypeScript (strict) is the client framework for every interactive screen, built
+**React with TypeScript (strict) is the client framework for every interactive screen, built
 by Vite in a new workspace member, `apps/web`.** Routing (TanStack Router, file-based, named
 exports — `import-x/no-default-export` stays enforced), data fetching and cache (TanStack Query),
 tables (TanStack Table, headless) and forms (TanStack Form + zod, reusing the zod 4.4.3 already in
@@ -47,16 +47,17 @@ because nothing about them is interactive — they are read once, then printed.
 not a straw man.** It is not rejected on ADR-0009's grounds; those already conceded Vue would win
 a framework-only comparison, and a framework is now genuinely needed, so that comparison no longer
 settles anything. It is rejected on a different axis, forced by the other stack choices this plan
-makes in the same breath: shadcn/ui and TanStack Router/Table/Form are React-first libraries, and
-their Vue ports trail the React originals in component coverage and feature completeness —
-shadcn/ui's Vue port lags the theming and component surface of the original, and TanStack's Vue
-adapters for Table and Form specifically are the least mature of the family (TanStack Query's Vue
-adapter is solid and would not by itself have forced this choice). The plan's own stated bar is
-not "a working UI" but "un niveau de finition produit réel, suffisant pour impressionner un
-décideur" (`frontend-plan.md` §0) — a deliverable judged on finish. Spending the build against a
-community port that is known to be less complete is exactly the wrong place to absorb that risk
+makes in the same breath: `frontend-plan.md` §1 pins shadcn/ui and TanStack Router/Table/Form as
+React-first, naming their Vue ports "moins complets" as the justification for the React column of
+its own stack table — this ADR does not go further than that stated reason, because this
+repository's discipline is to not assert what has not been read, and neither library's Vue
+ecosystem has been audited here beyond the plan's own claim. The plan's stated bar is not "a
+working UI" but "un niveau de finition produit réel, suffisant pour impressionner un décideur"
+(`frontend-plan.md` §0) — a deliverable judged on finish. Spending the build against a community
+port the plan itself already judged less complete is exactly the wrong place to absorb that risk
 when the goal is polish, not framework purity, and it is Vue's own faster-but-thinner-ecosystem
-profile — true when ADR-0009 wrote it and still true now — that decides it.
+profile — true when ADR-0009 wrote it and still true in the plan's own assessment now — that
+decides it.
 
 **Stay server-rendered, with richer CSS.** ADR-0009 already answered this at the exact threshold
 it wrote for itself: client-side entry with totals recomputed as the user edits does not happen by
