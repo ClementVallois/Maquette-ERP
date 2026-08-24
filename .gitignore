@@ -10,6 +10,13 @@ coverage/
 .DS_Store
 .idea/
 
+# Playwright's own output (apps/web/playwright.config.ts): traces, retries, the HTML report.
+# `tests/visual/review/` is NOT here — those screenshots are for human review (rule 0bis.10 of
+# docs/frontend-plan.md) and are meant to be committed.
+apps/web/tests/visual/test-results/
+apps/web/tests/visual/report/
+apps/web/.playwright-cache/
+
 # Editor settings ARE versioned (see .vscode/settings.json): without eslint.workingDirectories
 # and the workspace TypeScript, the guards do not behave the same for every reader.
 .vscode/*

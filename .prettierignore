@@ -4,3 +4,5 @@ build
 coverage
 pnpm-lock.yaml
 .next
+apps/web/tests/visual/test-results
+apps/web/tests/visual/report
