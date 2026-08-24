@@ -4,7 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 const DEPCRUISE = 'node_modules/.bin/depcruise';
 
-const SHIPPED = ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts'];
+// `.tsx` is its own entry for the same reason `scripts/boundaries.ts` gives: `apps/web`
+// (ADR-0062) is TSX-only at its entry point, and a glob that stopped matching `.tsx` would let
+// this test's "accepts the code that is actually shipped" case pass without ever cruising it.
+const SHIPPED = ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts', 'apps/*/src/**/*.tsx'];
 const DECLARED_ARROW_FIXTURE = ['packages/billing/src/__boundary-fixture__/**/*.ts'];
 const UNDECLARED_MODULE_FIXTURE = ['packages/__boundary-fixture__/**/*.ts'];
 const APP_FIXTURE = ['apps/__boundary-fixture__/src/**/*.ts'];
