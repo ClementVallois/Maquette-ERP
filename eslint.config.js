@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
 import importX from 'eslint-plugin-import-x';
+import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
@@ -103,7 +104,16 @@ export default tseslint.config(
       'import-x/resolver': {
         typescript: {
           alwaysTryTypes: true,
-          project: ['tsconfig.json', 'packages/*/tsconfig.json'],
+          // `apps/api/tsconfig.json` was never in this list either, and its absence is not
+          // repeated here on purpose: `apps/web` needs its own project registered so the
+          // resolver can follow the `@/` alias (`apps/web/tsconfig.json`'s `paths`), and
+          // `apps/api` picks up the same fix at no extra cost.
+          project: [
+            'tsconfig.json',
+            'packages/*/tsconfig.json',
+            'apps/api/tsconfig.json',
+            'apps/web/tsconfig.json',
+          ],
           noWarnOnMultipleProjects: true,
         },
       },
@@ -158,6 +168,8 @@ export default tseslint.config(
             '**/testing/**',
             '**/*.config.ts',
             'eslint.config.js',
+            // Playwright specs: e2e code that is never shipped, same reasoning as `testing/**`.
+            'apps/web/e2e/**',
           ],
         },
       ],
@@ -172,6 +184,22 @@ export default tseslint.config(
           alphabetize: { order: 'asc', caseInsensitive: true },
         },
       ],
+    },
+  },
+
+  {
+    // `apps/web` (ADR-0062, frontend-plan.md Phase 1.3). Browser globals: the base block above
+    // sets only `globals.node`, and flat config merges `languageOptions.globals` across cascading
+    // blocks rather than replacing it, so this adds `document`/`window`/… without losing `process`
+    // et al. in `vite.config.ts`/`playwright.config.ts`. `no-restricted-syntax` is deliberately
+    // NOT set here: the rule does not merge across config blocks (see the comment on
+    // `NATIVE_ERROR_CTORS` above), and setting it here would silently drop `NO_BARE_ERROR` +
+    // `NO_FLOAT_MONEY_CALLS` for every file this block matches — the base `**/*.ts`/`**/*.tsx`
+    // block already carries both and this block inherits them unchanged.
+    files: ['apps/web/**/*.ts', 'apps/web/**/*.tsx'],
+    ...reactHooks.configs.flat.recommended,
+    languageOptions: {
+      globals: { ...globals.browser },
     },
   },
 
