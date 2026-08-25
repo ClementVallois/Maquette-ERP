@@ -130,10 +130,10 @@ test.describe('guards', () => {
     // directly (`curl --cookie "erp_persona=garbage.value"` against a `forRoles`-guarded route
     // answers `403 /problems/unknown-persona`, but the session route itself never does). So this
     // exercises `routes/_shell.tsx`'s client-side `persona === null` branch, not a caught
-    // `/problems/unknown-persona` — the global purge-and-toast path in
-    // `features/session/session-guard.ts` is not reachable from any request Phase 4 issues, which
-    // is recorded as such in the Phase 4 checkpoint rather than asserted here as something this
-    // test cannot actually prove.
+    // `/problems/unknown-persona`. **Updated 25/08/2026**: the global purge-and-toast path this
+    // comment used to call unreachable is now provable — see the next test, added for
+    // `docs/open-questions.md`'s row of 24/08/2026 ("Resolve in Phase 6, task 6.1 … the first
+    // guarded endpoint the SPA calls").
     const origin = new URL(baseURL ?? 'http://127.0.0.1:5173').origin;
     await context.addCookies([
       { name: 'erp_persona', value: 'not-a-real-signed-value', url: origin },
@@ -143,6 +143,67 @@ test.describe('guards', () => {
     await page.waitForURL('/');
 
     await expect(page.getByRole('heading', { name: 'Choisir un persona' })).toBeVisible();
+  });
+
+  test('a session that turns unknown mid-visit is purged, toasted, and redirected (task 6.1)', async ({
+    page,
+    context,
+    baseURL,
+  }, testInfo) => {
+    // Below `md` the sidebar link this test clicks lives behind the mobile `Sheet` toggle, not in
+    // the page directly (direction-visuelle.md §6) — one viewport is enough for a guard behaviour
+    // that has nothing to do with responsive layout.
+    test.skip(testInfo.project.name !== 'desktop', 'one viewport is enough for this guard');
+
+    // `docs/open-questions.md`, row dated 24/08/2026: `session-guard.ts`'s `unknown-persona`
+    // branch had no live proof because Phase 4 built no screen that calls a `forRoles`-guarded
+    // endpoint — `GET /api/v1/session` (what `_shell.tsx`'s `beforeLoad` reads) is `PUBLIC` and
+    // never answers it. Phase 6's `GET /api/v1/cras` (task 6.1) is the first one that does, which
+    // is what this test reaches.
+    //
+    // The sequence matters: choosing a persona first (a real, valid cookie) means
+    // `sessionQueryOptions`'s cache is warm when the cookie is corrupted underneath it — within
+    // `lib/query-client.ts`'s 30s `staleTime`, navigating to `/cra` resolves `_shell`'s guard from
+    // that cache without a network call, so the corrupted cookie is never sent to `/api/v1/session`
+    // at all. It reaches the server for the first time on `CraListScreen`'s own
+    // `GET /api/v1/cras` — a fresh query key, always a real fetch — which is exactly the live
+    // `403 /problems/unknown-persona` `session-guard.ts` exists to catch.
+    await choosePersona(page, 'consultant-paris');
+
+    const origin = new URL(baseURL ?? 'http://127.0.0.1:5173').origin;
+    await context.addCookies([
+      { name: 'erp_persona', value: 'not-a-real-signed-value', url: origin },
+    ]);
+
+    // A client-side transition, not `page.goto('/cra')`: `goto` is a hard navigation that tears
+    // down the whole page — including the in-memory `QueryClient` — so `_shell.tsx`'s `beforeLoad`
+    // would run against an **empty** cache and re-fetch `GET /api/v1/session` for real. That
+    // route is `PUBLIC` and answers `{ persona: null }` for this same corrupted cookie (verified
+    // earlier in this file), so the redirect would come from `_shell.tsx`'s own client-side guard
+    // — the already-covered path the previous test proves — and `GET /api/v1/cras` would never be
+    // called at all (discovered running exactly that version of this test: the redirect completed
+    // and `waitForResponse` for `/api/v1/cras` timed out because the request never happened).
+    // Clicking the sidebar link keeps the warm, still-fresh `sessionQueryOptions` cache
+    // (`lib/query-client.ts`'s 30s `staleTime`) in place, so the corrupted cookie reaches the
+    // server for the first time on `CraListScreen`'s own fetch, exactly as the row this test
+    // resolves describes.
+    const unauthorized = page.waitForResponse(
+      (response) => response.url().includes('/api/v1/cras') && response.status() === 403,
+    );
+    await page.getByRole('link', { name: 'Mes CRA' }).click();
+    await unauthorized;
+
+    await page
+      .getByText('Votre persona n’est plus reconnue', { exact: false })
+      .waitFor({ state: 'visible' });
+    await page.waitForURL('/');
+    await expect(page.getByRole('heading', { name: 'Choisir un persona' })).toBeVisible();
+
+    // The purge is real, not only the client-side redirect: a fresh read confirms the cookie no
+    // longer resolves to anything, server-side.
+    const sessionResponse = await page.request.get('/api/v1/session');
+    const session = (await sessionResponse.json()) as { persona: unknown };
+    expect(session.persona).toBeNull();
   });
 });
 
