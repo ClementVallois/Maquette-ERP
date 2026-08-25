@@ -23,6 +23,8 @@ moves down to "Settled" with its answer, so the record shows it was known rather
 | 24/08/2026 | **`lib/api-client.ts` invents two `problemType` values Annexe A does not define** (`/problems/client-unparsable-response`, `/problems/client-network-failure`), for a non-2xx response whose body is not `application/problem+json` and for a `fetch()` that never got a response at all — a case task 3.1 names as unsettled by the plan ("La plan ne tranche pas..."). Both are marked client-originated in code and carry French sentences in `lib/labels.ts`, but no screen has rendered either yet, so the shape is a judgement call, not a verified UX.                                                                                                                                                                                                                                                                                                                                                                                                                           | If Phase 4's `ErrorState`/`DeniedState` find the two-sentinel shape awkward once a real proxy failure or offline demo laptop produces one live, the fix touches `lib/api-client.ts`, `lib/labels.ts` **and** `lib/labels.test.ts` at once — three files whose exhaustiveness test would otherwise catch only two of the three going stale.                                                                                                                                                                                                                                | Not an ADR — this is UI-error-handling ergonomics, not a structural boundary or invariant decision, and escalating it would be the over-formalisation `CLAUDE.md` warns against. Resolve **in Phase 4** (the shell's guards and `feedback/ErrorState`, the first code to actually render either sentinel), **2026-08-24** named as the date this was written rather than found later.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 24/08/2026 | **Whether the invoice detail screen should render a line's copied `Tjm` at all is not decided.** `features/factures/types.ts`'s `RegieDaysOrigin.tjmCents` exists on the wire (`GET /api/v1/invoices/:id`, verified against the route) because ADR-0034 requires an invoice line to **copy** its `Tjm`, and Annexe A gives no list projection this field. But the two governing texts read differently: BUILD-RULES § Authorization narrows the ban to "une vue de liste" (a list view), which the invoice detail is not; Annexe C.12 restates it without that qualifier ("ni dans une liste, ni dans le dashboard, ni dans un tooltip" — no exception named for a single record). The SSR printable invoice already prints the **derived** `unitPriceCents` (`LABELS.invoice.unitPrice`) without ever naming `tjmCents` directly, which is a third possible reading: derive, never echo the raw field.                                                                                 | Phase 8 builds `features/factures/api.ts` and the invoice detail screen without this decided, and picks a reading by default rather than by choice — exactly the drift BUILD-RULES' "a rule that blocks you is either right, or it needs a new ADR" exists to prevent, on the repository's own progressive-disclosure claim (ADR-0043).                                                                                                                                                                                                                                   | Not decided here: it needs the actual screen in front of someone to judge whether printing a raw `Tjm` figure (as opposed to only the amount it produces) on a single-record read reads as the same disclosure the marge screen exists to gate, or as ordinary invoice detail. Resolve **in Phase 8**, task 8.2 (the invoice detail screen), **2026-08-24** named as the date the tension was found rather than discovered later.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 24/08/2026 | **The SPA's `src/features/` folders mirror the sealed modules by name, and nothing enforces the boundary between them.** `dependency-cruiser`'s allowlist grants `apps/([^/]+)/ → apps/$1/` — any file in an app may import any other file in the same app — so `features/factures` importing `features/cra` (or the reverse) cruises green. It happened once already inside Phase 3: `InvoiceListItem` was declared in `features/cra/types.ts` and imported by `features/factures/types.ts`, i.e. **billing reaching into timesheet**, the exact arrow `docs/adr/0001` and the CI gate forbid one tier down. Corrected in review (the type now lives in `features/factures`, and `features/cra` imports it for `ValidationResponse` only), but by hand, not by a gate.                                                                                                                                                                                                                 | The mockup's headline claim is "real module boundaries, enforced by CI — not naming conventions" (`CLAUDE.md`). A demo that breaks the boundary live in `packages/` while the SPA quietly crosses the same line in `apps/web/src/features/` proves the narrower claim only. The failure is silent: it looks like an ordinary intra-app import and no gate says otherwise.                                                                                                                                                                                                 | Not decided here. The honest options are (a) leave it as discipline, documented at the one arrow that exists, (b) add a `forbidden` rule for `apps/web/src/features/([^/]+)/ → apps/web/src/features/(?!\\1)` with a named exception for `cra → factures`, or (c) accept that UI features are not modules and say so in an ADR that retires the mirror-by-name expectation. Deciding it now, with exactly one arrow and two features that both still lack fetchers, would be deciding it on no evidence. Resolve **in Phase 7**, the first phase where `cra` and `factures` both have live `api.ts`/`hooks.ts` and the real number of crossings is visible, **2026-08-24** named as the date the first crossing was found.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 24/08/2026 | **Phase 4 added `/marge` and a "Marge" sidebar entry that `docs/frontend-plan.md` §3 does not pin** — only `/marge/$consultantId` is pinned there, and task 4.3 needed a manager-facing landing target §3 names none for. A second, separate question rides with it: whether a _standing_ nav entry belongs at all. §7.5 reaches the real margin screen "par une navigation explicite depuis une ligne du pré-facturier (jamais un survol)" — a click off a table row, not obviously a permanent sidebar destination for something Annexe C.12 and ADR-0052 treat as a logged, deliberate reveal.                                                                                                                                                                                                                                                                                                                                                                                       | Phase 7 either keeps a route and a nav entry §3 never asked for, or removes both — and if it removes them, this phase's placeholder "Marge" entry and its `/marge` index route were dead work, an unremarked extension of the pinned list for one phase only.                                                                                                                                                                                                                                                                                                             | Not decided here: deciding now, with no real margin screen built yet to judge the disclosure question against, would be deciding on no evidence. Resolve **in Phase 7, task 7.5** (the phase that builds the real margin screen and can judge whether a persistent nav entry is the right shape for a logged reveal). Dated 24/08/2026.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 24/08/2026 | **`features/session/session-guard.ts`'s `unknown-persona` branch (purge cookie, toast, redirect to `/`) is implemented and unit-tested against a manufactured `ApiProblemError`, but has no live proof.** Verified directly: `GET /api/v1/session` is `PUBLIC` (`apps/api/src/routes/session.ts`) and answers `{ persona: null }` for a forged or a missing cookie alike — never `/problems/unknown-persona`, which only a `forRoles`-guarded route's `preHandler` sends (`apps/api/src/personas/access.ts`, confirmed with `curl --cookie "erp_persona=garbage.value"` against `GET /api/v1/cras`: `403 unknown-persona`, versus `GET /api/v1/session` with the same cookie: `200 { persona: null }`). No screen Phase 4 built calls a guarded endpoint.                                                                                                                                                                                                                               | Task 4.4 names this branch explicitly ("cookie périmé/forgé → DELETE session, redirection `/`, toast"), and the one thing it does not have is proof it fires on the exact shape the API actually sends — a reordering inside `classifyProblem` or a change to how `handleSessionError` reads `event.query.state.error`/`event.mutation.state.error` could silently stop matching the real wire shape, and nothing before the first guarded fetch would notice.                                                                                                            | Resolve **in Phase 6, task 6.1** (`GET /api/v1/cras`, the first guarded endpoint the SPA calls): add a Playwright case that reaches it with a forged cookie and asserts the purge, the toast and the redirect actually happen. Dated 24/08/2026.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ---
 
@@ -402,6 +404,217 @@ missed rather than being rewritten to look complete.
    `PROXIED_PATHS` (`vite.config.ts`). → **Fix now**: the success parse is wrapped like the error
    parse, falling back to the same client-originated `unparsableResponse` problem, and the
    docstring is true as written.
+
+## Front-end Phase 4 checkpoint — `feat/web`, 24-25/08/2026
+
+The two questions `CLAUDE.md` requires, asked of `docs/frontend-plan.md` Phase 4 (shell, navigation,
+persona selector). Every point resolves to exactly one of the four outcomes. Written across two
+sessions: tasks 4.1 to 4.5 and points 1 to 6 on **24/08/2026**, the review pass that produced
+points 7 to 10 on **25/08/2026**, before anything was committed.
+
+**Which tasks ran.** 4.1 to 4.5, all five, plus the exit Gate. What did **not** run, and why:
+
+- **`components/feedback/DeniedState` and `components/feedback/ConfirmDialog` were not built.**
+  Phase 4 builds only the `feedback/` components it actually needs, not the full list §3 pins —
+  `EmptyState` and `ErrorState` are the two this phase's screens (the persona grid's empty case,
+  the global error boundary, the styled 404) actually render. Nothing built in Phase 4 answers a
+  `403` live: the persona selector and every guarded route it leads to (via `_shell`'s
+  `beforeLoad`) only ever call `GET /api/v1/session`, which is `PUBLIC` and never refuses.
+  `DeniedState`'s first real caller is **Phase 6, task 6.5** (a Cra deep-link's `403 out-of-scope`);
+  `ConfirmDialog`'s is **Phase 7, tasks 7.2/7.3** (the validate and refuse dialogs).
+- **The `unknown-persona` global guard (`features/session/session-guard.ts`) is proven only at the
+  unit level.** The two rows dated 24/08/2026 in § Open above name this and the `/marge` route
+  addition as this phase's two real open questions — not repeated as "least confident" points here,
+  because each already carries its own outcome and its own named phase there.
+- **No axe scan ran.** Consistent with Phase 2's own checkpoint, which recorded the same thing for
+  the kitchen sink: Phase 10.2 audits accessibility on every screen, and it was not a task 4.x line
+  item. The shell was still built with the mechanics axe would check — skip link, visible focus
+  rings, `aria-label`s on icon-only controls, `sr-only` text on collapsed nav links, a
+  `role="dialog"` mobile sheet — but nothing in this phase asserts them with a tool.
+- **`rules-auditor` and `cold-reader` did not run** — the task's own instruction, and the same
+  deferral every earlier front-end checkpoint has recorded: Clement holds both for one pass over the
+  whole front-end plan.
+
+**Least confident in.**
+
+1. **`vitest.config.ts` had never resolved the `@/` alias, and this phase is the first to need it
+   from a `*.test.ts` file.** `apps/web/src/config/navigation.test.ts` and
+   `apps/web/src/features/session/session-guard.test.ts` are the first unit tests to import a module
+   (`navigation.ts`, `session-guard.ts`) that itself uses a `@/lib/...` import — every earlier
+   `apps/web/src/lib/*.test.ts` used relative imports throughout, so the gap was invisible until
+   now. The same shape as the `@/` → dependency-cruiser row this file already carries (dated
+   24/08/2026, resolved in Phase 2): a tool with its own import resolution that nobody had taught
+   the alias to. `resolve.alias` at the config root turned out **not** to be enough — verified
+   directly, the alias only took effect once duplicated inside the `unit` project's own object,
+   because Vitest's `test.projects` entries are each a near-standalone inline config rather than an
+   automatic inheritor of the root's `resolve`. → **Fix now, done and verified**: both copies are in
+   `vitest.config.ts`, commented on why the duplication is load-bearing rather than defensive.
+2. **`routes/dev.composants.tsx` sits outside `_shell`, a deviation from §3's pinned tree**, where
+   it is nested under it. Three reasons, written at the route's own declaration rather than only
+   here: a kitchen sink behind the session guard would need a persona cookie just to render,
+   defeating its use as the one API-free boot check (`e2e/smoke.spec.ts`, which — also unlike §3's
+   implied shape — now targets `/dev/composants` instead of `/` for the same reason: `/` fetches
+   live personas the instant it mounts, and `playwright.config.ts`'s `webServer` starts Vite only,
+   no API); it would gain a sidebar and topbar the kitchen sink's committed baseline screenshot was
+   never designed against; and dev-only tooling has no reason to carry the production shell's chrome
+   at all. → **Fix now, a documented judgement call** — the deviation is named at the route's own
+   file, not only in this checkpoint, and `config/navigation.ts` excludes the route from every
+   role's entries, so no persona ever reaches it through the UI.
+3. **`config/navigation.ts`'s consultant/manager wording for the shared `/cra` path trusts the
+   existing copy deck over task 4.3's own prose.** The plan's task text says the consultant entry is
+   "Mon CRA"; `lib/labels.ts` (Phase 3) already carries two distinct keys for this exact
+   nav-vs-heading split — `cra.nav` ("Mes CRA", the sidebar entry) and `cra.heading` ("Mon CRA", the
+   page's own `<h1>`, not built until Phase 6). Task 4.3 also names a **manager**-facing "CRA" entry
+   on the same `/cra` path that no existing key matched (`cra.nav`'s "Mes CRA" is possessive, wrong
+   for an office-wide list) — `LABELS.cra.navManager` ("CRA") is new, added this phase. Two
+   `NavEntry`s share `path: '/cra'`, gated to disjoint roles (`cra-mine`: consultant, `cra-office`:
+   manager), rather than one entry whose label is a function of the viewer — keeping
+   `config/navigation.ts` a plain data table, never a role-branching component. → **Fix now, a
+   documented judgement call**, recorded at the two entries' own declaration and here.
+4. **The mobile/desktop shell split does not use Tailwind's literal `md` breakpoint (768px),
+   despite task 4.5's own wording ("sidebar en Sheet sous le breakpoint md").**
+   `playwright.config.ts`'s own secondary viewport for this exact check is 768 wide, and Tailwind's
+   `md:` is a `min-width: 768px` query — at exactly 768, `md:flex`/`md:hidden` already reads as
+   desktop, so the plan's own two configured viewports (768, 1440) would never disagree and the
+   responsive check would be unable to fail. Found empirically, not reasoned: the first version of
+   `e2e/shell.spec.ts`'s mobile-sheet test timed out because the hamburger button was hidden at
+   768px. `components/shell/sidebar.tsx` and `components/shell/topbar.tsx` use `lg:` (1024px)
+   instead, with the reasoning written at both call sites. → **Fix now**, verified by the same test
+   passing after the change, on both configured viewports.
+5. **`_shell.tsx`'s redirect guard carries a narrow, commented `eslint-disable` for
+   `@typescript-eslint/only-throw-error`.** TanStack Router's own documented `beforeLoad` pattern is
+   `throw redirect(...)`, and `redirect()` returns a `Response`, not an `Error` — the one call site
+   in the SPA that throws a non-`Error` value, and a framework contract rather than a bug. The
+   alternative that satisfies the rule without disabling it (`redirect({ throw: true })`, no local
+   `throw` keyword) was tried first and rejected: TypeScript then cannot see the call as
+   never-returning, and `session.persona` reads as `PersonaSummary | null` past the guard, failing
+   `tsc` two lines later. → **Fix now**, the narrower of the two costs accepted on purpose and
+   explained at the one line it touches — this is the first `eslint-disable` comment in
+   `apps/web/src`.
+6. **The persona grid's empty state (`personas.data.personas.length === 0`) has no live proof.**
+   `EmptyState` is wired and the branch compiles and renders in isolation, but the seed always
+   returns four personas, so nothing in this phase's Playwright run ever takes this path — the same
+   shape as points raised in earlier phases about branches a fixed seed cannot reach. → Not
+   escalated to a row in § Open: `page.route()` interception (not MSW, and scoped to one Playwright
+   test rather than the app's runtime) would prove it without touching `usePersonas` at all, and is
+   cheap enough that not writing it is a gap in this phase's coverage rather than a real unresolved
+   question. Left as a known coverage gap, correctable in Phase 10.1's consistency pass without a
+   structural decision attached to it.
+7. **The Gate's own evidence paragraph was false when it was written, and `pnpm run check` was
+   red.** Re-run on 25/08/2026 before the first commit, `format:check` failed on this very file:
+   the two rows added to § Open on 24/08/2026 were never passed through Prettier, so the phase that
+   claimed "`pnpm run check` is green" would have been merged with a red gate — the third instance
+   in this plan of a claim written from what the agent believed rather than from what it had just
+   observed (`b81fe5a` and Phase 3's point 7 are the other two). → **Fix now**: the file is
+   formatted, `pnpm run check` was re-run end to end, and every number in the evidence paragraph
+   below is one this session observed rather than inherited.
+8. **The shell shipped four hardcoded English strings, inside `components/ui/`.** The mobile
+   navigation `Sheet` task 4.5 builds renders its close control's accessible name as
+   `<span className="sr-only">Close</span>` (`components/ui/sheet.tsx`), and `components/ui/dialog.tsx`
+   carried the same `sr-only` string plus a **visible** `<Button>Close</Button>` in `DialogFooter`,
+   with `components/ui/breadcrumb.tsx`'s ellipsis control reading "More". Vendored shadcn files, so
+   they had passed every earlier review as "generated" — but §2 of the plan says "aucune chaîne
+   visible en dur dans un composant", and ADR-0060 already refused exactly this once, on the
+   server-rendered pages: a French screen does not get to say `Close` because the string came from a
+   generator. `LABELS.shell.closeMenu` ("Fermer le menu") existed, unused, which is what the fix was
+   meant to be. → **Fix now**: the four strings read `LABELS.shell.closeMenu` and two new
+   `LABELS.action` keys (`close`, `more`); the three `components/ui/` files import the label deck
+   like any other component. No committed screenshot changed — three of the four are `sr-only` and
+   the fourth (`DialogFooter`'s button) has no caller yet.
+9. **`LABELS.shell.brandTagline` ("Usage interne — maquette") was dead on arrival.** No component
+   read it, and `direction-visuelle.md` §6 specifies a brand block, a nav, and a **reserved,
+   unpopulated** foot — no tagline anywhere. A label with no caller is the copy-deck equivalent of
+   the fake control §6 forbids: it reads as a decision that was made and is not visible anywhere.
+   → **Fix now**: deleted.
+10. **`components/shell/persona-block.tsx` rendered `Manager·Paris`, with no spaces.** Taken
+    literally from `direction-visuelle.md` §6's ASCII layout sketch, which writes `manager·Paris`
+    inside a monospace box drawn to a fixed width — a drawing constraint, not a typographic
+    instruction, and the same document's own brand block reads `ERP · CRA` two lines above. The
+    repository already has one middle-dot separator in shipped code and it is spaced:
+    `apps/api/src/web/problem-page.ts`'s `messages.join(' · ')`. → **Fix now**: spaced, with the
+    reasoning at the call site. This one **does** change pixels — the four `4.2-shell-*.png`
+    captures were regenerated with the fix in place, not before it.
+
+**In three months, what breaks.**
+
+1. **The two rows dated 24/08/2026 in § Open** (`/marge`'s extension of the pinned route list and
+   whether it survives Phase 7; the `unknown-persona` guard's live proof) are this phase's real
+   structural unknowns, both already carrying a named phase and a date — not duplicated here.
+2. **The dependency quarantine's mechanical gap** (the standing row, unchanged by this phase, not
+   this phase's to fix per that row's Owner line) was hand-verified once more rather than assumed:
+   `@tanstack/react-router@1.170.29` and `@tanstack/router-plugin@1.168.32` were both published
+   2026-08-14 (`pnpm view <pkg> time`), 10 days before this phase's cutoff. Every new transitive
+   `git diff --stat pnpm-lock.yaml` introduced was checked individually: `@tanstack/history@1.162.1`
+   (08-06), `@tanstack/router-core@1.171.24` and `@tanstack/router-generator@1.167.30` (both 08-14),
+   `@tanstack/router-utils@1.162.2` (06-05), `@tanstack/react-store@0.9.3`/`@tanstack/store@0.9.3`
+   (03-25), `@tanstack/virtual-file-routes@1.162.0` (05-15) — all at least 10 days old against the
+   cutoff, none inside the 7-day window. `rolldown@1.2.4`'s occurrence count in the lockfile changed
+   (2 → 6) with no version change, a new peer-resolution context rather than a new dependency. No
+   package outside the `@tanstack/*` namespace changed. → **A row in this file** — the existing row
+   already covers the mechanism and the owner; this phase's finding (zero drift beyond the packages
+   it deliberately added) is recorded here rather than duplicating that row.
+3. **The generated `apps/web/src/routeTree.gen.ts` is committed, and the ignore strategy was decided
+   once, up front, exactly as this task's brief asked.** It carries `/* eslint-disable */` and
+   `// @ts-nocheck` in its own header, with an explicit instruction to exclude it from linting and
+   formatting; the fix is a single-path entry in `eslint.config.js`'s top-level `ignores` and in
+   `.prettierignore`, not a directory glob (`apps/web/src/routes/**` — hand-written — stays linted
+   and formatted in full). `tsc` still typechecks every file that imports it (`src/router.ts`)
+   against its inferred types, unaffected by the file's own `@ts-nocheck`. The plugin rewrites this
+   file on every `dev`/`build`; `git status` after two full Playwright runs showed no diff on it,
+   confirming the committed version matches what the plugin regenerates from the route files also
+   committed here. → **Fix now, done and verified**, not left to be discovered as a fourth gate
+   quietly failing on the first `dev` run after merge.
+4. **Two of Phase 2's committed screenshots and Phase 3's own screenshot changed again, this time
+   for real** (`tests/visual/baseline/kitchen-sink.png`,
+   `tests/visual/review/2.6-kitchen-sink-dialog-open.png`, `tests/visual/review/3.6-personas-live.png`)
+   — Phase 3's checkpoint predicted exactly this and named Phase 4 as the fix. Unlike Phase 3's own
+   finding (a coupling that made the diff spurious, reverted with `git checkout --`), this diff
+   **is** the intended change: the kitchen sink moved to `/dev/composants` (point 2 above), and
+   `personas-live.spec.ts`'s assertions were rewritten for the new card layout
+   (`data-persona-key` plus separate name/role/office text nodes, not one concatenated string) — the
+   pixels differ because the URL and the DOM differ, not because anything regressed. → **Fix now,
+   kept rather than reverted**: all three PNGs are re-committed with this phase's changes, and this
+   paragraph is the deliberate record the brief asked for in place of a silent `git checkout --`.
+5. **The Playwright suite is not reliably green on the first run after `pnpm run db:reset`.** Four
+   full runs on 25/08/2026, same commit, same machine: 4 failed, then 5 failed, then 19/13/0 twice —
+   including once with `apps/web/node_modules/.vite` deleted, which rules out the cold
+   dependency-optimisation cache that was the obvious suspect. The failures move between runs and
+   are all 30-second `locator.click`/`toBeVisible` timeouts on tests that pass in isolation
+   (`personas-live.spec.ts` alone: green), while the API log shows every request answered `200` in
+   single-digit milliseconds throughout. So it is contention — seven Playwright workers against one
+   single-threaded Vite dev server, on a machine still settling after `docker compose down -v` and a
+   re-seed — not a defect in a spec or in the app. Not fixed here, because the fix depends on a
+   decision this phase cannot take on its own evidence (cap `workers`, raise the default timeout, or
+   simply let CI's `retries: 2` absorb it). → **A row in this file is not what this needs** — it
+   needs the environment Phase 9.6 builds, where the suite runs against the **built** SPA served by
+   Fastify with no Vite dev server in the picture at all, which removes the contended component
+   entirely. Recorded here so that phase inherits the observation instead of rediscovering it:
+   **if 9.6's CI job flakes, this is the first hypothesis, and `workers: 1` is the cheap test of it.**
+
+**Evidence, not a point.** Everything below was observed on 25/08/2026, after the fixes in points 7
+to 10, on the tree that is being committed. `pnpm run check` green end to end: env:check (13
+variables); lint, 0 warnings under `--max-warnings=0`, including the new `e2e/shell.spec.ts` and
+every file under `routes/`, `components/shell/`, `components/feedback/` and `config/`; boundaries —
+258 modules across 6 workspace members, 842 dependencies, no violation, and a direct grep of every
+new file under `apps/web/src/config` and `apps/web/src/components/shell` confirmed no import of
+`features/cra`, `features/factures`, `features/pre-facturier`, `features/marge` or
+`features/dashboard` — the structural question Phase 3's own addendum named as the one its
+checkpoint had missed; format:check (green only after point 7's fix); typecheck across all 7
+typechecked members; test:cov — **554 tests in 45 files**, up from 532 at the end of Phase 3,
+coverage 99.41 / 97.12 / 99.52 / 99.49 against the 90/90/85/90 thresholds (unchanged: `apps/web` is
+outside the measured surface, which the coverage config scopes to `packages/*/src/domain`,
+`packages/platform/src` and `apps/api/src/web/render`). `pnpm --filter @erp/web exec playwright test`
+against `pnpm run db:reset` and a backgrounded `pnpm run api` (`webServer` starts Vite only):
+**32 tests, 19 passed, 13 skipped by `testInfo.project.name` gating, 0 failed** — with the caveat
+point 5 above records in full. The suite is the four pre-existing specs updated in place
+(`smoke.spec.ts` now targets `/dev/composants`; `personas-live.spec.ts`'s assertions rewritten for
+the new card layout, screenshot path unchanged; `visual-baseline.spec.ts` and `visual-review.spec.ts`
+retargeted to `/dev/composants`) plus the new `e2e/shell.spec.ts`: nav-per-persona with **negative**
+assertions on the full, ordered label array — not a presence-only check — for all four seed personas;
+a deep-link with no cookie and one with a forged `erp_persona` cookie both redirecting to `/`; five
+shell screenshots and the persona-selector screenshot under `tests/visual/review/4.x-*.png`. No
+`waitForTimeout` anywhere in the new spec — `navLabels`'s own comment explains the one place a
+`waitFor` was needed, because `allTextContents()` does not auto-wait.
 
 ## Phase 6 checkpoint — `feat/web`, 21/08/2026 (reviewers and their fixes, 22/08/2026)
 
