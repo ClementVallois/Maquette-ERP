@@ -398,6 +398,16 @@ export const LABELS = {
 
   action: {
     continue: 'Continuer',
+    /**
+     * The accessible name of the close affordance shadcn's `Dialog` and `Sheet` primitives render
+     * themselves (`components/ui/dialog.tsx`, `components/ui/sheet.tsx`) — they ship it as a
+     * hardcoded English `sr-only` string, which ADR-0060 already refused once on the server-rendered
+     * pages ("a French sentence, never the English `title`"). A vendored component is still a
+     * component: §2's "aucune chaîne visible en dur" holds inside `components/ui/` too.
+     */
+    close: 'Fermer',
+    /** Same, for `BreadcrumbEllipsis`'s collapsed-crumbs control (`components/ui/breadcrumb.tsx`). */
+    more: 'Afficher les niveaux masqués',
   },
 
   /**
