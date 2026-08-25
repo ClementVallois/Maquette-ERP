@@ -89,6 +89,7 @@ retouched, so what was decided stays visible next to what replaced it.
 | [0062](./0062-react-spa-for-the-interactive-screens.md)                                      | A React SPA for the interactive screens                                          | accepted   |
 | [0063](./0063-the-spa-ships-in-the-api-deployable.md)                                        | The SPA ships in the API deployable, as build output, same-origin stays forced   | accepted   |
 | [0064](./0064-the-content-security-policy-admits-a-script.md)                                | The Content-Security-Policy admits a script, scoped to `'self'`                  | accepted   |
+| [0065](./0065-composition-root-reads-get-a-directory.md)                                     | Composition-root reads get a directory, and economics stays where it is          | accepted   |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering

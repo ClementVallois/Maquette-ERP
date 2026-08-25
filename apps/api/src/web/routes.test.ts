@@ -2,6 +2,7 @@ import { ROLES } from '@erp/platform';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { DECIDES_CRA } from '../composition/pre-facturier.ts';
 import type { ApiConfig } from '../config.ts';
 import { ApiFailure } from '../errors.ts';
 import type { Transactionally } from '../persistence/unit-of-work.ts';
@@ -14,7 +15,7 @@ import { STYLESHEET } from './assets.ts';
 import { LABELS } from './labels.ts';
 import { PATHS } from './paths.ts';
 import { CONTENT_SECURITY_POLICY } from './reply.ts';
-import { DECIDES_CRA, ISSUES_INVOICE } from './routes.ts';
+import { ISSUES_INVOICE } from './routes.ts';
 
 /**
  * The screens through `fastify.inject`, with no database: the persona catalogue is the in-memory

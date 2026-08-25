@@ -1,13 +1,6 @@
-import type { DeclineReason } from '@erp/billing';
 import { API_PROBLEM_TYPES, type ProblemDetails } from '@erp/contracts';
-import {
-  daysOf,
-  isoDateInFirmTimeZone,
-  lastDayOf,
-  periodFromIso,
-  periodToIso,
-} from '@erp/platform';
-import { type CraLine, type CraStatus, workingCalendar } from '@erp/timesheet';
+import { daysOf, isoDateInFirmTimeZone, periodFromIso, periodToIso } from '@erp/platform';
+import { type CraLine, workingCalendar } from '@erp/timesheet';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -15,6 +8,12 @@ import { issueInvoice } from '../chain/issue-invoice.ts';
 import { type HalfDayEntry, recordMonth } from '../chain/record-month.ts';
 import { refuseCra } from '../chain/refuse-cra.ts';
 import { validateCraAndDraftInvoices } from '../chain/validate-cra.ts';
+import { craGridComposition } from '../composition/cra-grid.ts';
+import {
+  DECIDES_CRA,
+  offeredPeriods,
+  preFacturierComposition,
+} from '../composition/pre-facturier.ts';
 import type { ServerDependencies } from '../dependencies.ts';
 import { consultantEconomics } from '../economics/consultant-economics.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
@@ -31,7 +30,7 @@ import { craPrintPage } from './pages/cra-print.ts';
 import { invoicePage } from './pages/invoice.ts';
 import { marginPage } from './pages/margin.ts';
 import { personaSelectorPage } from './pages/persona-selector.ts';
-import { type CraRow, preFacturierPage } from './pages/pre-facturier.ts';
+import { preFacturierPage } from './pages/pre-facturier.ts';
 import { PATHS } from './paths.ts';
 import { redirectTo, sendPage } from './reply.ts';
 
@@ -57,8 +56,10 @@ const SLOTS = [0, 1] as const;
  * carries it, through `carries` — so the offer cannot drift from the refusal, and moving a verb
  * between roles moves its button in the same edit. `routes.test.ts` proves the route each one is
  * registered on is the route the screen asks about.
+ *
+ * `DECIDES_CRA` lives in `../composition/pre-facturier.ts` now — the pré-facturier's own
+ * `mayDecide` field and these two routes' access both read the one declaration.
  */
-export const DECIDES_CRA = forRoles('manager');
 export const ISSUES_INVOICE = forRoles('billing');
 
 const ConsultantParam = z.object({ consultantId: z.string().min(1).max(64) });
@@ -161,57 +162,6 @@ function gridDays(periodIso: string, lines: readonly CraLine[]): GridDay[] {
 
     return { date, nonWorkable: calendar.nonWorkableReason(date), slots };
   });
-}
-
-/**
- * The months the period picker offers.
- *
- * Read off a page of Cras ordered by period descending, so it can omit an old month and never a
- * recent one — which is the behaviour a period picker wants. The selected month's rows come from
- * a second, period-filtered query (ADR-0053), so what the dropdown offers never bounds what the
- * table shows.
- */
-function offeredPeriods(cras: readonly { period: string }[]): string[] {
-  return [...new Set(cras.map((cra) => cra.period))].sort((left, right) =>
-    right.localeCompare(left),
-  );
-}
-
-/**
- * Why the half-days of one `Cra` are not on an invoice — two shapes, and they differ in kind
- * (ADR-0037 for the first, `CraStatus` for the second).
- *
- * A `Validated` Cra has been through the chain, so everything not billed has a typed decline
- * reason. A Cra in any other status has not reached `billing` at all, and the block is the
- * workflow rather than a rule of billing: saying "no reason recorded" there would be false.
- */
-function blockingOf(
-  cra: { readonly id: string; readonly recordedHalfDays: number },
-  status: CraStatus,
-  declined: readonly {
-    craId: string;
-    missionId: string;
-    halfDays: number;
-    reason: DeclineReason;
-  }[],
-  missionNames: ReadonlyMap<string, string>,
-): CraRow['blocking'] {
-  if (status !== 'validated') {
-    return cra.recordedHalfDays === 0
-      ? []
-      : [{ halfDays: cra.recordedHalfDays, why: { kind: 'notValidated', status } }];
-  }
-
-  return declined
-    .filter((record) => record.craId === cra.id)
-    .map((record) => ({
-      halfDays: record.halfDays,
-      why: {
-        kind: 'declined',
-        reason: record.reason,
-        missionName: missionNames.get(record.missionId) ?? record.missionId,
-      },
-    }));
 }
 
 /** The one refusal both manager verbs can produce that is an absence rather than a rule. */
@@ -321,32 +271,18 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
       const period = periodFromIso(params.value.period);
 
       const view = await dependencies.transactionally(async (unit) => {
-        const cra = await unit.cras.findByConsultantAndPeriod(actor.consultantId, period, actor);
-        // Only the missions this consultant is staffed on during the month reach the dropdown.
-        // Not a security control — the submission check is (ADR-0051 and task 1.5) — but a form
-        // that offers a mission the domain will refuse is a form that teaches the user nothing.
-        const reference = await new PgReferenceReader(unit.client).timesheet();
-        const names = await new PgReferenceReader(unit.client).missionNames();
-
-        const missions = [...names]
-          .filter(([id]) =>
-            daysOf(period).some((day) => reference.isAssigned(actor.consultantId, id, day)),
-          )
-          .map(([id, name]) => ({ id, name }));
+        const grid = await craGridComposition(unit, { actor, period });
 
         return {
           period: params.value.period,
-          craId: cra?.id ?? null,
-          status: cra?.status ?? null,
-          days: gridDays(params.value.period, cra?.lines ?? []),
-          missions,
-          flags: cra?.flags ?? [],
-          totals: totalsOf(cra?.lines ?? []),
-          // `draft` and `refused` are editable; `submitted` and `validated` are not, and the domain
-          // is the one that says so (ADR-0005). The screen reads the same fact rather than owning a
-          // second copy of it.
-          editable: cra === null || cra.status === 'draft' || cra.status === 'refused',
-          refusal: cra?.refusal ?? null,
+          craId: grid.craId,
+          status: grid.status,
+          days: gridDays(params.value.period, grid.lines),
+          missions: grid.missions,
+          flags: grid.flags,
+          totals: totalsOf(grid.lines),
+          editable: grid.editable,
+          refusal: grid.refusal,
         };
       });
 
@@ -399,95 +335,9 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
       // compares lexicographically, which is why no Date arithmetic appears here.
       const today = isoDateInFirmTimeZone(dependencies.clock.now());
 
-      const view = await dependencies.transactionally(async (unit) => {
-        const recent = await unit.cras.list({ actor, limit: MAX_MONTHS, offset: 0 });
-        const period = query.value.periode ?? offeredPeriods(recent)[0] ?? null;
-        // The month asked for is offered even when this office has no Cra in it. A picker that
-        // dropped the current selection would answer a shared link by silently showing another
-        // month, and BUILD-PLAN 6.6 makes every view shareable by URL.
-        const offered = offeredPeriods(period === null ? recent : [...recent, { period }]);
-
-        if (period === null) {
-          return {
-            period: null,
-            offeredPeriods: [],
-            billable: [],
-            cras: [],
-            lateHalfDays: 0,
-            periodClosed: false,
-            mayDecide: carries(DECIDES_CRA, actor.role),
-          };
-        }
-
-        const cras = await unit.cras.list({ actor, limit: MAX_MONTHS, offset: 0, period });
-        const declined = await unit.invoices.findDeclinedDays(
-          cras.map((cra) => cra.id),
-          actor,
-        );
-        const invoices = await unit.invoices.list({
-          actor,
-          limit: MAX_MONTHS,
-          offset: 0,
-          period,
-        });
-
-        const reference = new PgReferenceReader(unit.client);
-        const consultantNames = await reference.consultantNames();
-        const missionNames = await reference.missionNames();
-
-        // One read per invoice, and the totals come off the aggregate rather than out of a `SUM`
-        // (ADR-0053): a draft's `total_ttc_cents` column is NULL by design, and VAT is rounded
-        // once per rate in the domain — a total assembled in SQL would be a different number.
-        const billable = [];
-        for (const item of invoices) {
-          const invoice = await unit.invoices.findById(item.id, actor);
-          if (invoice === null) continue;
-
-          billable.push({
-            invoiceId: invoice.id,
-            clientName: invoice.billedTo.name,
-            status: invoice.status,
-            invoiceNumber: invoice.number,
-            totalExcludingVatCents: invoice.totals.totalExcludingVatCents,
-            totalIncludingVatCents: invoice.totals.totalIncludingVatCents,
-          });
-        }
-
-        const periodClosed = lastDayOf(periodFromIso(period)) < today;
-
-        const rows: CraRow[] = cras.map((cra) => {
-          const status = cra.status as CraStatus;
-
-          return {
-            craId: cra.id,
-            consultantId: cra.consultantId,
-            consultantName: consultantNames.get(cra.consultantId) ?? cra.consultantId,
-            status,
-            recordedHalfDays: cra.recordedHalfDays,
-            blocking: blockingOf(cra, status, declined, missionNames),
-          };
-        });
-
-        return {
-          period,
-          offeredPeriods: offered,
-          billable,
-          cras: rows,
-          // ADR-0054: half-days of a closed month that have not reached `Validated`. Summed over
-          // the rows the repository already scoped, so there is no second place the office rule
-          // could be forgotten.
-          lateHalfDays: periodClosed
-            ? rows
-                .filter((row) => row.status !== 'validated')
-                .reduce((total, row) => total + row.recordedHalfDays, 0)
-            : 0,
-          periodClosed,
-          // The navigational echo of the route's own declaration, and now literally that
-          // declaration: `billing` reads this table and decides nothing on it, and `POST` refuses
-          // it whatever renders.
-          mayDecide: carries(DECIDES_CRA, actor.role),
-        };
-      });
+      const view = await dependencies.transactionally((unit) =>
+        preFacturierComposition(unit, { actor, requestedPeriod: query.value.periode, today }),
+      );
 
       return sendPage(reply, preFacturierPage(view, personaFor(request)));
     },

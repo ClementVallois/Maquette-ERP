@@ -255,6 +255,15 @@ export class PgReferenceReader {
     return new Map(rows.map((row) => [row.id, row.name]));
   }
 
+  /** Mission → client name, for the grid's mission picker (front-end plan Phase 5.2). Presentation, not a rule. */
+  async missionClientNames(): Promise<ReadonlyMap<string, string>> {
+    const { rows } = await this.#client.query<{ id: string; client_name: string }>(
+      `SELECT m.id, c.name AS client_name FROM public.missions m JOIN public.clients c ON c.id = m.client_id`,
+    );
+
+    return new Map(rows.map((row) => [row.id, row.client_name]));
+  }
+
   /** The dated manager attachment: March's Cra is validated by March's manager (ADR-0034). */
   async hierarchy(): Promise<Hierarchy> {
     const { rows } = await this.#client.query<AttachmentRow>(
