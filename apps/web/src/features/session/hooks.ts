@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
 import { unwrap } from '@/lib/api-client';
@@ -13,11 +13,19 @@ import type { PersonasResponse, SelectPersonaResponse, SessionResponse } from '.
 const SESSION_QUERY_KEY = ['session'] as const;
 const PERSONAS_QUERY_KEY = ['personas'] as const;
 
+/**
+ * Exported so `routes/_shell.tsx`'s `beforeLoad` can call
+ * `context.queryClient.ensureQueryData(sessionQueryOptions)` against the exact same query key
+ * `useSession` reads — one cache entry, read from two places, rather than a second key the guard
+ * would own and the mutation below would have to remember to invalidate as well.
+ */
+export const sessionQueryOptions = queryOptions({
+  queryKey: SESSION_QUERY_KEY,
+  queryFn: async () => unwrap(await fetchSession()),
+});
+
 export function useSession(): UseQueryResult<SessionResponse> {
-  return useQuery({
-    queryKey: SESSION_QUERY_KEY,
-    queryFn: async () => unwrap(await fetchSession()),
-  });
+  return useQuery(sessionQueryOptions);
 }
 
 export function usePersonas(): UseQueryResult<PersonasResponse> {

@@ -51,6 +51,11 @@ export const LABELS = {
     none: 'Aucun persona sélectionné',
     office: 'Implantation',
     role: 'Rôle',
+    /** `GET /api/v1/personas` answering an empty list — a live instance edge case, not the "no
+     * persona chosen yet" state `none` above already names. */
+    emptyTitle: 'Aucun persona disponible',
+    emptyBody: 'Cette instance ne propose aucun persona pour le moment.',
+    selectError: 'Le persona n’a pas pu être choisi. Réessayez.',
   },
 
   roles: {
@@ -59,10 +64,27 @@ export const LABELS = {
     billing: 'Facturation',
   },
 
+  /**
+   * Phase 8 (task 8.4) builds the real screen behind `GET /api/v1/dashboard`. This section exists
+   * from Phase 4 on because the nav entry and the placeholder page both need the word — the shell
+   * does not wait for the endpoint to exist to say what the destination is called.
+   */
+  dashboard: {
+    heading: 'Tableau de bord',
+  },
+
   cra: {
     heading: 'Mon CRA',
     listHeading: 'Mes CRA',
     nav: 'Mes CRA',
+    /**
+     * The **manager's** nav-entry wording for the same `/cra` route (frontend-plan.md task 4.3:
+     * "manager → Pré-facturier, CRA, Factures, Marge") — deliberately not `nav` above, which is
+     * possessive ("Mes CRA", "my CRAs") and wrong for a manager's office-wide list. Two role-scoped
+     * `NavEntry`s point at the same path with this distinct label rather than one entry whose text
+     * varies by role (`config/navigation.ts`'s own comment explains why).
+     */
+    navManager: 'CRA',
     day: 'Jour',
     morning: 'Matin',
     afternoon: 'Après-midi',
@@ -376,6 +398,29 @@ export const LABELS = {
 
   action: {
     continue: 'Continuer',
+  },
+
+  /**
+   * The shell itself (frontend-plan.md Phase 4, tasks 4.2-4.4): the sidebar's collapse control,
+   * the mobile `Sheet` trigger, the "à venir" placeholder every Phase 6-8 route renders until its
+   * own phase builds it, the styled 404, and the copy for a session that stopped resolving after
+   * the shell had already rendered (`features/session/session-guard.ts`).
+   */
+  shell: {
+    collapse: 'Réduire la navigation',
+    expand: 'Déployer la navigation',
+    openMenu: 'Ouvrir le menu',
+    closeMenu: 'Fermer le menu',
+    breadcrumbHome: 'Accueil',
+    comingSoonTitle: 'Cet écran arrive dans une prochaine phase',
+    comingSoonBody:
+      'Cette page n’est pas encore construite dans la maquette : elle existe dans la navigation pour montrer le périmètre complet, pas pour être ouverte aujourd’hui.',
+    notFoundTitle: 'Page introuvable',
+    notFoundBody: 'Cette adresse ne correspond à aucun écran de la maquette.',
+    notFoundAction: 'Revenir à l’accueil',
+    unexpectedErrorBody:
+      'Une erreur inattendue a interrompu l’affichage de cette page. Revenez à l’accueil et recommencez.',
+    sessionInvalidatedToast: 'Votre persona n’est plus reconnue. Choisissez-en une à nouveau.',
   },
 
   footer: {

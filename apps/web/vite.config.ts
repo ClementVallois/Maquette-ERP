@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 
 import tailwindcss from '@tailwindcss/vite';
+import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
@@ -14,7 +15,13 @@ const PROXIED_PATHS = ['/api', '/facture', '/releve', '/healthz', '/readyz'];
 export default defineConfig({
   // Tailwind v4 is CSS-first (no tailwind.config.*): the plugin reads `@import "tailwindcss"`
   // from src/styles/globals.css and needs no options here.
-  plugins: [tailwindcss(), react()],
+  //
+  // `tanstackRouter` must run before `react()` (its own documented ordering): it rewrites
+  // `routes/**` into `src/routeTree.gen.ts` before the React plugin's Babel/SWC pass sees the
+  // route files. `target: 'react'` selects the React adapter; `autoCodeSplitting: true` is
+  // Phase 10.3's lazy-route splitting, taken now rather than retrofitted, since turning it on
+  // later would regenerate every route file's code-split boundary anyway.
+  plugins: [tanstackRouter({ target: 'react', autoCodeSplitting: true }), tailwindcss(), react()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
