@@ -1,17 +1,22 @@
 import { createFileRoute } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 
-import { ComingSoon } from '@/components/shell/coming-soon';
+import { CraGridScreen } from '@/features/cra/components/cra-grid-screen';
 
 /**
- * `/cra/$period` — the grid, Phase 6's flagship screen (task 6.2, `GET /api/v1/cras/:period/grid`,
- * Phase 5.2). Placeholder only: `$period` is not read here, since there is nothing yet to fetch
- * with it.
+ * `/cra/$period` — the grid, Phase 6's flagship screen (tasks 6.2-6.5, `GET
+ * /api/v1/cras/:period/grid`). `$period` is read straight off the URL and handed to the API
+ * unvalidated at this layer: a malformed value (`PeriodParam`'s regex on the API side) answers a
+ * typed 400, rendered the same way any other refusal is (`CraGridScreen`'s own error branch) — no
+ * second copy of the period-shape check belongs here.
  */
 export const Route = createFileRoute('/_shell/cra/$period')({
-  component: CraGridPlaceholder,
+  component: CraGridRoute,
 });
 
-function CraGridPlaceholder(): ReactElement {
-  return <ComingSoon />;
+function CraGridRoute(): ReactElement {
+  const { period } = Route.useParams();
+  const { persona } = Route.useRouteContext();
+
+  return <CraGridScreen period={period} role={persona.role} />;
 }

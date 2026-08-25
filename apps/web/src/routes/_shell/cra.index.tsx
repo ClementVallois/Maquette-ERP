@@ -1,17 +1,25 @@
 import { createFileRoute } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 
-import { ComingSoon } from '@/components/shell/coming-soon';
+import { CraListScreen } from '@/features/cra/components/cra-list-screen';
+import { LABELS } from '@/lib/labels';
 
 /**
- * `/cra` — the list of months (consultant) or the office's Cra (manager). The real screen is
- * Phase 6 (task 6.1, `GET /api/v1/cras`); this phase gives it a placeholder for both roles that
- * reach it (`config/navigation.ts`'s `cra-mine`/`cra-office` entries).
+ * `/cra` — the list of months (task 6.1, `GET /api/v1/cras`). `_shell`'s `beforeLoad` already
+ * guarantees a persona exists by the time this component renders (`routes/_shell.tsx`), so
+ * `Route.useRouteContext()` here reads the same `persona` the shell put there — no second fetch.
  */
 export const Route = createFileRoute('/_shell/cra/')({
-  component: CraListPlaceholder,
+  component: CraListRoute,
 });
 
-function CraListPlaceholder(): ReactElement {
-  return <ComingSoon />;
+function CraListRoute(): ReactElement {
+  const { persona } = Route.useRouteContext();
+
+  return (
+    <div className="flex flex-col gap-4">
+      <h2 className="sr-only">{LABELS.cra.listHeading}</h2>
+      <CraListScreen role={persona.role} />
+    </div>
+  );
 }

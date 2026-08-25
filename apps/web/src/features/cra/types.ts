@@ -80,6 +80,49 @@ export interface MonthEntriesResponse {
   readonly flags: readonly CraFlag[];
 }
 
+/**
+ * `GET /api/v1/cras/:period/grid` (front-end plan Phase 5.2) — verified against the **route's own
+ * object literal** (`apps/api/src/routes/api.ts`, the `days`/`missions.map`/`return` block at the
+ * end of the handler), not against `composition/cra-grid.ts`'s `CraGridComposition`: the route
+ * remaps the composition before answering, and three differences matter enough to name here rather
+ * than let a reader assume the two are the same shape.
+ *
+ * - `missions[].missionId`, not `.id` — the composition's `GridMission.id` becomes `missionId` on
+ *   the wire.
+ * - `days: GridDay[]` exists on the wire and not on the composition at all: it is the calendar
+ *   skeleton (`gridDaysSkeleton` in `routes/api.ts`), computed at the route from the same
+ *   `workingCalendar()` the domain uses, independently of whether the consultant recorded anything
+ *   that day.
+ * - **No `validatedBy`.** The composition does not carry it and the route does not add it, so a
+ *   `validated` grid's banner cannot name who validated it from this endpoint alone — see
+ *   `docs/open-questions.md`, row dated 25/08/2026, naming the gap rather than guessing a second
+ *   fetch's worth.
+ */
+export interface GridDay {
+  readonly date: string;
+  readonly nonWorkable: NonWorkableReason | null;
+}
+
+export interface GridMission {
+  readonly missionId: string;
+  readonly name: string;
+  readonly clientName: string;
+}
+
+export interface CraGridResponse {
+  readonly period: string;
+  /** `null` until the month has been saved once: there is no record to print yet. */
+  readonly craId: string | null;
+  readonly status: CraStatus | null;
+  readonly days: readonly GridDay[];
+  readonly missions: readonly GridMission[];
+  readonly lines: readonly CraLine[];
+  readonly flags: readonly CraFlag[];
+  readonly refusal: { readonly reason: string } | null;
+  /** The domain's own answer (ADR-0065): never re-derived from `status` in this SPA. */
+  readonly editable: boolean;
+}
+
 export interface DeclinedDay {
   readonly craId: string;
   readonly missionId: string;

@@ -95,6 +95,17 @@ export const LABELS = {
       'Les deux colonnes sont deux demi-journées. Le CRA enregistre « une demi-journée sur A, une demi-journée sur B » : l’ordre matin/après-midi n’est pas conservé, parce qu’il ne change ni la facture ni les totaux.',
     totalsAsOf:
       'Totaux calculés côté serveur, à jour du dernier enregistrement — pas à chaque frappe (ADR-0050).',
+    /**
+     * The SPA's own note, distinct from `totalsAsOf` above: that sentence describes the
+     * server-rendered screen (ADR-0009/ADR-0050), which has no client script and genuinely cannot
+     * recompute between saves. This screen does (task 6.2), so reusing `totalsAsOf` here would have
+     * the UI describe a behaviour it does not have (docs/open-questions.md, row dated 25/08/2026).
+     */
+    totalsLive:
+      'Totaux recalculés à chaque modification ; confirmés par le serveur à l’enregistrement.',
+    recorded: 'Demi-journées saisies',
+    savedToast: 'Enregistré',
+    submittedToast: 'Soumis',
     nothing: '—',
     absence: 'Absence',
     flagged: 'Signalé',
@@ -408,6 +419,10 @@ export const LABELS = {
     close: 'Fermer',
     /** Same, for `BreadcrumbEllipsis`'s collapsed-crumbs control (`components/ui/breadcrumb.tsx`). */
     more: 'Afficher les niveaux masqués',
+    /** A table's trailing action column, `sr-only`-headed: its own row action already carries a
+     * visible verb (`LABELS.cra.show`, …), so the header only needs to be named for a screen reader
+     * walking column headers, not repeated visibly over every row's button. */
+    tableActions: 'Actions',
   },
 
   /**
