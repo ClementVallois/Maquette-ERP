@@ -90,6 +90,9 @@ retouched, so what was decided stays visible next to what replaced it.
 | [0063](./0063-the-spa-ships-in-the-api-deployable.md)                                        | The SPA ships in the API deployable, as build output, same-origin stays forced   | accepted   |
 | [0064](./0064-the-content-security-policy-admits-a-script.md)                                | The Content-Security-Policy admits a script, scoped to `'self'`                  | accepted   |
 | [0065](./0065-composition-root-reads-get-a-directory.md)                                     | Composition-root reads get a directory, and economics stays where it is          | accepted   |
+| [0066](./0066-the-grid-mirrors-the-slot-fill-rule-client-side.md)                            | The grid mirrors the slot-fill rule client-side, and never persists a slot index | accepted   |
+| [0067](./0067-the-grid-write-is-refetch-driven-not-optimistic.md)                            | The grid write is refetch-driven, not optimistic                                 | accepted   |
+| [0068](./0068-the-grid-slot-control-is-a-native-select.md)                                   | The grid's slot control is a native `<select>`, not shadcn's `Select`            | accepted   |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
@@ -203,6 +206,14 @@ and all three supersede rather than add: nothing here identifies a decision the 
 already named, the way 0033 onward did. What Phase 0 forced was writing them down before the code
 that meets each threshold exists, because this repository's ADR discipline runs ahead of the
 diff, not behind it.
+
+0066 to 0068 are the three decisions Phase 6 — the grid, ADR-0062's own named trigger — actually
+forced once it was built rather than reopened. 0066 and 0067 answer the two halves of one
+question the plan named in advance ("comment le grid écrit"): what the two boxes per day mean when
+the wire carries no slot at all, and what happens between clicking Enregistrer and the screen
+believing it. 0068 is the odd one of the three: it is not required by the plan's own stack table,
+which names shadcn/ui without qualification, and it exists because 62 simultaneous instances of
+one Radix primitive is a scale nothing built before this phase had tried.
 
 ## Identified, not yet decided
 
