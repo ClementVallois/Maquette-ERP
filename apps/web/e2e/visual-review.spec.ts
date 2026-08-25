@@ -12,7 +12,8 @@ test('kitchen sink — a panel open, for the rounded-xl/shadow-overlay treatment
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'one capture is enough to show the treatment');
 
-  await page.goto('/');
+  // Phase 4 moved the kitchen sink to `/dev/composants` (see `visual-baseline.spec.ts`'s header).
+  await page.goto('/dev/composants');
   await page.getByRole('button', { name: 'Ouvrir un dialog' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
 

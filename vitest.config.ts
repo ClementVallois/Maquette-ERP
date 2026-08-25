@@ -1,9 +1,39 @@
+import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  // The `@/` alias apps/web/src's own code already uses throughout (`apps/web/vite.config.ts`,
+  // `apps/web/tsconfig.json`'s `paths`, `.dependency-cruiser.cjs`'s `tsConfig`) — Vitest is a
+  // fourth tool that resolves imports on its own, and had never needed to teach itself this alias
+  // because no test, before Phase 4, imported a module that used it. `navigation.ts` and
+  // `session-guard.ts` (Phase 4) are the first: their own `@/lib/...` imports failed to resolve
+  // under the plain `vitest run` this root config drives, with no failure anywhere else — Vite's
+  // dev server and build both already resolve it (they load `apps/web/vite.config.ts`'s own
+  // alias), so the gap was invisible until a unit test reached one of these modules directly.
+  // Scoped to the literal `@` key exactly as `apps/web/vite.config.ts` does: Vite/Vitest's alias
+  // matcher treats a bare key as an exact-or-slash-prefixed match, so `@erp/contracts` (no slash
+  // after `@`) is untouched — confirmed by the existing `@erp/*` workspace imports passing
+  // unchanged after this was added.
+  //
+  // Declared twice: once here at the root (read by anything that loads this file directly, e.g.
+  // `vitest --ui`) and once inside the `unit` project below. `test.projects` entries are each a
+  // near-standalone inline config — verified directly: a root-only `resolve.alias` here left
+  // `@/lib/labels` unresolved inside the `unit` project until the same block was duplicated into
+  // that project's own object, so the per-project copy is load-bearing, not defensive.
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./apps/web/src', import.meta.url)),
+    },
+  },
   test: {
     projects: [
       {
+        resolve: {
+          alias: {
+            '@': fileURLToPath(new URL('./apps/web/src', import.meta.url)),
+          },
+        },
         test: {
           name: 'unit',
           // `apps/**` is in this list and its absence was a gate that had stopped looking: the
