@@ -1,11 +1,18 @@
 import { API_PROBLEM_TYPES } from '@erp/contracts';
-import { periodFromIso } from '@erp/platform';
+import { daysOf, isoDateInFirmTimeZone, periodFromIso } from '@erp/platform';
+import { workingCalendar } from '@erp/timesheet';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { issueInvoice } from '../chain/issue-invoice.ts';
 import { recordMonth } from '../chain/record-month.ts';
 import { validateCraAndDraftInvoices } from '../chain/validate-cra.ts';
+import { craGridComposition } from '../composition/cra-grid.ts';
+import {
+  type Blocking,
+  type CraRow,
+  preFacturierComposition,
+} from '../composition/pre-facturier.ts';
 import type { ServerDependencies } from '../dependencies.ts';
 import { consultantEconomics } from '../economics/consultant-economics.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
@@ -95,6 +102,30 @@ function notFound(
     detail: `This ${what} does not exist, or has never existed.`,
     ...contextOf(request),
   };
+}
+
+/** Every day of the month, workable or not — the calendar half of front-end plan Phase 5.2's grid read. */
+function gridDaysSkeleton(periodIso: string): { date: string; nonWorkable: string | null }[] {
+  const calendar = workingCalendar();
+
+  return daysOf(periodFromIso(periodIso)).map((date) => ({
+    date,
+    nonWorkable: calendar.nonWorkableReason(date),
+  }));
+}
+
+/**
+ * The declared-reason half of a Cra row's `blocking` (ADR-0037): a `notValidated` block already
+ * has its own field on the row (`status`, `late`), so it is not repeated here as a string nobody
+ * would parse back into those two facts — only a validated Cra's typed decline reasons are.
+ */
+function blockingReasonsOf(row: CraRow): string[] {
+  return row.blocking
+    .filter(
+      (item): item is { halfDays: number; why: Extract<Blocking, { kind: 'declined' }> } =>
+        item.why.kind === 'declined',
+    )
+    .map((item) => item.why.reason);
 }
 
 export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDependencies): void {
@@ -225,6 +256,178 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       if (economics === null) return sendProblem(reply, notFound(request, 'economics record'));
 
       return economics;
+    },
+  );
+
+  // ── The pré-facturier, and the Cra grid (front-end plan Phase 5.1 and 5.2) ─
+
+  app.get(
+    '/api/v1/pre-facturier',
+    { config: { access: forRoles('manager', 'billing') } },
+    async (request, reply) => {
+      const query = parseInput(PeriodQuery, request.query);
+      if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
+
+      const actor = requireActor(request);
+      const today = isoDateInFirmTimeZone(dependencies.clock.now());
+
+      // The same composition the pré-facturier screen renders (ADR-0053, ADR-0065): the numbers on
+      // this JSON payload and the numbers on `GET /pre-facturier` come from one function, so they
+      // cannot answer a different question for the same period.
+      const composition = await dependencies.transactionally((unit) =>
+        preFacturierComposition(unit, { actor, requestedPeriod: query.value.period, today }),
+      );
+
+      return {
+        period: composition.period,
+        summary: {
+          billableCents: composition.billable.reduce(
+            (total, row) => total + row.totalExcludingVatCents,
+            0,
+          ),
+          // Half-days, despite the name Annexe A pins for this field — the unit every quantity
+          // on the wire uses, and what `frenchDays` (both copies) takes as its argument. A
+          // consumer that divides by two before formatting prints half the truth.
+          lateDays: composition.lateHalfDays,
+          craCount: composition.cras.length,
+        },
+        invoices: composition.invoices,
+        cras: composition.cras.map((row) => ({
+          craId: row.craId,
+          consultantId: row.consultantId,
+          consultantName: row.consultantName,
+          status: row.status,
+          late: composition.periodClosed && row.status !== 'validated',
+          recordedHalfDays: row.recordedHalfDays,
+          blockingReasons: blockingReasonsOf(row),
+          decidable: composition.mayDecide && row.status === 'submitted',
+        })),
+      };
+    },
+  );
+
+  app.get(
+    '/api/v1/cras/:period/grid',
+    { config: { access: forRoles('consultant') } },
+    async (request, reply) => {
+      const params = parseInput(PeriodParam, request.params);
+      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
+
+      const actor = requireActor(request);
+
+      const grid = await dependencies.transactionally((unit) =>
+        craGridComposition(unit, { actor, period: periodFromIso(params.value.period) }),
+      );
+
+      return {
+        period: params.value.period,
+        craId: grid.craId,
+        status: grid.status,
+        days: gridDaysSkeleton(params.value.period),
+        missions: grid.missions.map((mission) => ({
+          missionId: mission.id,
+          name: mission.name,
+          clientName: mission.clientName,
+        })),
+        lines: grid.lines,
+        flags: grid.flags,
+        refusal: grid.refusal,
+        editable: grid.editable,
+      };
+    },
+  );
+
+  // ── The dashboard (front-end plan Phase 5.3) ───────────────────────────────
+
+  /**
+   * Honest, role-scoped aggregates — every field computed from a repository this file already
+   * calls elsewhere, none invented for this route (front-end plan Phase 5.3's own instruction). The response
+   * carries only the fields of the caller's own role: a manager's payload has no consultant-only
+   * key sitting at `null`, and neither branch can carry `Cjm`, `Tjm` or a margin field, because
+   * neither branch ever reads one.
+   */
+  app.get(
+    '/api/v1/dashboard',
+    { config: { access: forRoles('consultant', 'manager', 'billing') } },
+    async (request, reply) => {
+      const query = parseInput(PeriodQuery, request.query);
+      if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
+
+      const actor = requireActor(request);
+      const period = periodFromIso(query.value.period);
+
+      if (actor.role === 'consultant') {
+        const calendar = workingCalendar();
+        const workableDays = daysOf(period).filter(
+          (day) => calendar.nonWorkableReason(day) === null,
+        );
+
+        const cra = await dependencies.transactionally((unit) =>
+          unit.cras.findByConsultantAndPeriod(actor.consultantId, period, actor),
+        );
+
+        const recordedByDay = new Map<string, number>();
+        for (const line of cra?.lines ?? []) {
+          recordedByDay.set(line.day, (recordedByDay.get(line.day) ?? 0) + line.halfDays);
+        }
+        const HALF_DAYS_PER_FULL_DAY = 2;
+
+        return {
+          period: query.value.period,
+          role: 'consultant' as const,
+          myMonthStatus: cra?.status ?? null,
+          recordedHalfDays: cra?.lines.reduce((total, line) => total + line.halfDays, 0) ?? 0,
+          // A day short of its two half-days still counts as not entered — a day recorded once is
+          // not a day recorded.
+          remainingWorkableDays: workableDays.filter(
+            (day) => (recordedByDay.get(day) ?? 0) < HALF_DAYS_PER_FULL_DAY,
+          ).length,
+        };
+      }
+
+      if (actor.role === 'manager') {
+        const today = isoDateInFirmTimeZone(dependencies.clock.now());
+        // The same composition `GET /api/v1/pre-facturier` answers from (ADR-0053, ADR-0065): the
+        // dashboard's three manager figures are read off it rather than recomputed, so they cannot
+        // disagree with the screen that already shows them in full. That also means this branch
+        // inherits ADR-0053's own fifty-row cap on the office's Cras for the period — its
+        // reconsideration threshold ("reopen when the office page exceeds the cap") is the one that
+        // governs here too, not a second one for the dashboard.
+        const composition = await dependencies.transactionally((unit) =>
+          preFacturierComposition(unit, { actor, requestedPeriod: query.value.period, today }),
+        );
+
+        return {
+          period: query.value.period,
+          role: 'manager' as const,
+          pendingDecisions: composition.cras.filter((row) => row.status === 'submitted').length,
+          billableCents: composition.billable.reduce(
+            (total, row) => total + row.totalExcludingVatCents,
+            0,
+          ),
+          lateCras: composition.cras.filter(
+            (row) => composition.periodClosed && row.status !== 'validated',
+          ).length,
+        };
+      }
+
+      // One page of the office's invoices for the month, not a `COUNT(*)`: the three figures
+      // below are bounded by `MAX_PAGE_SIZE`, the cap every list read in this file shares. The
+      // seed reaches three invoices in a month; an office that reached fifty-one would read the
+      // fifty-first as absent, and the fix then is a counting query, not a larger page.
+      const invoices = await dependencies.transactionally((unit) =>
+        unit.invoices.list({ actor, limit: MAX_PAGE_SIZE, offset: 0, period: query.value.period }),
+      );
+
+      return {
+        period: query.value.period,
+        role: 'billing' as const,
+        draftInvoices: invoices.filter((invoice) => invoice.status === 'draft').length,
+        issuedInvoices: invoices.filter((invoice) => invoice.status === 'issued').length,
+        totalTtcIssuedCents: invoices
+          .filter((invoice) => invoice.status === 'issued')
+          .reduce((total, invoice) => total + (invoice.totalTtcCents ?? 0), 0),
+      };
     },
   );
 
