@@ -99,7 +99,7 @@ export const LABELS = {
      * The SPA's own note, distinct from `totalsAsOf` above: that sentence describes the
      * server-rendered screen (ADR-0009/ADR-0050), which has no client script and genuinely cannot
      * recompute between saves. This screen does (task 6.2), so reusing `totalsAsOf` here would have
-     * the UI describe a behaviour it does not have (docs/open-questions.md, row dated 25/08/2026).
+     * the UI describe a behaviour it does not have — a new key, not a shared one, is the fix.
      */
     totalsLive:
       'Totaux recalculés à chaque modification ; confirmés par le serveur à l’enregistrement.',
