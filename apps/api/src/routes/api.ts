@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { issueInvoice } from '../chain/issue-invoice.ts';
 import { recordMonth } from '../chain/record-month.ts';
 import { validateCraAndDraftInvoices } from '../chain/validate-cra.ts';
-import { craGridComposition } from '../composition/cra-grid.ts';
+import { type CraGridComposition, craGridComposition } from '../composition/cra-grid.ts';
 import {
   type Blocking,
   type CraRow,
@@ -15,7 +15,9 @@ import {
 } from '../composition/pre-facturier.ts';
 import type { ServerDependencies } from '../dependencies.ts';
 import { consultantEconomics } from '../economics/consultant-economics.ts';
+import { ApiFailure } from '../errors.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
+import { PgReferenceReader } from '../persistence/reference-reader.ts';
 import { forRoles, requireActor } from '../personas/access.ts';
 import { malformed, parseInput } from '../validation.ts';
 
@@ -86,6 +88,10 @@ const MonthEntries = z.object({
 });
 
 const PeriodParam = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u) });
+const ConsultantPeriodParams = z.object({
+  consultantId: z.string().min(1).max(64),
+  period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u),
+});
 
 const IDEMPOTENCY_KEY_HEADER = 'idempotency-key';
 const IdempotencyKey = z.string().min(8).max(200);
@@ -119,6 +125,50 @@ function gridDaysSkeleton(periodIso: string): { date: string; nonWorkable: strin
 }
 
 /**
+ * The wire shape both grid routes answer (ADR-0071) — `consultantId`/`consultantName` are added on
+ * top of this by the manager route only, since the consultant route's caller already knows who
+ * they are and Annexe A never named those two fields on the existing endpoint.
+ */
+function gridResponseOf(
+  period: string,
+  grid: CraGridComposition,
+): {
+  period: string;
+  craId: string | null;
+  status: CraGridComposition['status'];
+  days: { date: string; nonWorkable: string | null }[];
+  missions: {
+    missionId: string;
+    name: string;
+    clientName: string;
+    assignableDays: readonly string[];
+  }[];
+  lines: CraGridComposition['lines'];
+  flags: CraGridComposition['flags'];
+  refusal: CraGridComposition['refusal'];
+  editable: boolean;
+  validatedBy: string | null;
+} {
+  return {
+    period,
+    craId: grid.craId,
+    status: grid.status,
+    days: gridDaysSkeleton(period),
+    missions: grid.missions.map((mission) => ({
+      missionId: mission.id,
+      name: mission.name,
+      clientName: mission.clientName,
+      assignableDays: mission.assignableDays,
+    })),
+    lines: grid.lines,
+    flags: grid.flags,
+    refusal: grid.refusal,
+    editable: grid.editable,
+    validatedBy: grid.validatedBy,
+  };
+}
+
+/**
  * The declared-reason half of a Cra row's `blocking` (ADR-0037): a `notValidated` block already
  * has its own field on the row (`status`, `late`), so it is not repeated here as a string nobody
  * would parse back into those two facts — only a validated Cra's typed decline reasons are.
@@ -135,6 +185,19 @@ function blockingReasonsOf(row: CraRow): string[] {
 export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDependencies): void {
   // ── Reads ─────────────────────────────────────────────────────────────────
 
+  /**
+   * The working calendar's own coverage (ADR-0004: a written table, 2026 only today). Not a Cra
+   * read at all — it exists so `/cra`'s month picker can offer exactly the months
+   * `workingCalendar()` can answer about, instead of a hard-coded upper bound the calendar itself
+   * would silently outgrow. Every connected role may ask; the answer carries nothing scoped to an
+   * office or a consultant.
+   */
+  app.get(
+    '/api/v1/calendar',
+    { config: { access: forRoles('consultant', 'manager', 'billing') } },
+    () => ({ years: workingCalendar().years }),
+  );
+
   app.get(
     '/api/v1/cras',
     { config: { access: forRoles('consultant', 'manager', 'billing') } },
@@ -146,9 +209,25 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
 
       // Filtered, not refused: a consultant sees their own months, a manager the office's. The
       // empty state is ADR-0003's first beat and it is what this route can answer.
-      return dependencies.transactionally(async (unit) => ({
-        cras: await unit.cras.list({ actor, limit: query.value.limit, offset: query.value.offset }),
-      }));
+      return dependencies.transactionally(async (unit) => {
+        const cras = await unit.cras.list({
+          actor,
+          limit: query.value.limit,
+          offset: query.value.offset,
+        });
+
+        // `consultantName`, presentation rather than a rule — the same source and the same
+        // justification `preFacturierComposition` already uses (ADR-0071): a manager's row needs a
+        // name to pick a consultant by, and a consultant's own rows just get their own name back.
+        const consultantNames = await new PgReferenceReader(unit.client).consultantNames();
+
+        return {
+          cras: cras.map((cra) => ({
+            ...cra,
+            consultantName: consultantNames.get(cra.consultantId) ?? cra.consultantId,
+          })),
+        };
+      });
     },
   );
 
@@ -320,25 +399,51 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       const actor = requireActor(request);
 
       const grid = await dependencies.transactionally((unit) =>
-        craGridComposition(unit, { actor, period: periodFromIso(params.value.period) }),
+        craGridComposition(unit, {
+          actor,
+          period: periodFromIso(params.value.period),
+          consultantId: actor.consultantId,
+        }),
       );
+      // A persona is always its own row in `public.consultants` — this route never asks about
+      // anyone else, so `null` (no such consultant) cannot happen here. Guarded rather than
+      // asserted with `!`, so a broken fixture fails loudly instead of reading `undefined`.
+      if (grid === null) {
+        throw new ApiFailure(`persona ${actor.consultantId} has no consultant record`);
+      }
+
+      return gridResponseOf(params.value.period, grid);
+    },
+  );
+
+  /**
+   * ADR-0071: a manager reads a **named** consultant's grid, read-only. Same composition as the
+   * route above, the same 404-vs-403 split as every other single-record read in this file
+   * (ADR-0003) — a `consultantId` matching nobody is a 404, one matching a consultant of another
+   * office is a 403 `out-of-scope`, raised by `assertMayRead` inside `craGridComposition` itself.
+   */
+  app.get(
+    '/api/v1/consultants/:consultantId/cras/:period/grid',
+    { config: { access: forRoles('manager') } },
+    async (request, reply) => {
+      const params = parseInput(ConsultantPeriodParams, request.params);
+      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
+
+      const actor = requireActor(request);
+
+      const grid = await dependencies.transactionally((unit) =>
+        craGridComposition(unit, {
+          actor,
+          period: periodFromIso(params.value.period),
+          consultantId: params.value.consultantId,
+        }),
+      );
+      if (grid === null) return sendProblem(reply, notFound(request, 'consultant'));
 
       return {
-        period: params.value.period,
-        craId: grid.craId,
-        status: grid.status,
-        days: gridDaysSkeleton(params.value.period),
-        missions: grid.missions.map((mission) => ({
-          missionId: mission.id,
-          name: mission.name,
-          clientName: mission.clientName,
-          assignableDays: mission.assignableDays,
-        })),
-        lines: grid.lines,
-        flags: grid.flags,
-        refusal: grid.refusal,
-        editable: grid.editable,
-        validatedBy: grid.validatedBy,
+        ...gridResponseOf(params.value.period, grid),
+        consultantId: grid.consultantId,
+        consultantName: grid.consultantName,
       };
     },
   );

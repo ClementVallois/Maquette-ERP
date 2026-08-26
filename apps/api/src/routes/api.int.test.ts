@@ -224,6 +224,47 @@ afterEach(async () => {
   await app.close();
 });
 
+describe('GET /api/v1/calendar', () => {
+  it("answers the working calendar's own coverage", async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/calendar',
+      headers: as('consultant-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    // ADR-0004: a written table, 2026 only, today — asserted as "contains 2026" rather than
+    // "equals [2026]" so this test does not itself need editing the day a second year is added.
+    expect(response.json<{ years: number[] }>().years).toContain(2026);
+  });
+
+  it('refuses a request with no persona at all', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/v1/calendar' });
+
+    expect(response.statusCode).toBe(401);
+  });
+});
+
+describe('GET /api/v1/cras — consultantName (ADR-0071)', () => {
+  it("names each row's consultant, for a manager's office-wide list", async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras',
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    const { cras } = response.json<{ cras: { consultantId: string; consultantName: string }[] }>();
+
+    expect(cras).toContainEqual(
+      expect.objectContaining({ consultantId: ALICE, consultantName: 'Alice Martin' }),
+    );
+    expect(cras).toContainEqual(
+      expect.objectContaining({ consultantId: CHLOE, consultantName: 'Chloé Dubois' }),
+    );
+  });
+});
+
 describe('ADR-0003, both beats', () => {
   it('beat one: the out-of-scope Cra is absent from the list, and nothing says why', async () => {
     const response = await app.inject({

@@ -16,6 +16,7 @@ import {
 } from '../composition/pre-facturier.ts';
 import type { ServerDependencies } from '../dependencies.ts';
 import { consultantEconomics } from '../economics/consultant-economics.ts';
+import { ApiFailure } from '../errors.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
 import { PgReferenceReader } from '../persistence/reference-reader.ts';
 import { carries, forRoles, PUBLIC, requireActor } from '../personas/access.ts';
@@ -288,7 +289,17 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
       const period = periodFromIso(params.value.period);
 
       const view = await dependencies.transactionally(async (unit) => {
-        const grid = await craGridComposition(unit, { actor, period });
+        const grid = await craGridComposition(unit, {
+          actor,
+          period,
+          consultantId: actor.consultantId,
+        });
+        // A persona is always its own row in `public.consultants` (see the same guard on the
+        // `apps/v1` route this composition also serves) — this SSR screen never asks about anyone
+        // else either.
+        if (grid === null) {
+          throw new ApiFailure(`persona ${actor.consultantId} has no consultant record`);
+        }
 
         return {
           period: params.value.period,

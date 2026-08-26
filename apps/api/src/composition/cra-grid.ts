@@ -1,17 +1,23 @@
-import { type Actor, daysOf, type Period } from '@erp/platform';
+import { type Actor, assertMayRead, daysOf, type Period } from '@erp/platform';
 import type { CraLine, CraStatus, NonWorkableDay } from '@erp/timesheet';
 
 import { PgReferenceReader } from '../persistence/reference-reader.ts';
 import type { UnitOfWork } from '../persistence/unit-of-work.ts';
 
 /**
- * What `web/pages/cra-grid.ts` and `GET /api/v1/cras/:period/grid` (front-end plan Phase 5.2) both need: the
- * consultant's month, the missions they are staffed on inside it, and the Cra that already exists
- * for it — if one does.
+ * What `web/pages/cra-grid.ts`, `GET /api/v1/cras/:period/grid` (front-end plan Phase 5.2) and
+ * `GET /api/v1/consultants/:consultantId/cras/:period/grid` (ADR-0071) all need: one consultant's
+ * month, the missions they are staffed on inside it, and the Cra that already exists for it — if
+ * one does.
  *
  * Extracted per ADR-0065. The screen still turns `lines` into a two-slot-per-day form
  * (`gridDays` in `web/pages/cra-grid.ts` — a fact about the HTML form, not about the month, so it
  * stays there); the API route exposes `lines` as recorded, which is what front-end plan Phase 5.2 asks for.
+ *
+ * ADR-0071 generalised this from "the caller's own month" to "a named consultant's month, if the
+ * caller's role and office reach that far" — the consultant route passes `actor.consultantId`, the
+ * manager route passes a path parameter, and this function no longer assumes the two are the same
+ * person.
  */
 
 export interface GridMission {
@@ -29,6 +35,8 @@ export interface GridMission {
 }
 
 export interface CraGridComposition {
+  readonly consultantId: string;
+  readonly consultantName: string;
   /** `null` until the month has been saved once: there is no record to print yet. */
   readonly craId: string | null;
   readonly status: CraStatus | null;
@@ -40,6 +48,11 @@ export interface CraGridComposition {
    * one that says so (ADR-0005). Both callers read this fact rather than owning a second copy of
    * it — deriving it again from `status` in the SPA would be the duplication ADR-0065 exists to
    * name before it happens a second time.
+   *
+   * This is "could the **consultant** edit this", never "may the caller edit this" — a manager
+   * reading someone else's month through ADR-0071's route ignores this field entirely and renders
+   * read-only regardless of its value, because a manager never edits a consultant's CRA
+   * (BUILD-RULES: separation of duties).
    */
   readonly editable: boolean;
   readonly missions: readonly GridMission[];
@@ -55,15 +68,45 @@ export interface CraGridComposition {
 export interface CraGridInput {
   readonly actor: Actor;
   readonly period: Period;
+  /**
+   * The consultant whose month this reads — **not necessarily the actor** (ADR-0071). The
+   * consultant route passes `actor.consultantId`; the manager route passes a path parameter, and
+   * the scope check below is what a manager asking about the wrong office fails on.
+   */
+  readonly consultantId: string;
 }
 
+interface ConsultantRow {
+  office_id: string;
+  first_name: string;
+  last_name: string;
+}
+
+/**
+ * `null` means no such consultant exists — a 404, distinct from `OutOfScopeError`'s 403
+ * (ADR-0003's "does not exist" vs. "exists, not yours", extended to the subject and not only the
+ * record).
+ */
 export async function craGridComposition(
   unit: UnitOfWork,
   input: CraGridInput,
-): Promise<CraGridComposition> {
-  const { actor, period } = input;
+): Promise<CraGridComposition | null> {
+  const { actor, period, consultantId } = input;
 
-  const cra = await unit.cras.findByConsultantAndPeriod(actor.consultantId, period, actor);
+  const { rows } = await unit.client.query<ConsultantRow>(
+    `SELECT office_id, first_name, last_name FROM public.consultants WHERE id = $1`,
+    [consultantId],
+  );
+  const consultant = rows[0];
+  if (consultant === undefined) return null;
+
+  // Before any line, mission or client name is read. ADR-0071: this has to run whether or not a
+  // Cra row exists for the month, which is why it is here and not left to
+  // `findByConsultantAndPeriod`'s own check (that one only fires once a row is found — exactly the
+  // gap a manager asking about a not-yet-started month would otherwise fall through).
+  assertMayRead(actor, 'cra', { officeId: consultant.office_id, subjectId: consultantId });
+
+  const cra = await unit.cras.findByConsultantAndPeriod(consultantId, period, actor);
 
   // Only the missions this consultant is staffed on during the month reach either caller. Not a
   // security control — the submission check is (ADR-0051) — but a form, or a dropdown, that offers
@@ -81,12 +124,14 @@ export async function craGridComposition(
       name,
       clientName: clientNames.get(id) ?? id,
       assignableDays: periodDays.filter((day) =>
-        timesheetReference.isAssigned(actor.consultantId, id, day),
+        timesheetReference.isAssigned(consultantId, id, day),
       ),
     }))
     .filter((mission) => mission.assignableDays.length > 0);
 
   return {
+    consultantId,
+    consultantName: `${consultant.first_name} ${consultant.last_name}`,
     craId: cra?.id ?? null,
     status: cra?.status ?? null,
     lines: cra?.lines ?? [],
