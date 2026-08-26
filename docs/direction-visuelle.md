@@ -180,18 +180,49 @@ Four colours for four reasons would imply a severity ordering the domain does no
 for all four would hide the only distinction that matters to the person reading the dialog: three
 of them are somebody's next task, and one is simply how the firm sells.
 
-### 4.4 Day flags in the grid (`flags[].reason`)
+### 4.4 The matrix (ADR-0070) — day flags, missions, absence
 
-Not badges — a day is a **row**, and the flag tints the row. Rendered, never blocking: the server
-flags a Saturday, it does not forbid it (Phase 6.2).
+Written here in Phase 6, the phase the plan itself named as the one that decides this table's
+content (front-end plan §6.2: "les valeurs exactes vont dans direction-visuelle.md §4.4"). ADR-0070
+transposed the grid — missions on rows, days on columns — so a day is now a **column**, not a row;
+the description below supersedes the row-tint reading this section held before the matrix existed.
 
-| Flag            | Label (verbatim) | Row tint  | Marker                                       |
-| --------------- | ---------------- | --------- | -------------------------------------------- |
-| `weekend`       | « Week-end »     | `#f4f6f8` | Day number in `--muted-foreground`           |
-| `publicHoliday` | « Férié »        | `#fdf9ef` | Same, plus the label in `#7a5a10` at 11.5 px |
+**Day flags** (`days[].nonWorkable`). Not badges — the flag tints the **column**, header included.
+Rendered, never blocking: the server flags a Saturday, it does not forbid it.
 
-A day the consultant has filled in stays fully legible on both tints — the fill is the record, the
+| Flag            | Label (verbatim) | Column tint | Marker                                       |
+| --------------- | ---------------- | ----------- | -------------------------------------------- |
+| `weekend`       | « Week-end »     | `#f4f6f8`   | Day number in `--muted-foreground`           |
+| `publicHoliday` | « Férié »        | `#fdf9ef`   | Same, plus the label in `#7a5a10` at 11.5 px |
+
+A cell the consultant has filled in stays fully legible on both tints — the fill is the record, the
 tint is context.
+
+**Missions** (one row each, per ADR-0070). "Une teinte par ligne, stable dans le mois" — a pastille
+in the row header plus a very light cell background, cycling through six hues by the row's position
+among the grid's currently visible rows (`features/cra/mission-tone.ts`). Six, not five and not
+eight: deliberately outside the status tones (§4.1-4.3) — a mission sharing a hue with `validated`
+or `late` on the same screen would read as a status — and bounded by ADR-0070's own reconsideration
+threshold (a seventh simultaneous mission is a staffing problem the row list itself would need
+redesigning for, not a seventh hue).
+
+| Tone | Fill      | Dot       |
+| ---- | --------- | --------- |
+| 1    | `#eef2fc` | `#4c5fb0` |
+| 2    | `#e9f6f3` | `#2f8f7f` |
+| 3    | `#fbf0f7` | `#a1428a` |
+| 4    | `#fdf3ec` | `#c2634a` |
+| 5    | `#eef7fb` | `#1f7a99` |
+| 6    | `#f3f6e9` | `#71852b` |
+
+**Absence** (the fixed row ADR-0070 adds unconditionally, never a value from `missions[]`). "Une
+teinte propre, réservée, jamais celle d'une mission" — one dedicated hue, a muted violet chosen
+precisely because none of the six mission tones or four status tones lean that way: text `#55447c`,
+fill `#f2eff8`, dot `#6b5b95`.
+
+**Not assignable this day** (`missions[].assignableDays` excludes the column, on a mission row).
+Inert, `aria-disabled`, `bg-muted` at reduced opacity, no dot — a cell that offers nothing reads as
+absent-of-interaction rather than as a sixth colour family.
 
 ### 4.5 Roles
 

@@ -144,6 +144,33 @@
   --flag-holiday-bg: #fdf9ef;
   --flag-holiday-text: var(--tone-amber-text);
 
+  /*
+   * Phase 6.2's matrix (ADR-0070): "une teinte par ligne, stable dans le mois" for a mission, and
+   * "une teinte propre, réservée, jamais celle d'une mission" for the Absence row — two families
+   * this note's §4.4 did not yet hold anything for (`docs/open-questions.md`'s Phase 5bis
+   * checkpoint named exactly this as the one line item still to write). Deliberately outside the
+   * five status tones above: a mission pastille sharing a hue with `validated`/`refused`/`late`
+   * would read as a status on a screen that already has four real ones. Six mission hues cycle by
+   * row index (`missionTone` in `features/cra/mission-tone.ts`) — six because a seventh staffed
+   * mission in one month is ADR-0070's own reconsideration threshold ("roughly eight" active
+   * missions), past which the row list itself needs redesigning, not a seventh hue.
+   */
+  --mission-tone-1-fill: #eef2fc;
+  --mission-tone-1-dot: #4c5fb0;
+  --mission-tone-2-fill: #e9f6f3;
+  --mission-tone-2-dot: #2f8f7f;
+  --mission-tone-3-fill: #fbf0f7;
+  --mission-tone-3-dot: #a1428a;
+  --mission-tone-4-fill: #fdf3ec;
+  --mission-tone-4-dot: #c2634a;
+  --mission-tone-5-fill: #eef7fb;
+  --mission-tone-5-dot: #1f7a99;
+  --mission-tone-6-fill: #f3f6e9;
+  --mission-tone-6-dot: #71852b;
+  --absence-fill: #f2eff8;
+  --absence-dot: #6b5b95;
+  --absence-text: #55447c;
+
   /* §4.5 Roles: the selector's role badge takes the primary tint (`--primary` on `--accent`,
      already declared above). Everywhere else roles are neutral-outlined using existing tokens
      (`--muted-foreground`, transparent fill, `--border`) — no new hex needed for that reading. */
@@ -238,6 +265,22 @@
   --color-flag-weekend-text: var(--flag-weekend-text);
   --color-flag-holiday-bg: var(--flag-holiday-bg);
   --color-flag-holiday-text: var(--flag-holiday-text);
+
+  --color-mission-tone-1-fill: var(--mission-tone-1-fill);
+  --color-mission-tone-1-dot: var(--mission-tone-1-dot);
+  --color-mission-tone-2-fill: var(--mission-tone-2-fill);
+  --color-mission-tone-2-dot: var(--mission-tone-2-dot);
+  --color-mission-tone-3-fill: var(--mission-tone-3-fill);
+  --color-mission-tone-3-dot: var(--mission-tone-3-dot);
+  --color-mission-tone-4-fill: var(--mission-tone-4-fill);
+  --color-mission-tone-4-dot: var(--mission-tone-4-dot);
+  --color-mission-tone-5-fill: var(--mission-tone-5-fill);
+  --color-mission-tone-5-dot: var(--mission-tone-5-dot);
+  --color-mission-tone-6-fill: var(--mission-tone-6-fill);
+  --color-mission-tone-6-dot: var(--mission-tone-6-dot);
+  --color-absence-fill: var(--absence-fill);
+  --color-absence-dot: var(--absence-dot);
+  --color-absence-text: var(--absence-text);
 
   /* Literal, not `var(--shadow-card)`: the raw value lives here and only here — a `:root`
      re-declaration under the same name would self-reference once Tailwind merges the two blocks,

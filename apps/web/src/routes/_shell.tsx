@@ -6,7 +6,25 @@ import { Sidebar } from '@/components/shell/sidebar';
 import { Topbar } from '@/components/shell/topbar';
 import { navEntryForPath, navigationForRole } from '@/config/navigation';
 import { sessionQueryOptions } from '@/features/session/hooks';
+import { frenchMonth } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
+
+/**
+ * Defect D2 (Phase 6 revue du 25/08): "le titre et le fil d'Ariane nomment le mois — sur l'écran
+ * livré le 25/08, rien n'indiquait quel mois était ouvert." `navEntryForPath`'s label is the same
+ * static string for every period (`/cra/$period` and `/cra/$period/$consultantId` both fall under
+ * the one `cra-*` nav entry), so the fix reads the period straight off the URL here rather than
+ * inventing a route-to-shell context channel for one string. `/cra/$period` is the only route this
+ * matters for — Annexe C.3's own routing table names no other screen with a period in its path.
+ */
+const CRA_PERIOD_IN_PATH = /^\/cra\/(\d{4}-\d{2})(?:\/|$)/u;
+
+function titleFor(entryLabel: string, pathname: string): string {
+  const match = CRA_PERIOD_IN_PATH.exec(pathname);
+  if (match?.[1] === undefined) return entryLabel;
+
+  return `${entryLabel} — ${frenchMonth(match[1])}`;
+}
 
 /** A UI preference (direction-visuelle.md §6: "collapse state is a UI preference, not session
  * state") — `localStorage`, never sent to the API, never part of `useSession`'s cache. */
@@ -72,7 +90,7 @@ function ShellLayout(): ReactElement {
 
   const entries = navigationForRole(persona.role);
   const activeEntry = navEntryForPath(entries, pathname);
-  const title = activeEntry?.label ?? LABELS.appName;
+  const title = titleFor(activeEntry?.label ?? LABELS.appName, pathname);
   const showBreadcrumb = activeEntry?.path !== '/tableau-de-bord';
 
   const toggleCollapsed = (): void => {
