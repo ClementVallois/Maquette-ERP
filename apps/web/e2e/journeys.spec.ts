@@ -198,6 +198,20 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
       fullPage: false,
     });
 
+    // Defect 2 (Phase 6 revue): arrow keys move focus, never a value — a closed native <select>
+    // otherwise cycles its own option on every arrow key (Left/Right no less than Up/Down),
+    // changing the cell being left, or the one about to be entered. Both cells are still blank
+    // here, so a value changing either way would show up as `'1'` (a full day), not `'0'`.
+    const tuesday = cell(page, DORA, '04/08/2026');
+    await page.keyboard.press('ArrowRight');
+    await expect(tuesday).toBeFocused();
+    await expect(monday).toHaveValue('0');
+    await expect(tuesday).toHaveValue('0');
+    await page.keyboard.press('ArrowLeft');
+    await expect(monday).toBeFocused();
+    await expect(monday).toHaveValue('0');
+    await expect(tuesday).toHaveValue('0');
+
     // A quarter-day, and the day total reflects it immediately (task 6.2's own contract) — read
     // off the row's own month total, which sums the same local state the cell just changed.
     // `frenchDays(1)` (`lib/format.ts`), not the cell's own `¼` glyph — the two are different

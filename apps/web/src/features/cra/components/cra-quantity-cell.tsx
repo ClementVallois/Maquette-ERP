@@ -30,6 +30,9 @@ function quantityOptionLabel(quantity: CellQuantity): string {
 
 const QUANTITIES: readonly CellQuantity[] = [0, 1, 2, 3, 4];
 
+/** The keys that enter a quantity directly — one digit per option, `0` clearing the cell. */
+const DIGIT_KEYS: ReadonlySet<string> = new Set(['0', '1', '2', '3', '4']);
+
 function parseQuantity(raw: string): CellQuantity {
   const parsed = Number.parseInt(raw, 10);
 
@@ -110,10 +113,14 @@ export function CraQuantityCell({
         onChange(parseQuantity(event.target.value));
       }}
       onKeyDown={(event) => {
-        // Same reasoning as the two-slot control it replaces (ADR-0068): a closed, focused
-        // native <select> cycles its own options on ArrowUp/ArrowDown, which would fight the
-        // matrix's own two-axis keyboard contract (task 6.4) — suppressed here so the grid can
-        // own both arrow axes. ArrowLeft/ArrowRight carry no such native behaviour.
+        // A modifier means the key belongs to the browser or the OS, never to the grid: Ctrl/Cmd+0
+        // is the zoom reset, Alt+ArrowDown opens the native dropdown. Handling those below would
+        // both swallow them and, for Ctrl+0, write a 0 into the focused cell.
+        if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+        // Same reasoning as the two-slot control it replaces (ADR-0068): a closed, focused native
+        // <select> moves to the adjacent option on all four arrow keys — Left/Right no less than
+        // Up/Down, which is what made navigating the matrix change the values it walked past.
         if (event.key === 'ArrowUp') {
           event.preventDefault();
           onNavigate('up');
@@ -121,8 +128,10 @@ export function CraQuantityCell({
           event.preventDefault();
           onNavigate('down');
         } else if (event.key === 'ArrowLeft') {
+          event.preventDefault();
           onNavigate('left');
         } else if (event.key === 'ArrowRight') {
+          event.preventDefault();
           onNavigate('right');
         } else if (event.key === 'Home') {
           event.preventDefault();
@@ -130,6 +139,13 @@ export function CraQuantityCell({
         } else if (event.key === 'End') {
           event.preventDefault();
           onNavigate('end');
+        } else if (DIGIT_KEYS.has(event.key)) {
+          // With all four arrow keys claimed by navigation, a digit is what enters a value from the
+          // keyboard alone. Left to the <select>, a digit would run the browser's own type-ahead,
+          // which matches an <option>'s *visible glyph* rather than its `value` — "1" would land on
+          // the full day (glyph "1"), not the quarter (glyph "¼").
+          event.preventDefault();
+          onChange(parseQuantity(event.key));
         }
       }}
       className="h-8 w-full appearance-none rounded-lg border border-input bg-background text-center text-sm text-foreground tabular-nums focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
