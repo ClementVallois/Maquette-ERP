@@ -4,7 +4,6 @@ import {
   LayoutDashboardIcon,
   type LucideIcon,
   ReceiptTextIcon,
-  TrendingUpIcon,
 } from 'lucide-react';
 
 import type { Role } from '@/features/session/types';
@@ -46,13 +45,17 @@ const ALL_ROLES: readonly Role[] = ['consultant', 'manager', 'billing'];
  * function of the viewer's role, which is what "the Sidebar reads this array exclusively" means in
  * practice.
  *
- * `marge` points at `/marge`, a route `docs/frontend-plan.md` §3 does not pin (only
- * `/marge/$consultantId` is pinned) — task 4.3 needs a landing target for the nav entry and the
- * plan does not name one. Added here as a placeholder index route; recorded as a checkpoint point
- * (`docs/open-questions.md`) rather than silently extending §3's list. Whether this entry survives
- * Phase 7 at all is a second, separate open question: §7.5 reaches the margin screen only by
- * explicit navigation from a pré-facturier row, never from the sidebar, so a persistent "Marge"
- * nav item may not be the shape Phase 7 wants either.
+ * No `marge` entry: Phase 4 added one pointing at `/marge`, a route §3 never pinned (only
+ * `/marge/$consultantId` is), as a landing target task 4.3 needed and the plan did not name.
+ * `docs/open-questions.md` (row dated 24/08/2026) recorded both questions that placeholder raised
+ * and named this phase to decide them with a real margin screen in front of it. Decided in Phase 7,
+ * task 7.5: §7.5 reaches the margin screen only by an explicit click on a pré-facturier row — "jamais
+ * un survol" — because every read is a logged disclosure (ADR-0052), and a standing sidebar entry
+ * is the opposite of that: it invites exactly the idle browsing the click-through exists to
+ * prevent, for a consultant chosen from a list this route does not have. The nav entry and its
+ * `/marge` index route are removed; `/marge/$consultantId` (the pinned route) keeps working, its
+ * page title resolved directly from the URL by `routes/_shell.tsx`'s `titleFor` (same mechanism
+ * `/cra/$period` already uses for a title no static nav entry could carry).
  */
 export const NAVIGATION: readonly NavEntry[] = [
   {
@@ -89,13 +92,6 @@ export const NAVIGATION: readonly NavEntry[] = [
     icon: FileTextIcon,
     path: '/factures',
     roles: MANAGER_AND_BILLING,
-  },
-  {
-    id: 'marge',
-    label: LABELS.margin.heading,
-    icon: TrendingUpIcon,
-    path: '/marge',
-    roles: MANAGER,
   },
 ] as const;
 

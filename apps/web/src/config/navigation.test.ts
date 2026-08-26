@@ -19,7 +19,7 @@ describe('navigationForRole', () => {
     expect(labels).toStrictEqual([LABELS.dashboard.heading, LABELS.cra.nav]);
   });
 
-  it('shows exactly the manager entries: Tableau de bord, Pré-facturier, CRA, Factures, Marge', () => {
+  it('shows exactly the manager entries: Tableau de bord, Pré-facturier, CRA, Factures', () => {
     const labels = navigationForRole('manager').map((entry) => entry.label);
 
     expect(labels).toStrictEqual([
@@ -27,7 +27,6 @@ describe('navigationForRole', () => {
       LABELS.preFacturier.nav,
       LABELS.cra.navManager,
       LABELS.invoice.nav,
-      LABELS.margin.heading,
     ]);
   });
 
@@ -48,8 +47,9 @@ describe('navigationForRole', () => {
     );
   });
 
-  it('never shows Marge to consultant or billing — Cjm/Tjm/margin stay manager-only', () => {
+  it('never shows a standing Marge entry to any role — reached only by a click from the pré-facturier (Phase 7, task 7.5)', () => {
     expect(navigationForRole('consultant').map((entry) => entry.id)).not.toContain('marge');
+    expect(navigationForRole('manager').map((entry) => entry.id)).not.toContain('marge');
     expect(navigationForRole('billing').map((entry) => entry.id)).not.toContain('marge');
   });
 });

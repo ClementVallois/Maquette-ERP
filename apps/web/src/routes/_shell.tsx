@@ -19,7 +19,17 @@ import { LABELS } from '@/lib/labels';
  */
 const CRA_PERIOD_IN_PATH = /^\/cra\/(\d{4}-\d{2})(?:\/|$)/u;
 
+/**
+ * `/marge/$consultantId` (Phase 7, task 7.5) has no nav entry at all — `config/navigation.ts`'s
+ * own comment explains why (a click-through the sidebar must not offer) — so `activeEntry` below
+ * is `undefined` for it and `entryLabel` falls back to `LABELS.appName`, which would show "CRA →
+ * Facture" as the page title for a screen that is very much not that.
+ */
+const MARGE_PATH_PREFIX = '/marge/';
+
 function titleFor(entryLabel: string, pathname: string): string {
+  if (pathname.startsWith(MARGE_PATH_PREFIX)) return LABELS.margin.heading;
+
   const match = CRA_PERIOD_IN_PATH.exec(pathname);
   if (match?.[1] === undefined) return entryLabel;
 
