@@ -68,6 +68,21 @@ describe('a Cra', () => {
     expect(cra.quarterDaysOn('2026-03-02')).toBe(4);
   });
 
+  it('carries four quarter-days of one day as four lines', () => {
+    // The bound on a day is a sum over its lines, not a count of them: four separate quarters
+    // fill a day exactly, and none of the four is the one that overflows it (ADR-0069). A `2 + 2`
+    // split passes even where the rule is written as "at most two lines", which is what this case
+    // is here to tell apart.
+    const cra = emptyCra();
+
+    for (const mission of ['mission-a', 'mission-b', 'mission-c', 'mission-d']) {
+      cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: mission, quarterDays: 1 });
+    }
+
+    expect(cra.lines).toHaveLength(4);
+    expect(cra.quarterDaysOn('2026-03-02')).toBe(4);
+  });
+
   it('hands out its lines as a copy', () => {
     // An aggregate whose caller can push into its own array holds no invariant at all.
     const cra = emptyCra();
