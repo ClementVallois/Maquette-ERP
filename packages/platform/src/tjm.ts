@@ -4,9 +4,10 @@ import { InvalidValueError } from './errors.ts';
  * The daily rate agreed with the client, in **integer cents** (ADR-0002).
  *
  * A Tjm is a whole number of euros, so the cents are always a multiple of 100 — and therefore
- * even. That is not trivia: it is the premise that makes half-day billing exact, because
- * `tjmCents / 2` is the one division this repository allows and it only stays exact while the
- * dividend is even. A Tjm of 150,50 € would break it, which is why the factory refuses one.
+ * divisible by four. That is not trivia: it is the premise that makes quarter-day billing exact
+ * (ADR-0069), because `tjmCents / 4` is the one division this repository allows and it only
+ * stays exact while the dividend is a multiple of 4. A Tjm of 150,50 € would break it, which is
+ * why the factory refuses one.
  */
 export const CENTS_PER_EURO = 100;
 

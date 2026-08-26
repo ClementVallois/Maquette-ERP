@@ -20,8 +20,8 @@ describe('a refused value', () => {
     expect(new InvalidValueError('date', '2026-02-30', 'a real day').message).toBe(
       'date must be a real day, got "2026-02-30"',
     );
-    expect(new InvalidValueError('halfDays', Number.NaN, 'a whole number').message).toBe(
-      'halfDays must be a whole number, got NaN',
+    expect(new InvalidValueError('quarterDays', Number.NaN, 'a whole number').message).toBe(
+      'quarterDays must be a whole number, got NaN',
     );
   });
 

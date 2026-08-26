@@ -1,4 +1,4 @@
-import type { HalfDays } from './half-days.ts';
+import type { QuarterDays } from './quarter-days.ts';
 
 /**
  * A fact that has already happened, published in-process (ADR-0001). The emitter does not know
@@ -34,12 +34,12 @@ export const TIMESHEET_VALIDATED = 'timesheet.TimesheetValidated';
  * missions, so the payload is a breakdown and not a single mission — a validated Cra with two
  * missions produces two invoice lines, and a single `missionId` would have silently billed one.
  *
- * Quantities are counts of **half-days** (ADR-0012): the unit that is recorded is the unit that is
- * transported and the unit that is billed, with no conversion anywhere on the way.
+ * Quantities are counts of **quarter-days** (ADR-0069): the unit that is recorded is the unit
+ * that is transported and the unit that is billed, with no conversion anywhere on the way.
  */
-export interface MissionHalfDays {
+export interface MissionQuarterDays {
   readonly missionId: string;
-  readonly halfDays: HalfDays;
+  readonly quarterDays: QuarterDays;
 }
 
 export interface TimesheetValidatedPayload {
@@ -50,7 +50,7 @@ export interface TimesheetValidatedPayload {
   readonly period: string;
   readonly validatedBy: string;
   /** Worked days only, grouped by mission. An absence is not billable and is not here. */
-  readonly missions: readonly MissionHalfDays[];
+  readonly missions: readonly MissionQuarterDays[];
 }
 
 export type TimesheetValidated = DomainEvent<typeof TIMESHEET_VALIDATED, TimesheetValidatedPayload>;
