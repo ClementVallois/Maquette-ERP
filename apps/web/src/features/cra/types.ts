@@ -177,3 +177,17 @@ export interface ValidationResponse {
   readonly invoices: readonly InvoiceListItem[];
   readonly declined: readonly DeclinedDay[];
 }
+
+/**
+ * `POST /api/v1/cras/:id/refusal` (Phase 7, task 7.3) — verified against the route itself
+ * (`apps/api/src/routes/api.ts`), added the same phase this type is first consumed: Annexe A never
+ * listed this endpoint (`docs/open-questions.md`, row dated 25/08/2026), so there was nothing to
+ * transcribe from prose. `status` is always `'refused'` on a 200 — the route never answers any
+ * other value — but the wider `CraStatus` is kept rather than the single literal, so a caller that
+ * reads it after another fetch (e.g. re-reading `GET /api/v1/cras/:id`) is not narrowed to a value
+ * that can go stale.
+ */
+export interface RefusalResponse {
+  readonly craId: string;
+  readonly status: CraStatus;
+}

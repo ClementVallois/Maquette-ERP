@@ -282,6 +282,33 @@ export const LABELS = {
       noAgreedRate: 'Aucun TJM en vigueur à cette date',
       unknownClient: 'Client inconnu',
     },
+    period: 'Mois',
+    /** task 7.2's result dialog — drafted invoices **and** declined days, French reasons, and the
+     * `replayed: true` case rendered as information rather than as a second success. */
+    validateDialog: {
+      title: 'Validation du CRA de {name}',
+      invoicesHeading: 'Factures brouillon créées',
+      noInvoices:
+        'Aucune facture créée : tous les jours de ce CRA sont écartés ci-dessous, pour un motif de facturation.',
+      declinedHeading: 'Jours écartés',
+      noDeclined: 'Aucun jour écarté : tout ce qui a été validé part en facture.',
+      declinedQuantity: '{days} sur la mission {mission}',
+      close: 'Fermer',
+    },
+    validateSuccessToast: 'CRA validé.',
+    validateReplayedToast: 'Ce CRA était déjà validé : résultat d’origine affiché.',
+    /** task 7.3 — the reason is mandatory (1-500 chars, `POST /api/v1/cras/:id/refusal`); the
+     * client-side "empty" message reuses the domain's own sentence
+     * (`problem.sentences['/problems/refusal-reason-required']`) rather than a second wording for
+     * the same rule. */
+    refuseDialog: {
+      title: 'Refuser le CRA de {name}',
+      lead: 'Le consultant verra ce motif sur son CRA et pourra corriger avant de le soumettre à nouveau.',
+      reasonLabel: 'Motif du refus',
+      confirm: 'Confirmer le refus',
+      cancel: 'Annuler',
+    },
+    refuseSuccessToast: 'CRA refusé.',
   },
 
   invoice: {
@@ -354,6 +381,7 @@ export const LABELS = {
     cost: 'Coût',
     margin: 'Marge',
     total: 'Total du mois',
+    noMissionTitle: 'Aucune mission facturée ce mois',
     noMission:
       'Aucune mission en régie sur ce mois : une mission au forfait n’a pas de TJM daté, et elle est écartée plutôt que comptée à zéro.',
   },

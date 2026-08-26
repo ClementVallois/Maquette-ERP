@@ -18,7 +18,6 @@ import { Route as ShellCraIndexRouteImport } from './routes/_shell/cra.index'
 import { Route as ShellCraPeriodRouteImport } from './routes/_shell/cra.$period'
 import { Route as ShellFacturesIndexRouteImport } from './routes/_shell/factures.index'
 import { Route as ShellFacturesIdRouteImport } from './routes/_shell/factures.$id'
-import { Route as ShellMargeIndexRouteImport } from './routes/_shell/marge.index'
 import { Route as ShellMargeConsultantIdRouteImport } from './routes/_shell/marge.$consultantId'
 import { Route as ShellCraPeriodIndexRouteImport } from './routes/_shell/cra.$period.index'
 import { Route as ShellCraPeriodConsultantIdRouteImport } from './routes/_shell/cra.$period.$consultantId'
@@ -67,11 +66,6 @@ const ShellFacturesIdRoute = ShellFacturesIdRouteImport.update({
   path: '/factures/$id',
   getParentRoute: () => ShellRoute,
 } as any)
-const ShellMargeIndexRoute = ShellMargeIndexRouteImport.update({
-  id: '/marge/',
-  path: '/marge/',
-  getParentRoute: () => ShellRoute,
-} as any)
 const ShellMargeConsultantIdRoute = ShellMargeConsultantIdRouteImport.update({
   id: '/marge/$consultantId',
   path: '/marge/$consultantId',
@@ -99,7 +93,6 @@ export interface FileRoutesByFullPath {
   '/marge/$consultantId': typeof ShellMargeConsultantIdRoute
   '/cra/': typeof ShellCraIndexRoute
   '/factures/': typeof ShellFacturesIndexRoute
-  '/marge/': typeof ShellMargeIndexRoute
   '/cra/$period/$consultantId': typeof ShellCraPeriodConsultantIdRoute
   '/cra/$period/': typeof ShellCraPeriodIndexRoute
 }
@@ -112,7 +105,6 @@ export interface FileRoutesByTo {
   '/marge/$consultantId': typeof ShellMargeConsultantIdRoute
   '/cra': typeof ShellCraIndexRoute
   '/factures': typeof ShellFacturesIndexRoute
-  '/marge': typeof ShellMargeIndexRoute
   '/cra/$period/$consultantId': typeof ShellCraPeriodConsultantIdRoute
   '/cra/$period': typeof ShellCraPeriodIndexRoute
 }
@@ -128,7 +120,6 @@ export interface FileRoutesById {
   '/_shell/marge/$consultantId': typeof ShellMargeConsultantIdRoute
   '/_shell/cra/': typeof ShellCraIndexRoute
   '/_shell/factures/': typeof ShellFacturesIndexRoute
-  '/_shell/marge/': typeof ShellMargeIndexRoute
   '/_shell/cra/$period/$consultantId': typeof ShellCraPeriodConsultantIdRoute
   '/_shell/cra/$period/': typeof ShellCraPeriodIndexRoute
 }
@@ -144,7 +135,6 @@ export interface FileRouteTypes {
     | '/marge/$consultantId'
     | '/cra/'
     | '/factures/'
-    | '/marge/'
     | '/cra/$period/$consultantId'
     | '/cra/$period/'
   fileRoutesByTo: FileRoutesByTo
@@ -157,7 +147,6 @@ export interface FileRouteTypes {
     | '/marge/$consultantId'
     | '/cra'
     | '/factures'
-    | '/marge'
     | '/cra/$period/$consultantId'
     | '/cra/$period'
   id:
@@ -172,7 +161,6 @@ export interface FileRouteTypes {
     | '/_shell/marge/$consultantId'
     | '/_shell/cra/'
     | '/_shell/factures/'
-    | '/_shell/marge/'
     | '/_shell/cra/$period/$consultantId'
     | '/_shell/cra/$period/'
   fileRoutesById: FileRoutesById
@@ -248,13 +236,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellFacturesIdRouteImport
       parentRoute: typeof ShellRoute
     }
-    '/_shell/marge/': {
-      id: '/_shell/marge/'
-      path: '/marge'
-      fullPath: '/marge/'
-      preLoaderRoute: typeof ShellMargeIndexRouteImport
-      parentRoute: typeof ShellRoute
-    }
     '/_shell/marge/$consultantId': {
       id: '/_shell/marge/$consultantId'
       path: '/marge/$consultantId'
@@ -301,7 +282,6 @@ interface ShellRouteChildren {
   ShellMargeConsultantIdRoute: typeof ShellMargeConsultantIdRoute
   ShellCraIndexRoute: typeof ShellCraIndexRoute
   ShellFacturesIndexRoute: typeof ShellFacturesIndexRoute
-  ShellMargeIndexRoute: typeof ShellMargeIndexRoute
 }
 
 const ShellRouteChildren: ShellRouteChildren = {
@@ -312,7 +292,6 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellMargeConsultantIdRoute: ShellMargeConsultantIdRoute,
   ShellCraIndexRoute: ShellCraIndexRoute,
   ShellFacturesIndexRoute: ShellFacturesIndexRoute,
-  ShellMargeIndexRoute: ShellMargeIndexRoute,
 }
 
 const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)

@@ -7,6 +7,8 @@ import type {
   ManagerCraGridResponse,
   MonthEntriesRequest,
   MonthEntriesResponse,
+  RefusalResponse,
+  ValidationResponse,
 } from './types';
 
 /**
@@ -47,5 +49,26 @@ export function saveMonth(
   return apiFetch<MonthEntriesResponse>(`/api/v1/cras/${period}/entries`, {
     method: 'PUT',
     body,
+  });
+}
+
+/**
+ * Phase 7, task 7.2 — the manager's decision on a submitted month. Lives here rather than in
+ * `features/pre-facturier`, the screen that first calls it: every `/api/v1/cras/*` fetch belongs
+ * to this feature regardless of which screen triggers it, the same reasoning `saveMonth` above
+ * already follows for the consultant's own write. `features/pre-facturier/hooks.ts` imports this
+ * function (not a hook) and owns its own cache invalidation, so the crossing stays at the fetch
+ * layer and `cra` never has to know a pré-facturier query key exists.
+ */
+export function postValidation(craId: string): Promise<ApiResult<ValidationResponse>> {
+  return apiFetch<ValidationResponse>(`/api/v1/cras/${craId}/validation`, { method: 'POST' });
+}
+
+/** Phase 7, task 7.3 — the manager's refusal, `reason` 1-500 chars (the domain's own bound; this
+ * function does not re-validate it, same division of labour as every other write in this file). */
+export function postRefusal(craId: string, reason: string): Promise<ApiResult<RefusalResponse>> {
+  return apiFetch<RefusalResponse>(`/api/v1/cras/${craId}/refusal`, {
+    method: 'POST',
+    body: { reason },
   });
 }
