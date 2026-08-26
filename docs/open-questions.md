@@ -2223,6 +2223,14 @@ correct, but this session did not reproduce the original screenshots that named 
 confirm it is actually gone. **Not fixed and not confirmed present** — a row below names the check
 that would close it, since it is a five-minute visual check, not a design decision.
 
+> **Closed on 26/08/2026, by running exactly the check that row named.** The four
+> `tests/visual/review/4.2-shell-*.png` and `6.2-cra-grid-draft.png` were decoded and the pixel at
+> `(50, 899)` — the bottom-left corner of a 1440×900 viewport shot, `fullPage: false` — read
+> `#121821`, the sidebar background, in all five. The `<aside>`'s `h-dvh` does reach the bottom;
+> D4 is **fixed**, not "probably fine". Read by eye at display scale the same PNG suggests a pale
+> band under the sidebar, which is what named the defect in the first place: the `border-t` of the
+> 16 px spacer at `sidebar.tsx:62`, ~64 px from the bottom, not a gap in the background.
+
 ### Where I am least confident, and what it resolved to
 
 1. **`fillEmptyWorkdays`'s "never touches a day already carrying anything" reads two ways in the
@@ -2286,7 +2294,8 @@ that would close it, since it is a five-minute visual check, not a design decisi
 2. **D4's status is now "probably fine, unverified" instead of either "fixed" or "open"** — a
    state this repository's own rule (`CLAUDE.md`'s double checkpoint) exists to rule out. **A row
    below**, closing it needs one screenshot at each persona's shell, which the existing
-   `shell.spec.ts` screenshot test already takes — reading those four PNGs is the whole check.
+   `shell.spec.ts` screenshot test already takes — reading those four PNGs is the whole check. **Resolved 26/08/2026 — fix now, not a row**: those PNGs were read (by
+   value, not by eye) and D4 is fixed. See the note under task 6.7 above.
 
 3. **`CraListItem` (the domain type, `packages/timesheet/src/domain/cra-repository.ts`) still has
    no `consultantName`.** The wire gained one, resolved at the route (`GET /api/v1/cras`'s
