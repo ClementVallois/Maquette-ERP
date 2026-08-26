@@ -553,13 +553,30 @@ le journal de migrations est l'histoire du schéma. **Aucune migration de donné
 déterministe et la base se réinitialise (ADR-0022) ; ADR-0069 dit pourquoi c'est la dernière fois.
 
 Le seed est régénéré : une journée pleine vaut `4`, et **au moins un jour du seed est saisi en
-quatre quarts** — sinon la grille refaite n'a rien à démontrer le jour de la démo. Le seed reste
-validé par zod.
+quatre quarts**. Il va dans le mois de **juin d'Alice**, qui est `validated` : il traverse donc
+toute la chaîne jusqu'à la facture, et prouve la facturation au quart de bout en bout plutôt que
+de décorer un écran. Le seed reste validé par zod.
+
+**Ce que le seed ne change pas** : juin reste `validated` pour tout le monde sauf Claire
+(`SUBMITTED_NOT_VALIDATED_EMAIL`), délibérément — c'est ce qui donne un historique réel au relevé
+imprimable. Le mois **éditable** d'Alice est le mois courant (`2026-08`), vide, et c'est celui que
+le parcours J1 saisit (6.8). C'est la moitié « J1 » de la question ouverte du 25/08 sur Annexe B ;
+l'autre moitié (J3 de la Phase 7) reste ouverte et se tranche là-bas.
 
 ### 5bis.5 `apps/api` — le contrat et deux manques nommés
 
 - `PUT /api/v1/cras/:period/entries` : une entrée par **cellule non vide**, portant `quarterDays`.
   `MAX_ENTRIES` passe de `62` à `124` (4 × 31), pour la même raison qu'il valait `62`.
+- **`linesOf` (`apps/api/src/chain/record-month.ts`) change de règle et il faut le dire** : il
+  groupait deux entrées identiques d'un même jour en **une** ligne de deux demi-journées, parce que
+  deux lignes d'une demi-journée auraient imprimé deux fois la même mission le même jour sur la
+  facture. Avec une quantité sur l'entrée, deux entrées pour le même `(day, dayType, missionId)` ne
+  sont plus une saisie normale — la matrice n'a qu'une cellule pour ce triplet. Elles se
+  **somment** en une ligne unique, ce qui garde la propriété qui compte (une ligne par triplet,
+  donc une ligne par cellule) et laisse `DayOverbookedError` refuser le total s'il dépasse la
+  journée. Une entrée dupliquée qui produirait deux lignes serait exactement l'aller-retour à perte
+  qu'ADR-0066 existait pour empêcher, réapparu une couche plus bas. **Test du cas dupliqué**, écrit
+  avant le changement.
 - `GET /api/v1/cras/:period/grid` gagne, par mission, **les jours où le consultant y est affecté**
   (`assignableDays`) : c'est ce qui permet à la grille de griser une mission qui démarre le 15
   plutôt que de laisser la saisie échouer à la soumission. La composition sait déjà le calculer —
@@ -580,11 +597,27 @@ retouchée au-delà de la compilation : elle est refaite en Phase 6.
 
 ### 5bis.7 Documentation
 
-`CONTEXT.md` : `HalfDays` → `QuarterDays` (l'entrée, ses interdits, ses renvois), **`HalfDaySlot`
-disparaît** du vocabulaire — la notion de créneau n'existe plus nulle part après ADR-0070.
-`README.md` : la ligne « Plus de deux missions dans une même journée » de « Ce que je ne construis
-pas » est **construite** ; elle est remplacée par la ligne des types d'absence (voir 6.2). Les ADR
-superseded ne sont pas réécrits.
+**La règle du balayage, parce que c'est un jugement et pas un `grep`** : un document **vivant** se
+met à jour (`BUILD-RULES.md`, `CONTEXT.md`, `README.md`, `docs/direction-visuelle.md`, ce plan) ; un
+document qui est un **enregistrement daté** garde son texte (les ADR, y compris superseded, la prose
+des Phases 1 et 2 de `BUILD-PLAN.md`, les lignes déjà écrites de `open-questions.md`,
+`PHASE-4-5-CLOSURE.md`). Réécrire un enregistrement, c'est effacer la trace que la décision a
+changé — ce que la règle 2 de `docs/adr/README.md` interdit explicitement.
+
+Ce qui bouge, nommément :
+
+- **`docs/BUILD-RULES.md`** (§ « **integer count of half-days** ») : c'est la forme opérante de
+  toute décision prise, elle ne peut pas rester en demi-journées une heure de plus que le code.
+- **`CONTEXT.md`** : l'entrée `HalfDays` → `QuarterDays`, et **le corps de cinq autres entrées**
+  qui énoncent l'unité dans leur prose — `LateDays`, `Tjm`, `InvoiceLine`, `RegieDaysOrigin`,
+  `DeclinedDays`. **`HalfDaySlot` disparaît** du vocabulaire : la notion de créneau n'existe plus
+  nulle part après ADR-0070.
+- **`docs/direction-visuelle.md`** : `tabular-nums` cite les demi-journées ; §4.4 gagne la table de
+  couleurs de 6.2.
+- **`README.md`** : la ligne « Plus de deux missions dans une même journée » de « Ce que je ne
+  construis pas » est **construite** — elle sort, remplacée par ce qui l'a rendue possible ; la
+  ligne « Objet `Money` » et la description du mois d'Alice passent au quart. La ligne des types
+  d'absence est déjà posée (26/08).
 
 **Gate de sortie** : `pnpm run check` vert, `pnpm run test:int` vert, e2e existants verts ;
 `grep -ri "halfday\|half_day" packages apps migrations` ne renvoie plus que des ADR superseded ;
@@ -712,12 +745,21 @@ Correction dans `lib/labels.ts`.
 
 ### 6.8 Gate de sortie — parcours e2e J1 (réécrit)
 
-Playwright, DB reset en global-setup, workers en série. Persona `consultant-paris` (Alice) →
-`/cra/2026-06` → vérifier le seed **en matrice** (deux missions le 11/06 sur deux lignes, la
-journée en quatre quarts du seed, absence le 18/06, samedi 13/06 flaggé) → saisir `¼` dans une
-cellule → le total du jour le reflète → « Remplir les jours ouvrés vides » sur une ligne →
-Enregistrer → rouvrir, la saisie persiste → Soumettre → lecture seule `submitted`. Audit axe sur la
-grille : zéro violation critique/sérieuse. Captures des sept états. `pnpm run check` vert.
+Playwright, DB reset en global-setup, workers en série. **Deux périodes, nommées explicitement** —
+le mois de juin d'Alice est `validated` donc immuable (ADR-0005), et un parcours qui prétend
+l'éditer échoue à la première frappe :
+
+1. `/cra/2026-06` en **lecture** : vérifier le seed **en matrice** (deux missions le 11/06 sur deux
+   lignes, la journée en quatre quarts, absence le 18/06, samedi 13/06 flaggé), bannière
+   `validated` nommant `validatedBy`, aucune cellule éditable.
+2. **Navigation de mois** jusqu'à `/cra/2026-08` (vide, éditable) — le geste de 6.3 est dans le
+   gate, pas seulement dans la spec.
+3. Ajouter une activité → saisir `¼` dans une cellule → le total du jour le reflète → « Remplir les
+   jours ouvrés vides » sur la ligne → Enregistrer → rouvrir, la saisie persiste → Soumettre →
+   lecture seule `submitted`.
+
+Audit axe sur la grille : zéro violation critique/sérieuse. Captures des sept états. `pnpm run
+check` vert.
 
 ---
 
