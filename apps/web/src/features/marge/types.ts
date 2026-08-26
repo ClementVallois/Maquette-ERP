@@ -14,7 +14,7 @@
 export interface MissionEconomics {
   readonly missionId: string;
   readonly missionName: string;
-  readonly halfDays: number;
+  readonly quarterDays: number;
   readonly tjmCents: number;
   readonly revenueCents: number;
   readonly costCents: number;

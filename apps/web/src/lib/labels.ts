@@ -103,7 +103,10 @@ export const LABELS = {
      */
     totalsLive:
       'Totaux recalculés à chaque modification ; confirmés par le serveur à l’enregistrement.',
-    recorded: 'Demi-journées saisies',
+    // D5 (revue du 25/08, tranché en 5bis.6): l'unité d'affichage est le jour, décidée une fois
+    // dans format.ts (frenchDays). Un en-tête « Demi-journées » au-dessus d'une valeur « 21 j »
+    // était la contradiction — la colonne s'intitule comme celle du pré-facturier.
+    recorded: 'Jours saisis',
     savedToast: 'Enregistré',
     submittedToast: 'Soumis',
     nothing: '—',
@@ -251,7 +254,7 @@ export const LABELS = {
     },
     designation: 'Désignation',
     quantity: 'Quantité',
-    unitPrice: 'Prix unitaire (demi-journée)',
+    unitPrice: 'Prix unitaire (quart de journée)',
     vatRate: 'TVA',
     amount: 'Montant HT',
     vatRecap: 'Récapitulatif de TVA',
@@ -364,7 +367,7 @@ export const LABELS = {
       '/problems/refusal-reason-required': 'Un refus doit dire ce qu’il faut corriger.',
       '/problems/unknown-mission': 'Cette mission n’existe pas.',
       '/problems/day-overbooked':
-        'Une journée compte deux demi-journées : celle-ci est déjà complète.',
+        'Une journée compte quatre quarts de journée : celle-ci est déjà complète.',
       '/problems/validated-cra-is-immutable':
         'Ce CRA est validé : un relevé de temps validé ne se modifie plus (ADR-0005).',
       '/problems/cra-transition-not-allowed':

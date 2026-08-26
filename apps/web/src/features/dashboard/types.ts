@@ -18,7 +18,7 @@
  */
 export interface ConsultantDashboard {
   readonly status: string;
-  readonly recordedHalfDays: number;
+  readonly recordedQuarterDays: number;
   readonly remainingDays: number;
 }
 

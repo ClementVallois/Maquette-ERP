@@ -26,7 +26,7 @@ export interface PreFacturierCraRow {
   readonly consultantName: string;
   readonly status: string;
   readonly late: boolean;
-  readonly recordedHalfDays: number;
+  readonly recordedQuarterDays: number;
   readonly blockingReasons: readonly string[];
   readonly decidable: boolean;
 }

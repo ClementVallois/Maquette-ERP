@@ -23,7 +23,7 @@ export interface CraListItem {
   readonly officeId: string;
   readonly period: string;
   readonly status: CraStatus;
-  readonly recordedHalfDays: number;
+  readonly recordedQuarterDays: number;
 }
 
 export interface CraListResponse {
@@ -36,7 +36,7 @@ export interface CraLine {
   readonly day: string;
   readonly dayType: RecordedDayType;
   readonly missionId: string | null;
-  readonly halfDays: 1 | 2;
+  readonly quarterDays: 1 | 2 | 3 | 4;
 }
 
 export type NonWorkableReason = 'weekend' | 'publicHoliday';
@@ -67,6 +67,7 @@ export interface MonthEntry {
   readonly day: string;
   readonly dayType: RecordedDayType;
   readonly missionId: string | null;
+  readonly quarterDays: number;
 }
 
 export interface MonthEntriesRequest {
@@ -93,10 +94,12 @@ export interface MonthEntriesResponse {
  *   skeleton (`gridDaysSkeleton` in `routes/api.ts`), computed at the route from the same
  *   `workingCalendar()` the domain uses, independently of whether the consultant recorded anything
  *   that day.
- * - **No `validatedBy`.** The composition does not carry it and the route does not add it, so a
- *   `validated` grid's banner cannot name who validated it from this endpoint alone — see
- *   `docs/open-questions.md`, row dated 25/08/2026, naming the gap rather than guessing a second
- *   fetch's worth.
+ * - **`validatedBy`.** Task 5bis.5 (ADR-0069) closed the gap `docs/open-questions.md` named on
+ *   25/08/2026: the composition now carries it and the route adds it, so a `validated` grid's
+ *   banner can name who validated it from this endpoint alone.
+ * - **`missions[].assignableDays`.** Added the same task: the days of the month this consultant is
+ *   staffed on this mission, so the matrix (ADR-0070) can grey out a day rather than let a write
+ *   fail at submission.
  */
 export interface GridDay {
   readonly date: string;
@@ -107,6 +110,7 @@ export interface GridMission {
   readonly missionId: string;
   readonly name: string;
   readonly clientName: string;
+  readonly assignableDays: readonly string[];
 }
 
 export interface CraGridResponse {
@@ -121,12 +125,13 @@ export interface CraGridResponse {
   readonly refusal: { readonly reason: string } | null;
   /** The domain's own answer (ADR-0065): never re-derived from `status` in this SPA. */
   readonly editable: boolean;
+  readonly validatedBy: string | null;
 }
 
 export interface DeclinedDay {
   readonly craId: string;
   readonly missionId: string;
-  readonly halfDays: number;
+  readonly quarterDays: number;
   readonly reason: 'notRegie' | 'unknownMission' | 'noAgreedRate' | 'unknownClient';
 }
 

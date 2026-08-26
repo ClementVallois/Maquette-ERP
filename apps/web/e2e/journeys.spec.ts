@@ -64,7 +64,7 @@ interface GridResponseForAssertions {
   readonly lines: readonly {
     readonly day: string;
     readonly dayType: string;
-    readonly halfDays: number;
+    readonly quarterDays: number;
   }[];
 }
 
@@ -106,7 +106,7 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then edit/s
     const rows = page.getByRole('table').first().locator('tbody tr');
     await expect(rows).toHaveCount(30);
 
-    // 11/06 — two missions on the same day, one half-day each (VARIED_MONTH.splitDay).
+    // 11/06 — two missions on the same day, two quarter-days each (VARIED_MONTH.splitDay).
     const splitDayCells = rows.nth(10).locator('td');
     await expect(splitDayCells.nth(0)).toHaveText(DORA);
     await expect(splitDayCells.nth(1)).toHaveText(PASSI);
@@ -134,8 +134,8 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then edit/s
     page,
   }) => {
     // Submission is a domain rule, not a UI nicety (`assertMonthAddsUp`,
-    // `packages/timesheet/src/domain/submission-checks.ts`): every workable day needs two
-    // recorded half-days or `cra.submit()` throws `IncompleteCraError`. Filling in the 21
+    // `packages/timesheet/src/domain/submission-checks.ts`): every workable day needs four
+    // recorded quarter-days or `cra.submit()` throws `IncompleteCraError`. Filling in the 21
     // workable days of August 2026 (discovered live: `GET /api/v1/cras/2026-08/grid`'s own
     // `days`, filtered on `nonWorkable === null`) is genuinely slower than the default 30s spec
     // timeout.
@@ -191,7 +191,7 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then edit/s
     expect(reread.status).toBe('draft');
     expect(reread.lines).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ day: '2026-08-04', dayType: 'absence', halfDays: 2 }),
+        expect.objectContaining({ day: '2026-08-04', dayType: 'absence', quarterDays: 4 }),
       ]),
     );
 

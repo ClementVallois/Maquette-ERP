@@ -12,9 +12,9 @@ describe('slotsFor', () => {
     expect(slotsFor([], '2026-06-05')).toStrictEqual([{ kind: 'empty' }, { kind: 'empty' }]);
   });
 
-  it('fills both slots with the same value for a two-half-day line (identical halves collapse)', () => {
+  it('fills both slots with the same value for a full-day line (a full day collapses to two slots)', () => {
     const lines: CraLine[] = [
-      { day: '2026-06-01', dayType: 'worked', missionId: 'mission-a', halfDays: 2 },
+      { day: '2026-06-01', dayType: 'worked', missionId: 'mission-a', quarterDays: 4 },
     ];
 
     expect(slotsFor(lines, '2026-06-01')).toStrictEqual([
@@ -23,18 +23,18 @@ describe('slotsFor', () => {
     ]);
   });
 
-  it('reads a lone half-day line into the first slot, never the second', () => {
+  it('reads a line worth one slot into the first slot, never the second', () => {
     const lines: CraLine[] = [
-      { day: '2026-06-18', dayType: 'absence', missionId: null, halfDays: 1 },
+      { day: '2026-06-18', dayType: 'absence', missionId: null, quarterDays: 1 },
     ];
 
     expect(slotsFor(lines, '2026-06-18')).toStrictEqual([{ kind: 'absence' }, { kind: 'empty' }]);
   });
 
-  it('fills slot 0 then slot 1, in the order the lines appear, for two distinct half-days on the same day', () => {
+  it('fills slot 0 then slot 1, in the order the lines appear, for two distinct lines on the same day', () => {
     const lines: CraLine[] = [
-      { day: '2026-06-11', dayType: 'worked', missionId: 'mission-a', halfDays: 1 },
-      { day: '2026-06-11', dayType: 'worked', missionId: 'mission-b', halfDays: 1 },
+      { day: '2026-06-11', dayType: 'worked', missionId: 'mission-a', quarterDays: 1 },
+      { day: '2026-06-11', dayType: 'worked', missionId: 'mission-b', quarterDays: 1 },
     ];
 
     expect(slotsFor(lines, '2026-06-11')).toStrictEqual([
@@ -45,7 +45,7 @@ describe('slotsFor', () => {
 
   it('ignores lines for other days', () => {
     const lines: CraLine[] = [
-      { day: '2026-06-02', dayType: 'worked', missionId: 'mission-a', halfDays: 2 },
+      { day: '2026-06-02', dayType: 'worked', missionId: 'mission-a', quarterDays: 4 },
     ];
 
     expect(slotsFor(lines, '2026-06-01')).toStrictEqual([{ kind: 'empty' }, { kind: 'empty' }]);
@@ -69,21 +69,21 @@ describe('entriesFor', () => {
     ];
 
     expect(entriesFor(days)).toStrictEqual([
-      { day: '2026-06-01', dayType: 'worked', missionId: 'mission-a' },
-      { day: '2026-06-02', dayType: 'absence', missionId: null },
-      { day: '2026-06-02', dayType: 'absence', missionId: null },
+      { day: '2026-06-01', dayType: 'worked', missionId: 'mission-a', quarterDays: 2 },
+      { day: '2026-06-02', dayType: 'absence', missionId: null, quarterDays: 2 },
+      { day: '2026-06-02', dayType: 'absence', missionId: null, quarterDays: 2 },
     ]);
   });
 
-  it('round-trips a two-half-day line through both directions unchanged', () => {
+  it('round-trips a full-day line through both directions unchanged', () => {
     const lines: CraLine[] = [
-      { day: '2026-06-01', dayType: 'worked', missionId: 'mission-a', halfDays: 2 },
+      { day: '2026-06-01', dayType: 'worked', missionId: 'mission-a', quarterDays: 4 },
     ];
     const slots = slotsFor(lines, '2026-06-01');
 
     expect(entriesFor([{ day: '2026-06-01', slots }])).toStrictEqual([
-      { day: '2026-06-01', dayType: 'worked', missionId: 'mission-a' },
-      { day: '2026-06-01', dayType: 'worked', missionId: 'mission-a' },
+      { day: '2026-06-01', dayType: 'worked', missionId: 'mission-a', quarterDays: 2 },
+      { day: '2026-06-01', dayType: 'worked', missionId: 'mission-a', quarterDays: 2 },
     ]);
   });
 

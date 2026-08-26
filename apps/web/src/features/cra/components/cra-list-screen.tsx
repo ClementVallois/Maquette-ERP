@@ -74,10 +74,10 @@ function columnsFor({ canOpen }: RowProps): ColumnDef<CraListItem>[] {
       cell: ({ row }) => <StatusBadge variant={STATUS_VARIANT[row.original.status]} />,
     },
     {
-      id: 'recordedHalfDays',
+      id: 'recordedQuarterDays',
       header: LABELS.cra.recorded,
       cell: ({ row }) => (
-        <span className="tabular-nums">{frenchDays(row.original.recordedHalfDays)}</span>
+        <span className="tabular-nums">{frenchDays(row.original.recordedQuarterDays)}</span>
       ),
     },
   ];

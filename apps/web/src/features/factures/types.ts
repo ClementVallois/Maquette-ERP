@@ -101,7 +101,7 @@ export interface RegieDaysOrigin {
   readonly missionId: string;
   readonly craId: string;
   readonly period: string;
-  readonly halfDays: number;
+  readonly quarterDays: number;
   /**
    * A `Tjm`, present here on purpose and not a violation of "`Cjm`, `Tjm` et la marge n'apparaissent
    * jamais dans une vue de liste" (BUILD-RULES § Authorization) or Annexe C.12's own restatement of
@@ -120,7 +120,7 @@ export interface RegieDaysOrigin {
 export interface InvoiceLine {
   readonly designation: string;
   readonly origin: RegieDaysOrigin;
-  readonly quantityHalfDays: number;
+  readonly quantityQuarterDays: number;
   readonly unitPriceCents: number;
   readonly amountCents: number;
   readonly vat: VatTreatment;

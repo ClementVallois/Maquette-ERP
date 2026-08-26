@@ -128,14 +128,19 @@ export function frenchEuros(cents: number): string {
   return `${negative ? '−' : ''}${euros},${centimes}${NO_BREAK_SPACE}€`;
 }
 
-/** `3` → `1,5 j`. Half-days are integers (ADR-0012) and stay integers here too. */
-export function frenchDays(halfDays: number): string {
-  const negative = halfDays < 0;
-  const absolute = Math.abs(halfDays);
-  const whole = (absolute - (absolute % 2)) / 2;
-  const half = absolute % 2 === 1 ? ',5' : '';
+const QUARTER_DAYS_PER_DAY = 4;
+/** The four remainders a count of quarter-days can leave against a whole day, in order. */
+const QUARTER_FRACTIONS = ['', ',25', ',5', ',75'] as const;
 
-  return `${negative ? '−' : ''}${String(whole)}${half}${NO_BREAK_SPACE}j`;
+/** `3` → `0,75 j`. Quarter-days are integers (ADR-0069) and stay integers here too. */
+export function frenchDays(quarterDays: number): string {
+  const negative = quarterDays < 0;
+  const absolute = Math.abs(quarterDays);
+  const remainder = absolute % QUARTER_DAYS_PER_DAY;
+  const whole = (absolute - remainder) / QUARTER_DAYS_PER_DAY;
+  const fraction = QUARTER_FRACTIONS[remainder] ?? '';
+
+  return `${negative ? '−' : ''}${String(whole)}${fraction}${NO_BREAK_SPACE}j`;
 }
 
 /** A rate in basis points (ADR-0035) → `20 %`. Same string surgery, same reason. */

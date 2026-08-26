@@ -23,7 +23,14 @@ import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 import { cn } from '@/lib/utils';
 
 import { useCraGrid, useSaveMonth } from '../hooks';
-import { entriesFor, MORNING, slotsFor, type DaySlots, type SlotValue } from '../slots';
+import {
+  entriesFor,
+  MORNING,
+  slotsFor,
+  SLOT_QUARTER_DAYS,
+  type DaySlots,
+  type SlotValue,
+} from '../slots';
 import type { CraGridResponse, GridDay } from '../types';
 
 import { CraSlotControl, labelForSlot, type NavigationDirection } from './cra-slot-control';
@@ -46,22 +53,27 @@ function initLocal(data: CraGridResponse): Map<string, DaySlots> {
 }
 
 interface Totals {
-  readonly perMission: readonly { readonly missionId: string; readonly halfDays: number }[];
-  readonly absenceHalfDays: number;
-  readonly totalHalfDays: number;
+  readonly perMission: readonly { readonly missionId: string; readonly quarterDays: number }[];
+  readonly absenceQuarterDays: number;
+  readonly totalQuarterDays: number;
 }
 
+/**
+ * Counts filled slots, then converts to quarter-days at the edge (`* SLOT_QUARTER_DAYS`): the
+ * counting itself stays slot-shaped, which is this legacy screen's own local state, and only the
+ * value handed to `frenchDays` needs to be in the storage unit (ADR-0069).
+ */
 function computeTotals(local: ReadonlyMap<string, DaySlots>): Totals {
   const perMission = new Map<string, number>();
-  let absenceHalfDays = 0;
-  let totalHalfDays = 0;
+  let absenceSlots = 0;
+  let totalSlots = 0;
 
   for (const slots of local.values()) {
     for (const slot of slots) {
       if (slot.kind === 'empty') continue;
-      totalHalfDays += 1;
+      totalSlots += 1;
       if (slot.kind === 'absence') {
-        absenceHalfDays += 1;
+        absenceSlots += 1;
       } else {
         perMission.set(slot.missionId, (perMission.get(slot.missionId) ?? 0) + 1);
       }
@@ -69,9 +81,12 @@ function computeTotals(local: ReadonlyMap<string, DaySlots>): Totals {
   }
 
   return {
-    perMission: [...perMission.entries()].map(([missionId, halfDays]) => ({ missionId, halfDays })),
-    absenceHalfDays,
-    totalHalfDays,
+    perMission: [...perMission.entries()].map(([missionId, slots]) => ({
+      missionId,
+      quarterDays: slots * SLOT_QUARTER_DAYS,
+    })),
+    absenceQuarterDays: absenceSlots * SLOT_QUARTER_DAYS,
+    totalQuarterDays: totalSlots * SLOT_QUARTER_DAYS,
   };
 }
 
@@ -423,7 +438,7 @@ interface TotalsPanelProps {
 }
 
 function TotalsPanel({ totals, data, editable }: TotalsPanelProps): ReactElement {
-  const hasAnything = totals.totalHalfDays > 0;
+  const hasAnything = totals.totalQuarterDays > 0;
 
   return (
     <div className="flex flex-col gap-2 rounded-xl bg-card p-4 shadow-card ring-1 ring-border">
@@ -448,18 +463,20 @@ function TotalsPanel({ totals, data, editable }: TotalsPanelProps): ReactElement
                 <TableCell>
                   {labelForSlot({ kind: 'mission', missionId: row.missionId }, data.missions)}
                 </TableCell>
-                <TableCell className="tabular-nums">{frenchDays(row.halfDays)}</TableCell>
+                <TableCell className="tabular-nums">{frenchDays(row.quarterDays)}</TableCell>
               </TableRow>
             ))}
-            {totals.absenceHalfDays > 0 && (
+            {totals.absenceQuarterDays > 0 && (
               <TableRow>
                 <TableCell>{LABELS.cra.absence}</TableCell>
-                <TableCell className="tabular-nums">{frenchDays(totals.absenceHalfDays)}</TableCell>
+                <TableCell className="tabular-nums">
+                  {frenchDays(totals.absenceQuarterDays)}
+                </TableCell>
               </TableRow>
             )}
             <TableRow className="font-medium hover:bg-transparent">
               <TableCell>{frenchMonth(data.period)}</TableCell>
-              <TableCell className="tabular-nums">{frenchDays(totals.totalHalfDays)}</TableCell>
+              <TableCell className="tabular-nums">{frenchDays(totals.totalQuarterDays)}</TableCell>
             </TableRow>
           </TableBody>
         </Table>

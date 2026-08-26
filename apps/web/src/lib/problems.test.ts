@@ -91,13 +91,13 @@ describe('classifyProblem', () => {
       type: '/problems/invalid-value',
       title: 'Invalid value',
       status: 422,
-      errors: { halfDays: ['must be 1 or 2'] },
+      errors: { quarterDays: ['must be 1 to 4'] },
       ...CONTEXT,
     };
 
     expect(classifyProblem(problem)).toStrictEqual({
       kind: 'field-errors',
-      errors: { halfDays: ['must be 1 or 2'] },
+      errors: { quarterDays: ['must be 1 to 4'] },
     });
   });
 
