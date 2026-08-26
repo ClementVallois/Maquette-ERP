@@ -30,7 +30,7 @@ export interface InvoiceListQuery {
 export interface DeclinedDaysRecord {
   readonly craId: CraId;
   readonly missionId: MissionId;
-  readonly halfDays: number;
+  readonly quarterDays: number;
   readonly reason: DeclineReason;
 }
 

@@ -1,4 +1,4 @@
-import { type HalfDays, InvalidValueError } from '@erp/platform';
+import { type QuarterDays, InvalidValueError } from '@erp/platform';
 
 import type { CraId, MissionId } from './ids.ts';
 import { lineAmountCents } from './money.ts';
@@ -19,7 +19,7 @@ export interface RegieDaysOrigin {
   readonly craId: CraId;
   /** The month worked, `YYYY-MM`. The rate below is the one in force then, not the one in force now. */
   readonly period: string;
-  readonly halfDays: HalfDays;
+  readonly quarterDays: QuarterDays;
   /** The contractual daily rate, **copied** onto the line and never referenced (ADR-0034). */
   readonly tjmCents: number;
 }
@@ -27,9 +27,10 @@ export interface RegieDaysOrigin {
 export type LineOrigin = RegieDaysOrigin;
 
 /**
- * One line of an invoice, frozen. Quantity is a count of half-days and the unit price is the price
- * of one half-day: the unit that is recorded is the unit that is transported and the unit that is
- * billed (ADR-0012), with no conversion — and no decimal quantity — anywhere on the way.
+ * One line of an invoice, frozen. Quantity is a count of quarter-days and the unit price is the
+ * price of one quarter-day: the unit that is recorded is the unit that is transported and the
+ * unit that is billed (ADR-0069), with no conversion — and no decimal quantity — anywhere on the
+ * way.
  *
  * Everything a line needs to be read again in five years is on it: the rate, the VAT treatment,
  * and the record it came from. Nothing here points at a reference table.
@@ -38,7 +39,7 @@ export interface InvoiceLine {
   /** The printed text. French, because it is printed on a French document. */
   readonly designation: string;
   readonly origin: LineOrigin;
-  readonly quantityHalfDays: HalfDays;
+  readonly quantityQuarterDays: QuarterDays;
   readonly unitPriceCents: number;
   readonly amountCents: number;
   readonly vat: VatTreatment;
@@ -49,22 +50,26 @@ export function regieLine(input: {
   missionId: MissionId;
   craId: CraId;
   period: string;
-  halfDays: HalfDays;
+  quarterDays: QuarterDays;
   tjmCents: number;
   vat: VatTreatment;
 }): InvoiceLine {
   if (input.designation.trim() === '') {
     throw new InvalidValueError('invoiceLine.designation', input.designation, 'a designation');
   }
-  if (input.halfDays <= 0) {
+  if (input.quarterDays <= 0) {
     // A line worth nothing is not a line. It would print on the invoice, sum to zero, and leave
     // the reader looking for the day it is about.
-    throw new InvalidValueError('invoiceLine.halfDays', input.halfDays, 'at least one half-day');
+    throw new InvalidValueError(
+      'invoiceLine.quarterDays',
+      input.quarterDays,
+      'at least one quarter-day',
+    );
   }
 
   // Both amounts go through the same function, which is what keeps the claim in BUILD-RULES true:
   // one division, at one call site, asserting one precondition. `unitPrice × quantity` equals
-  // `amountCents` exactly because a Tjm is even, and a reference test asserts it.
+  // `amountCents` exactly because a Tjm is a multiple of four, and a reference test asserts it.
   return {
     designation: input.designation,
     origin: {
@@ -72,12 +77,12 @@ export function regieLine(input: {
       missionId: input.missionId,
       craId: input.craId,
       period: input.period,
-      halfDays: input.halfDays,
+      quarterDays: input.quarterDays,
       tjmCents: input.tjmCents,
     },
-    quantityHalfDays: input.halfDays,
+    quantityQuarterDays: input.quarterDays,
     unitPriceCents: lineAmountCents(1, input.tjmCents),
-    amountCents: lineAmountCents(input.halfDays, input.tjmCents),
+    amountCents: lineAmountCents(input.quarterDays, input.tjmCents),
     vat: input.vat,
   };
 }

@@ -23,7 +23,7 @@ function lineOf(tjmCents = 65_000, vat: VatTreatment = STANDARD): InvoiceLine {
     missionId: REGIE_MISSION,
     craId: 'cra-1',
     period: '2026-03',
-    halfDays: 2,
+    quarterDays: 4,
     tjmCents,
     vat,
   });
