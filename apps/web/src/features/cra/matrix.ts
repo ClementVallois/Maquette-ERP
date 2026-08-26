@@ -159,6 +159,26 @@ export function isDayOverbooked(matrix: MatrixState, day: string): boolean {
   return dayTotal(matrix, day) > FULL_DAY;
 }
 
+/**
+ * The other half of the same invariant `isDayOverbooked` mirrors — `assertMonthAddsUp` →
+ * `IncompleteCraError`: a workable day the month does not account for. Workability is not the
+ * matrix's to know (it holds no calendar); the caller filters on `days[].nonWorkable` first.
+ *
+ * `flaggedByServer` is what keeps an untouched month from opening entirely amber: a day nobody has
+ * typed into yet is not a mistake, it is a day not reached. It becomes one only when the server
+ * has refused the submission over it — `missingDays` off `/problems/cra-incomplete` — and it stops
+ * being one as soon as the day adds up, without waiting for a second refusal to say so.
+ */
+export function isDayIncomplete(
+  matrix: MatrixState,
+  day: string,
+  flaggedByServer: boolean,
+): boolean {
+  const total = dayTotal(matrix, day);
+
+  return total < FULL_DAY && (total > 0 || flaggedByServer);
+}
+
 export function isRowEmpty(matrix: MatrixState, rowKey: string, days: readonly string[]): boolean {
   return rowTotal(matrix, rowKey, days) === 0;
 }

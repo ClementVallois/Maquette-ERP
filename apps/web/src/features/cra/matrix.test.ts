@@ -8,6 +8,7 @@ import {
   entriesFromMatrix,
   fillEmptyWorkdays,
   initMatrix,
+  isDayIncomplete,
   isDayOverbooked,
   isRowEmpty,
   removeRow,
@@ -130,6 +131,40 @@ describe('isDayOverbooked', () => {
     const matrix = initMatrix(gridResponse());
 
     expect(isDayOverbooked(matrix, '2026-08-03')).toBe(false);
+  });
+});
+
+describe('isDayIncomplete', () => {
+  it('is false on a day nobody has typed into, until the server says otherwise', () => {
+    const matrix = initMatrix(gridResponse());
+
+    expect(isDayIncomplete(matrix, '2026-08-03', false)).toBe(false);
+    expect(isDayIncomplete(matrix, '2026-08-03', true)).toBe(true);
+  });
+
+  it('is true on a day started but short of a full day, with or without the server', () => {
+    let matrix = addRow(initMatrix(gridResponse()), MISSION_A);
+    matrix = withValue(matrix, MISSION_A, '2026-08-03', 2);
+
+    expect(isDayIncomplete(matrix, '2026-08-03', false)).toBe(true);
+    expect(isDayIncomplete(matrix, '2026-08-03', true)).toBe(true);
+  });
+
+  it('stops being true as soon as the day adds up, even while the server still flags it', () => {
+    let matrix = addRow(initMatrix(gridResponse()), MISSION_A);
+    matrix = withValue(matrix, MISSION_A, '2026-08-03', 4);
+
+    expect(isDayIncomplete(matrix, '2026-08-03', true)).toBe(false);
+  });
+
+  it('is false past a full day — that day is overbooked, which is a different signal', () => {
+    let matrix = addRow(initMatrix(gridResponse()), MISSION_A);
+    matrix = addRow(matrix, MISSION_B);
+    matrix = withValue(matrix, MISSION_A, '2026-08-03', 4);
+    matrix = withValue(matrix, MISSION_B, '2026-08-03', 1);
+
+    expect(isDayIncomplete(matrix, '2026-08-03', true)).toBe(false);
+    expect(isDayOverbooked(matrix, '2026-08-03')).toBe(true);
   });
 });
 

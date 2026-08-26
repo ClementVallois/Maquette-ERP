@@ -35,6 +35,7 @@ import {
   withValue,
   type MatrixState,
 } from '../matrix';
+import { missingDaysFrom } from '../missing-days';
 import type { CraGridResponse } from '../types';
 
 import { CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
@@ -233,6 +234,10 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
 
   const mutationProblem =
     saveMonth.error instanceof ApiProblemError ? saveMonth.error.problem : null;
+  // Front-end plan §6.5: an `IncompleteCraError` names the days in the totals row, where the user
+  // reads them. `missingDaysFrom` yields an empty set for every other refusal, so the grid carries
+  // server-side flags only for the one that produced them.
+  const missingDays = missingDaysFrom(mutationProblem);
 
   return (
     <div className="flex flex-col gap-4">
@@ -259,6 +264,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
         matrix={matrix}
         editable={data.editable}
         flaggedDays={flaggedDays}
+        missingDays={missingDays}
         onChangeCell={data.editable ? updateCell : undefined}
         renderRowTools={
           data.editable

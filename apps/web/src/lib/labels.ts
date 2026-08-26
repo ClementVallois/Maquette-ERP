@@ -172,6 +172,12 @@ export const LABELS = {
       dayOverbookedColumn: 'Dépassement',
       dayOverbooked:
         'Ce jour dépasse une journée complète : la saisie sera refusée à l’enregistrement.',
+      /** The `< 1 j` counterpart, in amber rather than red because it is a month still being
+       * filled, not a save that cannot succeed (`isDayIncomplete`, `matrix.ts`). A day nobody has
+       * typed into stays neutral until a refused submission names it. */
+      dayIncompleteColumn: 'À compléter',
+      dayIncomplete:
+        'Ce jour ouvré n’atteint pas une journée complète : le mois ne pourra pas être soumis tant qu’il y manque quelque chose.',
       /** Accessible names for the five-option `<select>` a cell is (ADR-0068, ADR-0070) — never
        * the raw fraction glyph alone, which reads as nothing to a screen reader. */
       quantityOptions: {

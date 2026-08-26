@@ -188,7 +188,10 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
       .getByRole('row')
       .filter({ has: page.getByRole('rowheader', { name: DORA }) });
     const doraMonthTotal = doraRow.getByRole('cell').last();
-    const mondayDayTotal = page.locator('[aria-label="Total du jour — 03/08/2026"]');
+    // A prefix match, not an exact one: a day total out of range appends the reason to its own
+    // accessible name (`TOTAL_TONES[…].sentence`, `cra-matrix-table.tsx`) so a screen reader hears
+    // *why* the figure is flagged, and ¼ of a day makes this very cell incomplete two steps below.
+    const mondayDayTotal = page.locator('[aria-label^="Total du jour — 03/08/2026"]');
 
     // Keyboard-focus evidence (task 6.2).
     const monday = cell(page, DORA, '03/08/2026');

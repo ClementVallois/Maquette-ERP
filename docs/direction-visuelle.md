@@ -209,6 +209,20 @@ red with an alert-triangle icon ahead of the figure and an `aria-label`/`title` 
 the column would fight the mission-row tints already carrying meaning there, and the total row is
 where the number the invariant is about actually lives.
 
+**Workable day short of one full day** — the same bound from below, mirroring
+`assertMonthAddsUp`/`IncompleteCraError`, and drawn the same way on the same two elements: the
+header marked « À compléter », the totals cell filled with a dashed-circle icon ahead of the figure
+and a sentence on `aria-label`/`title`. **Amber** (`--flag-incomplete-bg` / `-text`, aliasing
+`--tone-amber-*`), never the red above it: a month still being filled is not a save that cannot
+succeed, and one red for both would flatten the only distinction that matters while typing.
+
+Which days carry it is a decision, not a threshold. A day nobody has typed into stays **neutral** —
+it is a day not reached, not a mistake — so a fresh month opens entirely uncoloured, keeping §6.7's
+"grille vierge invitante". Amber appears on a day that was _started_ and left short, and on every
+day a refused submission named (`missingDays`, plumbed by `features/cra/missing-days.ts`), which is
+where the zeros finally light up. A day stops being amber the moment it adds up, without waiting
+for a second refusal to agree.
+
 **Missions** (one row each, per ADR-0070). "Une teinte par ligne, stable dans le mois" — a pastille
 in the row header plus a very light cell background, cycling through six hues by the row's position
 among the grid's currently visible rows (`features/cra/mission-tone.ts`). Six, not five and not

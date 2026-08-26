@@ -1,4 +1,4 @@
-import { AlertTriangleIcon } from 'lucide-react';
+import { AlertTriangleIcon, CircleDashedIcon } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 import { useRef } from 'react';
 
@@ -6,7 +6,14 @@ import { frenchDate, frenchDays, frenchMonth, frenchWeekday } from '@/lib/format
 import { LABELS } from '@/lib/labels';
 import { cn } from '@/lib/utils';
 
-import { dayTotal, isDayOverbooked, rowTotal, valueAt, type MatrixState } from '../matrix';
+import {
+  dayTotal,
+  isDayIncomplete,
+  isDayOverbooked,
+  rowTotal,
+  valueAt,
+  type MatrixState,
+} from '../matrix';
 import { missionTone } from '../mission-tone';
 import type { GridDay } from '../types';
 
@@ -38,6 +45,8 @@ interface CraMatrixTableProps {
   readonly matrix: MatrixState;
   readonly editable: boolean;
   readonly flaggedDays: ReadonlySet<string>;
+  /** The days a refused submission named (`missing-days.ts`) — empty until one has been refused. */
+  readonly missingDays?: ReadonlySet<string> | undefined;
   readonly onChangeCell?: ((rowKey: string, day: string, value: CellQuantity) => void) | undefined;
   readonly renderRowTools?: ((row: MatrixRowMeta) => ReactNode) | undefined;
 }
@@ -105,6 +114,53 @@ function dayTint(day: GridDay): string | undefined {
   return undefined;
 }
 
+/**
+ * The two ways a day total can be out of range, and how each is drawn. Both mirror a domain
+ * invariant and neither decides anything (ADR-0070): red is a day the save will refuse
+ * (`DayOverbookedError`), amber a workable day the submission will (`IncompleteCraError`). Colour
+ * is never the only signal — each carries a word under the day number and a sentence on the total.
+ */
+type TotalTone = 'overbooked' | 'incomplete';
+
+const TOTAL_TONES: Readonly<
+  Record<
+    TotalTone,
+    {
+      readonly headerClass: string;
+      readonly cellClass: string;
+      readonly textClass: string;
+      readonly columnLabel: string;
+      readonly sentence: string;
+    }
+  >
+> = {
+  overbooked: {
+    headerClass: 'bg-flag-overbooked-bg text-flag-overbooked-text',
+    cellClass: 'bg-flag-overbooked-bg text-flag-overbooked-text',
+    textClass: 'text-flag-overbooked-text',
+    columnLabel: LABELS.cra.matrix.dayOverbookedColumn,
+    sentence: LABELS.cra.matrix.dayOverbooked,
+  },
+  incomplete: {
+    headerClass: 'bg-flag-incomplete-bg text-flag-incomplete-text',
+    cellClass: 'bg-flag-incomplete-bg text-flag-incomplete-text',
+    textClass: 'text-flag-incomplete-text',
+    columnLabel: LABELS.cra.matrix.dayIncompleteColumn,
+    sentence: LABELS.cra.matrix.dayIncomplete,
+  },
+};
+
+function totalTone(
+  overbooked: ReadonlySet<string>,
+  incomplete: ReadonlySet<string>,
+  day: string,
+): TotalTone | null {
+  if (overbooked.has(day)) return 'overbooked';
+  if (incomplete.has(day)) return 'incomplete';
+
+  return null;
+}
+
 export function CraMatrixTable({
   period,
   days,
@@ -112,6 +168,7 @@ export function CraMatrixTable({
   matrix,
   editable,
   flaggedDays,
+  missingDays,
   onChangeCell,
   renderRowTools,
 }: CraMatrixTableProps): ReactElement {
@@ -139,11 +196,18 @@ export function CraMatrixTable({
   }
 
   const weeks = weekGroups(days);
-  // task 6.2's "un jour ouvré à < 1 est signalé" sibling case (over one day, not under): computed
-  // once per render rather than inside each cell/header callback below, since both the header row
-  // and the totals row read it for the same set of days.
+  // task 6.2's two day-total signals, each the mirror of a domain invariant — over one day
+  // (`DayOverbookedError`) and under it on a workable day (`IncompleteCraError`). Computed once per
+  // render rather than inside each cell/header callback below, since the header row and the totals
+  // row read the same sets for the same days. A day cannot be in both.
   const overbookedDays = new Set(
     days.filter((day) => isDayOverbooked(matrix, day.date)).map((day) => day.date),
+  );
+  const incompleteDays = new Set(
+    days
+      .filter((day) => day.nonWorkable === null)
+      .filter((day) => isDayIncomplete(matrix, day.date, missingDays?.has(day.date) ?? false))
+      .map((day) => day.date),
   );
 
   return (
@@ -187,7 +251,7 @@ export function CraMatrixTable({
               {LABELS.cra.activity}
             </th>
             {days.map((day) => {
-              const overbooked = overbookedDays.has(day.date);
+              const total = totalTone(overbookedDays, incompleteDays, day.date);
 
               return (
                 <th
@@ -195,10 +259,8 @@ export function CraMatrixTable({
                   scope="col"
                   className={cn(
                     'min-w-[2.75rem] border-l border-border px-1 py-2 text-center font-medium whitespace-nowrap',
-                    overbooked ? 'bg-flag-overbooked-bg' : dayTint(day),
-                    overbooked
-                      ? 'text-flag-overbooked-text'
-                      : day.nonWorkable !== null && 'text-muted-foreground',
+                    total === null ? dayTint(day) : TOTAL_TONES[total].headerClass,
+                    total === null && day.nonWorkable !== null && 'text-muted-foreground',
                   )}
                 >
                   <span>{dayHeaderLabel(day.date)}</span>
@@ -206,8 +268,8 @@ export function CraMatrixTable({
                     <span
                       className={cn(
                         'block text-[0.6875rem]',
-                        overbooked
-                          ? 'text-flag-overbooked-text'
+                        total !== null
+                          ? TOTAL_TONES[total].textClass
                           : day.nonWorkable === 'publicHoliday'
                             ? 'text-flag-holiday-text'
                             : 'text-flag-weekend-text',
@@ -221,9 +283,14 @@ export function CraMatrixTable({
                       {LABELS.cra.flagged}
                     </span>
                   )}
-                  {overbooked && (
-                    <span className="block text-[0.6875rem] font-semibold text-flag-overbooked-text">
-                      {LABELS.cra.matrix.dayOverbookedColumn}
+                  {total !== null && (
+                    <span
+                      className={cn(
+                        'block text-[0.6875rem] font-semibold',
+                        TOTAL_TONES[total].textClass,
+                      )}
+                    >
+                      {TOTAL_TONES[total].columnLabel}
                     </span>
                   )}
                 </th>
@@ -313,21 +380,22 @@ export function CraMatrixTable({
               {LABELS.cra.dayTotal}
             </th>
             {days.map((day) => {
-              const overbooked = overbookedDays.has(day.date);
+              const tone = totalTone(overbookedDays, incompleteDays, day.date);
               const label = `${LABELS.cra.dayTotal} — ${frenchDate(day.date)}`;
+              const Icon = tone === 'incomplete' ? CircleDashedIcon : AlertTriangleIcon;
 
               return (
                 <td
                   key={day.date}
-                  aria-label={overbooked ? `${label} : ${LABELS.cra.matrix.dayOverbooked}` : label}
-                  title={overbooked ? LABELS.cra.matrix.dayOverbooked : undefined}
+                  aria-label={tone === null ? label : `${label} : ${TOTAL_TONES[tone].sentence}`}
+                  title={tone === null ? undefined : TOTAL_TONES[tone].sentence}
                   className={cn(
                     'border-l border-border px-1 py-2 text-center tabular-nums',
-                    overbooked && 'bg-flag-overbooked-bg text-flag-overbooked-text',
+                    tone !== null && TOTAL_TONES[tone].cellClass,
                   )}
                 >
-                  {overbooked && (
-                    <AlertTriangleIcon aria-hidden="true" className="mr-0.5 mb-0.5 inline size-3" />
+                  {tone !== null && (
+                    <Icon aria-hidden="true" className="mr-0.5 mb-0.5 inline size-3" />
                   )}
                   {frenchDays(dayTotal(matrix, day.date))}
                 </td>

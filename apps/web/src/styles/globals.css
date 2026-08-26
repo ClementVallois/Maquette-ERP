@@ -148,6 +148,11 @@
      refuse to save is exactly that: a refusal, shown before the round trip that produces one. */
   --flag-overbooked-bg: var(--tone-red-fill);
   --flag-overbooked-text: var(--tone-red-text);
+  /* The same bound from below (`isDayIncomplete`) — amber, not red: a workable day still short of
+     a full day is a month being filled, not a save that cannot succeed. Same amber the late status
+     and the public holiday already use. */
+  --flag-incomplete-bg: var(--tone-amber-fill);
+  --flag-incomplete-text: var(--tone-amber-text);
 
   /*
    * Phase 6.2's matrix (ADR-0070): "une teinte par ligne, stable dans le mois" for a mission, and
@@ -272,6 +277,8 @@
   --color-flag-holiday-text: var(--flag-holiday-text);
   --color-flag-overbooked-bg: var(--flag-overbooked-bg);
   --color-flag-overbooked-text: var(--flag-overbooked-text);
+  --color-flag-incomplete-bg: var(--flag-incomplete-bg);
+  --color-flag-incomplete-text: var(--flag-incomplete-text);
 
   --color-mission-tone-1-fill: var(--mission-tone-1-fill);
   --color-mission-tone-1-dot: var(--mission-tone-1-dot);
