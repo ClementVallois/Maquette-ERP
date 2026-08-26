@@ -2198,3 +2198,126 @@ what was true when it was written; the debt it describes is discharged. What the
 and what each finding owes before Phase 6 starts, is in
 [`PHASE-4-5-CLOSURE.md`](./PHASE-4-5-CLOSURE.md). The branch remains unmerged until that file's
 Blocking column is empty.
+
+## Front-end Phase 6 checkpoint (reopened) — `feat/web`, 26/08/2026
+
+The two questions `CLAUDE.md` requires, asked of the matrix rebuild (`docs/frontend-plan.md`
+Phase 6, tasks 6.1-6.8, reopened by ADR-0069/ADR-0070) and of four things asked outside the phase's
+own numbering: dropping the stale cache on a persona switch, opening a future month with no `Cra`
+yet, and a manager reading a named consultant's month (ADR-0071, new). Every point resolves to
+exactly one of the four outcomes.
+
+### Which tasks ran
+
+All eight of Phase 6's reopened tasks ran: 6.1 (list corrections — the filter removed, replaced by
+"Ouvrir un autre mois"), 6.2 (the matrix itself), 6.3 (the four row/month gestures), 6.4 (the
+two-axis keyboard contract and the axe gate), 6.5 (save/submit, refetch-driven), 6.6 (the four
+status banners, D3 fixed), 6.7 (the limit states — D2 fixed, the empty month, the 403), 6.8 (the
+Playwright gate, rewritten for the matrix DOM). The four items outside the phase's numbering also
+ran: the persona-cache fix, the "months ahead" picker, and ADR-0071's manager route and screen.
+
+**One line item from task 6.7 was not verified.** Defect D4 ("le fond de la barre latérale
+s'arrête ~68 px avant le bas du viewport") was named as "corrigé ici puisqu'il se voit ici" —
+`components/shell/sidebar.tsx` already uses `h-dvh` on the `<aside>`, which reads as already
+correct, but this session did not reproduce the original screenshots that named the defect to
+confirm it is actually gone. **Not fixed and not confirmed present** — a row below names the check
+that would close it, since it is a five-minute visual check, not a design decision.
+
+### Where I am least confident, and what it resolved to
+
+1. **`fillEmptyWorkdays`'s "never touches a day already carrying anything" reads two ways in the
+   plan's prose** — "le total est nul" could mean this row's own cell, or the day's total across
+   every row. Only the second guarantees the tool's own claim, "ne peut donc jamais surbooker": a
+   day filled from an empty _cell_ but a non-empty _day_ (another mission already recorded there)
+   would push the day over four quarters the moment the fill runs. → **Fixed now, read the second
+   way**, and the reading is load-bearing enough that `matrix.test.ts` has a dedicated test for it
+   ("never overbooks a day another row already recorded something on") rather than leaving the
+   ambiguity to be noticed by a future overbooked day.
+
+2. **The manager's read-only screen (`ManagerCraGridScreen`) and the consultant's editable one
+   (`CraGridScreen`) share `CraMatrixTable` but were never proven to share it correctly** —
+   specifically, whether `editable={false}` on the manager side actually suppresses every write
+   affordance (row tools, add-activity, save/submit) rather than only the cells. → **Fixed now,
+   verified live**: the manager route's own component never passes `renderRowTools` or
+   `onChangeCell` at all (not merely `editable={false}` on a shared prop), so there is no code
+   path left that could re-enable a write for that screen by mistake in either place ADR-0071's own
+   "expensive" consequence names. Proven by the journeys test asserting `select` has zero count on
+   that screen, not by reading the component.
+
+3. **TanStack Router's file-based nesting silently ate the whole first attempt at ADR-0071's
+   route.** `cra.$period.$consultantId.tsx` nests under `cra.$period.tsx` by the router's own file
+   convention; without an `<Outlet />` in the parent, the parent's own component (the
+   consultant-only editable grid, `forRoles('consultant')`) kept rendering under the manager's URL,
+   producing `insufficient-role` instead of ADR-0071's screen. → **Fixed now**: `cra.$period.tsx`
+   became a pathless `<Outlet />` layout, its former content moved to `cra.$period.index.tsx`. Found
+   by running the new journeys spec, not by reading the router's documentation in advance — worth
+   naming because the same shape (a route file that both matches a path exactly _and_ needs to gain
+   a child later) will recur the next time a route grows a sibling.
+
+4. **`validatedBy` was a raw `ConsultantId` on the wire, not a display name, in the one place a
+   screen actually names it** — the "validated" banner's whole point (task 6.6: "une bannière
+   nommant `validatedBy`"). → **Fixed now**, in `craGridComposition`, the same way `consultantName`
+   is already resolved there. **Not fixed**, and named rather than silently left: the SSR printable
+   Cra (`apps/api/src/web/routes.ts`'s `/releve/:id` handler, `cra-print.ts`'s template) reads
+   `cra.validatedBy` directly and prints the same raw id, one field away from the
+   `consultantName` it resolves correctly right next to it — a pre-existing gap this session found
+   while fixing the JSON route's copy of the same problem, not something this session's own changes
+   introduced. → **A row below**, since touching the SSR page is outside the five things this task
+   was asked to build.
+
+5. **The three row tools have uneven test coverage.** "Fill" is exercised end-to-end (J1's own
+   edit flow) and by three unit tests in `matrix.test.ts`; "clear" and "remove" are exercised by
+   `matrix.test.ts` (the pure state transitions) but by **no** Playwright journey — nothing clicks
+   the eraser or trash icon and checks the DOM. → **A row below**, Phase 7 named as the phase that
+   would naturally extend this journey if it touches the same screen again; not fixed now because
+   inventing a fourth mutation step in an already-long J1 to exercise two buttons whose logic is
+   already unit-tested is exactly the "test that proves nothing new" BUILD-RULES warns against
+   without a reason beyond coverage-for-its-own-sake.
+
+### In three months, what breaks if I leave it as it is
+
+1. **The axe gate covers three of the matrix's states (list, validated read-only, editable empty)
+   and not the two this task added** (ADR-0071's manager view, and the `submitted`/`refused`
+   states of the consultant's own grid). A future change that regresses accessibility on exactly
+   the screen a manager spends their time on could pass the gate cleanly. **A row below**: extend
+   `axe.spec.ts` with the manager route and the two uncovered consultant statuses the next time
+   this screen is touched, not deferred indefinitely.
+
+2. **D4's status is now "probably fine, unverified" instead of either "fixed" or "open"** — a
+   state this repository's own rule (`CLAUDE.md`'s double checkpoint) exists to rule out. **A row
+   below**, closing it needs one screenshot at each persona's shell, which the existing
+   `shell.spec.ts` screenshot test already takes — reading those four PNGs is the whole check.
+
+3. **`CraListItem` (the domain type, `packages/timesheet/src/domain/cra-repository.ts`) still has
+   no `consultantName`.** The wire gained one, resolved at the route (`GET /api/v1/cras`'s
+   handler), the same shape the pré-facturier already uses — deliberately, per ADR-0071's own
+   note that this needed no ADR of its own. A future caller of `unit.cras.list()` directly (not
+   through this route) will find the repository still answers only an id, and re-deriving the name
+   pattern is one grep away (`consultantNames()` on `PgReferenceReader`) rather than a trap, so
+   this is named rather than fixed.
+
+### Evidence
+
+**`pnpm run check`**: lint 0/0, boundaries clean (279 modules, 968 dependencies), format clean,
+`typecheck` all 7 members `Done`, `test:cov` **571 tests in 46 files**, coverage 99.41/97.12/99.52/99.49
+— unchanged to four significant figures from the Phase 5bis checkpoint, `apps/web` still outside
+the measured surface.
+
+**`pnpm run test:int`**: `Test Files 16 passed (16)`, `Tests 202 passed (202)` (up from 201 —
+ADR-0071's manager route: a positive read, an empty-month read, two negative scope reads — with
+and without an existing `Cra` row, the exact gap the ADR's Context section names — a 404 for an
+unknown consultant, an `insufficient-role` refusal for both `consultant` and `billing`).
+
+**Playwright, `journeys` project**, against a freshly reset and reseeded database: **9 passed** (up
+from 5 at the end of front-end Phase 6) — the persona-cache fix, the rewritten J1 (read the seed's
+matrix, navigate months, add an activity, fill, save, reopen, submit, then a manager's refusal),
+the "months ahead" picker, ADR-0071's manager read (positive and the out-of-scope negative), and
+the pre-existing `insufficient-role` and month-list checks, both re-verified against the new DOM.
+
+**Playwright, `axe.spec.ts`** (desktop and mobile-shell projects): 3 passed, 0 critical/serious
+violations — including the fix for `scrollable-region-focusable` the matrix's horizontal-scroll
+region needed (`role="region"` + `tabIndex={0}` on the wrapper), found running this gate rather
+than assumed in advance.
+
+**Full Playwright suite** (`desktop`, `mobile-shell`, `journeys`, unfiltered): 35 passed, 14
+skipped (per-project skips, expected), 0 failed.
