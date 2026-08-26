@@ -1,5 +1,5 @@
 import { API_PROBLEM_TYPES } from '@erp/contracts';
-import { daysOf, isoDateInFirmTimeZone, periodFromIso } from '@erp/platform';
+import { daysOf, isoDateInFirmTimeZone, periodFromIso, QUARTER_DAYS_PER_DAY } from '@erp/platform';
 import { workingCalendar } from '@erp/timesheet';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -57,16 +57,19 @@ const IdParam = z.object({ id: z.string().min(1).max(64) });
 const ConsultantParams = z.object({ consultantId: z.string().min(1).max(64) });
 
 /**
- * The month, as a body. One entry per **half-day slot** (ADR-0012 makes the half-day the unit, and
- * ADR-0050 makes the whole month the unit of write), so a day split across two missions is two
- * entries and needs no special case.
+ * The month, as a body. One entry per **matrix cell** (ADR-0069 makes the quarter-day the unit,
+ * ADR-0070 makes one cell one `(day, dayType, missionId)` triplet, and ADR-0050 makes the whole
+ * month the unit of write), so a day split across two missions is two entries and needs no special
+ * case. Each entry carries its own `quarterDays`, one to four.
  *
- * The cap is 62 — the longest month, twice — so a body longer than it is not a month however it is
- * spelled. It is enforced here and, on the web path, by the domain instead: `DayOverbookedError`
- * refuses a third half-day on a day, which is the same bound reached by the rule rather than by the
- * schema.
+ * The cap is 124 — 4 × 31, the longest month at its maximum density — so a body longer than it is
+ * not a month however it is spelled. It is enforced here and, on the web path, by the domain
+ * instead: `DayOverbookedError` refuses a fifth quarter-day on a day, which is the same bound
+ * reached by the rule rather than by the schema.
  */
-const MAX_ENTRIES = 62;
+const MAX_ENTRIES = 124;
+const MIN_QUARTER_DAYS = 1;
+const MAX_QUARTER_DAYS = 4;
 
 const MonthEntries = z.object({
   submit: z.boolean().default(false),
@@ -76,6 +79,7 @@ const MonthEntries = z.object({
         day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
         dayType: z.union([z.literal('worked'), z.literal('absence')]),
         missionId: z.string().min(1).max(64).nullable().default(null),
+        quarterDays: z.number().int().min(MIN_QUARTER_DAYS).max(MAX_QUARTER_DAYS),
       }),
     )
     .max(MAX_ENTRIES),
@@ -122,7 +126,7 @@ function gridDaysSkeleton(periodIso: string): { date: string; nonWorkable: strin
 function blockingReasonsOf(row: CraRow): string[] {
   return row.blocking
     .filter(
-      (item): item is { halfDays: number; why: Extract<Blocking, { kind: 'declined' }> } =>
+      (item): item is { quarterDays: number; why: Extract<Blocking, { kind: 'declined' }> } =>
         item.why.kind === 'declined',
     )
     .map((item) => item.why.reason);
@@ -285,10 +289,10 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
             (total, row) => total + row.totalExcludingVatCents,
             0,
           ),
-          // Half-days, despite the name Annexe A pins for this field — the unit every quantity
+          // Quarter-days, despite the name Annexe A pins for this field — the unit every quantity
           // on the wire uses, and what `frenchDays` (both copies) takes as its argument. A
-          // consumer that divides by two before formatting prints half the truth.
-          lateDays: composition.lateHalfDays,
+          // consumer that divides by four before formatting prints a quarter of the truth.
+          lateDays: composition.lateQuarterDays,
           craCount: composition.cras.length,
         },
         invoices: composition.invoices,
@@ -298,7 +302,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           consultantName: row.consultantName,
           status: row.status,
           late: composition.periodClosed && row.status !== 'validated',
-          recordedHalfDays: row.recordedHalfDays,
+          recordedQuarterDays: row.recordedQuarterDays,
           blockingReasons: blockingReasonsOf(row),
           decidable: composition.mayDecide && row.status === 'submitted',
         })),
@@ -328,11 +332,13 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           missionId: mission.id,
           name: mission.name,
           clientName: mission.clientName,
+          assignableDays: mission.assignableDays,
         })),
         lines: grid.lines,
         flags: grid.flags,
         refusal: grid.refusal,
         editable: grid.editable,
+        validatedBy: grid.validatedBy,
       };
     },
   );
@@ -368,19 +374,18 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
 
         const recordedByDay = new Map<string, number>();
         for (const line of cra?.lines ?? []) {
-          recordedByDay.set(line.day, (recordedByDay.get(line.day) ?? 0) + line.halfDays);
+          recordedByDay.set(line.day, (recordedByDay.get(line.day) ?? 0) + line.quarterDays);
         }
-        const HALF_DAYS_PER_FULL_DAY = 2;
 
         return {
           period: query.value.period,
           role: 'consultant' as const,
           myMonthStatus: cra?.status ?? null,
-          recordedHalfDays: cra?.lines.reduce((total, line) => total + line.halfDays, 0) ?? 0,
-          // A day short of its two half-days still counts as not entered — a day recorded once is
-          // not a day recorded.
+          recordedQuarterDays: cra?.lines.reduce((total, line) => total + line.quarterDays, 0) ?? 0,
+          // A day short of its four quarter-days still counts as not entered — a day recorded
+          // once is not a day recorded.
           remainingWorkableDays: workableDays.filter(
-            (day) => (recordedByDay.get(day) ?? 0) < HALF_DAYS_PER_FULL_DAY,
+            (day) => (recordedByDay.get(day) ?? 0) < QUARTER_DAYS_PER_DAY,
           ).length,
         };
       }

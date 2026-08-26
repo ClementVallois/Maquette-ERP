@@ -132,12 +132,12 @@ describe('problemFromBusinessError', () => {
 
   it('carries the field that was refused on a 422', () => {
     const problem = problemFromBusinessError(
-      new TestRefusal('/problems/invalid-value', { field: 'halfDays', value: 1.5 }),
+      new TestRefusal('/problems/invalid-value', { field: 'quarterDays', value: 1.5 }),
       context,
     );
 
     expect(problem.status).toBe(422);
-    expect(problem.errors).toStrictEqual({ field: ['halfDays'], value: ['1.5'] });
+    expect(problem.errors).toStrictEqual({ field: ['quarterDays'], value: ['1.5'] });
   });
 
   it('degrades an unmapped refusal to a 500 that publishes nothing', () => {

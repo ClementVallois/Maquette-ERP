@@ -59,7 +59,7 @@ function missionTable(economics: ConsultantEconomics): Html {
         (mission) =>
           html`<tr>
             <th scope="row">${mission.missionName}</th>
-            <td class="num">${frenchDays(mission.halfDays)}</td>
+            <td class="num">${frenchDays(mission.quarterDays)}</td>
             <td class="num">${frenchEuros(mission.tjmCents)}</td>
             <td class="num">${frenchEuros(mission.revenueCents)}</td>
             <td class="num">${frenchEuros(mission.costCents)}</td>

@@ -55,16 +55,27 @@ describe('frenchEuros', () => {
 });
 
 describe('frenchDays', () => {
-  it('writes a whole number of days when the half-days are even', () => {
+  it('writes a whole number of days when the quarter-days divide evenly', () => {
     expect(frenchDays(0)).toBe(`0${NBSP}j`);
-    expect(frenchDays(2)).toBe(`1${NBSP}j`);
-    expect(frenchDays(40)).toBe(`20${NBSP}j`);
+    expect(frenchDays(4)).toBe(`1${NBSP}j`);
+    expect(frenchDays(80)).toBe(`20${NBSP}j`);
   });
 
-  it('writes a half day with a decimal comma', () => {
-    expect(frenchDays(1)).toBe(`0,5${NBSP}j`);
-    expect(frenchDays(3)).toBe(`1,5${NBSP}j`);
-    expect(frenchDays(41)).toBe(`20,5${NBSP}j`);
+  it('writes a quarter, a half and three quarters with a decimal comma', () => {
+    expect(frenchDays(1)).toBe(`0,25${NBSP}j`);
+    expect(frenchDays(2)).toBe(`0,5${NBSP}j`);
+    expect(frenchDays(3)).toBe(`0,75${NBSP}j`);
+  });
+
+  it('carries the fraction past a whole day', () => {
+    expect(frenchDays(5)).toBe(`1,25${NBSP}j`);
+    expect(frenchDays(6)).toBe(`1,5${NBSP}j`);
+    expect(frenchDays(7)).toBe(`1,75${NBSP}j`);
+    expect(frenchDays(81)).toBe(`20,25${NBSP}j`);
+  });
+
+  it('carries the sign onto a negative count', () => {
+    expect(frenchDays(-1)).toBe(`−0,25${NBSP}j`);
   });
 });
 

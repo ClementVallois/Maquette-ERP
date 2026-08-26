@@ -5,7 +5,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { issueInvoice } from '../chain/issue-invoice.ts';
-import { type HalfDayEntry, recordMonth } from '../chain/record-month.ts';
+import { type QuarterDayEntry, recordMonth } from '../chain/record-month.ts';
 import { refuseCra } from '../chain/refuse-cra.ts';
 import { validateCraAndDraftInvoices } from '../chain/validate-cra.ts';
 import { craGridComposition } from '../composition/cra-grid.ts';
@@ -49,6 +49,12 @@ const NOT_MODIFIED = 304;
 /** A consultant's whole history fits well inside the repository's hard cap of fifty. */
 const MAX_MONTHS = 50;
 const SLOTS = [0, 1] as const;
+/**
+ * What one slot of this form is worth, in the storage unit (ADR-0069). This screen keeps its
+ * two-slot morning/afternoon shape — ADR-0070's matrix is `apps/web`'s, not this one's — so a
+ * slot stays worth half a day, now spelled as two quarter-days rather than one half-day.
+ */
+const SLOT_QUARTER_DAYS = 2;
 
 /**
  * The declarations the verbs are registered with, named because a **screen reads them too**
@@ -84,8 +90,9 @@ const PeriodFilter = z.object({
 });
 
 /**
- * What the grid posts (ADR-0050): one field per half-day slot, named `YYYY-MM-DD:0` or `:1`, whose
- * value is `''`, `absence`, or a mission id — plus which button was pressed.
+ * What the grid posts (ADR-0050): one field per slot, named `YYYY-MM-DD:0` or `:1`, whose value is
+ * `''`, `absence`, or a mission id — plus which button was pressed. Each slot is worth
+ * `SLOT_QUARTER_DAYS` quarter-days (ADR-0069).
  *
  * `looseObject` rather than the strict default, because the field **names are data**: they are the
  * days of a month, and a schema cannot enumerate them without knowing which month. Zod checks the
@@ -115,12 +122,17 @@ function backToPreFacturier(periode: string | undefined): string {
 }
 
 /**
- * The posted form, read back into half-day entries. Anything that is not a slot field is ignored
- * rather than refused: the same body carries the `action` button, and a browser adds fields nobody
- * asked for.
+ * The posted form, read back into quarter-day entries. Anything that is not a slot field is
+ * ignored rather than refused: the same body carries the `action` button, and a browser adds
+ * fields nobody asked for.
+ *
+ * Each slot is worth `SLOT_QUARTER_DAYS`: this form's granularity did not change, only the unit it
+ * is spelled in. Two slots naming the same mission on the same day are two entries of the same
+ * triplet — `linesOf` in `record-month.ts` sums them into one line of a full day (ADR-0069/0070),
+ * where the old model relied on `recordDay` accepting two identical half-day lines directly.
  */
-function entriesOf(body: Record<string, unknown>): HalfDayEntry[] {
-  const entries: HalfDayEntry[] = [];
+function entriesOf(body: Record<string, unknown>): QuarterDayEntry[] {
+  const entries: QuarterDayEntry[] = [];
 
   for (const [name, raw] of Object.entries(body)) {
     const match = SLOT_FIELD.exec(name);
@@ -129,8 +141,8 @@ function entriesOf(body: Record<string, unknown>): HalfDayEntry[] {
     const [, day = ''] = match;
     entries.push(
       raw === 'absence'
-        ? { day, dayType: 'absence', missionId: null }
-        : { day, dayType: 'worked', missionId: raw },
+        ? { day, dayType: 'absence', missionId: null, quarterDays: SLOT_QUARTER_DAYS }
+        : { day, dayType: 'worked', missionId: raw, quarterDays: SLOT_QUARTER_DAYS },
     );
   }
 
@@ -142,9 +154,13 @@ function gridDays(periodIso: string, lines: readonly CraLine[]): GridDay[] {
   const calendar = workingCalendar();
 
   return daysOf(periodFromIso(periodIso)).map((date) => {
-    // A line of two half-days fills both slots; two lines of one fill one each, in the order the
-    // record holds them. Which slot a half-day sits in is a fact about the form, never about the
-    // record — the domain has no morning.
+    // A line worth a full day (or worth two slots' notice of the same activity) fills both slots;
+    // a line worth one slot fills one, in the order the record holds them. Which slot a
+    // quarter-day sits in is a fact about the form, never about the record — the domain has no
+    // morning. A line worth an odd number of quarter-days (possible since ADR-0069, and never
+    // produced by this form) rounds up to the nearest slot rather than being dropped: this legacy
+    // two-slot grid was never built to show a finer split than half a day, and `apps/web`'s matrix
+    // (ADR-0070) is where that split is shown exactly.
     const slots: (SlotValue | null)[] = [null, null];
     let next = 0;
 
@@ -154,7 +170,8 @@ function gridDays(periodIso: string, lines: readonly CraLine[]): GridDay[] {
           ? { kind: 'absence' }
           : { kind: 'mission', missionId: line.missionId ?? '' };
 
-      for (let taken = 0; taken < line.halfDays && next < SLOTS.length; taken += 1) {
+      const slotsForLine = Math.ceil(line.quarterDays / SLOT_QUARTER_DAYS);
+      for (let taken = 0; taken < slotsForLine && next < SLOTS.length; taken += 1) {
         slots[next] = value;
         next += 1;
       }

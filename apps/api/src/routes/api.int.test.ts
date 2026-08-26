@@ -213,8 +213,8 @@ beforeEach(async () => {
   );
   for (const day of workedDaysOfJune()) {
     await client.query(
-      `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
-       VALUES ($1, $2, $3, 'worked', $4, 2), ($5, $6, $3, 'worked', $7, 2)`,
+      `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, quarter_days)
+       VALUES ($1, $2, $3, 'worked', $4, 4), ($5, $6, $3, 'worked', $7, 4)`,
       [uuidv7(), CRA, day, MISSION, uuidv7(), CRA_TWO, MISSION_TWO],
     );
   }
@@ -560,11 +560,16 @@ describe('pagination', () => {
 describe('recording a month through the API (ADR-0050)', () => {
   const JULY = workedDaysOfJuly();
 
-  function entries(mission = MISSION): { day: string; dayType: 'worked' }[] {
-    return JULY.flatMap((day) => [
-      { day, dayType: 'worked' as const },
-      { day, dayType: 'worked' as const },
-    ]).map((entry) => ({ ...entry, missionId: mission }));
+  /** One entry per day, each a full day (ADR-0069): one matrix cell per triplet (ADR-0070). */
+  function entries(
+    mission = MISSION,
+  ): { day: string; dayType: 'worked'; missionId: string; quarterDays: number }[] {
+    return JULY.map((day) => ({
+      day,
+      dayType: 'worked' as const,
+      missionId: mission,
+      quarterDays: 4,
+    }));
   }
 
   it('replaces the month and reports the status it left it in', async () => {
@@ -636,15 +641,52 @@ describe('recording a month through the API (ADR-0050)', () => {
       headers: writingAs('consultant-paris'),
       payload: {
         submit: false,
-        entries: Array.from({ length: 63 }, () => ({
+        // 124 is 4 × 31, the longest month at its maximum density (ADR-0069): one entry per
+        // quarter-day cell. 125 is one more than the cap however the body is spelled.
+        entries: Array.from({ length: 125 }, () => ({
           day: '2026-07-01',
           dayType: 'worked',
           missionId: MISSION,
+          quarterDays: 1,
         })),
       },
     });
 
     expect(response.statusCode).toBe(400);
+  });
+
+  it('sums two entries for the same day, type and mission into one line, not two', async () => {
+    // ADR-0069/0070: a quantity now lives on the entry, so two entries for the same
+    // (day, dayType, missionId) triplet are not a normal write — the matrix has exactly one cell
+    // for it. They sum into one line rather than producing two, which is the lossy round trip
+    // ADR-0066 existed to prevent, reappeared one layer down had this gone unhandled.
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: {
+        submit: false,
+        entries: [
+          { day: '2026-07-01', dayType: 'worked', missionId: MISSION, quarterDays: 1 },
+          { day: '2026-07-01', dayType: 'worked', missionId: MISSION, quarterDays: 3 },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const { craId } = response.json<{ craId: string }>();
+
+    const found = await app.inject({
+      method: 'GET',
+      url: `/api/v1/cras/${craId}`,
+      headers: as('consultant-paris'),
+    });
+
+    expect(
+      found.json<{
+        lines: { day: string; dayType: string; missionId: string; quarterDays: number }[];
+      }>().lines,
+    ).toStrictEqual([{ day: '2026-07-01', dayType: 'worked', missionId: MISSION, quarterDays: 4 }]);
   });
 
   it('submits the month, and the flags come back with it', async () => {
@@ -657,8 +699,7 @@ describe('recording a month through the API (ADR-0050)', () => {
         submit: true,
         entries: [
           ...entries(),
-          { day: saturday, dayType: 'worked', missionId: MISSION },
-          { day: saturday, dayType: 'worked', missionId: MISSION },
+          { day: saturday, dayType: 'worked', missionId: MISSION, quarterDays: 4 },
         ],
       },
     });
@@ -677,7 +718,7 @@ describe('recording a month through the API (ADR-0050)', () => {
       headers: writingAs('consultant-paris'),
       payload: {
         submit: true,
-        entries: [{ day: '2026-07-01', dayType: 'worked', missionId: MISSION }],
+        entries: [{ day: '2026-07-01', dayType: 'worked', missionId: MISSION, quarterDays: 4 }],
       },
     });
 
@@ -705,10 +746,12 @@ describe('the edges of the write route', () => {
   });
 
   it('refuses a replay of a submission, which is the one body PUT is not idempotent for', async () => {
-    const july = workedDaysOfJuly().flatMap((day) => [
-      { day, dayType: 'worked' as const, missionId: MISSION },
-      { day, dayType: 'worked' as const, missionId: MISSION },
-    ]);
+    const july = workedDaysOfJuly().map((day) => ({
+      day,
+      dayType: 'worked' as const,
+      missionId: MISSION,
+      quarterDays: 4,
+    }));
 
     const first = await app.inject({
       method: 'PUT',

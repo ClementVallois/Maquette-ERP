@@ -181,28 +181,28 @@ beforeEach(async () => {
   );
   const [firstDay = '', ...regieDays] = workedDaysOfJune();
   await client.query(
-    `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
-     VALUES ($1, $2, $3, 'worked', $4, 2)`,
+    `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, quarter_days)
+     VALUES ($1, $2, $3, 'worked', $4, 4)`,
     [uuidv7(), CRA_ALICE, firstDay, FORFAIT],
   );
   for (const day of regieDays) {
     await client.query(
-      `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
-       VALUES ($1, $2, $3, 'worked', $4, 2)`,
+      `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, quarter_days)
+       VALUES ($1, $2, $3, 'worked', $4, 4)`,
       [uuidv7(), CRA_ALICE, day, MISSION],
     );
   }
 
-  // Chloé's June: still a draft when July opens — three half-days, none of them validated, which
-  // is what ADR-0054's late-days counter counts.
+  // Chloé's June: still a draft when July opens — five quarter-days, none of them validated,
+  // which is what ADR-0054's late-days counter counts.
   await client.query(
     `INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
      VALUES ($1, $2, $3, '2026-06', 'draft')`,
     [CRA_CHLOE, CHLOE, PARIS],
   );
   await client.query(
-    `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
-     VALUES ($1, $2, '2026-06-02', 'worked', $3, 2), ($4, $2, '2026-06-03', 'worked', $3, 1)`,
+    `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, quarter_days)
+     VALUES ($1, $2, '2026-06-02', 'worked', $3, 4), ($4, $2, '2026-06-03', 'worked', $3, 1)`,
     [uuidv7(), CRA_CHLOE, MISSION, uuidv7()],
   );
 });
@@ -244,7 +244,7 @@ interface PreFacturierBody {
     readonly consultantName: string;
     readonly status: string;
     readonly late: boolean;
-    readonly recordedHalfDays: number;
+    readonly recordedQuarterDays: number;
     readonly blockingReasons: readonly string[];
     readonly decidable: boolean;
   }[];
@@ -266,8 +266,8 @@ describe('GET /api/v1/pre-facturier', () => {
     expect(body.period).toBe('2026-06');
     // 20 Regie days (21 workable minus the one on the Forfait mission) at 850 € = 17 000 € HT.
     expect(body.summary.billableCents).toBe(1_700_000);
-    // Chloé's three half-days: draft, unvalidated, and June has closed by the clock's July.
-    expect(body.summary.lateDays).toBe(3);
+    // Chloé's five quarter-days: draft, unvalidated, and June has closed by the clock's July.
+    expect(body.summary.lateDays).toBe(5);
     expect(body.summary.craCount).toBe(2);
 
     expect(body.invoices).toHaveLength(1);
@@ -284,7 +284,7 @@ describe('GET /api/v1/pre-facturier', () => {
     expect(alice).toMatchObject({
       status: 'validated',
       late: false,
-      recordedHalfDays: 21 * 2,
+      recordedQuarterDays: 21 * 4,
       blockingReasons: ['notRegie'],
       decidable: false,
     });
@@ -293,7 +293,7 @@ describe('GET /api/v1/pre-facturier', () => {
     expect(chloe).toMatchObject({
       status: 'draft',
       late: true,
-      recordedHalfDays: 3,
+      recordedQuarterDays: 5,
       blockingReasons: [],
       decidable: false,
     });

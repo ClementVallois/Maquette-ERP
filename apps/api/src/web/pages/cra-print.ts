@@ -55,7 +55,7 @@ function dayRows(view: CraPrintView): Html {
           ${flagOf(line.day, view.flags)}
         </th>
         <td>${nameOf(line, view)}</td>
-        <td class="num">${frenchDays(line.halfDays)}</td>
+        <td class="num">${frenchDays(line.quarterDays)}</td>
       </tr>`,
   )}`;
 }
@@ -74,10 +74,10 @@ function totalsTable(view: CraPrintView): Html {
   const perName = new Map<string, number>();
   for (const line of view.lines) {
     const name = nameOf(line, view);
-    perName.set(name, (perName.get(name) ?? 0) + line.halfDays);
+    perName.set(name, (perName.get(name) ?? 0) + line.quarterDays);
   }
 
-  const total = view.lines.reduce((sum, line) => sum + line.halfDays, 0);
+  const total = view.lines.reduce((sum, line) => sum + line.quarterDays, 0);
 
   return html`<table class="totals">
     <caption>
@@ -87,10 +87,10 @@ function totalsTable(view: CraPrintView): Html {
       ${[...perName]
         .sort(([left], [right]) => left.localeCompare(right))
         .map(
-          ([name, halfDays]) =>
+          ([name, quarterDays]) =>
             html`<tr>
               <th scope="row">${name}</th>
-              <td class="num">${frenchDays(halfDays)}</td>
+              <td class="num">${frenchDays(quarterDays)}</td>
             </tr>`,
         )}
     </tbody>

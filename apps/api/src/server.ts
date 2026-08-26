@@ -43,7 +43,7 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
   const app = Fastify({
     logger: loggerOptions(dependencies.config),
     genReqId: (request) => correlationIdOf(request.headers[CORRELATION_ID_HEADER]),
-    // The default is 100 MiB. Nothing this API accepts is larger than a month of half-days.
+    // The default is 100 MiB. Nothing this API accepts is larger than a month of quarter-days.
     bodyLimit: BODY_LIMIT_BYTES,
   });
 

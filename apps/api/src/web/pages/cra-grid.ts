@@ -8,13 +8,15 @@ import { html, type Html } from '../render/html.ts';
 import { shell } from '../shell.ts';
 
 /**
- * The Cra entry grid: days down, two half-day slots across.
+ * The Cra entry grid: days down, two slots across.
  *
- * **Two slots per day, not a number of half-days typed in a box.** ADR-0012 makes the half-day the
- * storage unit, and this is the truest rendering of it — a day split between two missions is a
- * morning and an afternoon, which is how the consultant actually lived it, and it needs no special
- * case in the form. The alternative (a mission and a quantity per row) makes the split day the
- * exception it is not.
+ * **Two slots per day, not a number of quarter-days typed in a box.** ADR-0069 makes the
+ * quarter-day the storage unit, but this screen predates the matrix ADR-0070 built for `apps/web`
+ * and keeps its own shape: a day split between two missions is a morning and an afternoon, which
+ * is how the consultant actually lived it, and it needs no special case in the form. Each slot is
+ * worth two quarter-days (`SLOT_QUARTER_DAYS` in `../routes.ts`) — the granularity this form
+ * offers did not change, only the unit it is counted in. The alternative (a mission and a quantity
+ * per row) makes the split day the exception it is not, and is what the matrix does instead.
  *
  * **The totals are computed here, on the server, and are current as of the last save** — not live
  * per keystroke. ADR-0050 records that narrowing of BUILD-PLAN's wording and why it is not a
@@ -49,7 +51,7 @@ export interface CraGridView {
   readonly days: readonly GridDay[];
   readonly missions: readonly GridMission[];
   readonly flags: readonly { day: string; reason: NonWorkableDay }[];
-  readonly totals: readonly { missionId: string | null; dayType: DayType; halfDays: number }[];
+  readonly totals: readonly { missionId: string | null; dayType: DayType; quarterDays: number }[];
   readonly editable: boolean;
   readonly refusal: { reason: string } | null;
 }
@@ -142,7 +144,7 @@ function totals(view: CraGridView): Html {
                   : LABELS.cra.absence
               }
             </td>
-            <td class="num">${frenchDays(total.halfDays)}</td>
+            <td class="num">${frenchDays(total.quarterDays)}</td>
           </tr>`,
       )}
     </tbody>
@@ -212,10 +214,10 @@ export function craGridPage(view: CraGridView, persona: Persona | undefined): Ht
 /** Groups the recorded lines the way the totals table shows them: by mission, absences apart. */
 export function totalsOf(
   lines: readonly CraLine[],
-): { missionId: string | null; dayType: DayType; halfDays: number }[] {
+): { missionId: string | null; dayType: DayType; quarterDays: number }[] {
   const perKey = new Map<
     string,
-    { missionId: string | null; dayType: DayType; halfDays: number }
+    { missionId: string | null; dayType: DayType; quarterDays: number }
   >();
 
   for (const line of lines) {
@@ -225,10 +227,10 @@ export function totalsOf(
       perKey.set(key, {
         missionId: line.missionId,
         dayType: line.dayType,
-        halfDays: line.halfDays,
+        quarterDays: line.quarterDays,
       });
     } else {
-      existing.halfDays += line.halfDays;
+      existing.quarterDays += line.quarterDays;
     }
   }
 

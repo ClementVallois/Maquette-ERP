@@ -175,8 +175,8 @@ beforeEach(async () => {
     [ENTITY],
   );
 
-  // Alice's June: a draft, five of the month's 22 workable days recorded — ten half-days, and
-  // seventeen days still not entered.
+  // Alice's June: a draft, five of the month's 22 workable days recorded — twenty quarter-days,
+  // and seventeen days still not entered.
   await client.query(
     `INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
      VALUES ($1, $2, $3, '2026-06', 'draft')`,
@@ -184,8 +184,8 @@ beforeEach(async () => {
   );
   for (const day of WORKABLE_JUNE.slice(0, 5)) {
     await client.query(
-      `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
-       VALUES ($1, $2, $3, 'worked', $4, 2)`,
+      `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, quarter_days)
+       VALUES ($1, $2, $3, 'worked', $4, 4)`,
       [uuidv7(), CRA_ALICE, day, MISSION],
     );
   }
@@ -199,8 +199,8 @@ beforeEach(async () => {
   );
   for (const day of WORKABLE_JUNE) {
     await client.query(
-      `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
-       VALUES ($1, $2, $3, 'worked', $4, 2)`,
+      `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, quarter_days)
+       VALUES ($1, $2, $3, 'worked', $4, 4)`,
       [uuidv7(), CRA_CHLOE, day, MISSION],
     );
   }
@@ -230,7 +230,7 @@ async function dashboard(persona: string): Promise<Awaited<ReturnType<typeof app
 }
 
 describe('GET /api/v1/dashboard — consultant', () => {
-  it('reports my month, in half-days and in days not yet entered', async () => {
+  it('reports my month, in quarter-days and in days not yet entered', async () => {
     const response = await dashboard('consultant-paris');
 
     expect(response.statusCode).toBe(200);
@@ -238,7 +238,7 @@ describe('GET /api/v1/dashboard — consultant', () => {
       period: '2026-06',
       role: 'consultant',
       myMonthStatus: 'draft',
-      recordedHalfDays: 10,
+      recordedQuarterDays: 20,
       remainingWorkableDays: 17,
     });
   });

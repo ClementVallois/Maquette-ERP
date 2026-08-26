@@ -125,11 +125,11 @@ beforeEach(async () => {
     [CRA_JUNE, ALICE, PARIS],
   );
   await client.query(
-    `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
-     VALUES ($1, $5, '2026-06-11', 'worked', $2, 1),
-            ($3, $5, '2026-06-11', 'worked', $4, 1),
-            ($6, $5, '2026-06-18', 'absence', NULL, 2),
-            ($7, $5, '2026-06-13', 'worked', $2, 2)`,
+    `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, quarter_days)
+     VALUES ($1, $5, '2026-06-11', 'worked', $2, 2),
+            ($3, $5, '2026-06-11', 'worked', $4, 2),
+            ($6, $5, '2026-06-18', 'absence', NULL, 4),
+            ($7, $5, '2026-06-13', 'worked', $2, 4)`,
     [uuidv7(), MISSION_A, uuidv7(), MISSION_B, CRA_JUNE, uuidv7(), uuidv7()],
   );
   await client.query(
@@ -159,16 +159,18 @@ interface GridBody {
     readonly missionId: string;
     readonly name: string;
     readonly clientName: string;
+    readonly assignableDays: readonly string[];
   }[];
   readonly lines: readonly {
     readonly day: string;
     readonly dayType: string;
     readonly missionId: string | null;
-    readonly halfDays: number;
+    readonly quarterDays: number;
   }[];
   readonly flags: readonly { readonly day: string; readonly reason: string }[];
   readonly refusal: { readonly reason: string } | null;
   readonly editable: boolean;
+  readonly validatedBy: string | null;
 }
 
 describe('GET /api/v1/cras/:period/grid', () => {
@@ -195,24 +197,38 @@ describe('GET /api/v1/cras/:period/grid', () => {
     const thursday = body.days.find((day) => day.date === '2026-06-11');
     expect(thursday?.nonWorkable).toBeNull();
 
+    // Both missions are assigned from 2026-01-05, open-ended, so every June day is assignable.
+    const juneDates = body.days.map((day) => day.date);
     expect(body.missions).toStrictEqual(
       expect.arrayContaining([
-        { missionId: MISSION_A, name: 'Audit DORA', clientName: 'Banque Nationale de Test' },
-        { missionId: MISSION_B, name: 'SOC Run', clientName: 'Banque Nationale de Test' },
+        {
+          missionId: MISSION_A,
+          name: 'Audit DORA',
+          clientName: 'Banque Nationale de Test',
+          assignableDays: juneDates,
+        },
+        {
+          missionId: MISSION_B,
+          name: 'SOC Run',
+          clientName: 'Banque Nationale de Test',
+          assignableDays: juneDates,
+        },
       ]),
     );
 
-    // The split day: one line per mission, one half-day each.
+    // The split day: one line per mission, one quarter of the day each — 3/1 rather than 2/2 on
+    // purpose in the seed, but this fixture uses 2/2 since it is inserted directly and is about
+    // the read, not about proving the seed's own split (that is `web/cra-grid.int.test.ts`).
     const splitDayLines = body.lines.filter((line) => line.day === '2026-06-11');
     expect(splitDayLines).toHaveLength(2);
-    expect(splitDayLines.every((line) => line.halfDays === 1)).toBe(true);
+    expect(splitDayLines.every((line) => line.quarterDays === 2)).toBe(true);
 
     // The absence: recorded, no mission.
     expect(body.lines).toContainEqual({
       day: '2026-06-18',
       dayType: 'absence',
       missionId: null,
-      halfDays: 2,
+      quarterDays: 4,
     });
 
     // The worked Saturday: recorded as a normal worked line, and separately flagged.
@@ -220,9 +236,57 @@ describe('GET /api/v1/cras/:period/grid', () => {
       day: '2026-06-13',
       dayType: 'worked',
       missionId: MISSION_A,
-      halfDays: 2,
+      quarterDays: 4,
     });
     expect(body.flags).toStrictEqual([{ day: '2026-06-13', reason: 'weekend' }]);
+    // June is submitted, not validated: nobody has accepted it yet.
+    expect(body.validatedBy).toBeNull();
+  });
+
+  it('carries who validated the month, once it is validated', async () => {
+    await transaction.client.query(
+      `INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status, submitted_at, validated_by, validated_at)
+       VALUES ($1, $2, $3, '2026-04', 'validated', '2026-05-01T09:00:00Z', $4, '2026-05-02T09:00:00Z')`,
+      [uuidv7(), ALICE, PARIS, BRUNO],
+    );
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras/2026-04/grid',
+      headers: as('consultant-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<GridBody>().validatedBy).toBe(BRUNO);
+  });
+
+  it('greys out a mission on the days the consultant is not staffed on it, so the matrix never offers a write the domain would refuse', async () => {
+    const midMonthMission = 'gridapi-mission-c';
+    await transaction.client.query(
+      `INSERT INTO public.missions (id, client_id, name, billing_model, start_date)
+       VALUES ($1, $2, 'Audit tardif', 'Regie', '2026-01-05')`,
+      [midMonthMission, CLIENT],
+    );
+    await transaction.client.query(
+      `INSERT INTO public.assignments (id, consultant_id, mission_id, from_date, to_date)
+       VALUES ($1, $2, $3, '2026-06-15', NULL)`,
+      [uuidv7(), ALICE, midMonthMission],
+    );
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras/2026-06/grid',
+      headers: as('consultant-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<GridBody>();
+    const mission = body.missions.find((candidate) => candidate.missionId === midMonthMission);
+
+    expect(mission).toBeDefined();
+    expect(mission!.assignableDays[0]).toBe('2026-06-15');
+    expect(mission!.assignableDays).not.toContain('2026-06-14');
+    expect(mission!.assignableDays.at(-1)).toBe('2026-06-30');
   });
 
   it('answers an empty month with no Cra rather than refusing it', async () => {

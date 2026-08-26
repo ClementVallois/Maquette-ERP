@@ -110,7 +110,7 @@ function lineTable(invoice: Invoice): Html {
         (line) =>
           html`<tr>
             <th scope="row">${line.designation}</th>
-            <td class="num">${frenchDays(line.quantityHalfDays)}</td>
+            <td class="num">${frenchDays(line.quantityQuarterDays)}</td>
             <td class="num">${frenchEuros(line.unitPriceCents)}</td>
             <td class="num">${vatOf(line)}</td>
             <td class="num">${frenchEuros(line.amountCents)}</td>

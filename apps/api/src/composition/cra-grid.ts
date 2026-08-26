@@ -18,6 +18,14 @@ export interface GridMission {
   readonly id: string;
   readonly name: string;
   readonly clientName: string;
+  /**
+   * The days of the month this consultant is staffed on this mission. What lets the matrix
+   * (ADR-0070) grey out a cell rather than let a write fail at submission — a mission that starts
+   * on the 15th is offered for the whole month, and the days before it started are the ones this
+   * field marks unassignable. Computed the same way the mission list itself is already filtered:
+   * `timesheetReference.isAssigned`, day by day, nothing new.
+   */
+  readonly assignableDays: readonly string[];
 }
 
 export interface CraGridComposition {
@@ -35,6 +43,13 @@ export interface CraGridComposition {
    */
   readonly editable: boolean;
   readonly missions: readonly GridMission[];
+  /**
+   * Who accepted the month, `null` until it is validated. Task 6.4 of the front-end plan asked
+   * for it on this composition and it was not carried — recorded as a gap in `open-questions.md`
+   * on 25/08/2026 and corrected here, in the same task that renumbers the composition's other
+   * fields.
+   */
+  readonly validatedBy: string | null;
 }
 
 export interface CraGridInput {
@@ -58,11 +73,18 @@ export async function craGridComposition(
   const names = await reference.missionNames();
   const clientNames = await reference.missionClientNames();
 
+  const periodDays = daysOf(period);
+
   const missions: GridMission[] = [...names]
-    .filter(([id]) =>
-      daysOf(period).some((day) => timesheetReference.isAssigned(actor.consultantId, id, day)),
-    )
-    .map(([id, name]) => ({ id, name, clientName: clientNames.get(id) ?? id }));
+    .map(([id, name]) => ({
+      id,
+      name,
+      clientName: clientNames.get(id) ?? id,
+      assignableDays: periodDays.filter((day) =>
+        timesheetReference.isAssigned(actor.consultantId, id, day),
+      ),
+    }))
+    .filter((mission) => mission.assignableDays.length > 0);
 
   return {
     craId: cra?.id ?? null,
@@ -73,5 +95,6 @@ export async function craGridComposition(
       cra?.refusal === null || cra?.refusal === undefined ? null : { reason: cra.refusal.reason },
     editable: cra === null || cra.status === 'draft' || cra.status === 'refused',
     missions,
+    validatedBy: cra?.validatedBy ?? null,
   };
 }

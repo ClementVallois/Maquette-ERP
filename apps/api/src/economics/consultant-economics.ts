@@ -28,7 +28,7 @@ import type { PgReadClient } from '../persistence/pg-client.ts';
 export interface MissionEconomics {
   readonly missionId: string;
   readonly missionName: string;
-  readonly halfDays: number;
+  readonly quarterDays: number;
   readonly tjmCents: number;
   readonly revenueCents: number;
   readonly costCents: number;
@@ -126,12 +126,12 @@ export async function consultantEconomics(
   }
   const cjmCents = exactCents('cjm_cents', cjmRow.cjm_cents);
 
-  const halfDaysByMission = new Map<string, number>();
+  const quarterDaysByMission = new Map<string, number>();
   for (const line of cra.lines) {
     if (line.dayType !== 'worked' || line.missionId === null) continue;
-    halfDaysByMission.set(
+    quarterDaysByMission.set(
       line.missionId,
-      (halfDaysByMission.get(line.missionId) ?? 0) + line.halfDays,
+      (quarterDaysByMission.get(line.missionId) ?? 0) + line.quarterDays,
     );
   }
 
@@ -145,7 +145,7 @@ export async function consultantEconomics(
   const rates = new Map(tjmRows.map((row) => [row.mission_id, row]));
 
   const missions: MissionEconomics[] = [];
-  for (const [missionId, halfDays] of [...halfDaysByMission].sort()) {
+  for (const [missionId, quarterDays] of [...quarterDaysByMission].sort()) {
     const rate = rates.get(missionId);
     // A Forfait mission has no dated Tjm. It is skipped rather than counted at zero, which would
     // report a loss equal to its cost on a mission that is not sold by the day.
@@ -155,13 +155,13 @@ export async function consultantEconomics(
     // Through `billing`'s helper, which is the single call site allowed to divide and the one
     // that asserts its precondition (BUILD-RULES § Money). The API does no money arithmetic of
     // its own beyond adding these integers together.
-    const revenueCents = lineAmountCents(halfDays, tjmCents);
-    const costCents = lineAmountCents(halfDays, cjmCents);
+    const revenueCents = lineAmountCents(quarterDays, tjmCents);
+    const costCents = lineAmountCents(quarterDays, cjmCents);
 
     missions.push({
       missionId,
       missionName: rate.mission_name,
-      halfDays,
+      quarterDays,
       tjmCents,
       revenueCents,
       costCents,

@@ -23,7 +23,7 @@ describe('PgEventStore', () => {
         officeId: 'office-paris',
         period: '2026-06',
         validatedBy: 'manager-1',
-        missions: [{ missionId: 'mission-1', halfDays: 42 }],
+        missions: [{ missionId: 'mission-1', quarterDays: 84 }],
       },
       ...overrides,
     };
@@ -54,7 +54,7 @@ describe('PgEventStore', () => {
       officeId: 'office-paris',
       period: '2026-06',
       validatedBy: 'manager-1',
-      missions: [{ missionId: 'mission-1', halfDays: 42 }],
+      missions: [{ missionId: 'mission-1', quarterDays: 84 }],
     });
   });
 

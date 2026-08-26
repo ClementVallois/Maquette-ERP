@@ -197,14 +197,14 @@ beforeEach(async () => {
   );
   const [firstDay = '', ...regieDays] = workedDaysOfJune();
   await client.query(
-    `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
-     VALUES ($1, $2, $3, 'worked', $4, 2)`,
+    `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, quarter_days)
+     VALUES ($1, $2, $3, 'worked', $4, 4)`,
     [uuidv7(), CRA_VALIDATED, firstDay, FORFAIT],
   );
   for (const day of regieDays) {
     await client.query(
-      `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
-       VALUES ($1, $2, $3, 'worked', $4, 2)`,
+      `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, quarter_days)
+       VALUES ($1, $2, $3, 'worked', $4, 4)`,
       [uuidv7(), CRA_VALIDATED, day, MISSION],
     );
   }
@@ -217,8 +217,8 @@ beforeEach(async () => {
     [CRA_SUBMITTED, CHLOE, PARIS],
   );
   await client.query(
-    `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
-     VALUES ($1, $2, '2026-06-02', 'worked', $3, 2), ($4, $2, '2026-06-03', 'worked', $3, 1)`,
+    `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, quarter_days)
+     VALUES ($1, $2, '2026-06-02', 'worked', $3, 4), ($4, $2, '2026-06-03', 'worked', $3, 1)`,
     [uuidv7(), CRA_SUBMITTED, MISSION, uuidv7()],
   );
 });
@@ -282,7 +282,7 @@ describe('the pré-facturier', () => {
       headers: as('manager-paris'),
     });
 
-    // Chloé's draft carries three half-days; Alice's is submitted and carries the whole month.
+    // Chloé's draft carries five quarter-days; Alice's is submitted and carries the whole month.
     // Both are late in July, and both are the consultant's or the manager's to move.
     expect(response.body).toContain(LABELS.preFacturier.awaitingConsultant);
     expect(response.body).toContain(LABELS.preFacturier.lateTag);
@@ -460,7 +460,7 @@ describe('the Cra as a printable record', () => {
     // time with the inconvenient rows removed is not one (ADR-0056).
     expect(response.body).toContain('Refonte SOC');
     expect(response.body).toContain('Audit DORA');
-    expect(response.body).toContain(frenchDays(42));
+    expect(response.body).toContain(frenchDays(84));
   });
 
   it('carries a signature block that names nobody', async () => {

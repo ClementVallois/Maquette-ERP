@@ -124,7 +124,7 @@ export async function validateCraAndDraftInvoices(
         result.declined.map((entry) => ({
           craId: event.payload.craId,
           missionId: entry.missionId,
-          halfDays: entry.halfDays,
+          quarterDays: entry.quarterDays,
           reason: entry.reason,
         })),
       );

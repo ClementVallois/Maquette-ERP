@@ -233,7 +233,10 @@ describe('saving a month', () => {
     expect(grid.body).not.toContain(LABELS.cra.notStartedYet);
   });
 
-  it('folds two half-days on one mission into one line of two half-days', async () => {
+  it('sums two slots on one mission into one line of a full day', async () => {
+    // Each slot of this legacy form is worth two quarter-days (`SLOT_QUARTER_DAYS`); the same
+    // mission in both slots produces two entries of the same triplet, which `linesOf` sums into
+    // one line of four (ADR-0069/0070), not two lines of two.
     await app.inject({
       method: 'POST',
       url: `${PATHS.consultantCra}/2026-06`,
@@ -241,15 +244,15 @@ describe('saving a month', () => {
       payload: fullMonthBody('save'),
     });
 
-    const { rows } = await transaction.client.query<{ half_days: number; count: string }>(
-      `SELECT half_days, count(*) FROM timesheet.cra_lines ${OF_ALICE} GROUP BY half_days`,
+    const { rows } = await transaction.client.query<{ quarter_days: number; count: string }>(
+      `SELECT quarter_days, count(*) FROM timesheet.cra_lines ${OF_ALICE} GROUP BY quarter_days`,
       [ALICE],
     );
 
-    expect(rows).toStrictEqual([{ half_days: 2, count: String(workableDaysOfJune().length) }]);
+    expect(rows).toStrictEqual([{ quarter_days: 4, count: String(workableDaysOfJune().length) }]);
   });
 
-  it('keeps a day split across two missions as two lines of one half-day', async () => {
+  it('keeps a day split across two missions as two lines of two quarter-days', async () => {
     const split = workableDaysOfJune()
       .flatMap((day, index) =>
         index === 0
@@ -271,14 +274,14 @@ describe('saving a month', () => {
       payload: `${split}&action=save`,
     });
 
-    const { rows } = await transaction.client.query<{ mission_id: string; half_days: number }>(
-      `SELECT mission_id, half_days FROM timesheet.cra_lines ${OF_ALICE}
+    const { rows } = await transaction.client.query<{ mission_id: string; quarter_days: number }>(
+      `SELECT mission_id, quarter_days FROM timesheet.cra_lines ${OF_ALICE}
          AND day = '2026-06-01' ORDER BY mission_id`,
       [ALICE],
     );
 
     expect(rows).toHaveLength(2);
-    expect(rows.every((row) => row.half_days === 1)).toBe(true);
+    expect(rows.every((row) => row.quarter_days === 2)).toBe(true);
   });
 
   it('replaces the month rather than merging into it', async () => {

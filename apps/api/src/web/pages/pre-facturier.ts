@@ -32,7 +32,7 @@ export interface BillableRow {
   readonly totalIncludingVatCents: number;
 }
 
-/** Why a half-day of this month is not on an invoice. Exactly two shapes, and they differ in kind. */
+/** Why a quarter-day of this month is not on an invoice. Exactly two shapes, and they differ in kind. */
 export type Blocking =
   /** The Cra was validated and the day still produced no line — ADR-0037's typed reason. */
   | { readonly kind: 'declined'; readonly reason: DeclineReason; readonly missionName: string }
@@ -44,8 +44,8 @@ export interface CraRow {
   readonly consultantId: string;
   readonly consultantName: string;
   readonly status: CraStatus;
-  readonly recordedHalfDays: number;
-  readonly blocking: readonly { readonly halfDays: number; readonly why: Blocking }[];
+  readonly recordedQuarterDays: number;
+  readonly blocking: readonly { readonly quarterDays: number; readonly why: Blocking }[];
 }
 
 export interface PreFacturierView {
@@ -54,8 +54,8 @@ export interface PreFacturierView {
   readonly offeredPeriods: readonly string[];
   readonly billable: readonly BillableRow[];
   readonly cras: readonly CraRow[];
-  /** ADR-0054: half-days of a **closed** month that have not reached `Validated`. */
-  readonly lateHalfDays: number;
+  /** ADR-0054: quarter-days of a **closed** month that have not reached `Validated`. */
+  readonly lateQuarterDays: number;
   readonly periodClosed: boolean;
   /**
    * Whether this actor may answer a submitted month. `false` for `billing`, which reads the same
@@ -92,7 +92,7 @@ function summary(view: PreFacturierView): Html {
     <div>
       <dt>${LABELS.preFacturier.summaryLate}</dt>
       <dd class="num">
-        ${frenchDays(view.lateHalfDays)}
+        ${frenchDays(view.lateQuarterDays)}
         ${view.periodClosed ? null : html`<span class="hint">${LABELS.preFacturier.lateNoneYet}</span>`}
       </dd>
     </div>
@@ -153,7 +153,7 @@ function blockingCell(row: CraRow): Html {
     ${row.blocking.map(
       (item) =>
         html`<li>
-          <strong>${frenchDays(item.halfDays)}</strong> —
+          <strong>${frenchDays(item.quarterDays)}</strong> —
           ${
             item.why.kind === 'declined'
               ? html`${item.why.missionName} : ${LABELS.preFacturier.declineReasons[item.why.reason]}`
@@ -245,7 +245,7 @@ function craTable(view: PreFacturierView, period: string): Html {
                   : null
               }
             </td>
-            <td class="num">${frenchDays(row.recordedHalfDays)}</td>
+            <td class="num">${frenchDays(row.recordedQuarterDays)}</td>
             <td>${blockingCell(row)}</td>
             ${view.mayDecide ? decideCell(row, period) : null}
             <td class="no-print">

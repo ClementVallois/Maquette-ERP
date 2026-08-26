@@ -30,7 +30,7 @@ export interface BillableRow {
   readonly totalIncludingVatCents: number;
 }
 
-/** Why a half-day of this month is not on an invoice. Exactly two shapes, and they differ in kind. */
+/** Why a quarter-day of this month is not on an invoice. Exactly two shapes, and they differ in kind. */
 export type Blocking =
   /** The Cra was validated and the day still produced no line — ADR-0037's typed reason. */
   | { readonly kind: 'declined'; readonly reason: DeclineReason; readonly missionName: string }
@@ -42,8 +42,8 @@ export interface CraRow {
   readonly consultantId: string;
   readonly consultantName: string;
   readonly status: CraStatus;
-  readonly recordedHalfDays: number;
-  readonly blocking: readonly { readonly halfDays: number; readonly why: Blocking }[];
+  readonly recordedQuarterDays: number;
+  readonly blocking: readonly { readonly quarterDays: number; readonly why: Blocking }[];
 }
 
 export interface PreFacturierComposition {
@@ -55,8 +55,8 @@ export interface PreFacturierComposition {
   /** The same invoices, with the HT/TTC totals `billing.pages/pre-facturier.ts` prints. */
   readonly billable: readonly BillableRow[];
   readonly cras: readonly CraRow[];
-  /** ADR-0054: half-days of a **closed** month that have not reached `Validated`. */
-  readonly lateHalfDays: number;
+  /** ADR-0054: quarter-days of a **closed** month that have not reached `Validated`. */
+  readonly lateQuarterDays: number;
   readonly periodClosed: boolean;
   /**
    * Whether this actor may answer a submitted month. `false` for `billing`, which reads the same
@@ -81,7 +81,7 @@ export function offeredPeriods(cras: readonly { period: string }[]): string[] {
 }
 
 /**
- * Why the half-days of one `Cra` are not on an invoice — two shapes, and they differ in kind
+ * Why the quarter-days of one `Cra` are not on an invoice — two shapes, and they differ in kind
  * (ADR-0037 for the first, `CraStatus` for the second).
  *
  * A `Validated` Cra has been through the chain, so everything not billed has a typed decline
@@ -89,26 +89,26 @@ export function offeredPeriods(cras: readonly { period: string }[]): string[] {
  * rather than a rule of billing: saying "no reason recorded" there would be false.
  */
 function blockingOf(
-  cra: { readonly id: string; readonly recordedHalfDays: number },
+  cra: { readonly id: string; readonly recordedQuarterDays: number },
   status: CraStatus,
   declined: readonly {
     craId: string;
     missionId: string;
-    halfDays: number;
+    quarterDays: number;
     reason: DeclineReason;
   }[],
   missionNames: ReadonlyMap<string, string>,
 ): CraRow['blocking'] {
   if (status !== 'validated') {
-    return cra.recordedHalfDays === 0
+    return cra.recordedQuarterDays === 0
       ? []
-      : [{ halfDays: cra.recordedHalfDays, why: { kind: 'notValidated', status } }];
+      : [{ quarterDays: cra.recordedQuarterDays, why: { kind: 'notValidated', status } }];
   }
 
   return declined
     .filter((record) => record.craId === cra.id)
     .map((record) => ({
-      halfDays: record.halfDays,
+      quarterDays: record.quarterDays,
       why: {
         kind: 'declined' as const,
         reason: record.reason,
@@ -144,7 +144,7 @@ export async function preFacturierComposition(
       invoices: [],
       billable: [],
       cras: [],
-      lateHalfDays: 0,
+      lateQuarterDays: 0,
       periodClosed: false,
       mayDecide: carries(DECIDES_CRA, actor.role),
     };
@@ -189,7 +189,7 @@ export async function preFacturierComposition(
       consultantId: cra.consultantId,
       consultantName: consultantNames.get(cra.consultantId) ?? cra.consultantId,
       status,
-      recordedHalfDays: cra.recordedHalfDays,
+      recordedQuarterDays: cra.recordedQuarterDays,
       blocking: blockingOf(cra, status, declined, missionNames),
     };
   });
@@ -200,13 +200,13 @@ export async function preFacturierComposition(
     invoices,
     billable,
     cras: rows,
-    // ADR-0054: half-days of a closed month that have not reached `Validated`. Summed over the
+    // ADR-0054: quarter-days of a closed month that have not reached `Validated`. Summed over the
     // rows the repository already scoped, so there is no second place the office rule could be
     // forgotten.
-    lateHalfDays: periodClosed
+    lateQuarterDays: periodClosed
       ? rows
           .filter((row) => row.status !== 'validated')
-          .reduce((total, row) => total + row.recordedHalfDays, 0)
+          .reduce((total, row) => total + row.recordedQuarterDays, 0)
       : 0,
     periodClosed,
     // The navigational echo of the route's own declaration, and now literally that declaration:
