@@ -7,8 +7,10 @@ import { clearPersona, fetchPersonas, fetchSession, selectPersona } from './api'
 import type { PersonasResponse, SelectPersonaResponse, SessionResponse } from './types';
 
 /**
- * `useSession` is what the shell and the guards (Phase 4) consume — one hook, one query key, so a
- * mutation that changes the persona has exactly one cache entry to invalidate.
+ * `useSession` is what the shell and the guards (Phase 4) consume — one hook, one query key.
+ * A persona change clears the whole `QueryClient` rather than invalidating this key alone (see
+ * `useSelectPersona`/`useClearPersona` below), so `beforeLoad`'s `ensureQueryData` below always
+ * refetches a session there is no cache left to lie with.
  */
 const SESSION_QUERY_KEY = ['session'] as const;
 const PERSONAS_QUERY_KEY = ['personas'] as const;
@@ -40,8 +42,14 @@ export function useSelectPersona(): UseMutationResult<SelectPersonaResponse, Err
 
   return useMutation({
     mutationFn: async (key: string) => unwrap(await selectPersona(key)),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: SESSION_QUERY_KEY });
+    // `clear()`, not `invalidateQueries({ queryKey: SESSION_QUERY_KEY })`: every query in this SPA
+    // is scoped by the persona cookie (`lib/query-client.ts`'s `staleTime: 30_000` otherwise keeps
+    // serving the *previous* persona's cached CRA list, dashboard and grid for up to thirty
+    // seconds). Invalidating one key per feature would need this file to grow in lockstep with
+    // every feature added under `features/`; dropping the whole cache is the one fix that cannot
+    // fall out of step with the feature list.
+    onSuccess: () => {
+      queryClient.clear();
     },
   });
 }
@@ -51,8 +59,10 @@ export function useClearPersona(): UseMutationResult<SessionResponse, Error, voi
 
   return useMutation({
     mutationFn: async () => unwrap(await clearPersona()),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: SESSION_QUERY_KEY });
+    // Same reasoning as `useSelectPersona` above — the identity acting changed (to none), so every
+    // persona-scoped query cached under the old one is stale in a sense `staleTime` does not cover.
+    onSuccess: () => {
+      queryClient.clear();
     },
   });
 }
