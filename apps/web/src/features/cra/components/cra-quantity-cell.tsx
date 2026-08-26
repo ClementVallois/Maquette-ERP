@@ -37,6 +37,9 @@ function parseQuantity(raw: string): CellQuantity {
 }
 
 interface CraQuantityCellProps {
+  /** The row's identity — a mission id, or `ABSENCE_ROW_KEY` — used only to build a stable,
+   * URL-safe element id. Display uses `activityLabel` instead. */
+  readonly rowKey: string;
   readonly activityLabel: string;
   readonly day: string;
   readonly dayLabel: string;
@@ -49,6 +52,7 @@ interface CraQuantityCellProps {
 }
 
 export function CraQuantityCell({
+  rowKey,
   activityLabel,
   day,
   dayLabel,
@@ -59,7 +63,7 @@ export function CraQuantityCell({
   onNavigate,
   registerRef,
 }: CraQuantityCellProps): ReactElement {
-  const cellId = `cra-cell-${day}-${activityLabel}`;
+  const cellId = `cra-cell-${rowKey}-${day}`;
   const accessibleName = `${activityLabel} — ${dayLabel}`;
 
   if (!assignable) {
