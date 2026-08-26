@@ -243,7 +243,7 @@ describe('GET /api/v1/cras/:period/grid', () => {
     expect(body.validatedBy).toBeNull();
   });
 
-  it('carries who validated the month, once it is validated', async () => {
+  it('carries who validated the month, as a display name, once it is validated', async () => {
     await transaction.client.query(
       `INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status, submitted_at, validated_by, validated_at)
        VALUES ($1, $2, $3, '2026-04', 'validated', '2026-05-01T09:00:00Z', $4, '2026-05-02T09:00:00Z')`,
@@ -257,7 +257,9 @@ describe('GET /api/v1/cras/:period/grid', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json<GridBody>().validatedBy).toBe(BRUNO);
+    // A display name, not the raw `ConsultantId` the aggregate carries — resolved the same way
+    // `consultantName` already is (`composition/cra-grid.ts`).
+    expect(response.json<GridBody>().validatedBy).toBe('Bruno Leroy');
   });
 
   it('greys out a mission on the days the consultant is not staffed on it, so the matrix never offers a write the domain would refuse', async () => {

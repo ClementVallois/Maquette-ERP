@@ -20,6 +20,7 @@ import { Route as ShellFacturesIndexRouteImport } from './routes/_shell/factures
 import { Route as ShellFacturesIdRouteImport } from './routes/_shell/factures.$id'
 import { Route as ShellMargeIndexRouteImport } from './routes/_shell/marge.index'
 import { Route as ShellMargeConsultantIdRouteImport } from './routes/_shell/marge.$consultantId'
+import { Route as ShellCraPeriodIndexRouteImport } from './routes/_shell/cra.$period.index'
 import { Route as ShellCraPeriodConsultantIdRouteImport } from './routes/_shell/cra.$period.$consultantId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -76,6 +77,11 @@ const ShellMargeConsultantIdRoute = ShellMargeConsultantIdRouteImport.update({
   path: '/marge/$consultantId',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellCraPeriodIndexRoute = ShellCraPeriodIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ShellCraPeriodRoute,
+} as any)
 const ShellCraPeriodConsultantIdRoute =
   ShellCraPeriodConsultantIdRouteImport.update({
     id: '/$consultantId',
@@ -95,19 +101,20 @@ export interface FileRoutesByFullPath {
   '/factures/': typeof ShellFacturesIndexRoute
   '/marge/': typeof ShellMargeIndexRoute
   '/cra/$period/$consultantId': typeof ShellCraPeriodConsultantIdRoute
+  '/cra/$period/': typeof ShellCraPeriodIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/pre-facturier': typeof ShellPreFacturierRoute
   '/tableau-de-bord': typeof ShellTableauDeBordRoute
   '/dev/composants': typeof DevComposantsRoute
-  '/cra/$period': typeof ShellCraPeriodRouteWithChildren
   '/factures/$id': typeof ShellFacturesIdRoute
   '/marge/$consultantId': typeof ShellMargeConsultantIdRoute
   '/cra': typeof ShellCraIndexRoute
   '/factures': typeof ShellFacturesIndexRoute
   '/marge': typeof ShellMargeIndexRoute
   '/cra/$period/$consultantId': typeof ShellCraPeriodConsultantIdRoute
+  '/cra/$period': typeof ShellCraPeriodIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -123,6 +130,7 @@ export interface FileRoutesById {
   '/_shell/factures/': typeof ShellFacturesIndexRoute
   '/_shell/marge/': typeof ShellMargeIndexRoute
   '/_shell/cra/$period/$consultantId': typeof ShellCraPeriodConsultantIdRoute
+  '/_shell/cra/$period/': typeof ShellCraPeriodIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -138,19 +146,20 @@ export interface FileRouteTypes {
     | '/factures/'
     | '/marge/'
     | '/cra/$period/$consultantId'
+    | '/cra/$period/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/pre-facturier'
     | '/tableau-de-bord'
     | '/dev/composants'
-    | '/cra/$period'
     | '/factures/$id'
     | '/marge/$consultantId'
     | '/cra'
     | '/factures'
     | '/marge'
     | '/cra/$period/$consultantId'
+    | '/cra/$period'
   id:
     | '__root__'
     | '/'
@@ -165,6 +174,7 @@ export interface FileRouteTypes {
     | '/_shell/factures/'
     | '/_shell/marge/'
     | '/_shell/cra/$period/$consultantId'
+    | '/_shell/cra/$period/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -252,6 +262,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellMargeConsultantIdRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/cra/$period/': {
+      id: '/_shell/cra/$period/'
+      path: '/'
+      fullPath: '/cra/$period/'
+      preLoaderRoute: typeof ShellCraPeriodIndexRouteImport
+      parentRoute: typeof ShellCraPeriodRoute
+    }
     '/_shell/cra/$period/$consultantId': {
       id: '/_shell/cra/$period/$consultantId'
       path: '/$consultantId'
@@ -264,10 +281,12 @@ declare module '@tanstack/react-router' {
 
 interface ShellCraPeriodRouteChildren {
   ShellCraPeriodConsultantIdRoute: typeof ShellCraPeriodConsultantIdRoute
+  ShellCraPeriodIndexRoute: typeof ShellCraPeriodIndexRoute
 }
 
 const ShellCraPeriodRouteChildren: ShellCraPeriodRouteChildren = {
   ShellCraPeriodConsultantIdRoute: ShellCraPeriodConsultantIdRoute,
+  ShellCraPeriodIndexRoute: ShellCraPeriodIndexRoute,
 }
 
 const ShellCraPeriodRouteWithChildren = ShellCraPeriodRoute._addFileChildren(

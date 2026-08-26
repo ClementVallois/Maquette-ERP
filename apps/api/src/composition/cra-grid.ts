@@ -57,10 +57,12 @@ export interface CraGridComposition {
   readonly editable: boolean;
   readonly missions: readonly GridMission[];
   /**
-   * Who accepted the month, `null` until it is validated. Task 6.4 of the front-end plan asked
-   * for it on this composition and it was not carried — recorded as a gap in `open-questions.md`
-   * on 25/08/2026 and corrected here, in the same task that renumbers the composition's other
-   * fields.
+   * Who accepted the month, `null` until it is validated — a **display name**, not the raw
+   * `ConsultantId` the aggregate carries (resolved below, the same way `consultantName` is).
+   * Task 6.4 of the front-end plan asked for it on this composition and it was not carried —
+   * recorded as a gap in `open-questions.md` on 25/08/2026 and corrected as a raw id; the name
+   * resolution was added afterwards, once the SPA's own "validated" banner needed to print it
+   * (task 6.6: "une bannière nommant `validatedBy`" reads oddly naming a UUID).
    */
   readonly validatedBy: string | null;
 }
@@ -115,6 +117,12 @@ export async function craGridComposition(
   const timesheetReference = await reference.timesheet();
   const names = await reference.missionNames();
   const clientNames = await reference.missionClientNames();
+  // `validatedBy` is a `ConsultantId` on the aggregate — resolved to a display name here, the
+  // same way `consultantName` above already is, so the grid's own "validated" banner can name
+  // who validated it without the caller carrying a raw UUID (frontend-plan.md task 6.6: "une
+  // bannière nommant validatedBy"). Falls back to the id if the row is ever missing, same as
+  // every other name lookup in this file.
+  const consultantNames = await reference.consultantNames();
 
   const periodDays = daysOf(period);
 
@@ -140,6 +148,9 @@ export async function craGridComposition(
       cra?.refusal === null || cra?.refusal === undefined ? null : { reason: cra.refusal.reason },
     editable: cra === null || cra.status === 'draft' || cra.status === 'refused',
     missions,
-    validatedBy: cra?.validatedBy ?? null,
+    validatedBy:
+      cra?.validatedBy === null || cra?.validatedBy === undefined
+        ? null
+        : (consultantNames.get(cra.validatedBy) ?? cra.validatedBy),
   };
 }

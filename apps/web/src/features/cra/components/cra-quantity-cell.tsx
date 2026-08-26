@@ -85,7 +85,10 @@ export function CraQuantityCell({
 
   if (!editable) {
     return (
-      <span className="flex h-8 w-full items-center justify-center text-sm tabular-nums">
+      <span
+        aria-label={accessibleName}
+        className="flex h-8 w-full items-center justify-center text-sm tabular-nums"
+      >
         {GLYPHS[value] === '' ? LABELS.cra.nothing : GLYPHS[value]}
       </span>
     );
