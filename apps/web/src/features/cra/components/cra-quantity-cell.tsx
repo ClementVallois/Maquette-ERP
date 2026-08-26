@@ -95,53 +95,50 @@ export function CraQuantityCell({
   }
 
   return (
-    <>
-      <label className="sr-only" htmlFor={cellId}>
-        {accessibleName}
-      </label>
-      <select
-        id={cellId}
-        ref={registerRef}
-        value={String(value)}
-        aria-label={accessibleName}
-        onChange={(event) => {
-          onChange(parseQuantity(event.target.value));
-        }}
-        onKeyDown={(event) => {
-          // Same reasoning as the two-slot control it replaces (ADR-0068): a closed, focused
-          // native <select> cycles its own options on ArrowUp/ArrowDown, which would fight the
-          // matrix's own two-axis keyboard contract (task 6.4) — suppressed here so the grid can
-          // own both arrow axes. ArrowLeft/ArrowRight carry no such native behaviour.
-          if (event.key === 'ArrowUp') {
-            event.preventDefault();
-            onNavigate('up');
-          } else if (event.key === 'ArrowDown') {
-            event.preventDefault();
-            onNavigate('down');
-          } else if (event.key === 'ArrowLeft') {
-            onNavigate('left');
-          } else if (event.key === 'ArrowRight') {
-            onNavigate('right');
-          } else if (event.key === 'Home') {
-            event.preventDefault();
-            onNavigate('home');
-          } else if (event.key === 'End') {
-            event.preventDefault();
-            onNavigate('end');
-          }
-        }}
-        className="h-8 w-full appearance-none rounded-lg border border-input bg-background text-center text-sm text-foreground tabular-nums focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
-      >
-        {QUANTITIES.map((quantity) => (
-          <option
-            key={quantity}
-            value={String(quantity)}
-            aria-label={quantityOptionLabel(quantity)}
-          >
-            {GLYPHS[quantity]}
-          </option>
-        ))}
-      </select>
-    </>
+    <select
+      id={cellId}
+      ref={registerRef}
+      value={String(value)}
+      // The accessible name, and deliberately not a paired `sr-only` <label>: `sr-only` is
+      // `position: absolute`, no ancestor here is positioned, so such a label resolves against the
+      // initial containing block — outside the grid's own `overflow-x-auto`, which therefore does
+      // not clip it. Sixty-two of them pushed the *document* scroll width past the viewport and the
+      // whole page panned sideways. `aria-label` is what the two read-only branches above already
+      // use, and it wins over a <label> in the name computation regardless.
+      aria-label={accessibleName}
+      onChange={(event) => {
+        onChange(parseQuantity(event.target.value));
+      }}
+      onKeyDown={(event) => {
+        // Same reasoning as the two-slot control it replaces (ADR-0068): a closed, focused
+        // native <select> cycles its own options on ArrowUp/ArrowDown, which would fight the
+        // matrix's own two-axis keyboard contract (task 6.4) — suppressed here so the grid can
+        // own both arrow axes. ArrowLeft/ArrowRight carry no such native behaviour.
+        if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          onNavigate('up');
+        } else if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          onNavigate('down');
+        } else if (event.key === 'ArrowLeft') {
+          onNavigate('left');
+        } else if (event.key === 'ArrowRight') {
+          onNavigate('right');
+        } else if (event.key === 'Home') {
+          event.preventDefault();
+          onNavigate('home');
+        } else if (event.key === 'End') {
+          event.preventDefault();
+          onNavigate('end');
+        }
+      }}
+      className="h-8 w-full appearance-none rounded-lg border border-input bg-background text-center text-sm text-foreground tabular-nums focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+    >
+      {QUANTITIES.map((quantity) => (
+        <option key={quantity} value={String(quantity)} aria-label={quantityOptionLabel(quantity)}>
+          {GLYPHS[quantity]}
+        </option>
+      ))}
+    </select>
   );
 }
