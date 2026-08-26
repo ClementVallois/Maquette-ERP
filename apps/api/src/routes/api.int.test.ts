@@ -387,6 +387,131 @@ describe('the chain, through the API', () => {
     expect(response.statusCode).toBe(403);
     expect(response.json()).toMatchObject({ type: '/problems/insufficient-role' });
   });
+});
+
+describe('the refusal, through the API', () => {
+  it("sends a submitted month back, with the manager's reason", async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('manager-paris'),
+      payload: { reason: 'jours incomplets' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toStrictEqual({ craId: CRA, status: 'refused' });
+
+    const read = await app.inject({
+      method: 'GET',
+      url: `/api/v1/cras/${CRA}`,
+      headers: as('manager-paris'),
+    });
+    expect(read.json<{ status: string }>().status).toBe('refused');
+  });
+
+  it('refuses a consultant the refusal route on its role alone', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('consultant-paris'),
+      payload: { reason: 'jours incomplets' },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ type: '/problems/insufficient-role' });
+  });
+
+  it('refuses billing the refusal route on its role alone', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('billing-paris'),
+      payload: { reason: 'jours incomplets' },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ type: '/problems/insufficient-role' });
+  });
+
+  it("refuses a manager of another office, naming the rule (ADR-0003's second beat)", async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('manager-lyon'),
+      payload: { reason: 'jours incomplets' },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({
+      type: '/problems/out-of-scope',
+      deniedBy: '/problems/out-of-scope',
+    });
+  });
+
+  it('refuses a body with no reason, before the domain is reached', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('manager-paris'),
+      payload: {},
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('refuses a reason that is longer than the bound the domain accepts', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('manager-paris'),
+      payload: { reason: 'x'.repeat(501) },
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('refuses a reason that is only whitespace, as the typed domain error it is', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('manager-paris'),
+      payload: { reason: '   ' },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toMatchObject({ type: '/problems/refusal-reason-required' });
+  });
+
+  it('refuses a Cra that is not in the submitted state', async () => {
+    const first = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('manager-paris'),
+      payload: { reason: 'jours incomplets' },
+    });
+    expect(first.statusCode).toBe(200);
+
+    const second = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('manager-paris'),
+      payload: { reason: 'encore' },
+    });
+
+    expect(second.statusCode).toBe(409);
+    expect(second.json()).toMatchObject({ type: '/problems/cra-transition-not-allowed' });
+  });
+
+  it('answers 404 for a Cra that does not exist at all', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/cras/api-does-not-exist/refusal',
+      headers: writingAs('manager-paris'),
+      payload: { reason: 'jours incomplets' },
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
 
   it('issues the invoice, and refuses to issue it twice under a new key', async () => {
     await app.inject({

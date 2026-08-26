@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import { issueInvoice } from '../chain/issue-invoice.ts';
 import { recordMonth } from '../chain/record-month.ts';
+import { refuseCra } from '../chain/refuse-cra.ts';
 import { validateCraAndDraftInvoices } from '../chain/validate-cra.ts';
 import { type CraGridComposition, craGridComposition } from '../composition/cra-grid.ts';
 import {
@@ -95,6 +96,13 @@ const ConsultantPeriodParams = z.object({
 
 const IDEMPOTENCY_KEY_HEADER = 'idempotency-key';
 const IdempotencyKey = z.string().min(8).max(200);
+
+/**
+ * The bound is a schema check — "is this a request" — and it stops short of trimming: a
+ * whitespace-only reason of the right length still reaches `refuse()`, whose own
+ * `RefusalReasonRequiredError` is the "is this a legitimate refusal" half of ADR-0042.
+ */
+const RefusalBody = z.object({ reason: z.string().min(1).max(500) });
 
 function notFound(
   request: FastifyRequest,
@@ -609,6 +617,36 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         invoices: outcome.invoices,
         declined: outcome.declined,
       });
+    },
+  );
+
+  app.post(
+    '/api/v1/cras/:id/refusal',
+    { config: { access: forRoles('manager') } },
+    async (request, reply) => {
+      const params = parseInput(IdParam, request.params);
+      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
+
+      const body = parseInput(RefusalBody, request.body);
+      if (!body.ok) return sendProblem(reply, malformed(body.errors, contextOf(request)));
+
+      // The symmetric twin of `/validation` above: same `findById` scoping (a Cra outside the
+      // manager's office throws `OutOfScopeError`, caught by the global handler as ADR-0003's
+      // second beat), same `notFound` shape for one that does not exist at all. Every other
+      // refusal — wrong status, blank reason after trim, wrong manager — is the domain's own
+      // typed error, thrown by `cra.refuse()` and mapped by `problemFromBusinessError`.
+      const outcome = await refuseCra(
+        { transactionally: dependencies.transactionally, clock: dependencies.clock },
+        {
+          craId: params.value.id,
+          actor: requireActor(request),
+          reason: body.value.reason,
+        },
+      );
+
+      if (outcome.kind === 'notFound') return sendProblem(reply, notFound(request, 'Cra'));
+
+      return reply.code(200).send({ craId: outcome.craId, status: 'refused' });
     },
   );
 
