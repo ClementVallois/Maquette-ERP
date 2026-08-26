@@ -148,7 +148,12 @@ export function CraMatrixTable({
       // region to be keyboard-reachable itself, not only through the controls inside it.
       // Discovered running the accessibility gate, not assumed.
       tabIndex={0}
-      className="overflow-x-auto rounded-xl bg-card shadow-card ring-1 ring-border"
+      // `pb-3`: a horizontal scrollbar draws on the scrollport's own bottom edge — on an
+      // overlay-scrollbar platform that is *over* the last pixel row, not below it, so without this
+      // gap the bar sits on top of the "Total du jour" row instead of under it. Reserved
+      // unconditionally (never measured against whether a bar is actually showing): the grid is
+      // wider than its viewport for every month this mockup seeds.
+      className="overflow-x-auto rounded-xl bg-card pb-3 shadow-card ring-1 ring-border"
     >
       <table className="w-full border-collapse text-sm">
         <caption className="sr-only">
