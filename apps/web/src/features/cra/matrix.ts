@@ -150,6 +150,15 @@ export function dayTotal(matrix: MatrixState, day: string): number {
   return total;
 }
 
+/**
+ * task 6.2's own reading of the domain's `DayOverbookedError`: the grid decides nothing, it only
+ * mirrors the same bound the domain enforces at `PUT .../entries` (`quarterDays > 4` on one day)
+ * so the write can be signalled before it is attempted, not just refused after.
+ */
+export function isDayOverbooked(matrix: MatrixState, day: string): boolean {
+  return dayTotal(matrix, day) > FULL_DAY;
+}
+
 export function isRowEmpty(matrix: MatrixState, rowKey: string, days: readonly string[]): boolean {
   return rowTotal(matrix, rowKey, days) === 0;
 }

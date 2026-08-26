@@ -8,6 +8,7 @@ import {
   entriesFromMatrix,
   fillEmptyWorkdays,
   initMatrix,
+  isDayOverbooked,
   isRowEmpty,
   removeRow,
   rowTotal,
@@ -105,6 +106,30 @@ describe('withValue / dayTotal', () => {
     matrix = withValue(matrix, MISSION_B, '2026-08-03', 2);
 
     expect(dayTotal(matrix, '2026-08-03')).toBe(4);
+  });
+});
+
+describe('isDayOverbooked', () => {
+  it('is false at exactly one full day and below', () => {
+    let matrix = addRow(initMatrix(gridResponse()), MISSION_A);
+    matrix = withValue(matrix, MISSION_A, '2026-08-03', 4);
+
+    expect(isDayOverbooked(matrix, '2026-08-03')).toBe(false);
+  });
+
+  it('is true past one full day, summed across every row on that day', () => {
+    let matrix = addRow(initMatrix(gridResponse()), MISSION_A);
+    matrix = addRow(matrix, MISSION_B);
+    matrix = withValue(matrix, MISSION_A, '2026-08-03', 4);
+    matrix = withValue(matrix, MISSION_B, '2026-08-03', 1);
+
+    expect(isDayOverbooked(matrix, '2026-08-03')).toBe(true);
+  });
+
+  it('is false on a day with nothing recorded', () => {
+    const matrix = initMatrix(gridResponse());
+
+    expect(isDayOverbooked(matrix, '2026-08-03')).toBe(false);
   });
 });
 

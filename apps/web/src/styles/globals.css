@@ -143,6 +143,11 @@
   --flag-weekend-text: var(--muted-foreground);
   --flag-holiday-bg: #fdf9ef;
   --flag-holiday-text: var(--tone-amber-text);
+  /* A day whose total exceeds one working day (`matrix.ts`'s `isDayOverbooked`, task 6.2) — the
+     same red as `status-cra-refused`, aliased rather than restated, because a bar the domain will
+     refuse to save is exactly that: a refusal, shown before the round trip that produces one. */
+  --flag-overbooked-bg: var(--tone-red-fill);
+  --flag-overbooked-text: var(--tone-red-text);
 
   /*
    * Phase 6.2's matrix (ADR-0070): "une teinte par ligne, stable dans le mois" for a mission, and
@@ -265,6 +270,8 @@
   --color-flag-weekend-text: var(--flag-weekend-text);
   --color-flag-holiday-bg: var(--flag-holiday-bg);
   --color-flag-holiday-text: var(--flag-holiday-text);
+  --color-flag-overbooked-bg: var(--flag-overbooked-bg);
+  --color-flag-overbooked-text: var(--flag-overbooked-text);
 
   --color-mission-tone-1-fill: var(--mission-tone-1-fill);
   --color-mission-tone-1-dot: var(--mission-tone-1-dot);

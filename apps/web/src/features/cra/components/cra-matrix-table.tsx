@@ -1,3 +1,4 @@
+import { AlertTriangleIcon } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 import { useRef } from 'react';
 
@@ -5,7 +6,7 @@ import { frenchDate, frenchDays, frenchMonth, frenchWeekday } from '@/lib/format
 import { LABELS } from '@/lib/labels';
 import { cn } from '@/lib/utils';
 
-import { dayTotal, rowTotal, valueAt, type MatrixState } from '../matrix';
+import { dayTotal, isDayOverbooked, rowTotal, valueAt, type MatrixState } from '../matrix';
 import { missionTone } from '../mission-tone';
 import type { GridDay } from '../types';
 
@@ -138,6 +139,12 @@ export function CraMatrixTable({
   }
 
   const weeks = weekGroups(days);
+  // task 6.2's "un jour ouvré à < 1 est signalé" sibling case (over one day, not under): computed
+  // once per render rather than inside each cell/header callback below, since both the header row
+  // and the totals row read it for the same set of days.
+  const overbookedDays = new Set(
+    days.filter((day) => isDayOverbooked(matrix, day.date)).map((day) => day.date),
+  );
 
   return (
     <div
@@ -179,36 +186,49 @@ export function CraMatrixTable({
             <th scope="col" className="sticky left-0 z-10 bg-card px-4 py-2 text-left">
               {LABELS.cra.activity}
             </th>
-            {days.map((day) => (
-              <th
-                key={day.date}
-                scope="col"
-                className={cn(
-                  'min-w-[2.75rem] border-l border-border px-1 py-2 text-center font-medium whitespace-nowrap',
-                  dayTint(day),
-                  day.nonWorkable !== null && 'text-muted-foreground',
-                )}
-              >
-                <span>{dayHeaderLabel(day.date)}</span>
-                {day.nonWorkable !== null && (
-                  <span
-                    className={cn(
-                      'block text-[0.6875rem]',
-                      day.nonWorkable === 'publicHoliday'
-                        ? 'text-flag-holiday-text'
-                        : 'text-flag-weekend-text',
-                    )}
-                  >
-                    {LABELS.cra.nonWorkable[day.nonWorkable]}
-                  </span>
-                )}
-                {flaggedDays.has(day.date) && (
-                  <span className="block text-[0.6875rem] text-status-late-text">
-                    {LABELS.cra.flagged}
-                  </span>
-                )}
-              </th>
-            ))}
+            {days.map((day) => {
+              const overbooked = overbookedDays.has(day.date);
+
+              return (
+                <th
+                  key={day.date}
+                  scope="col"
+                  className={cn(
+                    'min-w-[2.75rem] border-l border-border px-1 py-2 text-center font-medium whitespace-nowrap',
+                    overbooked ? 'bg-flag-overbooked-bg' : dayTint(day),
+                    overbooked
+                      ? 'text-flag-overbooked-text'
+                      : day.nonWorkable !== null && 'text-muted-foreground',
+                  )}
+                >
+                  <span>{dayHeaderLabel(day.date)}</span>
+                  {day.nonWorkable !== null && (
+                    <span
+                      className={cn(
+                        'block text-[0.6875rem]',
+                        overbooked
+                          ? 'text-flag-overbooked-text'
+                          : day.nonWorkable === 'publicHoliday'
+                            ? 'text-flag-holiday-text'
+                            : 'text-flag-weekend-text',
+                      )}
+                    >
+                      {LABELS.cra.nonWorkable[day.nonWorkable]}
+                    </span>
+                  )}
+                  {flaggedDays.has(day.date) && (
+                    <span className="block text-[0.6875rem] text-status-late-text">
+                      {LABELS.cra.flagged}
+                    </span>
+                  )}
+                  {overbooked && (
+                    <span className="block text-[0.6875rem] font-semibold text-flag-overbooked-text">
+                      {LABELS.cra.matrix.dayOverbookedColumn}
+                    </span>
+                  )}
+                </th>
+              );
+            })}
             <th scope="col" className="border-l border-border px-3 py-2 text-right">
               {LABELS.cra.monthTotal}
             </th>
@@ -292,15 +312,27 @@ export function CraMatrixTable({
             <th scope="row" className="sticky left-0 z-10 bg-card px-4 py-2 text-left">
               {LABELS.cra.dayTotal}
             </th>
-            {days.map((day) => (
-              <td
-                key={day.date}
-                aria-label={`${LABELS.cra.dayTotal} — ${frenchDate(day.date)}`}
-                className="border-l border-border px-1 py-2 text-center tabular-nums"
-              >
-                {frenchDays(dayTotal(matrix, day.date))}
-              </td>
-            ))}
+            {days.map((day) => {
+              const overbooked = overbookedDays.has(day.date);
+              const label = `${LABELS.cra.dayTotal} — ${frenchDate(day.date)}`;
+
+              return (
+                <td
+                  key={day.date}
+                  aria-label={overbooked ? `${label} : ${LABELS.cra.matrix.dayOverbooked}` : label}
+                  title={overbooked ? LABELS.cra.matrix.dayOverbooked : undefined}
+                  className={cn(
+                    'border-l border-border px-1 py-2 text-center tabular-nums',
+                    overbooked && 'bg-flag-overbooked-bg text-flag-overbooked-text',
+                  )}
+                >
+                  {overbooked && (
+                    <AlertTriangleIcon aria-hidden="true" className="mr-0.5 mb-0.5 inline size-3" />
+                  )}
+                  {frenchDays(dayTotal(matrix, day.date))}
+                </td>
+              );
+            })}
             <td className="border-l border-border px-3 py-2 text-right tabular-nums">
               {frenchDays(days.reduce((total, day) => total + dayTotal(matrix, day.date), 0))}
             </td>

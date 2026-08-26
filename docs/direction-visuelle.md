@@ -198,6 +198,17 @@ Rendered, never blocking: the server flags a Saturday, it does not forbid it.
 A cell the consultant has filled in stays fully legible on both tints — the fill is the record, the
 tint is context.
 
+**Day total over one working day** — client-computed (`features/cra/matrix.ts`'s
+`isDayOverbooked`), not a server flag: the grid decides nothing, it mirrors the same bound the
+domain enforces (`DayOverbookedError`) so the overrun is visible before the save that would refuse
+it, not only after. Same red as `status-cra-refused` (`--flag-overbooked-bg` / `-text`, aliasing
+`--tone-red-fill` / `--tone-red-text`), on two elements: the day's header column, marked with the
+label « Dépassement » under the day number; and that day's cell in the « Total du jour » row, filled
+red with an alert-triangle icon ahead of the figure and an `aria-label`/`title` naming the overrun
+— colour is never the only signal. Deliberately **not** a full-column tint: tinting every cell down
+the column would fight the mission-row tints already carrying meaning there, and the total row is
+where the number the invariant is about actually lives.
+
 **Missions** (one row each, per ADR-0070). "Une teinte par ligne, stable dans le mois" — a pastille
 in the row header plus a very light cell background, cycling through six hues by the row's position
 among the grid's currently visible rows (`features/cra/mission-tone.ts`). Six, not five and not

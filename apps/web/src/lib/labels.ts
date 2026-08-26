@@ -164,6 +164,14 @@ export const LABELS = {
       addActivityPlaceholder: 'Choisir une mission…',
       noActivityToAdd: 'Toutes les missions affectées ce mois-ci figurent déjà dans la grille.',
       notAssignableThisDay: 'Mission non affectée ce jour-là.',
+      /** task 6.2's day-total signal (`isDayOverbooked`, `matrix.ts`) — never a blocker: the
+       * domain's own `DayOverbookedError` is what actually refuses the write on save.
+       * `dayOverbookedColumn` is the short marker under the day number in the header (mirrors
+       * `nonWorkable`/`flagged`'s own one-word style); `dayOverbooked` is the fuller sentence for
+       * the total cell's `aria-label`/`title`. */
+      dayOverbookedColumn: 'Dépassement',
+      dayOverbooked:
+        'Ce jour dépasse une journée complète : la saisie sera refusée à l’enregistrement.',
       /** Accessible names for the five-option `<select>` a cell is (ADR-0068, ADR-0070) — never
        * the raw fraction glyph alone, which reads as nothing to a screen reader. */
       quantityOptions: {
