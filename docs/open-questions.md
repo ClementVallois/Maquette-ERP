@@ -1025,6 +1025,141 @@ skipped — most of that project's suite is desktop-only by design, including th
 `6.4-cra-grid-refused.png`, `6.5-cra-grid-empty-month.png`, `6.5-cra-denied-out-of-scope.png` — 8
 of the 9 named in the task. `6.1-cra-list-empty.png` is point 12 above.
 
+## Front-end Phase 5bis checkpoint — `feat/web`, 26/08/2026
+
+The two questions `CLAUDE.md` requires, asked of `docs/frontend-plan.md` Phase 5bis ("Le quart de
+journée devient l'unité", ADR-0069/ADR-0070). Every point resolves to exactly one of the four
+outcomes.
+
+### Which tasks ran
+
+All seven ran, in order: 5bis.1 (`@erp/platform`'s `quarter-days.ts`), 5bis.2 (`@erp/timesheet`'s
+two per-day invariants), 5bis.3 (`@erp/billing`'s one division site), 5bis.4 (migration 011,
+persistence, the seed), 5bis.5 (`apps/api`'s entries contract, `linesOf`, `assignableDays`,
+`validatedBy`), 5bis.6 (`apps/web`'s feature types, `slots.ts`'s minimal rename, D5), 5bis.7 (this
+sweep).
+
+**One line item did not run**: `docs/direction-visuelle.md` §4.4 was named in the plan as gaining
+"the colour table of [front-end plan task] 6.2" — that table describes the matrix grid's colour
+system, which does not exist yet (Phase 6 builds it). There is nothing to transcribe until it is
+built. `tabular-nums`'s own half-day mention, which does exist today, was corrected to quarter-days.
+This is deferred to Phase 6 itself, which is where the table's content is decided in the first
+place, not a gap this phase leaves open.
+
+### Where I am least confident, and what it resolved to
+
+1. **The seed's original split day (11/06) could not carry both the "not-decorative" quarter-day
+   split ADR-0069's own text asks for and stay displayable on the legacy two-slot grid both
+   `apps/api/src/web/pages/cra-grid.ts` and `apps/web/src/features/cra/slots.ts` still render this
+   phase.** A 3/1 split gives the "3" line `ceil(3/2) = 2` slots, leaving the "1" line's slot
+   nowhere to go — the second mission would silently vanish from a screen the J1 e2e journey
+   asserts both missions are visible on. → **Fixed now**: the split day stays an even 2/2 (the
+   physical half-a-day-each shape ADR-0012 always gave it, spelled in quarters, renders exactly as
+   before); a new day, `quarterProofDay` (12/06), carries the 3/1 split instead, on a day no
+   assertion reads the cell content of. Verified against a live, reseeded database: two
+   `invoice_lines` rows read back with `quantity_quarter_days` of 85 and 3, neither a multiple of
+   four, and the full `journeys` Playwright project passes (5/5).
+
+2. **The legacy two-slot grid (both the SSR screen and `apps/web`'s current, pre-Phase-6 one) can
+   no longer perfectly re-display a line whose `quarterDays` is not 2 or 4** — a value only
+   producible by `quarterProofDay`'s split today, but a real possibility for any future write this
+   phase's contract now allows (1..4 on any entry). `slotsFor`/`gridDays` round up to the nearest
+   slot rather than dropping the line, which is honest about the approximation without losing the
+   underlying data (the stored `CraLine`s, and everything derived from them — totals, invoicing —
+   stay exact; only this one legacy rendering is lossy). → **A row in this file**, named below,
+   Phase 6 named as the phase that removes the approximation by removing the two-slot shape
+   entirely (ADR-0070).
+
+3. **`CONTEXT.md` no longer names `HalfDaySlot`, but the code that shape describes — the two-slot
+   form — still exists for one more phase**, in both `apps/api/src/web/pages/cra-grid.ts` and
+   `apps/web/src/features/cra/slots.ts`. The plan names this explicitly ("la notion de créneau
+   n'existe plus nulle part après ADR-0070"), read here as "the vocabulary commits to the decision
+   now, the code catches up in the phase already named for it" rather than as a claim that the
+   code already matches. → **A row in this file**, Phase 6 again.
+
+4. **The exit gate's own grep clause is unsatisfiable literally.** `grep -ri
+"halfday|half_day" packages apps migrations` still returns `migrations/002-timesheet-tables.sql`
+   and `migrations/003-billing-tables.sql` (their original column definitions) and
+   `migrations/011-quarter-days.sql` itself (a rename has to name what it renames _from_). The
+   gate's own parenthetical — "there are no ADRs under those paths, so: nothing" — did not account
+   for migrations, which task 5bis.7's own living-vs-historical rule already answers: a numbered
+   migration is a dated record, exactly like a superseded ADR, and 002/003 are not edited for the
+   same reason 002/003 were never edited by migration 011 itself. → **Fix now, differently**: one
+   real hit outside that shape was found and fixed —
+   `packages/billing/src/domain/__boundary-fixture__/README.md` referenced `halfDays(1.5)` as an
+   illustrative example of the factory's negative test; renamed to `quarterDays(1.5)`, the name
+   that function actually has now. With that fixed, the grep's only remaining hits are the three
+   migration files, and the gate is read as satisfied under the rule the phase itself states.
+
+5. **The invoice-line and money test values were reread rather than doubled by convention** (task
+   5bis.3's own instruction), which means every changed multi-digit number in
+   `packages/billing/src/domain/money.test.ts` and `invoice-line.test.ts` was individually recomputed
+   against what the test's name claims — a full day is 4, half a day is 2, the smallest recordable
+   unit is 1, a stated real quantity of worked time keeps the same money. The self-check named in
+   the task brief (diff the billing tests, verify every changed 5+-digit number is either a
+   unit-price assertion or a deliberate seed re-split) was run by hand rather than mechanically;
+   a changed total that slipped through would be a silent wrong-money defect. → **No further
+   action**: `pnpm run test:int` and the live seed's `invoice_lines` totals (§ Evidence) are the
+   independent check, and both agree with the hand computation.
+
+### In three months, what breaks if I leave it as it is
+
+1. **The two legacy two-slot screens are a growing liability the longer they live.** Every phase
+   that adds a way to write an odd `quarterDays` value (the SPA's own write path already can, since
+   `MonthEntry.quarterDays` accepts 1..4) widens the gap between what can be stored and what the
+   legacy grids can show. Phase 6 deletes `apps/web/src/features/cra/slots.ts`
+   (ADR-0070) and is the one phase this threshold is already scoped to; the SSR screen
+   (`apps/api/src/web/pages/cra-grid.ts`) has no such deletion date named anywhere yet. **A row in
+   this file**: reopen the SSR grid's own two-slot shape the day a real user records a split this
+   mockup cannot show correctly, not before.
+
+2. **`quarterProofDay` is one seeded day whose only reader is the invoice line it produces and the
+   two-invoice-lines check in this checkpoint's own evidence.** No automated test asserts
+   `quantity_quarter_days` is not a multiple of four on a real seeded invoice line — the check in
+   this checkpoint was run once, by hand, against a live database. A future seed change could
+   silently make every seeded quantity a multiple of four again (decorative), and nothing would
+   fail. **A row in this file**: add an integration test asserting this property the next time the
+   seed is touched — not now, because writing one against `scripts/seed.ts` output needs the seed
+   itself to be a tested artifact, which it currently is not (only `seed:fingerprint` checks it,
+   and only for determinism, not for content).
+
+3. **`SLOT_QUARTER_DAYS = 2` is defined twice** (`apps/api/src/web/routes.ts` and
+   `apps/web/src/features/cra/slots.ts`), because the two screens do not share code across the
+   `apps/api`/`apps/web` boundary by design (Annexe C.8's "copies, not shared imports"). A future
+   change to what a slot is worth would need both edited in step, same as `frenchDays` and
+   `labels.ts` already are. No action beyond naming it: this is the existing, accepted duplication
+   pattern of this codebase, not a new one.
+
+### Evidence
+
+**`pnpm run migrate`**: `Applying migration 011-quarter-days.sql… Applied 1 migration(s).` — clean
+apply against the running Phase 6 database, no data migration (ADR-0069, ADR-0022).
+
+**`pnpm run check`**, run to completion: `env:check` — 13 variables, agrees with
+`.env.example`/`compose.yml`; `lint` — 0 errors, 0 warnings under `--max-warnings=0`; `boundaries`
+— 273 modules across 6 workspace members and 1 unmanifested directory, 926 dependencies, no
+violation; `format:check` — green; `typecheck` — all 7 typechecked members `Done`; `test:cov` —
+**567 tests in 46 files** (up from 563/46 at the end of front-end Phase 6), coverage 99.41 / 97.12 /
+99.52 / 99.49 — unchanged from Phase 6 to four significant figures, since `apps/web` still sits
+outside the coverage config's measured surface.
+
+**`pnpm run test:int`**: `Test Files 15 passed (15)`, `Tests 191 passed (191)` (up from 188 at the
+end of front-end Phase 6 — 3 new: the duplicate-entry-sums test, the `assignableDays` test, the
+`validatedBy` test).
+
+**Playwright, `journeys` project**, against a freshly reset and reseeded database: **5 passed**,
+unchanged in count from front-end Phase 6, now against the quarter-day contract end to end.
+
+**Live seed check**: `billing.invoice_lines` after `pnpm run seed`, queried directly —
+`quantity_quarter_days` values `3`, `85`, `88`, `88`. Two of the four (`3`, `85`) are not multiples
+of four, which is the seed's own proof that quarter-day billing is exercised rather than decorated
+(task 5bis.4's own instruction).
+
+**`grep -ri "halfday\|half_day" packages apps migrations`**: three hits, all inside
+`migrations/002-timesheet-tables.sql`, `migrations/003-billing-tables.sql` and
+`migrations/011-quarter-days.sql` itself — dated records under this phase's own living-vs-historical
+rule (§ "Where I am least confident", point 4). No hit outside `migrations/`.
+
 ## Phase 6 checkpoint — `feat/web`, 21/08/2026 (reviewers and their fixes, 22/08/2026)
 
 The two questions `CLAUDE.md` requires, asked of tasks 6.4 to 6.7. Every point resolves to exactly

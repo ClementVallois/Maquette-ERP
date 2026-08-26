@@ -220,7 +220,7 @@ references use and the density a nine-column billing table needs.
 
 Two rules that are not decoration:
 
-- **`font-variant-numeric: tabular-nums` on every number** — money, half-days, VAT rates, invoice
+- **`font-variant-numeric: tabular-nums` on every number** — money, quarter-days, VAT rates, invoice
   numbers, dates. A column of amounts that does not align is the first thing a reader distrusts in
   a billing tool.
 - **Invoice numbers and identifiers are monospace** (`ui-monospace, 'SF Mono', 'Cascadia Mono',

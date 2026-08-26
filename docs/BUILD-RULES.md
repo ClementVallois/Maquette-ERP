@@ -29,11 +29,11 @@ ADR and moves to the README's "Ce que je ne construis pas" — never a silent om
 - **Never a float on a monetary value.** Every intermediate result stays an integer. If a computation
   cannot, stop: it means a decision changed and ADR-0002's threshold is reached.
 - A `Tjm` is a whole number of euros, so `tjmCents` is a multiple of 100. Quantity is stored as an
-  **integer count of half-days**.
-- Line amount is `(halfDays * tjmCents) / 2` — **multiply first, divide last**. Exact because
-  `tjmCents` is even, and the guard is an assertion that it is (`tjmCents % 2 === 0`), not a ban on
-  `/`. Writing it as `halfDays * (tjmCents / 2)` is also exact today but inverts the safe order, so
-  the rule is the one above.
+  **integer count of quarter-days** (**ADR-0069**, superseding the half-day of ADR-0012).
+- Line amount is `(quarterDays * tjmCents) / 4` — **multiply first, divide last**. Exact because
+  `tjmCents` is a multiple of four, and the guard is an assertion that it is
+  (`tjmCents % 4 === 0`), not a ban on `/`. Writing it as `quarterDays * (tjmCents / 4)` is also
+  exact today but inverts the safe order, so the rule is the one above.
 - The lint rule therefore forbids **float-producing arithmetic on money** — no `parseFloat`, no
   `Number()` on a decimal string, no `Math.round` used to recover from one — and the division above is
   the single allowed one, at the single call site that asserts its precondition.
