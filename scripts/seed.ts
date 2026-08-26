@@ -637,22 +637,27 @@ async function seed(): Promise<void> {
           if (varied && day === VARIED_MONTH.absenceDay) {
             // No mission: a day not worked is not worked *on* anything (`craLine` refuses the
             // combination), and it produces no invoice line while still making the month add up.
-            cra.recordDay({ day, dayType: 'absence', missionId: null, halfDays: 2 });
+            cra.recordDay({ day, dayType: 'absence', missionId: null, quarterDays: 4 });
             continue;
           }
 
           if (varied && day === VARIED_MONTH.splitDay && secondAssignment !== undefined) {
+            // Three quarters and one, not two and two: a 2/2 split would round-trip through the
+            // old half-day model unchanged and prove nothing about the unit that replaced it.
+            // 3 quarter-days on this line pushes the primary mission's monthly total off a
+            // multiple of four, which is what makes the invoice line it produces demonstrate
+            // quarter-day billing rather than decorate the screen (ADR-0069).
             cra.recordDay({
               day,
               dayType: 'worked',
               missionId: primaryAssignment.missionId,
-              halfDays: 1,
+              quarterDays: 3,
             });
             cra.recordDay({
               day,
               dayType: 'worked',
               missionId: secondAssignment.missionId,
-              halfDays: 1,
+              quarterDays: 1,
             });
             continue;
           }
@@ -661,7 +666,7 @@ async function seed(): Promise<void> {
             day,
             dayType: 'worked',
             missionId: primaryAssignment.missionId,
-            halfDays: 2,
+            quarterDays: 4,
           });
         }
 
@@ -673,7 +678,7 @@ async function seed(): Promise<void> {
             day: VARIED_MONTH.flaggedSaturday,
             dayType: 'worked',
             missionId: primaryAssignment.missionId,
-            halfDays: 2,
+            quarterDays: 4,
           });
         }
       }
@@ -828,7 +833,7 @@ async function seed(): Promise<void> {
         result.declined.map((entry) => ({
           craId: payload.craId,
           missionId: entry.missionId,
-          halfDays: entry.halfDays,
+          quarterDays: entry.quarterDays,
           reason: entry.reason,
         })),
       );

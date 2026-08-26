@@ -639,14 +639,17 @@ export const SUBMITTED_NOT_VALIDATED_EMAIL = 'claire.dubois@secureco.test';
 /**
  * The month that is **not** uniform.
  *
- * Every other seeded June is every workable day, two half-days, one mission — which is a legible
- * default and exercises none of the three things the model spends structure on. `CONTEXT.md`
- * § Records of time gives the split day as the *structural reason* the mission sits on the line
- * rather than on the day, and until this existed no dataset contained one; `timesheet.cra_flags`
- * was created, indexed and read by nothing because no seeded day was ever flaggable; and no
- * `absence` existed, so a non-billable recorded day was a code path with no example.
+ * Every other seeded June is every workable day, four quarter-days, one mission — which is a
+ * legible default and exercises none of the four things the model spends structure on.
+ * `CONTEXT.md` § Records of time gives the split day as the *structural reason* the mission sits
+ * on the line rather than on the day, and until this existed no dataset contained one;
+ * `timesheet.cra_flags` was created, indexed and read by nothing because no seeded day was ever
+ * flaggable; no `absence` existed, so a non-billable recorded day was a code path with no
+ * example; and a 2/2 split of the day would have round-tripped unchanged through the half-day
+ * model it replaced, proving nothing about the unit ADR-0069 introduced — the 3/1 split below is
+ * what makes at least one seeded invoice line carry a quantity that is not a multiple of four.
  *
- * Alice carries all three because she is the one consultant staffed on two missions, and both are
+ * Alice carries all four because she is the one consultant staffed on two missions, and both are
  * sold to the same client — so the split day produces a second **line** on one invoice rather than
  * a second invoice, which is the shape ADR-0038 says to expect and is what a reader should see
  * first.
@@ -657,7 +660,11 @@ export const SUBMITTED_NOT_VALIDATED_EMAIL = 'claire.dubois@secureco.test';
  */
 export const VARIED_MONTH = {
   email: 'alice.martin@secureco.test',
-  /** One half-day on each of Alice's two missions. Thursday, an ordinary workable day. */
+  /**
+   * Three quarter-days on the primary mission, one on the second. Thursday, an ordinary workable
+   * day. Not an even 2/2 split on purpose (ADR-0069): that would decorate the screen without
+   * proving the unit, since it collapses to the same two half-days the old model already recorded.
+   */
   splitDay: '2026-06-11',
   /** A full day off. Recorded, so the month still adds up; not billable, so no line comes of it. */
   absenceDay: '2026-06-18',

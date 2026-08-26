@@ -77,7 +77,7 @@ describe('PgCraRepository', () => {
   function makeCompleteCra(): Cra {
     const cra = makeCra();
     for (const day of juneCalendar.workableDaysOf(period(2026, 6))) {
-      cra.recordDay({ day, dayType: 'worked', missionId: 'mission-1', halfDays: 2 });
+      cra.recordDay({ day, dayType: 'worked', missionId: 'mission-1', quarterDays: 4 });
     }
     return cra;
   }
@@ -99,7 +99,7 @@ describe('PgCraRepository', () => {
       day: isoDate('2026-06-02'),
       dayType: 'worked',
       missionId: 'mission-1',
-      halfDays: 2,
+      quarterDays: 4,
     });
 
     await repo().save(cra);
@@ -110,7 +110,7 @@ describe('PgCraRepository', () => {
     expect(found!.status).toBe('draft');
     expect(found!.lines).toHaveLength(1);
     expect(found!.lines[0]!.day).toBe('2026-06-02');
-    expect(found!.lines[0]!.halfDays).toBe(2);
+    expect(found!.lines[0]!.quarterDays).toBe(4);
   });
 
   it('returns null when CRA does not exist', async () => {
@@ -183,7 +183,7 @@ describe('PgCraRepository', () => {
     expect(lyonResults).toHaveLength(0);
   });
 
-  it('carries the half-days recorded, so a caller need not fetch each Cra to count them', async () => {
+  it('carries the quarter-days recorded, so a caller need not fetch each Cra to count them', async () => {
     // ADR-0053: the pré-facturier's late-days counter is a sum over this column. It is a
     // quantity and not a rate — `Cjm`, `Tjm` and margin stay out of every list view.
     await seedOffices();
@@ -191,12 +191,12 @@ describe('PgCraRepository', () => {
 
     const listed = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
 
-    expect(listed[0]!.recordedHalfDays).toBe(
-      makeCra().lines.reduce((sum, line) => sum + line.halfDays, 0),
+    expect(listed[0]!.recordedQuarterDays).toBe(
+      makeCra().lines.reduce((sum, line) => sum + line.quarterDays, 0),
     );
   });
 
-  it('carries zero half-days for a Cra with no line, rather than dropping the row', async () => {
+  it('carries zero quarter-days for a Cra with no line, rather than dropping the row', async () => {
     // A LEFT JOIN, not an inner one: a month that was opened and never filled is exactly the row
     // the pré-facturier has to show, and an inner join would hide it.
     await seedOffices();
@@ -209,7 +209,7 @@ describe('PgCraRepository', () => {
     const empty = listed.find((row) => row.id === 'cra-empty');
 
     expect(empty).toBeDefined();
-    expect(empty!.recordedHalfDays).toBe(0);
+    expect(empty!.recordedQuarterDays).toBe(0);
   });
 
   it('narrows to one period when asked, and to every period when not', async () => {
@@ -347,7 +347,7 @@ describe('PgCraRepository', () => {
       // A quantity, added by ADR-0053 for the late-days counter. It is listed here rather than
       // exempted: this assertion exists so that widening the projection is a decision somebody
       // took, and the only way to take it is to come and write the new name down.
-      'recordedHalfDays',
+      'recordedQuarterDays',
       'status',
     ]);
   });
@@ -362,7 +362,7 @@ describe('PgCraRepository', () => {
       day: isoDate('2026-06-02'),
       dayType: 'worked',
       missionId: 'mission-1',
-      halfDays: 2,
+      quarterDays: 4,
     });
     await repo().save(cra);
 
