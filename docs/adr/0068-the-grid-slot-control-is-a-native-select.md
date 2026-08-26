@@ -1,7 +1,7 @@
 # ADR-0068 — The grid's slot control is a native `<select>`, not shadcn's `Select`
 
 - **Date**: 2026-08-25
-- **Status**: accepted
+- **Status**: superseded by ADR-0070
 
 ## Context
 

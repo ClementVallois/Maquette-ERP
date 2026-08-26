@@ -106,7 +106,7 @@ Retirés par rapport à l'ancien plan : **MSW**, **@faker-js/faker** (l'API et l
   persona n'est **pas** une authentification et la notice qui le dit reste visible (pas de
   « Login », pas de « User »).
 - **Formats métier, non négociables** : argent en **centimes entiers** (`totalTtcCents`), taux de
-  TVA en **basis points** (2000 = 20 %, 850 = 8,5 %), quantités en **demi-journées** (affichées
+  TVA en **basis points** (2000 = 20 %, 850 = 8,5 %), quantités en **quarts de journée** (ADR-0069, affichées
   « 0,5 j » / « 1 j »), périodes `YYYY-MM`, dates ISO. Affichage français : virgule décimale,
   `JJ/MM/AAAA`, espace insécable avant €, `Europe/Paris`. Le module `src/lib/format.ts` est le
   **miroir** de `apps/api/src/web/format.ts` (mêmes sorties, testées).
@@ -388,7 +388,7 @@ assumée qui peut diverger — pas de nouveau `packages/`, pas d'import cross-ap
 
 Réimplémenter en miroir de `apps/api/src/web/format.ts` : `frenchEuros` (centimes → « 1 234,50 € »),
 `frenchDate` (`JJ/MM/AAAA`), `frenchMonth` (« juin 2026 »), `frenchWeekday`, `frenchDays`
-(demi-journées → « 0,5 j » / « 12 j »), `frenchPercent` (basis points → « 8,5 % »). **Tests
+(quarts de journée → « 0,25 j » / « 12 j »), `frenchPercent` (basis points → « 8,5 % »). **Tests
 unitaires vitest alignés sur les cas du `format.test.ts` de l'API** — mêmes entrées, mêmes sorties.
 
 ### 3.5 Query client
@@ -475,7 +475,7 @@ Miroir de la composition de `pages/pre-facturier.ts` (ADR-0053), périmétré au
 ```
 { period, summary: { billableCents, lateDays, craCount },
   invoices: [ InvoiceListItem ],
-  cras: [ { craId, consultantId, consultantName, status, late, recordedHalfDays,
+  cras: [ { craId, consultantId, consultantName, status, late, recordedQuarterDays,
             blockingReasons: [string], decidable } ] }
 ```
 
@@ -493,7 +493,7 @@ motif de refus). Tests : mois d'Alice (jour partagé, absence, samedi flaggé), 
 
 Agrégats **honnêtes** par rôle, calculés depuis les repositories existants — rien d'inventé :
 
-- consultant : statut de mon mois, demi-journées saisies, jours restants non saisis ;
+- consultant : statut de mon mois, quarts de journée saisis, jours restants non saisis ;
 - manager : Cra soumis en attente de décision, total facturable du bureau (centimes), Cra en retard ;
 - billing : factures brouillon / émises (compte), total TTC émis (centimes).
 
@@ -505,55 +505,219 @@ liste » s'applique. Tests par rôle avec les valeurs du seed.
 
 ---
 
-## Phase 6 — Écran vedette : Mon CRA (la grille de saisie)
+## Phase 5bis — Le quart de journée devient l'unité (backend, ADR-0069)
+
+**Scope commit : `platform`, `timesheet`, `billing`, `api`.** Décidée le 26/08/2026 : l'usage réel
+saisit au quart de journée, ce qui est **exactement** le seuil de réouverture qu'ADR-0012 s'était
+écrit à lui-même. ADR-0069 le tient. Cette phase passe **avant** la refonte de la grille et se
+termine par une suite verte : une grille matricielle qui propose `0,25` à un domaine qui le refuse
+n'est pas une étape intermédiaire, c'est un écran cassé.
+
+> **La règle de cette phase** : ce n'est **pas** un `sed`. Un test qui affirme `halfDays: 2` pour
+> « une journée pleine » a raison sur l'intention et tort sur la valeur ; renommé en aveugle il
+> reste vert et ne prouve plus rien. Chaque assertion se relit. Le seul repère mécanique est la
+> constante — `HALF_DAYS_PER_DAY` n'apparaît jamais en littéral `2` dans une règle, ce qui est
+> précisément ce qu'ADR-0012 avait acheté en l'exigeant.
+
+### 5bis.1 `@erp/platform` — la valeur
+
+`quarter-days.ts` remplace `half-days.ts` : `QuarterDays`, `QUARTER_DAYS_PER_DAY = 4`, fabrique
+`quarterDays()` qui refuse une fraction, un négatif, `NaN`. `MissionHalfDays` (charge utile de
+l'événement, `events.ts`) devient `MissionQuarterDays`. Tests de la fabrique d'abord.
+
+### 5bis.2 `@erp/timesheet` — les deux invariants par jour
+
+`CraLine` porte `1` à `4` quarts. `Cra.halfDaysOn` → `quarterDaysOn`. `DayOverbookedError` et
+`assertMonthAddsUp`/`IncompleteCraError` lisent la nouvelle constante — leur logique ne bouge pas,
+et c'est ce qui rend la migration sûre : les deux bornes d'une journée existent déjà, explicitement,
+dans le domaine. Elles ne sont **pas** réécrites côté client (règle 5 de `CLAUDE.md`).
+
+Tests à relire un par un : `cra.test.ts` (surbooking : `2 + 2` devient `4 + 1`), les checks de
+soumission (un jour ouvré incomplet), les erreurs typées et leurs messages français.
+
+### 5bis.3 `@erp/billing` — la division
+
+`money.ts` : diviseur `QUARTER_DAYS_PER_DAY`, précondition `tjmCents % 4 !== 0` au **même unique**
+site de division. Elle tient pour la même raison qu'avant : un `Tjm` est un nombre entier d'euros
+(ADR-0002), donc `tjmCents` est un multiple de 100, donc divisible par 4. `InvoiceLine` :
+`quantityQuarterDays`, `unitPriceCents` = prix d'**un quart de journée**, `origin.quarterDays`.
+`DeclinedDays` compte en quarts. Le test de référence `unitPrice × quantity === amountCents` reste
+le garde-fou.
+
+### 5bis.4 Persistance, migration, seed
+
+Migration **`011-quarter-days.sql`** : `RENAME COLUMN` sur `timesheet.cra_lines.half_days`,
+`billing.invoice_lines.quantity_half_days` / `origin_half_days`, `billing.declined_days.half_days`,
+et `CHECK` réécrit sur la nouvelle borne. Une migration numérotée, pas une édition de `002`/`003` :
+le journal de migrations est l'histoire du schéma. **Aucune migration de données** — le seed est
+déterministe et la base se réinitialise (ADR-0022) ; ADR-0069 dit pourquoi c'est la dernière fois.
+
+Le seed est régénéré : une journée pleine vaut `4`, et **au moins un jour du seed est saisi en
+quatre quarts** — sinon la grille refaite n'a rien à démontrer le jour de la démo. Le seed reste
+validé par zod.
+
+### 5bis.5 `apps/api` — le contrat et deux manques nommés
+
+- `PUT /api/v1/cras/:period/entries` : une entrée par **cellule non vide**, portant `quarterDays`.
+  `MAX_ENTRIES` passe de `62` à `124` (4 × 31), pour la même raison qu'il valait `62`.
+- `GET /api/v1/cras/:period/grid` gagne, par mission, **les jours où le consultant y est affecté**
+  (`assignableDays`) : c'est ce qui permet à la grille de griser une mission qui démarre le 15
+  plutôt que de laisser la saisie échouer à la soumission. La composition sait déjà le calculer —
+  `craGridComposition` filtre déjà les missions avec `isAssigned` jour par jour.
+- **`validatedBy` entre dans `CraGridComposition`** et dans la réponse : la tâche 6.4 le demandait,
+  la composition ne le portait pas, et le manque était consigné dans `open-questions.md` le
+  25/08 (défaut D6 de la revue). Il se corrige ici, avec son test d'intégration.
+- Écrans SSR conservés (relevé imprimable ADR-0056, pré-facturier), `/dashboard` : `recordedHalfDays`
+  → `recordedQuarterDays`.
+
+### 5bis.6 `apps/web` — juste ce qu'il faut pour compiler
+
+`frenchDays` formate des quarts (`3 quarts` → `0,75 j`), et **le défaut D5 se tranche ici** : la
+colonne de `/cra` s'intitule « Jours saisis » et affiche des jours — un en-tête « demi-journées » au
+dessus de « 21 j » était une contradiction, et l'unité d'affichage se décide **une fois**, dans
+`format.ts`. Les types de `features/cra` suivent le contrat. La grille existante n'est pas
+retouchée au-delà de la compilation : elle est refaite en Phase 6.
+
+### 5bis.7 Documentation
+
+`CONTEXT.md` : `HalfDays` → `QuarterDays` (l'entrée, ses interdits, ses renvois), **`HalfDaySlot`
+disparaît** du vocabulaire — la notion de créneau n'existe plus nulle part après ADR-0070.
+`README.md` : la ligne « Plus de deux missions dans une même journée » de « Ce que je ne construis
+pas » est **construite** ; elle est remplacée par la ligne des types d'absence (voir 6.2). Les ADR
+superseded ne sont pas réécrits.
+
+**Gate de sortie** : `pnpm run check` vert, `pnpm run test:int` vert, e2e existants verts ;
+`grep -ri "halfday\|half_day" packages apps migrations` ne renvoie plus que des ADR superseded ;
+un test de bout en bout qui enregistre **quatre quarts sur une journée** et retrouve quatre lignes.
+
+---
+
+## Phase 6 — Écran vedette : Mon CRA (la grille matricielle)
 
 **Scope commit : `web`.** C'est l'écran qui a fait tomber ADR-0009 — le niveau d'exigence est
 maximal ici.
 
-### 6.1 Liste des mois (`/cra`)
+> **Cette phase est rouverte.** Une première Phase 6 a été livrée le 25/08 (liste des mois + grille
+> un-jour-par-ligne, deux créneaux par jour). ADR-0069 et ADR-0070 la rouvrent : la forme
+> jour-par-ligne était le rendu direct de la demi-journée. Ce qui est **conservé** : la liste des
+> mois, la couche de données (`api.ts`, `hooks.ts`), le routage, les quatre états de statut, les
+> états vides/refusés. Ce qui est **refait** : la grille elle-même. Ce qui est **supprimé** :
+> `features/cra/slots.ts` et ses tests, `LABELS.cra.slotsNote` (ADR-0070).
 
-`GET /api/v1/cras` (l'API périmètre déjà : un consultant ne voit que les siens). Table : mois
-(`frenchMonth`), `StatusBadge`, demi-journées saisies, action « Ouvrir ». État vide designé
-(« aucun mois saisi » + action d'ouverture de la période courante).
+### 6.1 Liste des mois (`/cra`) — corrections
 
-### 6.2 La grille (`/cra/$period`)
+L'écran reste. Trois corrections issues de la revue du 25/08 :
 
-Données : `GET /api/v1/cras/:period/grid` (Phase 5.2).
+- en-tête « Jours saisis » et valeurs en jours (D5, tranché en 5bis.6) ;
+- le contrôle « Filtrer par mois » n'était demandé nulle part sur une table de deux lignes : il part ;
+- l'état vide reste designé (« aucun mois saisi » + ouverture de la période courante).
 
-- Une ligne par jour : jour de semaine + date + marqueur visuel pour `weekend`/`publicHoliday`
-  (rendus, jamais bloquants — le serveur flagge, il n'interdit pas).
-- Deux créneaux par jour (matin / après-midi) : sélecteur par créneau — vide, **Absence**, ou une
-  des missions affectées (nom + client).
-- **Clavier** : flèches entre créneaux, ouverture au clavier, focus toujours visible.
-- Panneau de totaux (demi-journées par mission + total mois, via `frenchDays`), recalculé
-  localement à l'édition et réconcilié à la sauvegarde.
+### 6.2 La grille (`/cra/$period`) — une matrice activités × jours
 
-### 6.3 Sauvegarder / Soumettre
+Données : `GET /api/v1/cras/:period/grid`. Forme : **ADR-0070**.
 
-`PUT /api/v1/cras/:period/entries` — **remplace le mois entier** (≤ 62 entrées, une par créneau ;
-un jour plein = deux entrées identiques ; `submit: boolean`). Optimistic UI avec rollback sur
-problème ; toast dont le verbe reprend le bouton (« Enregistrer » → « Enregistré », « Soumettre »
-→ « Soumis »). Un 400/422 avec `errors` s'affiche par champ/créneau concerné.
+- **Lignes = activités.** Une par mission sur laquelle le consultant est affecté dans le mois **et
+  qui porte au moins un quart saisi**, plus une ligne `Absence`. Une mission sans saisie n'apparaît
+  pas d'office : elle s'ajoute (6.3).
+- **Colonnes = jours**, tous les jours du mois, dans une zone à défilement horizontal. En-tête sur
+  deux niveaux : numéro de semaine, puis initiale du jour + quantième (`L 17`), comme un calendrier
+  se lit.
+- **Cellules = une quantité en quarts** : vide, `¼`, `½`, `¾`, `1`. `<select>` natif de cinq
+  options, chrome OS retiré (`appearance-none`) : une cellule de grille se lit comme une cellule,
+  pas comme 124 contrôles de formulaire. **C'est la réparation du défaut D1** — la saisie
+  n'est plus un sélecteur de mission large comme un nom de client.
+- **Couleurs** — quatre familles, et rien d'inventé :
+  | Ce qui est coloré                                                                                   | Source                                                      | Rendu                                                                          |
+  | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------ |
+  | Week-end, jour férié                                                                                | `days[].nonWorkable` (le serveur flagge, il n'interdit pas) | colonne en fond neutre appuyé, en-tête grisé, saisie **toujours possible**     |
+  | Absence                                                                                             | ligne `Absence`                                             | teinte propre, réservée, jamais celle d'une mission                            |
+  | Mission                                                                                             | une teinte par ligne, stable dans le mois                   | pastille dans l'en-tête de ligne + fond de cellule très clair                  |
+  | Jour non affectable sur cette ligne                                                                 | `missions[].assignableDays`                                 | cellule inerte, `aria-disabled`, infobulle « mission non affectée ce jour-là » |
+  | Les valeurs exactes vont dans `docs/direction-visuelle.md` §4.4, qui traite déjà les flags de jour. |
+- **Deux totaux, lus du même état local** : un total par jour (ligne de pied) et un total du mois
+  par activité (dernière colonne). Le total du jour est celui qui porte le sens : il matérialise, à
+  la frappe, les deux invariants que le domaine tient déjà — au-dessus d'une journée
+  (`DayOverbookedError`), en-dessous à la soumission (`IncompleteCraError`). Un jour ouvré à
+  `< 1` est signalé visuellement ; **la grille ne décide de rien**, elle affiche une somme et le
+  refus, s'il est dû, vient du domaine (ADR-0070).
 
-### 6.4 Les quatre états de statut — tâches explicites
+**Ce qui n'est pas construit** : la distinction congé payé / RTT / maladie. Le domaine ne connaît
+que `worked` et `absence` — une taxonomie d'absences est une valeur, une migration, un seed et des
+écrans, pour zéro conséquence sur la facturation (une absence ne produit pas de ligne). Décision du
+26/08, et elle part en ligne explicite dans « Ce que je ne construis pas » plutôt que d'être
+silencieusement rabotée en une seule couleur « absence ».
+
+### 6.3 Les gestes qui n'existent que sur une matrice
+
+Trois outils par ligne, à droite de l'en-tête de ligne, plus un ajout et une navigation :
+
+- **Remplir les jours ouvrés vides** : pose une journée pleine sur chaque jour **ouvré dont le
+  total est nul** et sur lequel la mission est affectable. Ne peut donc jamais surbooker, et ne
+  touche jamais un jour déjà saisi.
+- **Vider la ligne** : remet le mois de cette activité à zéro, **la ligne reste**.
+- **Retirer la ligne** : la ligne disparaît de la grille. Proposé uniquement si la ligne est vide —
+  retirer une ligne saisie, c'est vider puis retirer, en deux gestes conscients.
+- **Ajouter une activité** : liste les missions affectées dans le mois et non encore affichées
+  (`missions[]` les renvoie toutes, y compris celle qui démarre le 15). C'est le cas d'usage nommé
+  le 26/08 : le manager met une mission à disposition en cours de mois, le consultant l'ajoute et
+  saisit les jours déjà travaillés dessus.
+- **Navigation de mois** : `‹ août 2026 ›` dans l'en-tête, deux liens vers `/cra/$period`
+  adjacents. Une modification non enregistrée bloque la navigation par une confirmation.
+
+Tous ces gestes sont des opérations d'état local sur une ligne ou une colonne, réconciliées au
+`PUT` du mois entier (ADR-0050) et re-lues après écriture (ADR-0067) : aucun d'eux n'écrit tout seul.
+
+### 6.4 Clavier et accessibilité — le contrat gagne une dimension
+
+Flèches dans les **deux** axes (jour précédent/suivant, activité précédente/suivante), `Home`/`End`
+sur la ligne, focus toujours visible, cellule focalisée **ramenée dans la zone visible** — la grille
+défile horizontalement, il ne suffit plus de donner le focus. Table sémantique : `<caption>` qui
+nomme le mois, `scope="col"` sur les 31 dates, `scope="row"` sur l'activité, un label par cellule
+qui dit l'activité **et** le jour. Zéro violation critique/sérieuse à l'audit axe : c'est un gate
+de phase, pas un item de finition.
+
+### 6.5 Sauvegarder / Soumettre
+
+`PUT /api/v1/cras/:period/entries` — remplace le mois entier, une entrée par cellule non vide
+(≤ 124), `submit: boolean`. Écriture **refetch-driven** (ADR-0067), toast dont le verbe reprend le
+bouton, `400`/`422` avec `errors` affichés sur la cellule concernée. Un `IncompleteCraError` au
+`submit` désigne les jours en cause **dans la ligne de totaux**, là où l'utilisateur les lit.
+
+### 6.6 Les quatre états de statut
 
 - `draft` : éditable, boutons Enregistrer + Soumettre.
-- `refused` : **bannière avec le motif de refus** (renvoyé par l'API), grille rééditable.
+- `refused` : bannière avec le motif de refus renvoyé par l'API, grille rééditable.
 - `submitted` : lecture seule, bannière « soumis, en attente de décision ».
-- `validated` : lecture seule, bannière avec `validatedBy` ; lien vers le relevé imprimable
-  **SSR** `/releve/:id` (nouvel onglet).
+- `validated` : lecture seule, bannière nommant **`validatedBy`** (livré en 5bis.5 — défaut D6) ;
+  lien vers le relevé imprimable SSR `/releve/:id` (nouvel onglet).
 
-### 6.5 Livrables d'états
+**Défaut D3** : la bannière `validated` affichait « (ADR-0005) » et le mot « relevé de temps ». Un
+identifiant d'ADR ne s'affiche jamais à un utilisateur, et `Cra` reste `Cra` (`CONTEXT.md`).
+Correction dans `lib/labels.ts`.
 
-- Mois vide (aucune ligne) : grille vierge invitante, pas une page cassée.
-- 403 `out-of-scope` sur un deep-link vers le Cra d'un autre : `DeniedState` designé.
+### 6.7 États limites
 
-**Gate de sortie — parcours e2e J1** (Playwright, DB reset en global-setup via
-`pnpm run db:reset`, workers **en série**) : persona `consultant-paris` (Alice) → `/cra/2026-06` →
-vérifier le seed (deux missions le 11/06, absence le 18/06, samedi 13/06 flaggé) → éditer un
-créneau → Enregistrer → rouvrir, la modification persiste → Soumettre → l'écran passe en lecture
-seule `submitted`. Audit axe sur la grille : zéro violation critique/sérieuse. Screenshots.
-`pnpm run check` vert.
+- **Mois vide** : grille vierge invitante — les colonnes du mois, la ligne `Absence`, et l'invite
+  « ajoutez une activité », pas une page cassée.
+- **403 sur un deep-link** : `DeniedState` **centré, aéré, avec une phrase qui explique** — défaut
+  D7 : l'écran de refus est la démonstration du modèle d'autorisation (tâche 7.6), pas une carte
+  serrée en haut à gauche d'une page vide.
+- **Défaut D2** : le titre et le fil d'Ariane nomment le mois (« CRA — août 2026 »). Sur l'écran
+  livré le 25/08, rien n'indiquait quel mois était ouvert.
+- **Défaut D4** : le fond de la barre latérale s'arrête ~68 px avant le bas du viewport sur les
+  quatre captures — défaut du shell (Phase 4), corrigé ici puisqu'il se voit ici.
+- **Défaut D8** : la capture `6.5-cra-denied-out-of-scope.png` rend en réalité
+  `insufficient-role` ; le vrai `out-of-scope` est produit par le parcours J5 (Phase 7) — la capture
+  est renommée à ce moment-là.
+
+### 6.8 Gate de sortie — parcours e2e J1 (réécrit)
+
+Playwright, DB reset en global-setup, workers en série. Persona `consultant-paris` (Alice) →
+`/cra/2026-06` → vérifier le seed **en matrice** (deux missions le 11/06 sur deux lignes, la
+journée en quatre quarts du seed, absence le 18/06, samedi 13/06 flaggé) → saisir `¼` dans une
+cellule → le total du jour le reflète → « Remplir les jours ouvrés vides » sur une ligne →
+Enregistrer → rouvrir, la saisie persiste → Soumettre → lecture seule `submitted`. Audit axe sur la
+grille : zéro violation critique/sérieuse. Captures des sept états. `pnpm run check` vert.
 
 ---
 
@@ -565,7 +729,7 @@ seule `submitted`. Audit axe sur la grille : zéro violation critique/sérieuse.
 
 Données : Phase 5.1. Sélecteur de période ; **3 `StatCard`** (facturable €, jours en retard,
 nombre de Cra) ; table des factures facturables (client, `StatusBadge`, numéro ou « — », HT, TTC,
-lien détail) ; table des Cra (consultant, statut + badge « en retard », demi-journées, **motifs
+lien détail) ; table des Cra (consultant, statut + badge « en retard », jours saisis, **motifs
 bloquants en liste**, actions).
 
 ### 7.2 Valider (manager)
@@ -589,7 +753,7 @@ reste entièrement lisible.
 
 `GET /api/v1/consultants/:id/economics?period=`. Navigation **explicite** depuis une ligne du
 pré-facturier (jamais un survol — chaque lecture est loggée côté serveur, ADR-0052). Contenu :
-`Cjm` en en-tête, table par mission (demi-journées, `Tjm`, CA, coût, marge — via `frenchEuros`),
+`Cjm` en en-tête, table par mission (jours, `Tjm`, CA, coût, marge — via `frenchEuros`),
 totaux. **Pas de taux de marge en %** (une division sur de l'argent).
 
 ### 7.6 Livrables d'états
@@ -626,7 +790,7 @@ comme sur les maquettes).
 ### 8.2 Détail (`/factures/$id`)
 
 `GET /api/v1/invoices/:id`. Blocs vendeur / client facturé, faits (numéro, dates, période,
-conditions), table des lignes (désignation, origine — mission/Cra —, demi-journées, PU, montant),
+conditions), table des lignes (désignation, origine — mission/Cra —, quantité, PU, montant),
 **récapitulatif TVA par taux** (basis points via `frenchPercent`), totaux **uniquement si
 `issued`**. Lien « Version imprimable » → **SSR `/facture/:id`** (nouvel onglet).
 
@@ -785,13 +949,13 @@ des captures `tests/visual/review/` (case à cocher, hors périmètre agent).
 
 ### Timesheet
 
-| Méthode + chemin                   | Rôles   | Notes                                                                                                                                                                                                                                                                                    |
-| ---------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/v1/cras?limit&offset`    | c, m, b | `limit` 1..50, défaut 20 — **`>50` = 400, pas un clamp**. Hors périmètre = **filtré**, pas refusé. → `{ cras: [{ id, consultantId, officeId, period, status, recordedHalfDays }] }`                                                                                                      |
-| `GET /api/v1/cras/:id`             | c, m, b | Cra complet : `lines: [{ day, dayType: 'worked'\|'absence', missionId\|null, halfDays: 1\|2 }]`, `flags: [{ day, reason: 'weekend'\|'publicHoliday' }]`, `status`, `validatedBy\|null`. **404 (n'existe pas) ≠ 403 `/problems/out-of-scope` (existe, pas à vous)** — distinction voulue. |
-| `PUT /api/v1/cras/:period/entries` | c       | Body `{ submit: boolean, entries: [{ day, dayType, missionId\|null }] }`, **max 62 entrées, une par demi-journée, remplace le mois entier**. → `{ craId, status, flags }`                                                                                                                |
-| `POST /api/v1/cras/:id/validation` | m       | Sans body. → `{ craId, replayed, invoices: [InvoiceListItem], declined: [{ craId, missionId, halfDays, reason }] }`. **Rejeu = 200 `replayed: true`**, pas un 409.                                                                                                                       |
-| `GET /api/v1/cras/:period/grid`    | c       | **Phase 5.2** — squelette du mois + missions affectées + état du Cra.                                                                                                                                                                                                                    |
+| Méthode + chemin                   | Rôles   | Notes                                                                                                                                                                                                                                                                                       |
+| ---------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/v1/cras?limit&offset`    | c, m, b | `limit` 1..50, défaut 20 — **`>50` = 400, pas un clamp**. Hors périmètre = **filtré**, pas refusé. → `{ cras: [{ id, consultantId, officeId, period, status, recordedQuarterDays }] }`                                                                                                      |
+| `GET /api/v1/cras/:id`             | c, m, b | Cra complet : `lines: [{ day, dayType: 'worked'\|'absence', missionId\|null, quarterDays: 1..4 }]`, `flags: [{ day, reason: 'weekend'\|'publicHoliday' }]`, `status`, `validatedBy\|null`. **404 (n'existe pas) ≠ 403 `/problems/out-of-scope` (existe, pas à vous)** — distinction voulue. |
+| `PUT /api/v1/cras/:period/entries` | c       | Body `{ submit: boolean, entries: [{ day, dayType, missionId\|null, quarterDays }] }`, **max 124 entrées, une par cellule non vide, remplace le mois entier**. → `{ craId, status, flags }`                                                                                                 |
+| `POST /api/v1/cras/:id/validation` | m       | Sans body. → `{ craId, replayed, invoices: [InvoiceListItem], declined: [{ craId, missionId, quarterDays, reason }] }`. **Rejeu = 200 `replayed: true`**, pas un 409.                                                                                                                       |
+| `GET /api/v1/cras/:period/grid`    | c       | **Phase 5.2** — squelette du mois + missions affectées + état du Cra.                                                                                                                                                                                                                       |
 
 ### Billing
 
@@ -800,7 +964,7 @@ des captures `tests/visual/review/` (case à cocher, hors périmètre agent).
 | `GET /api/v1/invoices?limit&offset`             | m, b             | → `{ invoices: [{ id, status, supplyPeriod, billedToName, invoiceNumber\|null, issueDate\|null, totalTtcCents\|null }] }`                                                                                                                                                                                          |
 | `GET /api/v1/invoices/:id`                      | m, b             | Document complet (`billedTo`, `seller`, `terms`, `mentions`, `lines` avec `origin` et `vat`, `vatBreakdown`). **`totals` est `null` tant que `status ≠ 'issued'`.**                                                                                                                                                |
 | `POST /api/v1/invoices/:id/issuance`            | b                | **En-tête `Idempotency-Key` 8-200 obligatoire** (absent → 400 `idempotency-key-required` ; réutilisée ailleurs → 409 `idempotency-key-reused`). → `{ invoiceId, replayed, invoiceNumber, issueDate, totalTtcCents }`. Numéro : `SEC-2026-\d{6}`. Déjà émise + nouvelle clé → 409 `invoice-transition-not-allowed`. |
-| `GET /api/v1/consultants/:id/economics?period=` | **m uniquement** | billing → 403. → `{ consultantId, displayName, period, cjmCents, missions: [{ missionId, missionName, halfDays, tjmCents, revenueCents, costCents, marginCents }], revenueCents, costCents, marginCents }`. Chaque lecture est loggée (divulgation, ADR-0052).                                                     |
+| `GET /api/v1/consultants/:id/economics?period=` | **m uniquement** | billing → 403. → `{ consultantId, displayName, period, cjmCents, missions: [{ missionId, missionName, quarterDays, tjmCents, revenueCents, costCents, marginCents }], revenueCents, costCents, marginCents }`. Chaque lecture est loggée (divulgation, ADR-0052).                                                  |
 | `GET /api/v1/pre-facturier?period=`             | m, b             | **Phase 5.1.**                                                                                                                                                                                                                                                                                                     |
 | `GET /api/v1/dashboard?period=`                 | c, m, b          | **Phase 5.3.**                                                                                                                                                                                                                                                                                                     |
 
@@ -825,12 +989,12 @@ un nouvel onglet par la SPA.
 
 ### Le seed (période `2026-06`, déterministe — ADR-0022)
 
-| Persona (clé)      | Qui                             | Sert à démontrer                                                                                                            |
-| ------------------ | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `consultant-paris` | Alice Martin (Paris/Audit)      | La grille : **jour partagé le 11/06** (2 missions), **absence le 18/06**, **samedi 13/06 travaillé et flaggé**.             |
-| `manager-paris`    | Bruno Leroy (Paris/Audit)       | Validation/refus ; **Claire Dubois (Paris/SOC) a un mois `submitted`** qui attend sa décision (mission Réunion, TVA 8,5 %). |
-| `manager-lyon`     | Emma Robert (Lyon/GRC)          | Le 403 `out-of-scope` sur les données parisiennes.                                                                          |
-| `billing-paris`    | Henri Laurent (Paris, director) | L'émission avec idempotence ; le 403 sur la marge.                                                                          |
+| Persona (clé)      | Qui                             | Sert à démontrer                                                                                                                                             |
+| ------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `consultant-paris` | Alice Martin (Paris/Audit)      | La grille : **jour partagé le 11/06** (2 missions), **une journée en quatre quarts** (ADR-0069), **absence le 18/06**, **samedi 13/06 travaillé et flaggé**. |
+| `manager-paris`    | Bruno Leroy (Paris/Audit)       | Validation/refus ; **Claire Dubois (Paris/SOC) a un mois `submitted`** qui attend sa décision (mission Réunion, TVA 8,5 %).                                  |
+| `manager-lyon`     | Emma Robert (Lyon/GRC)          | Le 403 `out-of-scope` sur les données parisiennes.                                                                                                           |
+| `billing-paris`    | Henri Laurent (Paris, director) | L'émission avec idempotence ; le 403 sur la marge.                                                                                                           |
 
 5 clients (un par cas de TVA : 20 %, 8,5 %, hors champ, autoliquidation UE, interne), 7 missions
 (dont une exigeant l'habilitation PASSI et un Forfait — **seule la Regie se facture**), une
@@ -838,14 +1002,14 @@ consultante en Intercontrat. Reset : `pnpm run db:reset` ; setup froid : `pnpm r
 
 ## Annexe B — Les six parcours e2e
 
-| #   | Persona            | Parcours                                                              | Phase |
-| --- | ------------------ | --------------------------------------------------------------------- | ----- |
-| J1  | `consultant-paris` | Grille 2026-06 : vérifier le seed, éditer, enregistrer, soumettre     | 6     |
-| J2  | `manager-paris`    | Valider le mois soumis de Claire → factures brouillon + jours écartés | 7     |
-| J3  | `manager-paris`    | Refuser le mois soumis par Alice (J1), motif → bannière côté Alice    | 7     |
-| J4  | `billing-paris`    | Émettre la facture de J2 avec clé → `SEC-2026-\d{6}`, rejeu prouvé    | 8     |
-| J5  | `manager-lyon`     | Deep-link d'un Cra parisien → 403 `out-of-scope` designé              | 7     |
-| J6  | `billing-paris`    | URL de marge → 403 `insufficient-role` nommant `deniedBy`             | 7     |
+| #   | Persona            | Parcours                                                                                      | Phase |
+| --- | ------------------ | --------------------------------------------------------------------------------------------- | ----- |
+| J1  | `consultant-paris` | Grille 2026-06 : vérifier le seed, saisir un quart, remplir une ligne, enregistrer, soumettre | 6     |
+| J2  | `manager-paris`    | Valider le mois soumis de Claire → factures brouillon + jours écartés                         | 7     |
+| J3  | `manager-paris`    | Refuser le mois soumis par Alice (J1), motif → bannière côté Alice                            | 7     |
+| J4  | `billing-paris`    | Émettre la facture de J2 avec clé → `SEC-2026-\d{6}`, rejeu prouvé                            | 8     |
+| J5  | `manager-lyon`     | Deep-link d'un Cra parisien → 403 `out-of-scope` designé                                      | 7     |
+| J6  | `billing-paris`    | URL de marge → 403 `insufficient-role` nommant `deniedBy`                                     | 7     |
 
 Exécution **en série** (base partagée), `db:reset` en global-setup, ordre J1 → {J2, J3} → J4 ;
 J5/J6 en lecture seule n'importe où après J1. Le seed déterministe autorise les **assertions

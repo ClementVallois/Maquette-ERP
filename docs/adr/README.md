@@ -40,7 +40,7 @@ retouched, so what was decided stays visible next to what replaced it.
 | [0009](./0009-server-rendered-html-no-client-framework.md)                                   | Server-rendered HTML, with no client framework                                   | superseded |
 | [0010](./0010-vat-rounded-per-rate.md)                                                       | VAT is rounded per rate, and the rate is resolved from territoriality            | accepted   |
 | [0011](./0011-hand-written-sql-no-orm.md)                                                    | Hand-written SQL over `pg`, and no ORM                                           | accepted   |
-| [0012](./0012-half-day-as-the-storage-unit.md)                                               | The half-day is the single storage unit for recorded time                        | accepted   |
+| [0012](./0012-half-day-as-the-storage-unit.md)                                               | The half-day is the single storage unit for recorded time                        | superseded |
 | [0013](./0013-invoice-line-carries-its-origin.md)                                            | The invoice line carries its origin, though only `Regie` exists                  | accepted   |
 | [0014](./0014-triage-leaves-the-public-history.md)                                           | The working triage leaves the public history                                     | accepted   |
 | [0015](./0015-apps-tier-separate-from-packages.md)                                           | The application shell lives in `apps/`, a tier above `packages/`                 | accepted   |
@@ -90,9 +90,11 @@ retouched, so what was decided stays visible next to what replaced it.
 | [0063](./0063-the-spa-ships-in-the-api-deployable.md)                                        | The SPA ships in the API deployable, as build output, same-origin stays forced   | accepted   |
 | [0064](./0064-the-content-security-policy-admits-a-script.md)                                | The Content-Security-Policy admits a script, scoped to `'self'`                  | accepted   |
 | [0065](./0065-composition-root-reads-get-a-directory.md)                                     | Composition-root reads get a directory, and economics stays where it is          | accepted   |
-| [0066](./0066-the-grid-mirrors-the-slot-fill-rule-client-side.md)                            | The grid mirrors the slot-fill rule client-side, and never persists a slot index | accepted   |
+| [0066](./0066-the-grid-mirrors-the-slot-fill-rule-client-side.md)                            | The grid mirrors the slot-fill rule client-side, and never persists a slot index | superseded |
 | [0067](./0067-the-grid-write-is-refetch-driven-not-optimistic.md)                            | The grid write is refetch-driven, not optimistic                                 | accepted   |
-| [0068](./0068-the-grid-slot-control-is-a-native-select.md)                                   | The grid's slot control is a native `<select>`, not shadcn's `Select`            | accepted   |
+| [0068](./0068-the-grid-slot-control-is-a-native-select.md)                                   | The grid's slot control is a native `<select>`, not shadcn's `Select`            | superseded |
+| [0069](./0069-the-quarter-day-is-the-storage-unit.md)                                        | The quarter-day replaces the half-day as the single storage unit                 | accepted   |
+| [0070](./0070-the-entry-grid-is-a-mission-by-day-matrix.md)                                  | The entry grid is a mission × day matrix, and one cell is one `CraLine`          | accepted   |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
@@ -214,6 +216,16 @@ the wire carries no slot at all, and what happens between clicking Enregistrer a
 believing it. 0068 is the odd one of the three: it is not required by the plan's own stack table,
 which names shadcn/ui without qualification, and it exists because 62 simultaneous instances of
 one Radix primitive is a scale nothing built before this phase had tried.
+
+0069 and 0070 are one arbitration in two files, and the pair is the clearest thing this log has to
+show about why it exists. ADR-0012 wrote, on 18/08, the sentence "reopen if quarter-days appear in
+real usage" — a threshold nobody was going to be held to. On 26/08 they appeared, in the tool the
+firm actually uses, and 0069 honours it: the unit changes, and the two per-day invariants written
+against a named constant rather than a literal `2` move with it for free, which is the payoff of a
+convention that looked like pedantry when it was adopted. 0070 is the consequence rather than a
+second decision — a day that holds four things is not a day-per-row grid any more — and it takes
+0066 and 0068 with it, because both were answers to a question (what do two boxes per day mean)
+that the new shape does not ask.
 
 ## Identified, not yet decided
 

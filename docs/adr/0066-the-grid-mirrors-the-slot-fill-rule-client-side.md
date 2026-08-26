@@ -1,7 +1,7 @@
 # ADR-0066 — The grid mirrors the slot-fill rule client-side, and never persists a slot index
 
 - **Date**: 2026-08-25
-- **Status**: accepted
+- **Status**: superseded by ADR-0070
 
 ## Context
 
