@@ -127,7 +127,7 @@ describe('the money rules', () => {
   });
 
   it('reject the same calls in a test, and allow the float a negative test has to write', () => {
-    // The narrowing this pair exists for. `halfDays(1.5)` is a test that proves a factory refuses
+    // The narrowing this pair exists for. `quarterDays(1.5)` is a test that proves a factory refuses
     // a float, and it cannot be written without writing one — while a `Math.round` added to make
     // an assertion pass is the failure the rule is about, wherever it is written.
     const messages = lint(TEST_MONEY_FIXTURE).map((message) => message.message);
