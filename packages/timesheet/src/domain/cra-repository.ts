@@ -10,11 +10,11 @@ export interface CraListItem {
   readonly period: string;
   readonly status: string;
   /**
-   * The half-days the Cra records, summed. A quantity and not a rate, so it does not reach the
+   * The quarter-days the Cra records, summed. A quantity and not a rate, so it does not reach the
    * line `Cjm`, `Tjm` and margin are held behind (BUILD-RULES § Authorization); it is here so the
    * pré-facturier can sum a month without fetching every Cra in full (ADR-0053).
    */
-  readonly recordedHalfDays: number;
+  readonly recordedQuarterDays: number;
 }
 
 export interface CraListQuery {

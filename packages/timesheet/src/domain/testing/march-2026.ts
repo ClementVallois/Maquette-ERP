@@ -45,7 +45,7 @@ export function completeCra(id = 'cra-1'): Cra {
   const cra = emptyCra(id);
 
   for (const day of calendar.workableDaysOf(MARCH)) {
-    cra.recordDay({ day, dayType: 'worked', missionId: MISSION, halfDays: 2 });
+    cra.recordDay({ day, dayType: 'worked', missionId: MISSION, quarterDays: 4 });
   }
 
   return cra;

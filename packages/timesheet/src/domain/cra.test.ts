@@ -52,38 +52,43 @@ describe('a Cra', () => {
   it('records a day on a mission', () => {
     const cra = emptyCra();
 
-    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: MISSION, halfDays: 2 });
+    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: MISSION, quarterDays: 4 });
 
     expect(cra.lines).toStrictEqual([
-      { day: '2026-03-02', dayType: 'worked', missionId: MISSION, halfDays: 2 },
+      { day: '2026-03-02', dayType: 'worked', missionId: MISSION, quarterDays: 4 },
     ]);
   });
 
   it('splits a day between two missions', () => {
     const cra = emptyCra();
 
-    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-a', halfDays: 1 });
-    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-b', halfDays: 1 });
+    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-a', quarterDays: 2 });
+    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-b', quarterDays: 2 });
 
-    expect(cra.halfDaysOn('2026-03-02')).toBe(2);
+    expect(cra.quarterDaysOn('2026-03-02')).toBe(4);
   });
 
   it('hands out its lines as a copy', () => {
     // An aggregate whose caller can push into its own array holds no invariant at all.
     const cra = emptyCra();
-    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: MISSION, halfDays: 2 });
+    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: MISSION, quarterDays: 4 });
 
     (cra.lines as { length: number }).length = 0;
 
     expect(cra.lines).toHaveLength(1);
   });
 
-  it('refuses more than two half-days on one day', () => {
+  it('refuses more than four quarter-days on one day', () => {
     const cra = emptyCra();
-    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-a', halfDays: 2 });
+    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-a', quarterDays: 4 });
 
     expect(() => {
-      cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-b', halfDays: 1 });
+      cra.recordDay({
+        day: '2026-03-02',
+        dayType: 'worked',
+        missionId: 'mission-b',
+        quarterDays: 1,
+      });
     }).toThrow(DayOverbookedError);
   });
 
@@ -91,7 +96,7 @@ describe('a Cra', () => {
     const cra = emptyCra();
 
     expect(() => {
-      cra.recordDay({ day: '2026-04-01', dayType: 'worked', missionId: MISSION, halfDays: 2 });
+      cra.recordDay({ day: '2026-04-01', dayType: 'worked', missionId: MISSION, quarterDays: 4 });
     }).toThrow(DayOutsidePeriodError);
   });
 
@@ -99,33 +104,43 @@ describe('a Cra', () => {
     const cra = emptyCra();
 
     expect(() => {
-      cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: null, halfDays: 2 });
+      cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: null, quarterDays: 4 });
     }).toThrow(MissionRequiredError);
     expect(() => {
-      cra.recordDay({ day: '2026-03-03', dayType: 'absence', missionId: MISSION, halfDays: 2 });
+      cra.recordDay({
+        day: '2026-03-03',
+        dayType: 'absence',
+        missionId: MISSION,
+        quarterDays: 4,
+      });
     }).toThrow(MissionOnNonWorkedDayError);
   });
 
-  it('refuses a quantity that is not one or two half-days', () => {
+  it('refuses a quantity that is not one to four quarter-days', () => {
     const cra = emptyCra();
 
     expect(() => {
-      cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: MISSION, halfDays: 3 });
+      cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: MISSION, quarterDays: 5 });
     }).toThrow(InvalidValueError);
     expect(() => {
-      cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: MISSION, halfDays: 0.5 });
+      cra.recordDay({
+        day: '2026-03-02',
+        dayType: 'worked',
+        missionId: MISSION,
+        quarterDays: 0.5,
+      });
     }).toThrow(InvalidValueError);
   });
 
   it('clears a day so a correction is remove-then-record', () => {
     const cra = emptyCra();
-    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-a', halfDays: 1 });
-    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-b', halfDays: 1 });
-    cra.recordDay({ day: '2026-03-03', dayType: 'absence', missionId: null, halfDays: 2 });
+    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-a', quarterDays: 2 });
+    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-b', quarterDays: 2 });
+    cra.recordDay({ day: '2026-03-03', dayType: 'absence', missionId: null, quarterDays: 4 });
 
     cra.clearDay('2026-03-02');
 
-    expect(cra.halfDaysOn('2026-03-02')).toBe(0);
+    expect(cra.quarterDaysOn('2026-03-02')).toBe(0);
     expect(cra.lines).toHaveLength(1);
   });
 });
@@ -152,7 +167,7 @@ describe('the Cra lifecycle', () => {
     // The flags are a deliverable of the manager's screen, not a by-product: a Saturday that was
     // worked has to be visible to the person accepting the month.
     const cra = completeCra();
-    cra.recordDay({ day: '2026-03-14', dayType: 'worked', missionId: MISSION, halfDays: 2 });
+    cra.recordDay({ day: '2026-03-14', dayType: 'worked', missionId: MISSION, quarterDays: 4 });
 
     cra.submit({ clock: fixedClock(), calendar, reference });
 
@@ -184,7 +199,7 @@ describe('the Cra lifecycle', () => {
     });
 
     cra.clearDay('2026-03-03');
-    cra.recordDay({ day: '2026-03-03', dayType: 'absence', missionId: null, halfDays: 2 });
+    cra.recordDay({ day: '2026-03-03', dayType: 'absence', missionId: null, quarterDays: 4 });
     cra.submit({ clock: fixedClock(), calendar, reference });
 
     expect(cra.status).toBe('submitted');
@@ -203,7 +218,7 @@ describe('the Cra lifecycle', () => {
     const cra = submittedCra();
 
     expect(() => {
-      cra.recordDay({ day: '2026-03-03', dayType: 'worked', missionId: MISSION, halfDays: 2 });
+      cra.recordDay({ day: '2026-03-03', dayType: 'worked', missionId: MISSION, quarterDays: 4 });
     }).toThrow(CraTransitionError);
     expect(() => {
       cra.clearDay('2026-03-02');
@@ -267,7 +282,7 @@ describe('a validated Cra', () => {
 
     for (const attempt of [
       () => {
-        cra.recordDay({ day: '2026-03-07', dayType: 'worked', missionId: MISSION, halfDays: 2 });
+        cra.recordDay({ day: '2026-03-07', dayType: 'worked', missionId: MISSION, quarterDays: 4 });
       },
       () => {
         cra.clearDay('2026-03-02');

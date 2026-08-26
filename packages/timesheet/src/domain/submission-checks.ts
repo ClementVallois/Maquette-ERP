@@ -1,4 +1,4 @@
-import { HALF_DAYS_PER_DAY, type IsoDate, type Period } from '@erp/platform';
+import { QUARTER_DAYS_PER_DAY, type IsoDate, type Period } from '@erp/platform';
 
 import type { CraLine } from './cra-line.ts';
 import type { NonWorkableDay } from './day-type.ts';
@@ -82,12 +82,14 @@ function assertMonthAddsUp(input: {
   calendar: WorkingCalendar;
 }): void {
   const workable = input.calendar.workableDaysOf(input.period);
-  const recordedPerDay = halfDaysPerDay(input.lines);
+  const recordedPerDay = quarterDaysPerDay(input.lines);
 
-  const missingDays = workable.filter((day) => (recordedPerDay.get(day) ?? 0) < HALF_DAYS_PER_DAY);
+  const missingDays = workable.filter(
+    (day) => (recordedPerDay.get(day) ?? 0) < QUARTER_DAYS_PER_DAY,
+  );
   if (missingDays.length === 0) return;
 
-  const recordedHalfDays = workable.reduce(
+  const recordedQuarterDays = workable.reduce(
     (total, day) => total + (recordedPerDay.get(day) ?? 0),
     0,
   );
@@ -95,8 +97,8 @@ function assertMonthAddsUp(input: {
   throw new IncompleteCraError({
     craId: input.craId,
     missingDays,
-    recordedHalfDays,
-    expectedHalfDays: workable.length * HALF_DAYS_PER_DAY,
+    recordedQuarterDays,
+    expectedQuarterDays: workable.length * QUARTER_DAYS_PER_DAY,
   });
 }
 
@@ -111,11 +113,11 @@ function flagsFor(lines: readonly CraLine[], calendar: WorkingCalendar): CraFlag
   return [...flagged].map(([day, reason]) => ({ day, reason }));
 }
 
-function halfDaysPerDay(lines: readonly CraLine[]): Map<IsoDate, number> {
+function quarterDaysPerDay(lines: readonly CraLine[]): Map<IsoDate, number> {
   const total = new Map<IsoDate, number>();
 
   for (const line of lines) {
-    total.set(line.day, (total.get(line.day) ?? 0) + line.halfDays);
+    total.set(line.day, (total.get(line.day) ?? 0) + line.quarterDays);
   }
 
   return total;

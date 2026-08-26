@@ -15,8 +15,8 @@ import { calendar, CONSULTANT, MARCH, MISSION, reference } from './testing/march
 
 const MAY = period(2026, 5);
 
-function worked(day: IsoDate, halfDays = 2, missionId = MISSION): CraLine {
-  return { day, dayType: 'worked', missionId, halfDays };
+function worked(day: IsoDate, quarterDays = 4, missionId = MISSION): CraLine {
+  return { day, dayType: 'worked', missionId, quarterDays };
 }
 
 /** Every workable day of a month, worked on one mission: the shape that passes. */
@@ -164,7 +164,7 @@ describe('the submission checks', () => {
   });
 
   it('refuse a day recorded on a mission that does not exist', () => {
-    const lines = [...fullMonth(MARCH).slice(1), worked('2026-03-02', 2, 'mission-that-never-was')];
+    const lines = [...fullMonth(MARCH).slice(1), worked('2026-03-02', 4, 'mission-that-never-was')];
 
     expect(() => check(lines)).toThrow(UnknownMissionError);
   });
@@ -245,16 +245,16 @@ describe('the submission checks', () => {
       expect(error).toBeInstanceOf(IncompleteCraError);
       expect((error as IncompleteCraError).details).toMatchObject({
         missingDays: ['2026-03-17'],
-        recordedHalfDays: 42,
-        expectedHalfDays: 44,
+        recordedQuarterDays: 84,
+        expectedQuarterDays: 88,
       });
     }
   });
 
   it('count a half-worked day as not accounted for', () => {
-    // The failure a total-only check misses: 43 of 44 half-days, one day half empty.
+    // The failure a total-only check misses: 86 of 88 quarter-days, one day half empty.
     const lines = fullMonth(MARCH).map((line) =>
-      line.day === '2026-03-17' ? worked(line.day, 1) : line,
+      line.day === '2026-03-17' ? worked(line.day, 2) : line,
     );
 
     expect(() => check(lines)).toThrow(IncompleteCraError);

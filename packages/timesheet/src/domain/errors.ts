@@ -43,13 +43,13 @@ export class DayOutsidePeriodError extends BusinessError {
   }
 }
 
-/** Nobody works three half-days in a day. Two lines of two half-days each is the classic double entry. */
+/** Nobody works more than a full day. Two lines of four quarter-days each is the classic double entry. */
 export class DayOverbookedError extends BusinessError {
   readonly problemType = '/problems/day-overbooked';
 
   constructor(day: string, recorded: number, limit: number) {
     super(
-      `${day} already carries ${String(recorded)} half-days, and a day holds ${String(limit)}`,
+      `${day} already carries ${String(recorded)} quarter-days, and a day holds ${String(limit)}`,
       {
         day,
         recorded,
@@ -159,11 +159,11 @@ export class IncompleteCraError extends BusinessError {
   constructor(input: {
     craId: string;
     missingDays: readonly string[];
-    recordedHalfDays: number;
-    expectedHalfDays: number;
+    recordedQuarterDays: number;
+    expectedQuarterDays: number;
   }) {
     super(
-      `${input.craId} accounts for ${String(input.recordedHalfDays)} of ${String(input.expectedHalfDays)} half-days; ${String(input.missingDays.length)} workable days are not accounted for`,
+      `${input.craId} accounts for ${String(input.recordedQuarterDays)} of ${String(input.expectedQuarterDays)} quarter-days; ${String(input.missingDays.length)} workable days are not accounted for`,
       { ...input },
     );
   }
