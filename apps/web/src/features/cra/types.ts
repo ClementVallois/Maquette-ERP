@@ -20,6 +20,13 @@ export type CraStatus = 'draft' | 'submitted' | 'refused' | 'validated';
 export interface CraListItem {
   readonly id: string;
   readonly consultantId: string;
+  /**
+   * Added for ADR-0071: a manager's row needs a name to pick a consultant by. Presentation, not a
+   * rule — resolved server-side the same way `preFacturierComposition` already resolves it. A
+   * consultant's own rows carry their own name back; harmless, and one shape for every role rather
+   * than a field that exists only for `manager`.
+   */
+  readonly consultantName: string;
   readonly officeId: string;
   readonly period: string;
   readonly status: CraStatus;
@@ -126,6 +133,23 @@ export interface CraGridResponse {
   /** The domain's own answer (ADR-0065): never re-derived from `status` in this SPA. */
   readonly editable: boolean;
   readonly validatedBy: string | null;
+}
+
+/**
+ * `GET /api/v1/consultants/:consultantId/cras/:period/grid` (ADR-0071, manager-only). The same
+ * wire shape `CraGridResponse` answers, plus the two fields only this route carries — the
+ * consultant route's caller already knows who they are. `editable` still means "could the
+ * consultant edit this"; the manager screen ignores it and never renders an input (ADR-0071's own
+ * decision — a manager never edits a consultant's CRA).
+ */
+export interface ManagerCraGridResponse extends CraGridResponse {
+  readonly consultantId: string;
+  readonly consultantName: string;
+}
+
+/** `GET /api/v1/calendar` — the working calendar's own year coverage (ADR-0004). */
+export interface CalendarResponse {
+  readonly years: readonly number[];
 }
 
 export interface DeclinedDay {

@@ -3,18 +3,28 @@ import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
 import { unwrap } from '@/lib/api-client';
 
-import { fetchCraGrid, fetchCraList, saveMonth } from './api';
+import { fetchCalendar, fetchCraGrid, fetchCraList, fetchManagerCraGrid, saveMonth } from './api';
 import type {
+  CalendarResponse,
   CraGridResponse,
   CraListResponse,
+  ManagerCraGridResponse,
   MonthEntriesRequest,
   MonthEntriesResponse,
 } from './types';
 
 const CRA_LIST_QUERY_KEY = ['cra', 'list'] as const;
+const CALENDAR_QUERY_KEY = ['cra', 'calendar'] as const;
 
 function craGridQueryKey(period: string): readonly [string, string, string] {
   return ['cra', 'grid', period] as const;
+}
+
+function managerCraGridQueryKey(
+  consultantId: string,
+  period: string,
+): readonly [string, string, string, string] {
+  return ['cra', 'manager-grid', consultantId, period] as const;
 }
 
 export const craListQueryOptions = queryOptions({
@@ -41,6 +51,28 @@ export function craGridQueryOptions(period: string) {
 
 export function useCraGrid(period: string): UseQueryResult<CraGridResponse> {
   return useQuery(craGridQueryOptions(period));
+}
+
+/** ADR-0071 — a manager's read of a named consultant's month. Read-only, so window-focus refetch
+ * carries none of `craGridQueryOptions`'s data-loss risk and stays on the global default. */
+export function useManagerCraGrid(
+  consultantId: string,
+  period: string,
+): UseQueryResult<ManagerCraGridResponse> {
+  return useQuery({
+    queryKey: managerCraGridQueryKey(consultantId, period),
+    queryFn: async () => unwrap(await fetchManagerCraGrid(consultantId, period)),
+  });
+}
+
+/** The working calendar's own year coverage (ADR-0004) — bounds the "open a future month" picker.
+ * Effectively static within a session (the calendar table is code, not data), so the default
+ * `staleTime` is left alone rather than tuned per query. */
+export function useCalendar(): UseQueryResult<CalendarResponse> {
+  return useQuery({
+    queryKey: CALENDAR_QUERY_KEY,
+    queryFn: async () => unwrap(await fetchCalendar()),
+  });
 }
 
 /**

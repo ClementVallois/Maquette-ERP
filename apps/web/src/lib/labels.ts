@@ -85,14 +85,13 @@ export const LABELS = {
      * varies by role (`config/navigation.ts`'s own comment explains why).
      */
     navManager: 'CRA',
-    day: 'Jour',
-    morning: 'Matin',
-    afternoon: 'Après-midi',
-    mission: 'Mission',
-    quantity: 'Quantité',
+    /** The matrix's row-header column (ADR-0070: rows are activities, not days). */
+    activity: 'Activité',
     totals: 'Totaux du mois',
-    slotsNote:
-      'Les deux colonnes sont deux demi-journées. Le CRA enregistre « une demi-journée sur A, une demi-journée sur B » : l’ordre matin/après-midi n’est pas conservé, parce qu’il ne change ni la facture ni les totaux.',
+    /** The matrix's per-day total row, and the total-per-day column header on the totals panel
+     * (Phase 6.2's "deux totaux, lus du même état local"). */
+    dayTotal: 'Total du jour',
+    monthTotal: 'Total du mois',
     totalsAsOf:
       'Totaux calculés côté serveur, à jour du dernier enregistrement — pas à chaque frappe (ADR-0050).',
     /**
@@ -117,30 +116,70 @@ export const LABELS = {
     period: 'Mois',
     status: 'Statut',
     show: 'Ouvrir',
+    consultant: 'Consultant',
     notStartedYet: 'Ce mois n’a pas encore été commencé. Remplissez-le, puis enregistrez.',
     nothingRecorded: 'Rien n’est encore saisi sur ce mois.',
     refused: 'Ce CRA a été refusé par le manager. Corrigez-le, puis soumettez-le à nouveau.',
     emptyList: 'Aucun CRA sur cette période.',
     emptyListHint:
       'Ce n’est pas un refus : la liste est bien la vôtre, elle ne contient simplement rien pour ce mois.',
-    filter: 'Filtrer par mois',
-    apply: 'Filtrer',
-    allPeriods: 'Tous les mois',
+    /** task 6.1: the two-row list needed no filter; this replaces it with the control item 2
+     * actually asked for — opening a month that has no `Cra` row yet. */
+    openAnotherMonth: 'Ouvrir un autre mois',
+    openAnotherMonthHint:
+      'Choisissez un mois à venir pour commencer sa saisie à partir d’une grille vide.',
+    openAnotherMonthPlaceholder: 'Choisir un mois…',
+    noOtherMonthToOpen: 'Le calendrier ouvré ne couvre aucun autre mois pour l’instant (ADR-0004).',
     nonWorkable: {
       weekend: 'Week-end',
       publicHoliday: 'Férié',
     },
     readOnly: {
       submitted: 'CRA soumis : il est entre les mains du manager et n’est plus modifiable.',
-      validated: 'CRA validé : un relevé de temps validé est immuable (ADR-0005).',
+      // D3 (revue du 25/08): un identifiant d'ADR ne s'affiche jamais à l'utilisateur, et « Cra »
+      // reste « Cra » — pas « relevé de temps » (CONTEXT.md). `validatedByLabel` complète cette
+      // phrase avec le nom du manager, lu sur `validatedBy` (défaut D6).
+      validated: 'Ce CRA est validé, et un CRA validé est immuable.',
       draft: '',
       refused: '',
     },
+    /** `{name}` is interpolated at the call site — the same convention `craPrint.openFor` and
+     * `margin.revealFor` already use below. */
+    validatedByLabel: 'Validé par {name}.',
     statuses: {
       draft: 'Brouillon',
       submitted: 'Soumis',
       validated: 'Validé',
       refused: 'Refusé',
+    },
+    matrix: {
+      /** `<caption>` (task 6.4: "un caption qui nomme le mois") — `{month}` interpolated. */
+      caption: 'CRA — {month}',
+      previousMonth: 'Mois précédent',
+      nextMonth: 'Mois suivant',
+      fillEmptyWorkdays: 'Remplir les jours ouvrés vides',
+      clearRow: 'Vider la ligne',
+      removeRow: 'Retirer la ligne',
+      addActivity: 'Ajouter une activité',
+      addActivityPlaceholder: 'Choisir une mission…',
+      noActivityToAdd: 'Toutes les missions affectées ce mois-ci figurent déjà dans la grille.',
+      notAssignableThisDay: 'Mission non affectée ce jour-là.',
+      /** Accessible names for the five-option `<select>` a cell is (ADR-0068, ADR-0070) — never
+       * the raw fraction glyph alone, which reads as nothing to a screen reader. */
+      quantityOptions: {
+        empty: 'Aucune saisie',
+        quarter: 'Un quart de journée',
+        half: 'Une demi-journée',
+        threeQuarters: 'Trois quarts de journée',
+        full: 'Une journée entière',
+      },
+      unsavedChangesConfirm:
+        'Des modifications ne sont pas enregistrées sur ce mois. Changer de mois maintenant les perdra. Continuer ?',
+    },
+    /** ADR-0071 — a manager's read-only view of a named consultant's month. `{name}` interpolated. */
+    managerView: {
+      banner: 'Vous consultez le CRA de {name}, en lecture seule.',
+      backToList: 'Retour à la liste',
     },
   },
 

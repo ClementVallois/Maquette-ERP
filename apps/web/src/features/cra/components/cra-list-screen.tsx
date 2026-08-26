@@ -1,8 +1,8 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import { CalendarIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import { DataTable } from '@/components/data-table/data-table';
 import { DeniedState } from '@/components/feedback/denied-state';
@@ -24,7 +24,7 @@ import { frenchDays, frenchMonth } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
-import { useCraList } from '../hooks';
+import { useCalendar, useCraList } from '../hooks';
 import type { CraListItem, CraStatus } from '../types';
 
 const STATUS_VARIANT: Record<CraStatus, StatusBadgeVariant> = {
@@ -43,6 +43,36 @@ function currentPeriod(): string {
   return `${String(now.getFullYear())}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/**
+ * Item 2's own bound: "offer the months the calendar actually covers … derive that bound from the
+ * calendar rather than hardcoding it." From the current wall-clock month through December of the
+ * calendar's latest known year (`GET /api/v1/calendar`, ADR-0004) — never earlier, this is "the
+ * months ahead" — minus whatever the list already carries a row (and therefore an "Ouvrir" button)
+ * for.
+ */
+function offeredFutureMonths(
+  years: readonly number[],
+  alreadyListed: ReadonlySet<string>,
+): string[] {
+  if (years.length === 0) return [];
+  const maxYear = Math.max(...years);
+  const [startYearRaw, startMonthRaw] = currentPeriod().split('-');
+  const startYear = Number.parseInt(startYearRaw ?? '0', 10);
+  const startMonth = Number.parseInt(startMonthRaw ?? '1', 10);
+  if (startYear > maxYear) return [];
+
+  const months: string[] = [];
+  for (let year = startYear; year <= maxYear; year += 1) {
+    const firstMonth = year === startYear ? startMonth : 1;
+    for (let month = firstMonth; month <= 12; month += 1) {
+      const period = `${String(year)}-${String(month).padStart(2, '0')}`;
+      if (!alreadyListed.has(period)) months.push(period);
+    }
+  }
+
+  return months;
+}
+
 function ListSkeleton(): ReactElement {
   return (
     <div className="flex flex-col gap-2" aria-hidden="true">
@@ -54,12 +84,22 @@ function ListSkeleton(): ReactElement {
   );
 }
 
-interface RowProps {
-  readonly canOpen: boolean;
-}
+function columnsFor(role: Role): ColumnDef<CraListItem>[] {
+  const columns: ColumnDef<CraListItem>[] = [];
 
-function columnsFor({ canOpen }: RowProps): ColumnDef<CraListItem>[] {
-  const columns: ColumnDef<CraListItem>[] = [
+  // ADR-0071: a manager's row needs a name to pick a consultant by. A consultant's own list is
+  // always their own rows — a "Consultant" column repeating their own name would be noise.
+  if (role === 'manager') {
+    columns.push({
+      id: 'consultantName',
+      header: LABELS.cra.consultant,
+      cell: ({ row }) => (
+        <span className="font-medium text-foreground">{row.original.consultantName}</span>
+      ),
+    });
+  }
+
+  columns.push(
     {
       id: 'period',
       header: LABELS.cra.period,
@@ -80,17 +120,26 @@ function columnsFor({ canOpen }: RowProps): ColumnDef<CraListItem>[] {
         <span className="tabular-nums">{frenchDays(row.original.recordedQuarterDays)}</span>
       ),
     },
-  ];
+  );
 
-  if (canOpen) {
+  if (role === 'consultant' || role === 'manager') {
     columns.push({
       id: 'actions',
       header: () => <span className="sr-only">{LABELS.action.tableActions}</span>,
       cell: ({ row }) => (
         <Button asChild variant="outline" size="sm" className="ml-auto flex w-fit">
-          <Link to="/cra/$period" params={{ period: row.original.period }}>
-            {LABELS.cra.show}
-          </Link>
+          {role === 'consultant' ? (
+            <Link to="/cra/$period" params={{ period: row.original.period }}>
+              {LABELS.cra.show}
+            </Link>
+          ) : (
+            <Link
+              to="/cra/$period/$consultantId"
+              params={{ period: row.original.period, consultantId: row.original.consultantId }}
+            >
+              {LABELS.cra.show}
+            </Link>
+          )}
         </Button>
       ),
     });
@@ -104,34 +153,13 @@ interface CraListScreenProps {
 }
 
 /**
- * `/cra` (task 6.1). `GET /api/v1/cras` scopes itself server-side (a consultant sees their own
- * months, a manager the office's — Annexe A) but this phase's "Ouvrir" action only ever leads
- * somewhere that answers: `GET /api/v1/cras/:period/grid` is `forRoles('consultant')` with no
- * consultant id on the path (it is always the caller's own month), so a manager's click would be a
- * guaranteed `insufficient-role`. The action column is therefore only rendered for `consultant`
- * (`docs/open-questions.md`, row dated 25/08/2026, names the manager-facing "CRA" nav entry this
- * leaves without a working destination — Phase 7's pré-facturier is where a manager reviews a
- * named consultant's month today).
- *
- * The period filter is **client-side only**: `GET /api/v1/cras` takes no `period` query parameter
- * (only `limit`/`offset`), and Annexe C.10's own reading — never guess a contract — rules out
- * sending one on the hope the route accepts it silently.
+ * `/cra` (task 6.1, corrected; ADR-0071 for the manager column and action). `GET /api/v1/cras`
+ * scopes itself server-side (a consultant sees their own months, a manager the office's —
+ * Annexe A). "Ouvrir" now works for both: a consultant reaches their own editable grid, a manager
+ * reaches ADR-0071's read-only view of the row's own consultant and period.
  */
 export function CraListScreen({ role }: CraListScreenProps): ReactElement {
   const query = useCraList();
-  const [periodFilter, setPeriodFilter] = useState<string>('all');
-
-  const periods = useMemo(() => {
-    const distinct = new Set((query.data?.cras ?? []).map((row) => row.period));
-
-    return [...distinct].sort((a, b) => b.localeCompare(a));
-  }, [query.data]);
-
-  const rows = useMemo(() => {
-    const all = query.data?.cras ?? [];
-
-    return periodFilter === 'all' ? all : all.filter((row) => row.period === periodFilter);
-  }, [query.data, periodFilter]);
 
   if (query.isPending) return <ListSkeleton />;
 
@@ -159,33 +187,17 @@ export function CraListScreen({ role }: CraListScreenProps): ReactElement {
     );
   }
 
-  const hasAnyCra = query.data.cras.length > 0;
+  const rows = query.data.cras;
+  const hasAnyCra = rows.length > 0;
 
   return (
     <div className="flex flex-col gap-4">
-      {periods.length > 1 && (
-        <div className="flex items-center gap-2">
-          <label htmlFor="cra-period-filter" className="text-label">
-            {LABELS.cra.filter}
-          </label>
-          <Select value={periodFilter} onValueChange={setPeriodFilter}>
-            <SelectTrigger id="cra-period-filter" className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{LABELS.cra.allPeriods}</SelectItem>
-              {periods.map((period) => (
-                <SelectItem key={period} value={period}>
-                  {frenchMonth(period)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      {role === 'consultant' && (
+        <OpenAnotherMonth alreadyListed={new Set(rows.map((row) => row.period))} />
       )}
 
       <DataTable
-        columns={columnsFor({ canOpen: role === 'consultant' })}
+        columns={columnsFor(role)}
         data={rows}
         getRowId={(row) => row.id}
         emptyState={
@@ -199,6 +211,58 @@ export function CraListScreen({ role }: CraListScreenProps): ReactElement {
           />
         }
       />
+    </div>
+  );
+}
+
+/** Item 2: "un consultant doit pouvoir ouvrir un CRA pour les mois à venir, vierge." */
+function OpenAnotherMonth({
+  alreadyListed,
+}: {
+  readonly alreadyListed: ReadonlySet<string>;
+}): ReactElement | null {
+  const calendar = useCalendar();
+  const navigate = useNavigate();
+  const [picked, setPicked] = useState<string | undefined>(undefined);
+
+  if (calendar.isPending || calendar.isError) return null;
+
+  const offered = offeredFutureMonths(calendar.data.years, alreadyListed);
+  if (offered.length === 0) {
+    return <p className="text-sm text-muted-foreground">{LABELS.cra.noOtherMonthToOpen}</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <label htmlFor="cra-open-another-month" className="text-label">
+          {LABELS.cra.openAnotherMonth}
+        </label>
+        <Select onValueChange={setPicked}>
+          <SelectTrigger id="cra-open-another-month" className="w-48">
+            <SelectValue placeholder={LABELS.cra.openAnotherMonthPlaceholder} />
+          </SelectTrigger>
+          <SelectContent>
+            {offered.map((period) => (
+              <SelectItem key={period} value={period}>
+                {frenchMonth(period)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          variant="outline"
+          disabled={picked === undefined}
+          onClick={() => {
+            if (picked !== undefined) {
+              void navigate({ to: '/cra/$period', params: { period: picked } });
+            }
+          }}
+        >
+          {LABELS.cra.show}
+        </Button>
+      </div>
+      <p className="text-help">{LABELS.cra.openAnotherMonthHint}</p>
     </div>
   );
 }
