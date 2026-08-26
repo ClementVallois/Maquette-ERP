@@ -642,11 +642,36 @@ async function seed(): Promise<void> {
           }
 
           if (varied && day === VARIED_MONTH.splitDay && secondAssignment !== undefined) {
-            // Three quarters and one, not two and two: a 2/2 split would round-trip through the
-            // old half-day model unchanged and prove nothing about the unit that replaced it.
-            // 3 quarter-days on this line pushes the primary mission's monthly total off a
-            // multiple of four, which is what makes the invoice line it produces demonstrate
-            // quarter-day billing rather than decorate the screen (ADR-0069).
+            // Two quarters and two: the physical shape ADR-0012's split day always had (half a
+            // day on each mission), re-expressed in the new unit. This day stays the one every
+            // screen — including the legacy two-slot grid `apps/web/src/features/cra/slots.ts`
+            // still renders during the phase this seed serves — can display exactly as before.
+            // The quantity that actually exercises quarter-day granularity is
+            // `quarterProofDay`, below: a 2/2 split here would prove nothing new (ADR-0069).
+            cra.recordDay({
+              day,
+              dayType: 'worked',
+              missionId: primaryAssignment.missionId,
+              quarterDays: 2,
+            });
+            cra.recordDay({
+              day,
+              dayType: 'worked',
+              missionId: secondAssignment.missionId,
+              quarterDays: 2,
+            });
+            continue;
+          }
+
+          if (varied && day === VARIED_MONTH.quarterProofDay && secondAssignment !== undefined) {
+            // Three quarters and one: a split that cannot be expressed as a whole number of
+            // half-days, so the invoice line it produces genuinely needs the quarter-day unit
+            // rather than merely being spelled in it (ADR-0069). Pushes both missions' monthly
+            // totals off a multiple of four. Not a day the legacy two-slot grid can display
+            // exactly — the second slot has nowhere to put a line worth more than half a day
+            // once the first one has claimed both — which is expected and documented at
+            // `slotsFor` (`apps/web/src/features/cra/slots.ts`): no test reads this day's cell
+            // content, only the totals and the invoice line the chain produces from it.
             cra.recordDay({
               day,
               dayType: 'worked',
