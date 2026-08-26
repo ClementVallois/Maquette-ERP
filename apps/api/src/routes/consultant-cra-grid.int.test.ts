@@ -28,6 +28,7 @@ const LYON = 'mgrid-office-lyon';
 const ALICE = 'mgrid-alice';
 const BRUNO = 'mgrid-bruno';
 const EMMA = 'mgrid-emma';
+const HENRI = 'mgrid-henri';
 const MISSION = 'mgrid-mission';
 const CLIENT = 'mgrid-client';
 const CRA_JUNE = 'mgrid-cra-june';
@@ -66,6 +67,14 @@ const personas: readonly Persona[] = [
     officeName: 'Lyon',
     displayName: 'Emma Robert',
   },
+  {
+    key: 'billing-paris',
+    role: 'billing',
+    consultantId: HENRI,
+    officeId: PARIS,
+    officeName: 'Paris',
+    displayName: 'Henri Laurent',
+  },
 ];
 
 function as(key: string): { cookie: string } {
@@ -93,10 +102,11 @@ beforeEach(async () => {
   await client.query(`INSERT INTO public.practices (id, name) VALUES ('mgrid-practice', 'Audit')`);
   await client.query(
     `INSERT INTO public.consultants (id, first_name, last_name, email, office_id, practice_id, role)
-     VALUES ($1, 'Alice', 'Martin', 'mgrid-a@t', $4, 'mgrid-practice', 'consultant'),
-            ($2, 'Bruno', 'Leroy', 'mgrid-b@t', $4, 'mgrid-practice', 'manager'),
-            ($3, 'Emma', 'Robert', 'mgrid-e@t', $5, 'mgrid-practice', 'manager')`,
-    [ALICE, BRUNO, EMMA, PARIS, LYON],
+     VALUES ($1, 'Alice', 'Martin', 'mgrid-a@t', $5, 'mgrid-practice', 'consultant'),
+            ($2, 'Bruno', 'Leroy', 'mgrid-b@t', $5, 'mgrid-practice', 'manager'),
+            ($3, 'Emma', 'Robert', 'mgrid-e@t', $6, 'mgrid-practice', 'manager'),
+            ($4, 'Henri', 'Laurent', 'mgrid-h@t', $5, 'mgrid-practice', 'director')`,
+    [ALICE, BRUNO, EMMA, HENRI, PARIS, LYON],
   );
   await client.query(
     `INSERT INTO public.clients (id, name, siren, territoriality, billing_address_street,
@@ -232,6 +242,17 @@ describe('GET /api/v1/consultants/:consultantId/cras/:period/grid', () => {
       method: 'GET',
       url: `/api/v1/consultants/${ALICE}/cras/2026-06/grid`,
       headers: as('consultant-paris'),
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ type: '/problems/insufficient-role' });
+  });
+
+  it('refuses billing too: this route is manager-only, not office-scoped-anyone', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/v1/consultants/${ALICE}/cras/2026-06/grid`,
+      headers: as('billing-paris'),
     });
 
     expect(response.statusCode).toBe(403);
