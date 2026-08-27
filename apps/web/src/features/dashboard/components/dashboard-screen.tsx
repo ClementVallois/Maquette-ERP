@@ -12,6 +12,7 @@ import { frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
+import { callToAction, type DashboardCallToAction } from '../actions';
 import { useDashboard } from '../hooks';
 import type { BillingDashboard, ConsultantDashboard, ManagerDashboard } from '../types';
 
@@ -29,26 +30,22 @@ function DashboardSkeleton(): ReactElement {
   );
 }
 
-interface ActionCardProps {
-  readonly sentence: string;
-  /** `to` is a plain `string`, not a typed-router literal, same widening
-   * `components/feedback/empty-state.tsx`'s own `action` prop already uses for a dynamic
-   * destination (`cra-list-screen.tsx`'s `` `/cra/${currentPeriod()}` ``) — a query string is
-   * baked into it directly (`/factures?status=draft`) rather than a separate `search` prop, which
-   * TanStack Router's typed `Link` refuses on a `to` it cannot narrow to one literal route. */
-  readonly action: { readonly label: string; readonly to: string };
-}
-
 /** The "1 Cra en attente de votre décision → pré-facturier" shape task 8.4 names by example: one
  * sentence stating the fact, one button carrying the visitor to the screen that acts on it. Never
  * a second copy of a StatCard's own figure — the sentence names what to *do*, the cards above it
- * already named what the figure *is*. */
-function ActionCard({ sentence, action }: ActionCardProps): ReactElement {
+ * already named what the figure *is*.
+ *
+ * Where it points is decided in `../actions.ts`, as data: the destination is a typed `LinkProps`,
+ * so a search param cannot be smuggled into `to` as a query string (which TanStack Router does
+ * not parse — that module's header says why). */
+function ActionCard({ sentence, action }: DashboardCallToAction): ReactElement {
+  const { label, ...link } = action;
+
   return (
     <div className="flex items-center justify-between gap-4 rounded-xl bg-card p-5 shadow-card ring-1 ring-border">
       <p className="text-sm text-foreground">{sentence}</p>
       <Button asChild size="sm">
-        <Link to={action.to}>{action.label}</Link>
+        <Link {...link}>{label}</Link>
       </Button>
     </div>
   );
@@ -61,16 +58,9 @@ const CONSULTANT_STATUS_LABEL: Record<NonNullable<ConsultantDashboard['myMonthSt
   refused: LABELS.cra.statuses.refused,
 };
 
-function ConsultantCards({
-  data,
-  period,
-}: {
-  readonly data: ConsultantDashboard;
-  readonly period: string;
-}): ReactElement {
+function ConsultantCards({ data }: { readonly data: ConsultantDashboard }): ReactElement {
   const labels = LABELS.dashboard.consultant;
   const status = data.myMonthStatus;
-  const hint = status === null ? labels.hints.none : labels.hints[status];
 
   return (
     <div className="flex flex-col gap-4">
@@ -82,19 +72,13 @@ function ConsultantCards({
         <StatCard label={labels.recorded} value={frenchDays(data.recordedQuarterDays)} />
         <StatCard label={labels.remaining} value={String(data.remainingWorkableDays)} />
       </div>
-      <ActionCard sentence={hint} action={{ label: labels.open, to: `/cra/${period}` }} />
+      <ActionCard {...callToAction(data)} />
     </div>
   );
 }
 
 function ManagerCards({ data }: { readonly data: ManagerDashboard }): ReactElement {
   const labels = LABELS.dashboard.manager;
-  const sentence =
-    data.pendingDecisions === 0
-      ? labels.pendingSentenceNone
-      : data.pendingDecisions === 1
-        ? labels.pendingSentenceOne
-        : labels.pendingSentenceMany.replace('{count}', String(data.pendingDecisions));
 
   return (
     <div className="flex flex-col gap-4">
@@ -103,19 +87,13 @@ function ManagerCards({ data }: { readonly data: ManagerDashboard }): ReactEleme
         <StatCard label={labels.billable} value={frenchEuros(data.billableCents)} />
         <StatCard label={labels.late} value={String(data.lateCras)} />
       </div>
-      <ActionCard sentence={sentence} action={{ label: labels.open, to: '/pre-facturier' }} />
+      <ActionCard {...callToAction(data)} />
     </div>
   );
 }
 
 function BillingCards({ data }: { readonly data: BillingDashboard }): ReactElement {
   const labels = LABELS.dashboard.billing;
-  const sentence =
-    data.draftInvoices === 0
-      ? labels.draftSentenceNone
-      : data.draftInvoices === 1
-        ? labels.draftSentenceOne
-        : labels.draftSentenceMany.replace('{count}', String(data.draftInvoices));
 
   return (
     <div className="flex flex-col gap-4">
@@ -124,13 +102,7 @@ function BillingCards({ data }: { readonly data: BillingDashboard }): ReactEleme
         <StatCard label={labels.issued} value={String(data.issuedInvoices)} />
         <StatCard label={labels.totalIssued} value={frenchEuros(data.totalTtcIssuedCents)} />
       </div>
-      <ActionCard
-        sentence={sentence}
-        action={{
-          label: labels.open,
-          to: data.draftInvoices > 0 ? '/factures?status=draft' : '/factures',
-        }}
-      />
+      <ActionCard {...callToAction(data)} />
     </div>
   );
 }
@@ -181,7 +153,7 @@ export function DashboardScreen({ role, period }: DashboardScreenProps): ReactEl
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">{frenchMonth(data.period)}</p>
-      {data.role === 'consultant' && <ConsultantCards data={data} period={data.period} />}
+      {data.role === 'consultant' && <ConsultantCards data={data} />}
       {data.role === 'manager' && <ManagerCards data={data} />}
       {data.role === 'billing' && <BillingCards data={data} />}
     </div>

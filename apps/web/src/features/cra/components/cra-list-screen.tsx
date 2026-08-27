@@ -198,7 +198,13 @@ export function CraListScreen({ role }: CraListScreenProps): ReactElement {
             title={LABELS.cra.emptyList}
             body={LABELS.cra.emptyListHint}
             {...(!hasAnyCra && role === 'consultant'
-              ? { action: { label: LABELS.cra.show, to: `/cra/${currentPeriod()}` } }
+              ? {
+                  action: {
+                    label: LABELS.cra.show,
+                    to: '/cra/$period',
+                    params: { period: currentPeriod() },
+                  },
+                }
               : {})}
           />
         }

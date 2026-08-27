@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { OctagonAlertIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 
+import { type ActionLink, linkOf } from '@/components/action-link';
 import { Button } from '@/components/ui/button';
 import { LABELS } from '@/lib/labels';
 
@@ -18,7 +19,7 @@ interface ErrorStateProps {
   readonly title: string;
   readonly body: string;
   readonly correlationId?: string;
-  readonly action?: { readonly label: string; readonly to: string };
+  readonly action?: ActionLink;
 }
 
 export function ErrorState({ title, body, correlationId, action }: ErrorStateProps): ReactElement {
@@ -34,7 +35,7 @@ export function ErrorState({ title, body, correlationId, action }: ErrorStatePro
       )}
       {action !== undefined && (
         <Button asChild size="sm" className="mt-1">
-          <Link to={action.to}>{action.label}</Link>
+          <Link {...linkOf(action)}>{action.label}</Link>
         </Button>
       )}
     </div>

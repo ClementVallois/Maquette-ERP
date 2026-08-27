@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 
+import { type ActionLink, linkOf } from '@/components/action-link';
 import { Button } from '@/components/ui/button';
 
 /**
@@ -19,7 +20,7 @@ interface EmptyStateProps {
   readonly icon: LucideIcon;
   readonly title: string;
   readonly body: string;
-  readonly action?: { readonly label: string; readonly to: string };
+  readonly action?: ActionLink;
 }
 
 export function EmptyState({ icon: Icon, title, body, action }: EmptyStateProps): ReactElement {
@@ -32,7 +33,7 @@ export function EmptyState({ icon: Icon, title, body, action }: EmptyStateProps)
       <p className="max-w-sm text-sm text-muted-foreground">{body}</p>
       {action !== undefined && (
         <Button asChild variant="outline" size="sm" className="mt-1">
-          <Link to={action.to}>{action.label}</Link>
+          <Link {...linkOf(action)}>{action.label}</Link>
         </Button>
       )}
     </div>
