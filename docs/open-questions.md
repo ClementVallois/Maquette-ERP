@@ -2961,11 +2961,18 @@ byte-identical both times — and is the frozen reference.
 
 ### Which tasks did not run, and why
 
-None. What did not happen inside a task that ran: the bundle and Lighthouse checks stayed manual
-rather than becoming CI gates (10.3, both rows above); the Cra-list-empty-state row was narrowed,
-not resolved, because the only real path left is a seed-shape change that is Clement's to approve
-(10.4); a demo scenario that declines a day was named as absent rather than manufactured, because
-no seeded persona can produce one without a seed change of its own (10.4).
+None of the six. What did not happen inside a task that ran: the bundle and Lighthouse checks
+stayed manual rather than becoming CI gates (10.3, both rows above); the Cra-list-empty-state row
+was narrowed, not resolved, because the only real path left is a seed-shape change that is
+Clement's to approve (10.4); a demo scenario that declines a day was named as absent rather than
+manufactured, because no seeded persona can produce one without a seed change of its own (10.4).
+
+One thing outside the six also did not run: `CLAUDE.md` names `rules-auditor` for "before every
+merge to `main` and at every phase checkpoint", and this is one — a dispatch was started during
+this checkpoint's own review and stopped before reporting, on an explicit instruction ("No audit
+agent") not to use one this session. Recorded rather than silently skipped: the checkpoint's own
+evidence (`pnpm run check`, `test:int`, both Playwright topologies, all re-run green after every
+fix this correction section lists) is what stands in its place this time.
 
 ### Correction, 27/08/2026 — three findings from a review of this checkpoint
 
