@@ -319,3 +319,90 @@ test.describe('screenshots — the shell per persona (rule 0bis.10)', () => {
     });
   });
 });
+
+/**
+ * Task 10.2: "navigation clavier complète du shell (script Playwright), focus visible en
+ * permanence". `document.activeElement` after each real `Tab` keypress (not `.focus()` — a
+ * synthetic focus does not engage `:focus-visible`, which is exactly the state this test has to
+ * prove is on), against the desktop, non-`Sheet` sidebar (task 4.5's mobile treatment is a
+ * different tab order and out of this test's scope).
+ */
+interface FocusedElementSnapshot {
+  readonly tag: string;
+  readonly accessibleName: string;
+  readonly hasVisibleFocusRing: boolean;
+}
+
+async function focusedElement(page: Page): Promise<FocusedElementSnapshot> {
+  return page.evaluate(() => {
+    const el = document.activeElement;
+    if (el === null || el === document.body) {
+      return { tag: '', accessibleName: '', hasVisibleFocusRing: false };
+    }
+
+    // shadcn's focus rings are Tailwind `ring-*` utilities, which paint as `box-shadow`, not the
+    // native `outline` — most components pair them with `outline-none`. Checking both is what
+    // makes this assertion catch either family rather than assuming the app's own convention. A
+    // string comparison against `'0px'`, not a parsed number: this file's own money rule
+    // (`no-restricted-syntax`, ADR-0002) forbids `parseFloat` repo-wide, on the identifier alone,
+    // and a pixel width is not worth carving an exception into a rule that exists for cents.
+    const style = getComputedStyle(el);
+    const hasOutline = style.outlineStyle !== 'none' && style.outlineWidth !== '0px';
+    const hasBoxShadow = style.boxShadow !== 'none' && style.boxShadow !== '';
+    // `Node.textContent`'s getter is `string`, never `null` (only its setter accepts `null`) —
+    // this pinned TypeScript's own `lib.dom.d.ts`, so the fallback below needs no `?? ''`.
+    const accessibleName = el.getAttribute('aria-label') ?? el.textContent;
+
+    return {
+      tag: el.tagName,
+      accessibleName: accessibleName.trim(),
+      hasVisibleFocusRing: hasOutline || hasBoxShadow,
+    };
+  });
+}
+
+test.describe('keyboard navigation of the shell (task 10.2)', () => {
+  test('Tab reaches the skip link, every nav entry and the persona block, each with a visible focus ring', async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'desktop',
+      'the tab order asserted here is the desktop (non-Sheet) sidebar',
+    );
+
+    await choosePersona(page, 'manager-paris');
+    await page.getByText('CRA en attente de décision').waitFor({ state: 'visible' });
+    // A hard reload, not the client-side navigation `choosePersona` just did: the persona
+    // selector's own button is still removed from the DOM at this point (React unmounted it on
+    // the route change), and Chromium resumes `Tab` from that removed node's former document
+    // position rather than from the top — landing on the sidebar, not the skip link. The cookie
+    // `choosePersona` set survives the reload, so the shell renders straight back to this page.
+    await page.reload();
+    await page.getByText('CRA en attente de décision').waitFor({ state: 'visible' });
+
+    await page.keyboard.press('Tab');
+    let focused = await focusedElement(page);
+    expect(focused.accessibleName).toBe('Aller au contenu');
+    expect(focused.hasVisibleFocusRing, JSON.stringify(focused)).toBe(true);
+
+    await page.keyboard.press('Tab'); // the sidebar's own collapse toggle
+    focused = await focusedElement(page);
+    expect(focused.tag).toBe('BUTTON');
+    expect(focused.hasVisibleFocusRing, JSON.stringify(focused)).toBe(true);
+
+    // manager-paris's own nav, `shell.spec.ts`'s own list above — asserted here in tab order
+    // rather than copied blind, so a reordering of the config breaks this test too.
+    for (const label of ['Tableau de bord', 'Pré-facturier', 'CRA', 'Factures']) {
+      await page.keyboard.press('Tab');
+      focused = await focusedElement(page);
+      expect(focused.tag).toBe('A');
+      expect(focused.accessibleName).toContain(label);
+      expect(focused.hasVisibleFocusRing, JSON.stringify(focused)).toBe(true);
+    }
+
+    await page.keyboard.press('Tab'); // the topbar's persona block (task 4.2)
+    focused = await focusedElement(page);
+    expect(focused.accessibleName).toContain('Bruno Leroy');
+    expect(focused.hasVisibleFocusRing, JSON.stringify(focused)).toBe(true);
+  });
+});
