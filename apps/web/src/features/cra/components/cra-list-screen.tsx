@@ -22,6 +22,7 @@ import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
 import { frenchDays, frenchMonth } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
+import { currentPeriod } from '@/lib/period';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
 import { useCalendar, useCraList } from '../hooks';
@@ -33,15 +34,6 @@ const STATUS_VARIANT: Record<CraStatus, StatusBadgeVariant> = {
   validated: 'cra-validated',
   refused: 'cra-refused',
 };
-
-/** The current wall-clock month, `YYYY-MM` — the seed's own calendar lives in 2026, and the demo
- * runs in real time against it, so "the period a brand-new consultant should open first" is
- * genuinely today's month, not a value the seed dictates. */
-function currentPeriod(): string {
-  const now = new Date();
-
-  return `${String(now.getFullYear())}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
 
 /**
  * Item 2's own bound: "offer the months the calendar actually covers … derive that bound from the
