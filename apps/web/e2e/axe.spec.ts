@@ -32,6 +32,9 @@ async function choosePersona(page: Page, personaKey: string): Promise<void> {
   await page.waitForURL('/tableau-de-bord');
 }
 
+/** Same shape as `journeys.spec.ts`'s own guard: a bare `new Error()` is forbidden repo-wide. */
+class FixtureAssumptionError extends Error {}
+
 test.describe('accessibility — Mon CRA', () => {
   test('the month list has no critical/serious violation', async ({ page }) => {
     await choosePersona(page, 'consultant-paris');
@@ -148,4 +151,112 @@ test.describe('accessibility — Tableau de bord (task 8.4, three roles)', () =>
       });
     });
   }
+});
+
+/**
+ * Task 10.2's own list of screens: "sélecteur" is the one that never appears in `axe.spec.ts`
+ * elsewhere, because every other test starts past it (`choosePersona`'s first act is landing on
+ * it, but no test has asserted the screen itself against axe before this one).
+ */
+test.describe('accessibility — Sélecteur de persona', () => {
+  test('the persona selector has no critical/serious violation', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('heading', { name: 'Choisir un persona' }).waitFor({ state: 'visible' });
+
+    await assertNoSeriousViolations(page);
+  });
+});
+
+/**
+ * `docs/open-questions.md`, row dated 27/08/2026: ADR-0061 states its two accessibility claims
+ * (scoped headers, no `title` attribute) universally, and Phase 9 deleted the two server-rendered
+ * screens that used to carry the margin table's own mechanical gate. This is the one test that
+ * replaces it, on the same pattern as the pré-facturier's two above.
+ *
+ * Deep-linked directly (`manager-paris` → Alice's own June economics) rather than reached by
+ * clicking off a pré-facturier row, the way `journeys.spec.ts` does it: this file's other tests
+ * are read-only and order-independent across the parallel `desktop`/`mobile-shell` projects, and a
+ * deep link keeps this one the same. Alice's June Cra is `validated` and no spec in this
+ * repository mutates it, unlike Claire's (whose economics only become interesting after
+ * `journeys.spec.ts`'s J2 validates her) — so this test never races that one for the same row.
+ */
+test.describe('accessibility — Marge', () => {
+  test('the margin screen has no critical/serious violation', async ({ page }) => {
+    await choosePersona(page, 'manager-paris');
+    const listResponse = await page.request.get('/api/v1/cras?limit=50');
+    const { cras } = (await listResponse.json()) as {
+      cras: { consultantId: string; consultantName: string; period: string }[];
+    };
+    const aliceRow = cras.find(
+      (row) => row.consultantName === 'Alice Martin' && row.period === '2026-06',
+    );
+    if (aliceRow === undefined) {
+      throw new FixtureAssumptionError('Expected Alice’s June row in the office list.');
+    }
+
+    await page.goto(`/marge/${aliceRow.consultantId}?period=${aliceRow.period}`);
+    await page.getByRole('heading', { name: 'Alice Martin' }).waitFor({ state: 'visible' });
+
+    await assertNoSeriousViolations(page);
+  });
+});
+
+/**
+ * Task 10.2's "états 403/404" — the two refusal shapes `lib/problems.ts` renders
+ * (`out-of-scope`, the record exists and this actor's office may not see it; `insufficient-role`,
+ * this actor's role may never call the route at all) plus the router's own not-found screen.
+ * Every deep link below is the same one `journeys.spec.ts` already proves is *correct*
+ * (J5, J6, task 6.5) — this file adds the axe pass those journeys never run.
+ */
+test.describe('accessibility — États 403/404', () => {
+  test('out-of-scope (a manager of another office, denied) has no critical/serious violation', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'manager-paris');
+    const listResponse = await page.request.get('/api/v1/cras?limit=50');
+    const { cras } = (await listResponse.json()) as {
+      cras: { consultantId: string; consultantName: string; period: string }[];
+    };
+    const aliceRow = cras.find(
+      (row) => row.consultantName === 'Alice Martin' && row.period === '2026-06',
+    );
+    if (aliceRow === undefined) {
+      throw new FixtureAssumptionError('Expected Alice’s June row in the office list.');
+    }
+
+    await choosePersona(page, 'manager-lyon');
+    await page.goto(`/cra/2026-06/${aliceRow.consultantId}`);
+    await page.getByText('Accès refusé', { exact: true }).waitFor({ state: 'visible' });
+    await page.getByText('/problems/out-of-scope').waitFor({ state: 'visible' });
+
+    await assertNoSeriousViolations(page);
+  });
+
+  test('insufficient-role (billing on a margin URL, denied) has no critical/serious violation', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'billing-paris');
+    const listResponse = await page.request.get('/api/v1/cras?limit=50');
+    const { cras } = (await listResponse.json()) as { cras: { consultantId: string }[] };
+    const anyRow = cras[0];
+    if (anyRow === undefined) {
+      throw new FixtureAssumptionError(
+        'Expected at least one Cra in the seed for billing to read.',
+      );
+    }
+
+    await page.goto(`/marge/${anyRow.consultantId}?period=2026-06`);
+    await page.getByText('Accès refusé', { exact: true }).waitFor({ state: 'visible' });
+    await page.getByText('/problems/insufficient-role').waitFor({ state: 'visible' });
+
+    await assertNoSeriousViolations(page);
+  });
+
+  test('the styled 404 (no matching route) has no critical/serious violation', async ({ page }) => {
+    await choosePersona(page, 'consultant-paris');
+    await page.goto('/cette-route-n-existe-pas');
+    await page.getByRole('heading', { name: 'Page introuvable' }).waitFor({ state: 'visible' });
+
+    await assertNoSeriousViolations(page);
+  });
 });

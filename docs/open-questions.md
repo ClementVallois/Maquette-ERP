@@ -2837,3 +2837,34 @@ Playwright, **served build** (`E2E_SERVED_BUILD=1`, the Gate): desktop **30 pass
 mobile-shell **11 passed / 20 skipped**, journeys **14 passed**. Playwright, dev topology, so the
 daily path is not traded for the Gate: journeys **14 passed**. No review screenshot changed byte
 for byte in either topology — the dev captures stand, and the served run reproduces them.
+
+### Correction, 27/08/2026 — the SAST gate was red after this checkpoint said green
+
+The evidence above is local, and CI runs one gate no local command does. The `sast` job failed on
+the push: Semgrep's `javascript.express.security.audit.express-res-sendfile` matched task 9.1's
+`/assets/*` handler (`apps/api/src/web/spa.ts`), which the checkpoint above did not mention because
+nothing local had run it.
+
+**Triaged as a true pattern match on a false vulnerability, and suppressed by rule id on the one
+line.** It is an _Express_ rule and the sink is _Fastify_'s: `@fastify/send`, under
+`@fastify/static`, roots every read at `root` and refuses a `..` segment and an absolute path
+before touching the disk. `spa.test.ts`'s "never reads outside dist, even when the captured segment
+is a literal `..`" already proved that against a secret planted one level above `distDir`, driving
+`sendFile` directly so that URL normalization cannot be what passes the test — written in 9.1,
+before this finding, so it is evidence and not a response to it.
+
+Not fixed by adding canonicalization to the handler: validation that duplicates a guarantee the
+library already makes is dead code, and writing it would imply the guarantee is not trusted while
+testing nothing new. Not a `.semgrepignore` entry either — that blinds the whole module to all 292
+rules, including the ones that would be real. No ADR: triaging a scanner's false positive is not a
+structural decision.
+
+One mechanical trap is recorded in the code, because it fails silently: the directive must name the
+id Semgrep **reports**, which repeats the rule's own name after its path
+(`…express-res-sendfile.express-res-sendfile`). The natural short form is accepted without
+complaint and suppresses nothing — verified by running the pinned CI image locally both ways, 1
+finding then 0.
+
+**Evidence**: the exact CI command (`docker run … semgrep/semgrep@sha256:b68f9b68… semgrep scan
+--config=p/typescript --config=p/security-audit --error --metrics=off`) run locally: **0 findings,
+exit code 0**, on 453 files and 97 rules.

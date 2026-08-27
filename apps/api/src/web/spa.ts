@@ -40,6 +40,18 @@ export function registerSpa(app: FastifyInstance, distDir: string = DEFAULT_DIST
         access: PUBLIC('a built JS/CSS/asset file carries no more than its own content'),
       },
     },
+    // Semgrep's `express-res-sendfile` matches this line: an Express rule, on a Fastify sink. The
+    // two are not the same call — `@fastify/send` (under `@fastify/static`) roots every read at
+    // `root` and refuses a `..` segment and an absolute path before touching the disk, which
+    // `spa.test.ts`'s "never reads outside dist, even when the captured segment is a literal `..`"
+    // proves against a secret planted one level above `distDir`, driving `sendFile` directly so
+    // that URL normalization cannot be what passes the test. Suppressed by rule id, on this line
+    // only: a `.semgrepignore` entry would blind the whole module to all 292 rules.
+    //
+    // The id below repeats its last segment, and that is not a typo — the directive must match the
+    // id Semgrep *reports*, which appends the rule's own name to its path. The natural short form
+    // (`…audit.express-res-sendfile`) is accepted silently and suppresses nothing.
+    // nosemgrep: javascript.express.security.audit.express-res-sendfile.express-res-sendfile
     (request, reply) => reply.sendFile(`assets/${request.params['*']}`),
   );
 }
