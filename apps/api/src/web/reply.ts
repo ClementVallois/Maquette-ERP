@@ -9,26 +9,32 @@ const OK = 200;
 const SEE_OTHER = 303;
 
 /**
- * The Content-Security-Policy this application can honestly claim, which is the strictest one there
- * is: `default-src 'none'` and then exactly two allowances.
+ * The Content-Security-Policy this application can honestly claim.
  *
  * It is worth having as a header even though BUILD-PLAN 8.3 puts security headers on the nginx
  * vhost, and the reason is not defence in depth. It is that **this policy is a statement about the
- * code**, not about the deployment: ADR-0009 decided there is no client framework and no script,
- * ADR-0025 decided nothing may be interpolated into a `<script>` body, and `script-src 'none'`
- * is those two decisions made checkable by a browser and by `curl -I`. A policy that lived only in
- * the reverse proxy would be absent in development, absent in the tests, and true by accident.
+ * code**, not about the deployment. A policy that lived only in the reverse proxy would be absent
+ * in development, absent in the tests, and true by accident.
  *
  * `form-action 'self'` is the one that matters most in a mockup whose every write is a form post:
  * it means an injected `<form action="https://…">` cannot exfiltrate a submission even if the
  * escaping of ADR-0025 were defeated.
+ *
+ * The exact string is frozen in ADR-0064 (front-end plan Phase 9.2): `script-src 'self'` is the
+ * SPA's own self-hosted bundle and nothing else, `font-src 'self'` is Phase 2.2's self-hosted
+ * interface font, `connect-src 'self'` is the SPA's own `fetch` calls to `/api/v1` — all three new
+ * relative to ADR-0049's six. Changing any clause here without changing ADR-0064 in the same
+ * commit is the drift that ADR itself was written to prevent.
  */
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'none'",
+  "script-src 'self'",
   "style-src 'self'",
   "img-src 'self'",
-  "form-action 'self'",
+  "font-src 'self'",
+  "connect-src 'self'",
   "base-uri 'none'",
+  "form-action 'self'",
   "frame-ancestors 'none'",
 ].join('; ');
 

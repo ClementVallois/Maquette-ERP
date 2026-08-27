@@ -250,12 +250,15 @@ describe('the stylesheet', () => {
 });
 
 describe('security headers', () => {
-  it('states that this application has no script, in a form a browser enforces', async () => {
+  it("sends exactly the string frozen in ADR-0064, admitting only the SPA's own bundle", async () => {
     const response = await app.inject({ method: 'GET', url: PATHS.home });
 
     expect(response.headers['content-security-policy']).toBe(CONTENT_SECURITY_POLICY);
-    expect(CONTENT_SECURITY_POLICY).toContain("default-src 'none'");
-    expect(CONTENT_SECURITY_POLICY).toContain("form-action 'self'");
+    expect(CONTENT_SECURITY_POLICY).toBe(
+      "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; " +
+        "font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; " +
+        "frame-ancestors 'none'",
+    );
   });
 
   it('carries them on the API too, so the list has no exception to remember', async () => {
