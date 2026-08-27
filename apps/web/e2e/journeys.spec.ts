@@ -406,3 +406,197 @@ test.describe('task 6.1 — the month list', () => {
     await page.screenshot({ path: 'tests/visual/review/6.1-cra-list.png', fullPage: false });
   });
 });
+
+/**
+ * Phase 7's own journeys (Annexe B, "Phase" column = 7). Placed after every Phase 6 test rather
+ * than interleaved: `test.describe.configure({ mode: 'serial' })` at the top of this file orders
+ * every describe block in the file, not only the ones inside a given block, so appending here is
+ * what actually runs these last — after J1 has left `2026-08` in the state J3 below needs.
+ *
+ * J5 is not repeated as its own block: "items 4/5" above (`a manager of another office is
+ * refused, out-of-scope, on the same deep link`) already deep-links `manager-lyon` into a Paris
+ * Cra and asserts the designed `out-of-scope` refusal — the exact shape Annexe B's J5 names, one
+ * office and one persona earlier than Phase 7 existed to give it a number. Duplicating it here
+ * would be the "test that proves nothing new" `CLAUDE.md`/BUILD-RULES both warn against; that
+ * test and its screenshot (`item4-5-manager-out-of-scope.png`) are J5's evidence.
+ */
+
+/** `frenchEuros`'s own formatting (`src/lib/format.ts`), reproduced rather than imported — this
+ * spec runs under Playwright's own TS pipeline, not Vite, and every other exact assertion in this
+ * file already re-states a small piece of app knowledge locally (`DORA`/`PASSI` above) rather than
+ * reaching into `src/` for it. A narrow no-break space groups thousands and a plain no-break
+ * space sits before "€" — `format.ts`'s own two constants, reproduced here as the literal
+ * characters they are: an ordinary space would build a string that reads the same in this
+ * file's source but never matches what the page actually renders. */
+function euro(cents: number): string {
+  const NARROW_NBSP = ' ';
+  const NBSP = ' ';
+  const digits = String(Math.abs(cents)).padStart(3, '0');
+  const eurosPart = digits.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/gu, NARROW_NBSP);
+  const centimes = digits.slice(-2);
+
+  return `${cents < 0 ? '−' : ''}${eurosPart},${centimes}${NBSP}€`;
+}
+
+test.describe('J2 — manager-paris (Bruno): validates Claire’s submitted June, drafts the Réunion invoice', () => {
+  test('validating drafts exactly one invoice, addressed to the Réunion client, nothing declined — then the margin behind that same row', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'manager-paris');
+    // Explicit period: Bruno's own `/pre-facturier` (no `period`) defaults to the office's most
+    // recent Cra period, which J1 (run earlier in this file) may have pushed to `2026-08` by now
+    // — this journey is about the seed's June data specifically, so it never relies on that
+    // default.
+    await page.goto('/pre-facturier?period=2026-06');
+    await page.getByRole('heading', { name: 'Les CRA du mois' }).waitFor({ state: 'visible' });
+
+    const claireRow = page.getByRole('row').filter({ hasText: 'Claire Dubois' });
+    await claireRow.getByRole('button', { name: 'Valider' }).click();
+
+    const validateDialog = page.getByRole('dialog');
+    await validateDialog.getByText('Validation du CRA de Claire Dubois').waitFor({
+      state: 'visible',
+    });
+    // The seed's own Réunion mission (Annexe A: "TVA 8,5 %") is what makes this exact assertion
+    // possible — one draft invoice, addressed to that client, nothing declined.
+    await expect(validateDialog.getByText('Réunion Cyber Services')).toBeVisible();
+    await expect(validateDialog.getByText('Aucun jour écarté', { exact: false })).toBeVisible();
+    await page.screenshot({
+      path: 'tests/visual/review/7.2-validate-result-dialog.png',
+      fullPage: false,
+    });
+
+    // Two "Fermer" buttons share this dialog: `DialogContent`'s own top-right close icon (an
+    // `sr-only` label, `LABELS.action.close`) and the footer button `validate-result-dialog.tsx`
+    // renders — `.last()` is the footer one, DOM order putting the icon first.
+    await validateDialog.getByRole('button', { name: 'Fermer' }).last().click();
+    await expect(validateDialog).toBeHidden();
+
+    // The row is now decided: Alice's June was already `validated` before this test touched
+    // anything, and Claire's just joined her — so nothing on this period is `decidable` any more.
+    await expect(page.getByRole('button', { name: 'Valider' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Refuser' })).toHaveCount(0);
+    await expect(page.getByText('Réunion Cyber Services')).toBeVisible();
+    await page.screenshot({ path: 'tests/visual/review/7.1-pre-facturier.png', fullPage: false });
+
+    // Task 7.5's own "navigation explicite depuis une ligne du pré-facturier" — one click, off
+    // Claire's row, never a hover (ADR-0052).
+    await claireRow.getByRole('link', { name: 'Marge de Claire Dubois' }).click();
+    await page.waitForURL(/\/marge\/.+/u);
+
+    await page.getByRole('heading', { name: 'Claire Dubois' }).waitFor({ state: 'visible' });
+    await expect(page.getByText(euro(20000))).toBeVisible(); // Cjm — the header StatCard only
+    await expect(page.getByRole('cell', { name: 'SOC Réunion Cyber' })).toBeVisible();
+    await expect(page.getByText(euro(70000))).toBeVisible(); // Tjm — the mission row only
+    // Revenue/cost/margin each render twice — the single mission's own row, and the total
+    // StatCard above it, which are the same figure with only one mission in play. `.first()`
+    // picks either; both must read the same amount for this assertion to mean anything.
+    await expect(page.getByText(euro(1540000)).first()).toBeVisible(); // revenue
+    await expect(page.getByText(euro(440000)).first()).toBeVisible(); // cost
+    await expect(page.getByText(euro(1100000)).first()).toBeVisible(); // margin
+    await page.screenshot({ path: 'tests/visual/review/7.5-marge.png', fullPage: false });
+
+    await page.getByRole('link', { name: 'Revenir au pré-facturier' }).click();
+    await page.waitForURL(/\/pre-facturier/u);
+  });
+});
+
+test.describe('J3 — manager-paris (Bruno): refuses the month Alice submitted in J1, with a reason', () => {
+  test('the manager refuses through the pré-facturier dialog, and Alice sees the reason on her own grid', async ({
+    page,
+  }) => {
+    // J1's own last sub-test already refused this exact Cra once, through the pre-existing SSR
+    // route (`docs/open-questions.md`, row dated 25/08/2026 — the JSON route Phase 7 adds had
+    // nothing to be driven against until this phase). Annexe B's J3 wants "the month Alice
+    // submitted in J1" refused through the SPA's own dialog; that submission was already spent
+    // proving the SSR path, so this resubmits the exact same August matrix — nothing is retyped,
+    // the grid the refusal left behind (still carrying every line J1 filled) is simply handed
+    // back to the manager — before refusing it again, this time through the dialog Phase 7 built.
+    await choosePersona(page, 'consultant-paris');
+    await page.goto(`/cra/${EDIT_PERIOD}`);
+    await page
+      .getByText('Ce CRA a été refusé par le manager', { exact: false })
+      .waitFor({ state: 'visible' });
+    await page.getByRole('button', { name: 'Soumettre au manager' }).click();
+    await page.getByText('Soumis', { exact: true }).waitFor({ state: 'visible' });
+
+    await switchPersonaViaUi(page, 'manager-paris');
+    await page.goto(`/pre-facturier?period=${EDIT_PERIOD}`);
+    await page.getByRole('heading', { name: 'Les CRA du mois' }).waitFor({ state: 'visible' });
+
+    const aliceRow = page.getByRole('row').filter({ hasText: 'Alice Martin' });
+    await aliceRow.getByRole('button', { name: 'Refuser' }).click();
+
+    const refuseDialog = page.getByRole('dialog');
+    await refuseDialog.getByText('Refuser le CRA de Alice Martin').waitFor({ state: 'visible' });
+    const reason = 'Le 03/08 doit être reventilé sur un seul projet — motif de démonstration J3.';
+    await refuseDialog.getByLabel('Motif du refus').fill(reason);
+    await page.screenshot({ path: 'tests/visual/review/7.3-refuse-dialog.png', fullPage: false });
+
+    await refuseDialog.getByRole('button', { name: 'Confirmer le refus' }).click();
+    await expect(refuseDialog).toBeHidden();
+    await page.getByText('CRA refusé.', { exact: true }).waitFor({ state: 'visible' });
+
+    await switchPersonaViaApi(page, 'consultant-paris');
+    await page.goto(`/cra/${EDIT_PERIOD}`);
+    await page
+      .getByText('Ce CRA a été refusé par le manager', { exact: false })
+      .waitFor({ state: 'visible' });
+    await expect(page.getByText(reason)).toBeVisible();
+  });
+});
+
+test.describe('J6 — billing-paris (Henri): the margin URL refuses him, by role, and names the rule', () => {
+  test('deep-linking a marge URL as billing renders the designed 403, naming insufficient-role', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'billing-paris');
+    // Any real Cra of Henri's own office is enough: `GET .../economics` is manager-only (Annexe
+    // A), a role gate ahead of any scope check, so which consultant or period this names does not
+    // change the refusal — verified live (`billing-paris` against several different ids and
+    // periods, always the same `insufficient-role`).
+    const listResponse = await page.request.get('/api/v1/cras?limit=50');
+    const { cras } = (await listResponse.json()) as { cras: CraListRowForAssertions[] };
+    const anyRow = cras[0];
+    if (anyRow === undefined) {
+      throw new FixtureAssumptionError(
+        'Expected at least one Cra in the seed for billing to read.',
+      );
+    }
+
+    await page.goto(`/marge/${anyRow.consultantId}?period=${anyRow.period}`);
+
+    await page.getByText('Accès refusé', { exact: true }).waitFor({ state: 'visible' });
+    await expect(page.getByText('/problems/insufficient-role')).toBeVisible();
+    await expect(page.getByText('Facturation', { exact: true })).toBeVisible();
+
+    await page.screenshot({
+      path: 'tests/visual/review/7.6-marge-denied-insufficient-role.png',
+      fullPage: false,
+    });
+  });
+});
+
+test.describe('task 7.6 — a period with nothing in it', () => {
+  test('2026-07 renders a designed empty pré-facturier, not a blank page', async ({ page }) => {
+    await choosePersona(page, 'manager-paris');
+    await page.goto('/pre-facturier?period=2026-07');
+
+    // Not the "office has never had a Cra at all" branch (`data.period === null`) — this office
+    // has plenty of Cras, just none on this specific period, so the ordinary response comes back
+    // empty and each table renders its own `EmptyState` (`routes/_shell/pre-facturier.tsx`'s own
+    // comment draws this exact distinction; that other branch has no live persona to demonstrate
+    // it, since every seeded office has at least one Cra somewhere).
+    await page
+      .getByText('Aucun CRA sur ce mois dans cette implantation.')
+      .waitFor({ state: 'visible' });
+    await expect(
+      page.getByText('Aucune facture en brouillon sur ce mois', { exact: false }),
+    ).toBeVisible();
+
+    await page.screenshot({
+      path: 'tests/visual/review/7.6-pre-facturier-empty.png',
+      fullPage: false,
+    });
+  });
+});
