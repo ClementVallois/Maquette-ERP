@@ -2716,6 +2716,14 @@ string outright. `EmptyState` and `ErrorState` carried the same widening and tak
 and one on the defect _class_ (no destination on any branch contains `?` or `&`) — were checked
 red against the previous shape before the fix.
 
+**One converted call site is not covered by a test, and that is stated rather than glossed**:
+`cra-list-screen.tsx`'s empty-state action renders only when a consultant has no month at all, and
+no seeded persona is in that state (Alice always has at least `2026-06`), so nothing in the suite
+draws it. Its evidence is type-identity with line 124 of the same file — the already-exercised
+`<Link to="/cra/$period" params={{ period }}>` — plus the typecheck, not a live render. It closes
+with the empty-state coverage the row of 21/08 already tracks; no new row, since that is the same
+question.
+
 ### 4. Every role's dashboard is empty on a fresh seed — **a row above**, Phase 9.3
 
 Found while reading Phase 8's own committed screenshots for finding 2. Not fixed here: the three
