@@ -85,3 +85,58 @@ test.describe('accessibility — Pré-facturier', () => {
     await assertNoSeriousViolations(page);
   });
 });
+
+/**
+ * Phase 8's own axe gate (task 8's exit criterion: "axe on list + detail + dashboard"). Every
+ * screen below is read against seed rows no spec in this repository mutates: `billing-paris`'s own
+ * "Banque Nationale de Test" invoice (draft, present on any fresh seed regardless of whether
+ * `journeys.spec.ts` has already run) for the list and detail, and each persona's own `?period=`-
+ * free dashboard, which always answers for the wall-clock month (`lib/period.ts`) — read-only, so
+ * two invocations never disagree on which period that is.
+ */
+test.describe('accessibility — Factures', () => {
+  test('the invoice list has no critical/serious violation', async ({ page }) => {
+    await choosePersona(page, 'billing-paris');
+    await page.goto('/factures');
+    await page.getByText('Banque Nationale de Test', { exact: true }).waitFor({ state: 'visible' });
+
+    await assertNoSeriousViolations(page);
+    await page.screenshot({ path: 'tests/visual/review/8.1-factures-list.png', fullPage: false });
+  });
+
+  test('an invoice detail has no critical/serious violation', async ({ page }) => {
+    await choosePersona(page, 'billing-paris');
+    await page.goto('/factures');
+    await page.getByText('Banque Nationale de Test', { exact: true }).waitFor({ state: 'visible' });
+    await page.getByRole('link', { name: 'Ouvrir la facture' }).first().click();
+    await page.getByText('Émetteur').waitFor({ state: 'visible' });
+
+    await assertNoSeriousViolations(page);
+    await page.screenshot({ path: 'tests/visual/review/8.2-facture-detail.png', fullPage: true });
+  });
+});
+
+test.describe('accessibility — Tableau de bord (task 8.4, three roles)', () => {
+  const roles: readonly { key: string; label: string; anchor: string }[] = [
+    { key: 'consultant-paris', label: 'consultant', anchor: 'Statut du mois' },
+    { key: 'manager-paris', label: 'manager', anchor: 'CRA en attente de décision' },
+    { key: 'billing-paris', label: 'billing', anchor: 'Factures en brouillon' },
+  ];
+
+  for (const role of roles) {
+    test(`the ${role.label} dashboard has no critical/serious violation`, async ({
+      page,
+    }, testInfo) => {
+      test.skip(testInfo.project.name !== 'desktop', 'one capture per role is enough here');
+
+      await choosePersona(page, role.key);
+      await page.getByText(role.anchor).waitFor({ state: 'visible' });
+
+      await assertNoSeriousViolations(page);
+      await page.screenshot({
+        path: `tests/visual/review/8.4-dashboard-${role.label}.png`,
+        fullPage: false,
+      });
+    });
+  }
+});

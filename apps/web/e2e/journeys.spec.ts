@@ -527,6 +527,76 @@ test.describe('J2 — manager-paris (Bruno): validates Claire’s submitted June
   });
 });
 
+test.describe('J4 — billing-paris (Henri): issues the draft J2 created, with a key, then proves the replay', () => {
+  test('issuing allocates a SEC-2026 number through the dialog, and the same key replays it at the API', async ({
+    page,
+  }) => {
+    // Runs after J2 in this file's declared order (`test.describe.configure({ mode: 'serial' })`
+    // at the top orders every describe block, not only what is inside one) — J2 leaves exactly
+    // one draft invoice behind, Claire's Réunion one, still unissued (its own dialog closed
+    // without an issuance, and the marge visit afterwards is a read). That is the Cra this test
+    // consumes.
+    await choosePersona(page, 'billing-paris');
+    await page.goto('/factures');
+
+    const reunionRow = page.getByRole('row').filter({ hasText: 'Réunion Cyber Services' });
+    await reunionRow.waitFor({ state: 'visible' });
+    await reunionRow.getByRole('link', { name: 'Ouvrir la facture' }).click();
+    await page.waitForURL(/\/factures\/.+/u);
+
+    await page.getByRole('button', { name: 'Émettre la facture' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog
+      .getByText('Émettre la facture de Réunion Cyber Services')
+      .waitFor({ state: 'visible' });
+
+    // The same key the confirm click is about to send — read off the DOM before confirming, the
+    // only way this test can reuse it afterwards: `IssuanceDialog` generates it once per open
+    // (`useState`'s initializer) and never exposes it any other way.
+    const idempotencyKey = await dialog
+      .getByText('Idempotency-Key', { exact: true })
+      .locator('xpath=following-sibling::span[1]')
+      .textContent();
+    if (idempotencyKey === null || idempotencyKey.length === 0) {
+      throw new FixtureAssumptionError('Expected the dialog to render its own Idempotency-Key.');
+    }
+
+    await dialog.getByRole('button', { name: 'Émettre', exact: true }).click();
+    const numberLocator = dialog.locator('.font-mono.font-medium');
+    await numberLocator.waitFor({ state: 'visible' });
+    const invoiceNumber = await numberLocator.textContent();
+    // The seed is deterministic (ADR-0022): this is the firm's first-ever issuance in this
+    // database, so the series' own first number is the exact one to assert, not only the shape.
+    expect(invoiceNumber).toBe('SEC-2026-000001');
+
+    await page.screenshot({
+      path: 'tests/visual/review/8.3-issuance-dialog-success.png',
+      fullPage: false,
+    });
+    // Two "Fermer" buttons again (see J2's own comment on the same ambiguity): the close icon,
+    // then the footer button `IssuanceDialog` renders once `issued !== null`.
+    await dialog.getByRole('button', { name: 'Fermer' }).last().click();
+    await expect(dialog).toBeHidden();
+
+    // The replay itself: `IssuanceDialog` has nothing left to click a second time on an invoice
+    // it now shows as issued (task 8.3's own "l'offre suit le statut" — same reasoning
+    // `pre-facturier-screen.tsx`'s `decidable` already applies) — the real second call a network
+    // retry would make is reproduced directly, the same pattern J1's own SSR-refusal step above
+    // uses for an edge case the UI cannot represent twice.
+    const invoiceId = /\/factures\/([^/?]+)/u.exec(page.url())?.[1];
+    if (invoiceId === undefined) {
+      throw new FixtureAssumptionError('Expected the detail route to carry the invoice id.');
+    }
+    const replay = await page.request.post(`/api/v1/invoices/${invoiceId}/issuance`, {
+      headers: { origin: DEV_ORIGIN, 'idempotency-key': idempotencyKey },
+    });
+    expect(replay.ok()).toBe(true);
+    const replayBody = (await replay.json()) as { replayed: boolean; invoiceNumber: string };
+    expect(replayBody.replayed).toBe(true);
+    expect(replayBody.invoiceNumber).toBe('SEC-2026-000001');
+  });
+});
+
 test.describe('J3 — manager-paris (Bruno): refuses the month Alice submitted in J1, with a reason', () => {
   test('the manager refuses through the pré-facturier dialog, and Alice sees the reason on her own grid', async ({
     page,
