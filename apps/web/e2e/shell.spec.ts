@@ -74,7 +74,7 @@ test.describe('nav shows exactly the entries of the session role', () => {
     expect(labels).toStrictEqual(['Tableau de bord', 'Mes CRA']);
   });
 
-  test('manager (Bruno, manager-paris): Tableau de bord, Pré-facturier, CRA, Factures, Marge', async ({
+  test('manager (Bruno, manager-paris): Tableau de bord, Pré-facturier, CRA, Factures — no standing Marge entry', async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'one viewport is enough for the label check');
@@ -82,10 +82,14 @@ test.describe('nav shows exactly the entries of the session role', () => {
     await choosePersona(page, 'manager-paris');
     const labels = await navLabels(page);
 
-    expect(labels).toStrictEqual(['Tableau de bord', 'Pré-facturier', 'CRA', 'Factures', 'Marge']);
+    // No `Marge` here: Phase 7 (task 7.5) removed the placeholder standing entry Phase 4 had
+    // added (`docs/open-questions.md`, row dated 24/08/2026, resolved) — the real margin screen
+    // is reached only by an explicit click off a pré-facturier row (ADR-0052, "jamais un survol"),
+    // never from the sidebar.
+    expect(labels).toStrictEqual(['Tableau de bord', 'Pré-facturier', 'CRA', 'Factures']);
   });
 
-  test('manager (Emma, manager-lyon): the same five entries as any other manager', async ({
+  test('manager (Emma, manager-lyon): the same four entries as any other manager', async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'one viewport is enough for the label check');
@@ -93,7 +97,7 @@ test.describe('nav shows exactly the entries of the session role', () => {
     await choosePersona(page, 'manager-lyon');
     const labels = await navLabels(page);
 
-    expect(labels).toStrictEqual(['Tableau de bord', 'Pré-facturier', 'CRA', 'Factures', 'Marge']);
+    expect(labels).toStrictEqual(['Tableau de bord', 'Pré-facturier', 'CRA', 'Factures']);
   });
 
   test('billing (Henri, billing-paris): Tableau de bord, Pré-facturier, Factures — never CRA or Marge', async ({
@@ -105,9 +109,11 @@ test.describe('nav shows exactly the entries of the session role', () => {
     const labels = await navLabels(page);
 
     expect(labels).toStrictEqual(['Tableau de bord', 'Pré-facturier', 'Factures']);
-    // Restated as an explicit absence, not only as "the array has exactly these three": Cjm/Tjm/
-    // margin never appear outside the margin screen (Annexe C.12), and Marge is the nav entry
-    // that would put them one click away from a role that must not reach them.
+    // Restated as an explicit absence, not only as "the array has exactly these three": no role
+    // has a standing `Marge` nav entry any more (Phase 7, task 7.5) — the margin screen is
+    // reached only by an explicit click off a pré-facturier row, which billing's own `Refuser`/
+    // `Valider`-less table (task 7.4) never renders for this role either
+    // (`pre-facturier-screen.tsx`'s `craColumns`, filtered on `role === 'manager'`).
     expect(labels).not.toContain('Marge');
   });
 });
