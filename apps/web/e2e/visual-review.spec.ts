@@ -18,6 +18,7 @@ test('kitchen sink — a panel open, for the rounded-xl/shadow-overlay treatment
   await expect(page.getByRole('dialog')).toBeVisible();
 
   await page.screenshot({
+    animations: 'disabled',
     path: 'tests/visual/review/2.6-kitchen-sink-dialog-open.png',
     fullPage: false,
   });

@@ -84,6 +84,7 @@ test('the four seed personas render, fetched live through the dev proxy', async 
   await expect(henri).toContainText('Paris');
 
   await page.screenshot({
+    animations: 'disabled',
     path: 'tests/visual/review/3.6-personas-live.png',
     fullPage: false,
   });

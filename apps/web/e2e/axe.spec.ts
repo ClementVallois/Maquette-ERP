@@ -101,7 +101,11 @@ test.describe('accessibility — Factures', () => {
     await page.getByText('Banque Nationale de Test', { exact: true }).waitFor({ state: 'visible' });
 
     await assertNoSeriousViolations(page);
-    await page.screenshot({ path: 'tests/visual/review/8.1-factures-list.png', fullPage: false });
+    await page.screenshot({
+      animations: 'disabled',
+      path: 'tests/visual/review/8.1-factures-list.png',
+      fullPage: false,
+    });
   });
 
   test('an invoice detail has no critical/serious violation', async ({ page }) => {
@@ -112,7 +116,11 @@ test.describe('accessibility — Factures', () => {
     await page.getByText('Émetteur').waitFor({ state: 'visible' });
 
     await assertNoSeriousViolations(page);
-    await page.screenshot({ path: 'tests/visual/review/8.2-facture-detail.png', fullPage: true });
+    await page.screenshot({
+      animations: 'disabled',
+      path: 'tests/visual/review/8.2-facture-detail.png',
+      fullPage: true,
+    });
   });
 });
 
@@ -134,6 +142,7 @@ test.describe('accessibility — Tableau de bord (task 8.4, three roles)', () =>
 
       await assertNoSeriousViolations(page);
       await page.screenshot({
+        animations: 'disabled',
         path: `tests/visual/review/8.4-dashboard-${role.label}.png`,
         fullPage: false,
       });

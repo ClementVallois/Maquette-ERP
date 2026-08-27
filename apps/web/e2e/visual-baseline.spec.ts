@@ -18,6 +18,7 @@ test('kitchen sink — baseline screenshot at 1440', async ({ page }, testInfo) 
   await expect(page.getByRole('heading', { name: 'Kitchen sink — design system' })).toBeVisible();
 
   await page.screenshot({
+    animations: 'disabled',
     path: 'tests/visual/baseline/kitchen-sink.png',
     fullPage: true,
   });

@@ -164,6 +164,7 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     await expect(page.locator('select')).toHaveCount(0);
 
     await page.screenshot({
+      animations: 'disabled',
       path: 'tests/visual/review/6.4-cra-grid-validated.png',
       fullPage: false,
     });
@@ -190,6 +191,7 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
       .waitFor({ state: 'visible' });
     await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(1);
     await page.screenshot({
+      animations: 'disabled',
       path: 'tests/visual/review/6.5-cra-grid-empty-month.png',
       fullPage: false,
     });
@@ -212,6 +214,7 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     const monday = cell(page, DORA, '03/08/2026');
     await monday.focus();
     await page.screenshot({
+      animations: 'disabled',
       path: 'tests/visual/review/6.2-cra-grid-keyboard-focus.png',
       fullPage: false,
     });
@@ -237,7 +240,11 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     await monday.selectOption({ label: '¼' });
     await expect(doraMonthTotal).toHaveText(/0,25\s*j/u);
     await expect(mondayDayTotal).toHaveText(/0,25\s*j/u);
-    await page.screenshot({ path: 'tests/visual/review/6.2-cra-grid-draft.png', fullPage: false });
+    await page.screenshot({
+      animations: 'disabled',
+      path: 'tests/visual/review/6.2-cra-grid-draft.png',
+      fullPage: false,
+    });
 
     // Complete that one day (topping the quarter up to a full day), then let the row tool fill
     // every other workable day — "remplir les jours ouvrés vides" never touches a day that
@@ -262,6 +269,7 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     await page.getByText('CRA soumis', { exact: false }).waitFor({ state: 'visible' });
     await expect(page.locator('select')).toHaveCount(0);
     await page.screenshot({
+      animations: 'disabled',
       path: 'tests/visual/review/6.4-cra-grid-submitted.png',
       fullPage: false,
     });
@@ -300,6 +308,7 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     await expect(page.locator('select').first()).toBeVisible();
 
     await page.screenshot({
+      animations: 'disabled',
       path: 'tests/visual/review/6.4-cra-grid-refused.png',
       fullPage: false,
     });
@@ -326,7 +335,10 @@ test.describe('item 2 — a consultant opens a month ahead that has no Cra yet',
       .waitFor({ state: 'visible' });
     expect(pickedLabel).not.toBeNull();
 
-    await page.screenshot({ path: 'tests/visual/review/item2-open-another-month.png' });
+    await page.screenshot({
+      animations: 'disabled',
+      path: 'tests/visual/review/item2-open-another-month.png',
+    });
   });
 });
 
@@ -357,6 +369,7 @@ test.describe('items 4/5 — a manager sees consultants, picks one, opens a read
     await page.waitForURL('/cra');
 
     await page.screenshot({
+      animations: 'disabled',
       path: 'tests/visual/review/item4-5-manager-cra-view.png',
       fullPage: false,
     });
@@ -382,6 +395,7 @@ test.describe('items 4/5 — a manager sees consultants, picks one, opens a read
     await expect(page.getByText('/problems/out-of-scope')).toBeVisible();
 
     await page.screenshot({
+      animations: 'disabled',
       path: 'tests/visual/review/item4-5-manager-out-of-scope.png',
       fullPage: false,
     });
@@ -404,6 +418,7 @@ test.describe('task 6.5 — a role this route cannot serve', () => {
     await expect(page.getByText('Manager', { exact: true })).toBeVisible();
 
     await page.screenshot({
+      animations: 'disabled',
       path: 'tests/visual/review/6.5-cra-denied-insufficient-role.png',
       fullPage: false,
     });
@@ -418,7 +433,11 @@ test.describe('task 6.1 — the month list', () => {
     await expect(page.getByRole('columnheader', { name: 'Mois' })).toBeVisible();
     await expect(page.getByText('Filtrer par mois')).toHaveCount(0);
 
-    await page.screenshot({ path: 'tests/visual/review/6.1-cra-list.png', fullPage: false });
+    await page.screenshot({
+      animations: 'disabled',
+      path: 'tests/visual/review/6.1-cra-list.png',
+      fullPage: false,
+    });
   });
 });
 
@@ -477,6 +496,7 @@ test.describe('J2 — manager-paris (Bruno): validates Claire’s submitted June
     await expect(validateDialog.getByText('Réunion Cyber Services')).toBeVisible();
     await expect(validateDialog.getByText('Aucun jour écarté', { exact: false })).toBeVisible();
     await page.screenshot({
+      animations: 'disabled',
       path: 'tests/visual/review/7.2-validate-result-dialog.png',
       fullPage: false,
     });
@@ -492,7 +512,11 @@ test.describe('J2 — manager-paris (Bruno): validates Claire’s submitted June
     await expect(page.getByRole('button', { name: 'Valider' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Refuser' })).toHaveCount(0);
     await expect(page.getByText('Réunion Cyber Services')).toBeVisible();
-    await page.screenshot({ path: 'tests/visual/review/7.1-pre-facturier.png', fullPage: false });
+    await page.screenshot({
+      animations: 'disabled',
+      path: 'tests/visual/review/7.1-pre-facturier.png',
+      fullPage: false,
+    });
 
     // Task 7.5's own "navigation explicite depuis une ligne du pré-facturier" — one click, off
     // Claire's row, never a hover (ADR-0052).
@@ -520,7 +544,11 @@ test.describe('J2 — manager-paris (Bruno): validates Claire’s submitted June
     await expect(statCardValue(page, 'Chiffre d’affaires')).toHaveText(euro(1540000));
     await expect(statCardValue(page, 'Coût')).toHaveText(euro(440000));
     await expect(statCardValue(page, 'Marge')).toHaveText(euro(1100000));
-    await page.screenshot({ path: 'tests/visual/review/7.5-marge.png', fullPage: false });
+    await page.screenshot({
+      animations: 'disabled',
+      path: 'tests/visual/review/7.5-marge.png',
+      fullPage: false,
+    });
 
     await page.getByRole('link', { name: 'Revenir au pré-facturier' }).click();
     await page.waitForURL(/\/pre-facturier/u);
@@ -570,6 +598,7 @@ test.describe('J4 — billing-paris (Henri): issues the draft J2 created, with a
     expect(invoiceNumber).toBe('SEC-2026-000001');
 
     await page.screenshot({
+      animations: 'disabled',
       path: 'tests/visual/review/8.3-issuance-dialog-success.png',
       fullPage: false,
     });
@@ -627,7 +656,11 @@ test.describe('J3 — manager-paris (Bruno): refuses the month Alice submitted i
     await refuseDialog.getByText('Refuser le CRA de Alice Martin').waitFor({ state: 'visible' });
     const reason = 'Le 03/08 doit être reventilé sur un seul projet — motif de démonstration J3.';
     await refuseDialog.getByLabel('Motif du refus').fill(reason);
-    await page.screenshot({ path: 'tests/visual/review/7.3-refuse-dialog.png', fullPage: false });
+    await page.screenshot({
+      animations: 'disabled',
+      path: 'tests/visual/review/7.3-refuse-dialog.png',
+      fullPage: false,
+    });
 
     await refuseDialog.getByRole('button', { name: 'Confirmer le refus' }).click();
     await expect(refuseDialog).toBeHidden();
@@ -667,6 +700,7 @@ test.describe('J6 — billing-paris (Henri): the margin URL refuses him, by role
     await expect(page.getByText('Facturation', { exact: true })).toBeVisible();
 
     await page.screenshot({
+      animations: 'disabled',
       path: 'tests/visual/review/7.6-marge-denied-insufficient-role.png',
       fullPage: false,
     });
@@ -691,6 +725,7 @@ test.describe('task 7.6 — a period with nothing in it', () => {
     ).toBeVisible();
 
     await page.screenshot({
+      animations: 'disabled',
       path: 'tests/visual/review/7.6-pre-facturier-empty.png',
       fullPage: false,
     });

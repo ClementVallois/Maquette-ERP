@@ -246,11 +246,15 @@ const DASHBOARD_ANCHOR = {
   billing: 'Factures en brouillon',
 } as const;
 
-/** Screenshots are compared by **bytes** in review, so a shot fired mid-transition churns the
- * committed evidence for no change in what the screen says. `animations: 'disabled'` finishes
- * CSS transitions and animations before the capture — the skeleton-to-content swap and the
- * card's own shadow are both in flight at exactly the moment the anchor appears. */
-const REVIEW_CAPTURE = { fullPage: false, animations: 'disabled' } as const;
+/**
+ * Every capture in this repository's e2e suite passes `animations: 'disabled'`, and this is the
+ * file where the reason was found. Screenshots are compared by **bytes** in review, so a shot
+ * fired mid-transition churns the committed evidence without anything on the screen having
+ * changed: the skeleton-to-content swap and the card's own shadow are both in flight at exactly
+ * the moment the anchor below becomes visible. The same held for every dialog capture in
+ * `journeys.spec.ts` — `8.3-issuance-dialog-success.png` moved 4 KB between two runs of identical
+ * code, caught re-running the full suite on 27/08.
+ */
 
 test.describe('screenshots — the shell per persona (rule 0bis.10)', () => {
   const personas: readonly {
@@ -273,8 +277,9 @@ test.describe('screenshots — the shell per persona (rule 0bis.10)', () => {
       await page.getByText(persona.anchor).waitFor({ state: 'visible' });
 
       await page.screenshot({
+        animations: 'disabled',
         path: `tests/visual/review/4.2-shell-${persona.label}.png`,
-        ...REVIEW_CAPTURE,
+        fullPage: false,
       });
     });
   }
@@ -287,8 +292,9 @@ test.describe('screenshots — the shell per persona (rule 0bis.10)', () => {
     await expect(page.locator('[data-persona-key="consultant-paris"]')).toBeVisible();
 
     await page.screenshot({
+      animations: 'disabled',
       path: 'tests/visual/review/4.1-persona-selector.png',
-      ...REVIEW_CAPTURE,
+      fullPage: false,
     });
   });
 
@@ -307,8 +313,9 @@ test.describe('screenshots — the shell per persona (rule 0bis.10)', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.screenshot({
+      animations: 'disabled',
       path: 'tests/visual/review/4.5-shell-mobile-sheet.png',
-      ...REVIEW_CAPTURE,
+      fullPage: false,
     });
   });
 });

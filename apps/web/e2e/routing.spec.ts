@@ -81,8 +81,15 @@ async function anyCraId(page: Page): Promise<string> {
   return first.id;
 }
 
+/** One viewport throughout: which document a URL resolves to has nothing to do with viewport
+ * width, and each test here is a full page load against the single dev stack — the row of
+ * 25/08 in `docs/open-questions.md` records what running both projects at once costs it. */
 test.describe('the /facture prefix does not capture the SPA’s plural routes', () => {
-  test('a full navigation to /factures lands on the SPA invoice list', async ({ page }) => {
+  test('a full navigation to /factures lands on the SPA invoice list', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'the dispatcher does not know the viewport');
+
     await choosePersona(page, 'billing-paris');
 
     const response = await page.goto('/factures');
@@ -100,7 +107,11 @@ test.describe('the /facture prefix does not capture the SPA’s plural routes', 
     await expect(page.getByRole('tab', { name: 'Brouillon' })).toBeVisible();
   });
 
-  test('a full navigation to /factures/:id lands on the SPA invoice detail', async ({ page }) => {
+  test('a full navigation to /factures/:id lands on the SPA invoice detail', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'the dispatcher does not know the viewport');
+
     await choosePersona(page, 'billing-paris');
     const id = await anyInvoiceId(page);
 
@@ -120,7 +131,9 @@ test.describe('the /facture prefix does not capture the SPA’s plural routes', 
 
   test('the singular printable /facture/:id still answers the server-rendered document', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'the dispatcher does not know the viewport');
+
     await choosePersona(page, 'billing-paris');
     const id = await anyInvoiceId(page);
 
@@ -134,7 +147,9 @@ test.describe('the /facture prefix does not capture the SPA’s plural routes', 
 
   test('the other reserved prefix, /releve/:id, still answers the server-rendered Cra', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'the dispatcher does not know the viewport');
+
     await choosePersona(page, 'consultant-paris');
     const id = await anyCraId(page);
 
