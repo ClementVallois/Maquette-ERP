@@ -97,6 +97,7 @@ retouched, so what was decided stays visible next to what replaced it.
 | [0070](./0070-the-entry-grid-is-a-mission-by-day-matrix.md)                                  | The entry grid is a mission × day matrix, and one cell is one `CraLine`            | accepted   |
 | [0071](./0071-a-manager-reads-a-named-consultants-grid-through-a-new-scoped-route.md)        | A manager reads a named consultant's grid through a new, scoped route              | accepted   |
 | [0072](./0072-style-src-admits-inline-because-the-kit-writes-style-attributes.md)            | `style-src` admits `'unsafe-inline'`, because the UI kit writes `style` attributes | accepted   |
+| [0073](./0073-the-dashboard-reads-an-optional-period-override.md)                            | The dashboard reads an optional `?period=` override, defaulting to the wall clock  | accepted   |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
@@ -228,6 +229,20 @@ convention that looked like pedantry when it was adopted. 0070 is the consequenc
 second decision — a day that holds four things is not a day-per-row grid any more — and it takes
 0066 and 0068 with it, because both were answers to a question (what do two boxes per day mean)
 that the new shape does not ask.
+
+0071 and 0072 continue Phase 9's own sequence, unnarrated here until now: 0071 is Phase 6's grid
+reopened by a role rather than by data — a manager reading a named consultant's month needed its
+own scoped route rather than the consultant's own `/cra/:period`, because the two answer different
+authorization questions. 0072 is ADR-0064 reopened by the one topology that had never run it:
+Vite's dev server sends no CSP at all, so `style-src 'self'` stood untested for two whole phases
+against a UI kit that writes `style` attributes at render time.
+
+0073 is Phase 10's, and it is the same shape as 0050's "narrowing of BUILD-PLAN's own wording"
+further up this log: a decision Phase 8 had already made — the dashboard reads the wall clock,
+with no picker — turned out wrong once the seed's frozen `2026-06` (ADR-0022) met a calendar that
+keeps moving, and task 10.4's demo checklist forced the question rather than leaving it latent. The
+override changes nothing a visitor can see; it exists for the one caller (`journeys.spec.ts`) that
+needs a period a re-run of the suite does not depend on the day it happens to run.
 
 ## Identified, not yet decided
 
