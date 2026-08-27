@@ -1,18 +1,22 @@
 import { createFileRoute } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 
-import { ComingSoon } from '@/components/shell/coming-soon';
+import { DashboardScreen } from '@/features/dashboard/components/dashboard-screen';
+import { currentPeriod } from '@/lib/period';
 
 /**
  * `/tableau-de-bord` — reachable by every role (frontend-plan.md task 4.3), and the redirect
- * target after choosing a persona (task 4.1). The real screen is Phase 8 (task 8.4,
- * `GET /api/v1/dashboard`); this phase gives it a considered placeholder rather than build ahead
- * of an endpoint that does not exist yet (rule 0bis.8).
+ * target after choosing a persona (task 4.1). Task 8.4, `GET /api/v1/dashboard?period=`. The
+ * period is always the wall-clock "now" (`lib/period.ts`) — there is no picker on this screen, and
+ * none of Annexe A's other periods (the seed's June, J1's August) is what "the dashboard, right
+ * now" means for a first-time visitor.
  */
 export const Route = createFileRoute('/_shell/tableau-de-bord')({
-  component: DashboardPlaceholder,
+  component: DashboardRoute,
 });
 
-function DashboardPlaceholder(): ReactElement {
-  return <ComingSoon />;
+function DashboardRoute(): ReactElement {
+  const { persona } = Route.useRouteContext();
+
+  return <DashboardScreen role={persona.role} period={currentPeriod()} />;
 }
