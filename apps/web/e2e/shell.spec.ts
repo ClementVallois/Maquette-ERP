@@ -175,6 +175,18 @@ test.describe('guards', () => {
     // `GET /api/v1/cras` — a fresh query key, always a real fetch — which is exactly the live
     // `403 /problems/unknown-persona` `session-guard.ts` exists to catch.
     await choosePersona(page, 'consultant-paris');
+    // Phase 8's own dashboard (task 8.4) made this wait load-bearing where it previously did
+    // nothing: `choosePersona` returns the instant the URL becomes `/tableau-de-bord`, before the
+    // new route's own effects have necessarily run, and `/tableau-de-bord` now fetches
+    // `GET /api/v1/dashboard` itself — a `forRoles`-guarded route, exactly the kind this test's
+    // corrupted cookie is meant to reach for the first time on `/cra`, not here. Without this
+    // wait, that request can still be in flight (or not yet dispatched) when the cookie below is
+    // corrupted, so *it* becomes the first guarded call to answer `unknown-persona` — the global
+    // guard (`session-guard.ts`) fires `window.location.assign('/')` while Playwright is mid-click
+    // on "Mes CRA", tearing the page down under the click ("element was detached from the DOM").
+    // Reproduced live before this wait was added. Waiting for the dashboard's own first StatCard
+    // settles that query (a real fetch, the still-valid cookie) before the corruption below runs.
+    await page.getByText('Statut du mois').waitFor({ state: 'visible' });
 
     const origin = new URL(baseURL ?? 'http://127.0.0.1:5173').origin;
     await context.addCookies([
