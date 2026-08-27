@@ -60,6 +60,21 @@ function cell(page: Page, activityLabel: string, day: string): Locator {
   return page.locator(`[aria-label="${activityLabel} — ${day}"]`);
 }
 
+/**
+ * A `StatCard`'s value span, located via its own label span's exact text, then the next sibling
+ * span `StatCard` renders it as (`components/stat-card.tsx` — one `<div>`, two `<span>` children
+ * in a fixed order, no `data-testid` to hook). `following-sibling::span[1]`, not the parent
+ * `<div>`: the parent's own text is the concatenation of both spans ("CJM200,00 €"), which
+ * `toHaveText` compares whole, so scoping to the parent asserts the label and the value at once
+ * rather than the value alone — this needs only the value. Scoping starts from the *label*'s exact
+ * text (not `getByText(value)`) so a label that also appears as a table column header
+ * (`Chiffre d’affaires`/`Coût`/`Marge` all repeat as `MISSION_COLUMNS` headers on the same screen)
+ * still resolves to the one `StatCard` and nothing else.
+ */
+function statCardValue(page: Page, label: string): Locator {
+  return page.getByText(label, { exact: true }).locator('xpath=following-sibling::span[1]');
+}
+
 async function choosePersona(page: Page, personaKey: string): Promise<void> {
   await page.goto('/');
   await page.locator(`[data-persona-key="${personaKey}"] button`).click();
@@ -485,15 +500,26 @@ test.describe('J2 — manager-paris (Bruno): validates Claire’s submitted June
     await page.waitForURL(/\/marge\/.+/u);
 
     await page.getByRole('heading', { name: 'Claire Dubois' }).waitFor({ state: 'visible' });
-    await expect(page.getByText(euro(20000))).toBeVisible(); // Cjm — the header StatCard only
-    await expect(page.getByRole('cell', { name: 'SOC Réunion Cyber' })).toBeVisible();
-    await expect(page.getByText(euro(70000))).toBeVisible(); // Tjm — the mission row only
-    // Revenue/cost/margin each render twice — the single mission's own row, and the total
-    // StatCard above it, which are the same figure with only one mission in play. `.first()`
-    // picks either; both must read the same amount for this assertion to mean anything.
-    await expect(page.getByText(euro(1540000)).first()).toBeVisible(); // revenue
-    await expect(page.getByText(euro(440000)).first()).toBeVisible(); // cost
-    await expect(page.getByText(euro(1100000)).first()).toBeVisible(); // margin
+    await expect(statCardValue(page, 'CJM')).toHaveText(euro(20000));
+
+    // Revenue/cost/margin each render twice on this screen: the single mission's own row
+    // (`marge-screen.tsx`'s `MISSION_COLUMNS`, reading `data.missions[0]`) and the total StatCard
+    // above it (reading `data.revenueCents`/`costCents`/`marginCents`, the server's own separate
+    // aggregate) — two different fields on the wire that only look like the same number because
+    // this consultant has one mission. Asserting only one of the two (`.first()`, the previous
+    // shape of this test) would pass even if the aggregate disagreed with the row it is supposed
+    // to total — exactly the defect a totals figure exists to catch. Both are asserted here,
+    // scoped to where each actually renders, so a real mismatch fails the test.
+    const missionRow = page.getByRole('row').filter({ hasText: 'SOC Réunion Cyber' });
+    const missionCells = missionRow.getByRole('cell');
+    await expect(missionCells.nth(2)).toHaveText(euro(70000)); // Tjm
+    await expect(missionCells.nth(3)).toHaveText(euro(1540000)); // revenue
+    await expect(missionCells.nth(4)).toHaveText(euro(440000)); // cost
+    await expect(missionCells.nth(5)).toHaveText(euro(1100000)); // margin
+
+    await expect(statCardValue(page, 'Chiffre d’affaires')).toHaveText(euro(1540000));
+    await expect(statCardValue(page, 'Coût')).toHaveText(euro(440000));
+    await expect(statCardValue(page, 'Marge')).toHaveText(euro(1100000));
     await page.screenshot({ path: 'tests/visual/review/7.5-marge.png', fullPage: false });
 
     await page.getByRole('link', { name: 'Revenir au pré-facturier' }).click();
