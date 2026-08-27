@@ -46,15 +46,26 @@ function as(key: string): { cookie: string } {
 
 let app: FastifyInstance;
 
+/**
+ * Deliberately non-existent, so this suite's SPA-fallback assertions do not depend on whether
+ * `pnpm --filter @erp/web build` happens to have already run on the machine running it — the same
+ * test must answer the same way either way. `spa.test.ts` covers the real-`dist` case against a
+ * throwaway fixture directory of its own.
+ */
+const NO_DIST_HERE = '/nonexistent-dist-fixture-for-routes-test/';
+
 beforeEach(() => {
-  app = buildServer({
-    config,
-    clock: { now: () => new Date('2026-06-15T09:00:00.000Z') },
-    probeDatabase: () => Promise.resolve(),
-    personas: inMemoryPersonas(),
-    transactionally: noDatabase,
-    newId: () => 'unused',
-  });
+  app = buildServer(
+    {
+      config,
+      clock: { now: () => new Date('2026-06-15T09:00:00.000Z') },
+      probeDatabase: () => Promise.resolve(),
+      personas: inMemoryPersonas(),
+      transactionally: noDatabase,
+      newId: () => 'unused',
+    },
+    NO_DIST_HERE,
+  );
 });
 
 afterEach(async () => {
@@ -240,12 +251,61 @@ describe('the stylesheet', () => {
     expect(response.statusCode).toBe(304);
   });
 
-  it('has no path parameter to traverse', async () => {
-    // Not a hardened path join: there is no join. The route is one literal string computed at
-    // boot, so anything else is simply not a route.
-    for (const attempt of ['/assets/style.css', '/assets/../config.ts', '/assets/']) {
-      expect((await app.inject({ method: 'GET', url: attempt })).statusCode).toBe(404);
+  it('has no path parameter of its own to traverse — one literal route, computed at boot', async () => {
+    for (const attempt of ['/assets/style.css', '/assets/']) {
+      const response = await app.inject({ method: 'GET', url: attempt });
+      expect(response.statusCode).toBe(404);
+      expect(response.headers['content-type']).toContain('application/problem+json');
     }
+  });
+});
+
+describe('the SPA build assets (Phase 9.1)', () => {
+  it("serves a real built file under /assets/*, distinct from the stylesheet's own route", async () => {
+    const response = await app.inject({ method: 'GET', url: '/assets/index-fixture.js' });
+
+    // No `apps/web/dist` in this suite (no route in this file builds the web app), so this is
+    // the same "not built" 404 every non-e2e test gets — proven distinct from the stylesheet's
+    // one hand-computed literal by going through `registerSpa`'s wildcard route at all rather
+    // than 404ing before a route ever matched.
+    expect(response.statusCode).toBe(404);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+  });
+
+  // Traversal safety under `/assets/*` is proven in `spa.test.ts`, driving `reply.sendFile`
+  // directly against a real fixture: `app.inject()` (`light-my-request`) normalizes a literal
+  // `..` out of the URL before Fastify's router ever sees it, so a traversal attempt sent through
+  // this file's `app.inject` never reaches the code path it would claim to test. Verified live
+  // too (task 9.1's own commit): `curl --path-as-is` against a real built `dist` answers 403
+  // before any handler runs.
+
+  it('still renders the ordinary 404 page for an unmatched screen path when dist is not built', async () => {
+    // `serveSpaShellOrNull` returns `null` here (no `apps/web/dist` in this suite), so this
+    // proves the fallback wiring in `server.ts` does not swallow the pre-existing behaviour when
+    // the shell isn't available — `spa.test.ts` proves the actual `index.html` serving, against
+    // a real fixture directory, and task 9.1's own commit records a live `curl` against a real
+    // build showing `/cra` answering the SPA shell (200, `text/html`, the built `index.html`).
+    const response = await app.inject({ method: 'GET', url: '/cra/2026-06' });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.headers['content-type']).toContain('text/html');
+  });
+
+  it('leaves an unmatched API path as JSON, never the SPA shell', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/v1/nope' });
+
+    expect(response.headers['content-type']).toContain('application/problem+json');
+  });
+
+  it('leaves an unmatched non-GET path as the ordinary refusal page, not the SPA shell', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/nope',
+      headers: { origin: ORIGIN },
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.headers['content-type']).toContain('text/html');
   });
 });
 

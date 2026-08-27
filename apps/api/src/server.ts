@@ -15,7 +15,9 @@ import { registerOpsRoutes } from './routes/ops.ts';
 import { registerSessionRoutes } from './routes/session.ts';
 import { registerFormBodyParser } from './web/form-body.ts';
 import { registerSecurityHeaders } from './web/reply.ts';
+import { representationOf } from './web/representation.ts';
 import { registerWebRoutes } from './web/routes.ts';
+import { DEFAULT_DIST_DIR, registerSpa, serveSpaShellOrNull } from './web/spa.ts';
 
 /**
  * The HTTP edge. Everything it knows how to do with a failure is turn it into RFC 9457
@@ -39,7 +41,16 @@ function statusCarriedBy(failure: unknown): number {
   return typeof statusCode === 'number' ? statusCode : SERVER_ERROR_FLOOR;
 }
 
-export function buildServer(dependencies: ServerDependencies): FastifyInstance {
+/**
+ * `spaDistDir` defaults to `spa.ts`'s own computed `apps/web/dist` — `main.ts` never passes it.
+ * A test passes an explicit, deliberately non-existent path instead of relying on whether a
+ * previous `pnpm --filter @erp/web build` happens to have left a real `dist` on the machine
+ * running the suite: the same test must answer the same way whether or not that build ran.
+ */
+export function buildServer(
+  dependencies: ServerDependencies,
+  spaDistDir: string = DEFAULT_DIST_DIR,
+): FastifyInstance {
   const app = Fastify({
     logger: loggerOptions(dependencies.config),
     genReqId: (request) => correlationIdOf(request.headers[CORRELATION_ID_HEADER]),
@@ -54,6 +65,19 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
   });
 
   app.setNotFoundHandler((request, reply) => {
+    // The SPA fallback (ADR-0063, front-end plan Phase 9.1): every screen navigation that isn't
+    // `/api/*`, an asset, or one of the two printable routes (matched by their own registration,
+    // so they never reach here) answers `index.html` instead of this application's own 404 page,
+    // and the client-side router takes it from there. `serveSpaShellOrNull` returns `null` when
+    // the web app was never built, which is every non-e2e test — the ordinary 404 below is what
+    // those get instead.
+    if (request.method === 'GET' || request.method === 'HEAD') {
+      if (representationOf(request.url) === 'html') {
+        const shell = serveSpaShellOrNull(reply, spaDistDir);
+        if (shell !== null) return shell;
+      }
+    }
+
     void sendProblem(reply, {
       type: API_PROBLEM_TYPES.notFound,
       title: 'No such route',
@@ -112,6 +136,10 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
   registerSessionRoutes(app, dependencies);
   registerApiRoutes(app, dependencies);
   registerWebRoutes(app, dependencies);
+  // After registerAccessControl, like every route above: its `onRoute` hook applies to whatever
+  // is registered after it runs, and `registerSpa`'s one route declares `PUBLIC` for the same
+  // reason every other route here declares something (ADR-0023).
+  registerSpa(app, spaDistDir);
 
   return app;
 }

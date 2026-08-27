@@ -68,17 +68,28 @@ function as(key: string): { cookie: string } {
 
 let app: FastifyInstance;
 
+/**
+ * Deliberately non-existent (same reasoning as `routes.test.ts`): the "unknown page answers a
+ * page, not JSON" test below must answer the same way whether or not `pnpm --filter @erp/web
+ * build` has already run on the machine running this suite. `spa.test.ts` covers the real-`dist`
+ * SPA-fallback case against a throwaway fixture directory of its own.
+ */
+const NO_DIST_HERE = '/nonexistent-dist-fixture-for-states-int-test/';
+
 beforeEach(async () => {
   const { client } = transaction;
 
-  app = buildServer({
-    config,
-    clock: { now: () => new Date('2026-07-02T09:00:00.000Z') },
-    probeDatabase: () => Promise.resolve(),
-    personas: inMemoryPersonas(personas),
-    transactionally: savepointTransactionally(client, uuidv7),
-    newId: uuidv7,
-  });
+  app = buildServer(
+    {
+      config,
+      clock: { now: () => new Date('2026-07-02T09:00:00.000Z') },
+      probeDatabase: () => Promise.resolve(),
+      personas: inMemoryPersonas(personas),
+      transactionally: savepointTransactionally(client, uuidv7),
+      newId: uuidv7,
+    },
+    NO_DIST_HERE,
+  );
 
   await client.query(`INSERT INTO public.offices (id, name, city) VALUES ($1, 'Paris', 'Paris')`, [
     PARIS,
