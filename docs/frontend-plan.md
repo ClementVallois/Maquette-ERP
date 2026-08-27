@@ -876,6 +876,19 @@ Ajouter `@fastify/static` (justifié, épinglé ≥ 7 jours). Servir les assets 
 SPA** : tout `GET` qui n'est pas `/api/*`, `/facture/:id`, `/releve/:id`, `/healthz`, `/readyz`
 ou un asset renvoie `index.html`. Les deux routes SSR imprimables gardent la priorité.
 
+🔴 **La liste ci-dessus n'est pas une liste de préfixes.** Écrite en `startsWith` — la façon
+évidente de lire la phrase — `/factures` (la liste de la SPA, au pluriel) tombe dans l'exclusion
+`/facture` et la production sert la route imprimable ou un 404 sur l'écran principal de
+facturation. C'est exactement le bug corrigé dans le proxy de dev en tâche 8.1 (Annexe C.9),
+rejoué une couche plus bas : le correctif de `vite.config.ts` ne s'applique pas ici, Vite étant
+hors-jeu en production. **Implémenter l'exclusion par enregistrement de route, ou par une
+correspondance de forme `/:id` exacte — jamais par un test de préfixe nu.**
+
+`apps/web/e2e/routing.spec.ts` porte déjà les assertions (écrites en Phase 8, vérifiées rouges
+en retirant le `/` final de `PROXIED_PATHS`) : elles tournent aujourd'hui contre Vite et sont les
+mêmes qui attrapent la régression contre le build servi par l'API en 9.6. **Aucune autre du dépôt
+ne couvre les deux topologies** — donc tant que 9.6 n'est pas câblé, 9.1 n'est pas vérifié.
+
 ### 9.2 La CSP — chaîne exacte, figée dans ADR-0064
 
 Remplacer la constante de `apps/api/src/web/reply.ts` par **exactement** :
@@ -924,7 +937,9 @@ Activer le job Playwright pour de vrai : Postgres service → migrate + seed →
 `dist` sur 3000 → suite e2e complète **contre le build servi** (pas Vite).
 
 **Gate de sortie** : suite e2e complète verte contre le build servi par l'API sur 3000 (sans
-Vite) ; `/facture/:id` et `/releve/:id` inchangés en comportement (leurs tests passent) ;
+Vite) — **`routing.spec.ts` en fait partie et est la porte de 9.1** : `GET /factures` et
+`GET /factures/:id` en navigation complète rendent l'`index.html` de la SPA, pas la route
+imprimable ; `/facture/:id` et `/releve/:id` inchangés en comportement (leurs tests passent) ;
 `pnpm run check` et `pnpm run test:int` verts ; la CSP est assertée par les tests mis à jour ;
 plus aucune route d'écran interactif SSR ne répond.
 
@@ -1077,6 +1092,17 @@ exactes** (numéros, montants) — les utiliser.
 8. **`labels.ts` et `format.ts` sont des copies** dans `apps/web` — pas de nouveau `packages/`,
    pas d'import cross-app ; les tests de `format.ts` s'alignent sur ceux de l'API.
 9. **`/factures/$id` (SPA, pluriel) ≠ `/facture/:id` (SSR, singulier)** — jamais de collision.
+   ⚠️ **« Jamais de collision » ne veut pas dire « jamais la même URL » : la collision est un
+   préfixe.** `'/factures'.startsWith('/facture')` vaut `true`, donc tout aiguillage qui décide
+   « est-ce la route imprimable ? » par un test de préfixe nu capture la liste de factures de la
+   SPA. Arrivé une fois pour de vrai, dans le proxy de dev (`apps/web/vite.config.ts`, tâche
+   8.1) : `/factures` répondait la page `/problems/not-found` de l'API. **Règle** : toute
+   exclusion d'un chemin SSR se fait par enregistrement de route, ou par une correspondance de
+   forme `/:id` exacte, ou à défaut sur un préfixe **terminé par `/`** — jamais sur `/facture` ou
+   `/releve` nus. Gardée par `apps/web/e2e/routing.spec.ts`, qui vérifie les deux sens (la SPA
+   répond sur `/factures` et `/factures/:id`, les imprimables répondent toujours sur
+   `/facture/:id` et `/releve/:id`) et qui vaut dans les deux topologies — Vite aujourd'hui,
+   Fastify dès 9.6.
 10. **Playwright** : série, seedé, `db:reset` en global-setup, zéro `waitForTimeout`, assertions
     exactes permises par le seed déterministe.
 11. **ADR 0062+** ; 0027-0030 et 0032 réservés, intouchables.
