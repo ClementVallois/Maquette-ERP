@@ -1,4 +1,4 @@
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import { FileTextIcon, ReceiptTextIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
@@ -152,6 +152,7 @@ function invoiceColumns(): ColumnDef<PreFacturierInvoiceRow>[] {
 
 function craColumns(
   role: Role,
+  period: string,
   onValidate: (row: PreFacturierCraRow) => void,
   onRefuse: (row: PreFacturierCraRow) => void,
 ): ColumnDef<PreFacturierCraRow>[] {
@@ -206,6 +207,29 @@ function craColumns(
           </ul>
         ),
     },
+    // Task 7.5's "navigation explicite depuis une ligne du pré-facturier (jamais un survol)" —
+    // this is that click, one per row. `GET .../economics` is manager-only (Annexe A), so the
+    // column is filtered out below for every other role rather than rendered and left to 403 on
+    // click: the offer follows the role (BUILD-RULES § Authorization), the same rule `actions`
+    // already applies to `billing`.
+    {
+      id: 'marge',
+      header: () => <span className="sr-only">{LABELS.margin.heading}</span>,
+      cell: ({ row }) => (
+        <Link
+          to="/marge/$consultantId"
+          params={{ consultantId: row.original.consultantId }}
+          search={{ period }}
+          className="text-sm text-primary hover:underline"
+        >
+          {LABELS.preFacturier.reveal}
+          <span className="sr-only">
+            {' '}
+            {LABELS.preFacturier.revealFor.replace('{name}', row.original.consultantName)}
+          </span>
+        </Link>
+      ),
+    },
     // `role` decides nothing here: `decidable` is already the server's own combination of role and
     // status (`mayDecide && status === 'submitted'`, `composition/pre-facturier.ts`) — repeating a
     // role check client-side would be a second copy of the same rule, not a second control.
@@ -237,7 +261,11 @@ function craColumns(
     },
   ];
 
-  return columns.filter((column) => role !== 'billing' || column.id !== 'actions');
+  return columns.filter(
+    (column) =>
+      (role !== 'billing' || column.id !== 'actions') &&
+      (role === 'manager' || column.id !== 'marge'),
+  );
 }
 
 interface PreFacturierScreenProps {
@@ -362,9 +390,13 @@ export function PreFacturierScreen({ period, role }: PreFacturierScreenProps): R
 
       <section className="flex flex-col gap-2">
         <h2 className="text-card-title">{LABELS.preFacturier.cras}</h2>
+        {role === 'manager' && (
+          <p className="text-sm text-muted-foreground">{LABELS.preFacturier.revealNote}</p>
+        )}
         <DataTable
           columns={craColumns(
             role,
+            period,
             (row) => {
               void handleValidate(row);
             },
