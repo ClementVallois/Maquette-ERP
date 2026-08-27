@@ -39,6 +39,8 @@ moves down to "Settled" with its answer, so the record shows it was known rather
 | 27/08/2026 | **Task 8.5's empty-invoices state has no live persona to demonstrate it: every manager/billing persona in the seed reaches at least one invoice.** `scripts/seed.ts` inserts three draft invoices directly as part of seeding — deliberately, so the CRA→invoice chain visibly works from the first login rather than requiring a validation first — and no office a live persona belongs to (Paris, Lyon) has zero. `InvoiceListScreen`'s own `EmptyState` branch is real, reachable code, verified by reading; it is simply unproven by a screenshot. | A future regression in the empty-state branch (e.g. a filter applied before the length check) would ship with nothing to catch it — no e2e test exercises `data.invoices.length === 0`, and the axe/screenshot Gate does not either. | Not decided here — this is a seed/demo-data decision (the same shape as `SUBMITTED_NOT_VALIDATED_EMAIL`'s own existing row), Clement's to make: either a persona or office is added with zero invoices, or an existing seeded invoice is removed from one, or the state stays proven only by reading the code. Resolve **whichever phase next touches `scripts/seed.ts`'s invoice rows**, none currently scheduled. Dated 27/08/2026. |
 | 27/08/2026 | **`components/ui/table.tsx`'s new `containerLabel` prop (added this phase, fixing `scrollable-region-focusable`) is unused everywhere** — every table in the app is still an unlabelled scroll region to a screen reader beyond "region enter/exit". The axe rule that found the underlying defect checks focusability, not naming, so the gate is green without it. | A screen reader user hears "region" with no name for every table in the app — not a Gate failure, but short of what a labelled region would offer, and the prop exists without a single caller to prove its own shape is right. | Not decided here — threading a real label through every `DataTable` call site is a larger, cross-screen change unrelated to what Phase 8 was asked to build. Resolve **whichever phase next touches a table screen for an unrelated reason**, none currently scheduled — not invented on its own. Dated 27/08/2026. |
 
+| 27/08/2026 | **Every role's dashboard is empty on a fresh seed, because the screen reads the wall-clock month and the seed holds `2026-06`.** `routes/_shell/tableau-de-bord.tsx` hard-codes `currentPeriod()` (no `?period=` search param, deliberately — its own header says a picker is not what "the dashboard, right now" means), and `scripts/lib/seed-data.ts`'s `CRA_PERIOD` is `2026-06`. Captured live on 27/08: `8.4-dashboard-manager.png` and `8.4-dashboard-billing.png` read `0 / 0,00 € / 0` and `0 / 0 / 0,00 €` under the heading « août 2026 »; only the consultant's shows anything (`Non commencé / 0 j / 21`), and only because `remainingWorkableDays` is computed from the calendar rather than from data. | Task 8.4 is "the first screen after the persona selector, polish maximal", and it is the first screen the cold reader and the demo both land on. Task 10.4's own demo checklist says « Bruno : dashboard (« en attente ») » — a state the wall-clock reader cannot produce against a `2026-06` seed on any day after June 2026, so the checklist and the screen already disagree. It also makes one branch of the billing call to action unreachable on any seeded run: `draftInvoices > 0` never holds, which is exactly why the dead `/factures?status=draft` link (fixed 27/08) went unnoticed through the whole phase. | Not decided here. Three real options, and choosing between them is a **demo-data decision Clement owns** — the same shape as the row of 25/08 on Alice's validated June Cra, left to him for the same reason: (a) move the seed to the wall-clock month, which costs the deterministic `SEED_TIMESTAMP_MS`/`seed-fingerprint.ts` guarantee; (b) give `/tableau-de-bord` a period the demo can set, contradicting the route's own written reasoning; (c) accept an empty first screen and say so in the demo script, which is honest and weak. Resolve **in Phase 9, task 9.3** (`docs/demo.md`) — the next artefact that writes the demo scenario end to end and therefore the first that cannot avoid it. Dated 27/08/2026, found reviewing Phase 8's own committed screenshots. |
+| 27/08/2026 | **`tests/visual/review/4.2-shell-*.png` and `8.4-dashboard-*.png` now capture the same screen for the same persona, and after the race fix of 27/08 they are byte-identical where the personas overlap.** Both navigate to `/tableau-de-bord` at 1440 and both now wait for the same anchor, so the duplication is structural rather than accidental: `4.2-shell-consultant-paris.png` and `8.4-dashboard-consultant.png` are the same 34001 bytes, `4.2-shell-manager-paris.png` and `8.4-dashboard-manager.png` the same 35452, `4.2-shell-billing-paris.png` and `8.4-dashboard-billing.png` the same 32457. | Seven review captures where five would do, re-committed on every phase that touches either screen — and a human reviewer opening both sets sees the same picture twice without being told it is the same picture. | Not resolved by deleting either set, which would be the wrong call: 4.2's subject is the **nav per persona** (two entries, four, three — genuinely different, and `manager-lyon` has no `8.4` twin at all), 8.4's is the **cards per role**. The overlap is real; the intents are not the same. Whether the review set keeps both is a question for the human review of `tests/visual/review/` that is itself a named deliverable — resolve **in Phase 10, task 10.6** ("Figer les captures … revue humaine des captures"), which is the step that decides what the committed reference set is. Dated 27/08/2026. |
 ---
 
 ## Front-end Phase 1 checkpoint — `feat/web`, 24/08/2026
@@ -2617,3 +2619,127 @@ for one — the two shared-component fixes (point 2) are accessibility correctio
 existing, already-adopted design system, not new structural decisions, and the HT/TTC question
 (the previous commit) is recorded as a recommendation for Clement precisely because it is his
 decision to make, not one an ADR written by this session could make on his behalf.
+
+---
+
+## Front-end Phase 8 — review findings and their outcomes — `feat/web`, 27/08/2026
+
+A review of the merged Phase 8 work, after its checkpoint. Two findings arrived from the reviewer;
+two more came out of checking them. Each resolves to one of `CLAUDE.md`'s four outcomes, and the
+two that are rows name their phase above.
+
+### 1. The `/facture` prefix collision, one layer down — **fixed now**, `82d851c` and `d830ba5`
+
+The reviewer's point: task 8.1 found and fixed this in `vite.config.ts`'s dev proxy, but task 9.1
+writes the same decision again inside Fastify ("tout `GET` qui n'est pas `/api/*`, `/facture/:id`,
+`/releve/:id`, `/healthz`, `/readyz` … renvoie `index.html`"), where the dev fix does not reach.
+Written as a `startsWith` list — the obvious reading — production serves the printable route for
+`/factures`, the SPA's own invoice list. Invisible in dev, invisible to the e2e suite as it runs
+today, and caught only by task 9.6.
+
+Task 9.1 is **not built** (checked: no `@fastify/static`, no static handler, no fallback), so
+implementing it here would be Phase 9 work done early, and would drag in 9.2's CSP rewrite and
+9.3's SSR removal with it. What is buildable today is the assertion 9.1 has to satisfy, and it is
+better than a note because it is a gate: `apps/web/e2e/routing.spec.ts` asserts a **full**
+navigation to `/factures` and `/factures/:id` renders the SPA document (`#root`, never
+`main#contenu`) and that `/facture/:id` and `/releve/:id` still render the server-rendered one, in
+both directions. It runs against Vite today and against `apps/web/dist` served by Fastify from
+9.6 — the only spec here that means the same thing in both topologies. Proved to be a guard rather
+than a passing test: removing the trailing slash from `PROXIED_PATHS` turns both plural tests red
+and leaves both printable ones green.
+
+The rule that proved insufficient was amended with it. Annexe C.9's "jamais de collision" is a
+statement about two URLs never being equal, and the failure is a prefix match; C.9 now states the
+constraint (route registration, exact `/:id`-shaped matching, or at worst a prefix ending in `/`).
+§9.1 carries the same constraint in bold, and 9.6's exit gate names the assertion and says 9.1 is
+unverified until that job runs.
+
+**The reviewer asked whether `/releve` has the same problem. It does not** — checked against the
+pinned SPA route list (`docs/frontend-plan.md`, "Routes SPA épinglées"): `/factures` and
+`/factures/$id` against `/facture` are the only collision family, and nothing pinned begins with
+`/releve`, `/api`, `/healthz` or `/readyz`. `/factures/x` does not begin with `/facture/` either
+(index 8 is `s`, not `/`), which is why the trailing slash is a whole fix rather than half of one.
+
+### 2. The screenshot race in `shell.spec.ts` — **fixed now**, `e7bb057`
+
+Confirmed exactly as reported. `4.2-shell-billing-paris.png` at `448f70b` is three grey skeleton
+blocks; `4.2-shell-consultant-paris.png`/`4.2-shell-manager-paris.png` were byte-identical to
+their `8.4-dashboard-*` twins, which is what winning the same race looks like. Same cause as
+`24746d6`: Phase 8's dashboard query resolves after the shell renders, and these tests waited on
+the sidebar's first link — which the session `beforeLoad` already has — so they waited on nothing.
+
+Every capture now waits on the anchor of its role's own card set, keyed to the same three strings
+`e2e/axe.spec.ts` uses, so the two files cannot drift on what "loaded" means. The mobile Sheet
+capture gets it too: it won the race, which is not the same as not being in it.
+`animations: 'disabled'` on every review capture handles the second half — the skeleton-to-content
+swap and the card shadow are mid-transition at the instant the anchor appears, and the evidence is
+compared by bytes. Verified: two full desktop + mobile runs afterwards produce byte-identical
+files, and only `4.2-shell-billing-paris.png` differed from `HEAD` — exactly the one capture the
+diagnosis said had lost the race. Both runs at `--workers=2`, per the row of 25/08: at the default
+7 against one dev stack, two unrelated tests failed on the first attempt.
+
+**The reviewer's aside about "some of the review-PNG byte churn we have been re-committing every
+phase" turned out to be the larger half, and it is fixed too** (`a7513f5`). Running the whole
+suite twice against identical code moved six committed PNGs, because every dialog and overlay
+capture fires while its own open animation is still running. It was not cosmetic:
+`8.3-issuance-dialog-success.png` was catching the success toast mid-fade, so the one thing task
+8.3 asks that screenshot to show — « Facture émise : SEC-2026-000001 » — was not in the evidence.
+`animations: 'disabled'` now applies to all 27 `page.screenshot` calls across the six specs that
+take one, and `shell.spec.ts`'s one-file `REVIEW_CAPTURE` constant went away with it: every other
+spec passes the option explicitly, and a local abstraction for it was one more thing to keep in
+step. Determinism proved rather than assumed — three consecutive full passes (`desktop`,
+`mobile-shell`, `journeys`, each with its own `db:reset`), hashing all of `tests/visual/` between
+them: the first still moved the two `6.2-cra-grid-*` captures, the second and third are
+byte-identical throughout (`md5sum -c` clean over the directory).
+
+The fix makes the two capture sets duplicates by construction — **a row above**, Phase 10.6.
+
+### 3. The dashboard's billing deep link was dead — **fixed now**, `281a1e4` (not reported; found checking the above)
+
+`ActionCard`'s `to` was a widened `string` and the billing branch wrote `/factures?status=draft`
+into it. TanStack Router never parses that: `buildLocation` resolves `to` through
+`resolvePathWithBase`/`interpolatePath` and then sets `nextSearch = fromSearch`, so the query
+string becomes part of the **pathname**, matches no route, and lands on the not-found branch. Read
+in `@tanstack/router-core`'s own `router.js`, not inferred.
+
+Nothing showed it, and finding 4 below is why: the branch renders only when a draft invoice exists
+in the period the screen reads, that period is the wall clock, and the seed holds `2026-06` — so
+`draftInvoices` is 0 on every seeded run and the dead link is never drawn. No e2e test clicks any
+of the three dashboard actions either.
+
+The mapping moved to `features/dashboard/actions.ts` as a pure function, which is what makes the
+unreachable branch provable without a browser, and the descriptor is now `ActionLink`
+(`components/action-link.ts`) — `LinkProps` with a label — so the type system refuses the query
+string outright. `EmptyState` and `ErrorState` carried the same widening and take the shared type;
+`cra-list-screen.tsx`'s `` `/cra/${currentPeriod()}` `` became `to: '/cra/$period'` with a
+`params`, which is the form the widening existed to avoid. Both new assertions — the specific one
+and one on the defect _class_ (no destination on any branch contains `?` or `&`) — were checked
+red against the previous shape before the fix.
+
+### 4. Every role's dashboard is empty on a fresh seed — **a row above**, Phase 9.3
+
+Found while reading Phase 8's own committed screenshots for finding 2. Not fixed here: the three
+available options each cost something real (the seed's determinism, the route's written reasoning,
+or the demo's substance), and which one to pay is a demo-data decision Clement owns. The row names
+9.3 and names the concrete conflict — task 10.4's checklist already says « Bruno : dashboard
+(« en attente ») », which this screen cannot produce.
+
+### Evidence for this pass
+
+`pnpm run check`: green — **592 tests in 49 files** (up 6, the new `actions.test.ts`), coverage
+unchanged at 99.41/97.12/99.52/99.49 (`apps/web` is still outside the measured surface).
+`pnpm run test:int`: **211 passed in 16 files**. Full Playwright suite, run per project as the row
+of 25/08 prescribes: **desktop 30 passed / 1 skipped, mobile-shell 11 passed / 20 skipped,
+journeys 14 passed** — 0 failed, three passes in a row.
+
+### Two things checked and found sound, recorded so the check is on the record
+
+- **`issuance-dialog.tsx` against the gapless-numbering invariant.** The `Idempotency-Key` is
+  generated once in a `useState` initializer (not an effect, not per render), the confirm button
+  is `disabled={issueMutation.isPending}`, and a replay is handled as success with its own
+  informational toast (ADR-0021: 200, never 409). A double-submit or a retry reuses the key and
+  therefore the number. No defect.
+- **`tests/visual/baseline/kitchen-sink.png` moving 166330 → 166443.** Not a re-baselined green
+  gate: `visual-baseline.spec.ts` carries no comparison assertion at all — it is a capture, and
+  its own header says Phase 10.6 is where the baseline gets frozen. The byte move is the expected
+  consequence of this phase's `tabs.tsx`/`table.tsx` fixes.
