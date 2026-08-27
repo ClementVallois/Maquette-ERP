@@ -675,6 +675,20 @@ describe('the progressive-disclosure read', () => {
     expect(response.json()).toMatchObject({ type: '/problems/insufficient-role' });
   });
 
+  it('answers a month the consultant has no Cra for with an absence, not a refusal', async () => {
+    // Coverage moved here from the now-deleted `/marge` screen's own test (front-end plan
+    // Phase 9.3/9.4): the same route, the same fact — a month nobody ever recorded is a 404
+    // naming the record, not a 403 naming a rule nobody broke.
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/v1/consultants/${ALICE}/economics?period=2026-05`,
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({ type: '/problems/not-found' });
+  });
+
   it('never puts Cjm in a list projection, which is what makes the extra request the control', async () => {
     await app.inject({
       method: 'POST',

@@ -73,8 +73,12 @@ export interface PreFacturierComposition {
  * recent one — which is the behaviour a period picker wants. The selected month's rows come from a
  * second, period-filtered query (ADR-0053), so what the dropdown offers never bounds what the table
  * shows.
+ *
+ * Module-private since Phase 9.3: the pré-facturier's own screen imported it directly to build the
+ * Cra list's picker, and that screen is `apps/web`'s now — it reads the `offeredPeriods` field of
+ * the composition below, like every other consumer.
  */
-export function offeredPeriods(cras: readonly { period: string }[]): string[] {
+function offeredPeriods(cras: readonly { period: string }[]): string[] {
   return [...new Set(cras.map((cra) => cra.period))].sort((left, right) =>
     right.localeCompare(left),
   );

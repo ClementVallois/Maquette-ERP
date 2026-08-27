@@ -1,6 +1,5 @@
 import { API_PROBLEM_TYPES, type ProblemDetails } from '@erp/contracts';
-import { daysOf, isoDateInFirmTimeZone, periodFromIso, periodToIso } from '@erp/platform';
-import { type CraLine, workingCalendar } from '@erp/timesheet';
+import { isoDateInFirmTimeZone, periodFromIso, periodToIso } from '@erp/platform';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -8,15 +7,8 @@ import { issueInvoice } from '../chain/issue-invoice.ts';
 import { type QuarterDayEntry, recordMonth } from '../chain/record-month.ts';
 import { refuseCra } from '../chain/refuse-cra.ts';
 import { validateCraAndDraftInvoices } from '../chain/validate-cra.ts';
-import { craGridComposition } from '../composition/cra-grid.ts';
-import {
-  DECIDES_CRA,
-  offeredPeriods,
-  preFacturierComposition,
-} from '../composition/pre-facturier.ts';
+import { DECIDES_CRA } from '../composition/pre-facturier.ts';
 import type { ServerDependencies } from '../dependencies.ts';
-import { consultantEconomics } from '../economics/consultant-economics.ts';
-import { ApiFailure } from '../errors.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
 import { PgReferenceReader } from '../persistence/reference-reader.ts';
 import { carries, forRoles, PUBLIC, requireActor } from '../personas/access.ts';
@@ -25,31 +17,30 @@ import { personaFor } from '../personas/resolved.ts';
 import { malformed, parseInput } from '../validation.ts';
 
 import { STYLESHEET } from './assets.ts';
-import { craGridPage, type GridDay, type SlotValue, totalsOf } from './pages/cra-grid.ts';
-import { craListPage } from './pages/cra-list.ts';
 import { craPrintPage } from './pages/cra-print.ts';
 import { invoicePage } from './pages/invoice.ts';
-import { marginPage } from './pages/margin.ts';
-import { personaSelectorPage } from './pages/persona-selector.ts';
-import { preFacturierPage } from './pages/pre-facturier.ts';
 import { PATHS } from './paths.ts';
 import { redirectTo, sendPage } from './reply.ts';
 
 /**
- * The screens (ADR-0048: they share this deployable with `/api/v1`, and the two differ by a
- * directory and a content type, not by a boundary).
+ * The two printable documents (ADR-0056, ADR-0055) and the write verbs behind the chain
+ * (ADR-0048: they share this deployable with `/api/v1`, and the two differ by a directory and a
+ * content type, not by a boundary).
  *
  * Every route here declares its `Access` exactly as an API route does, goes through the same origin
  * check, and refuses through the same `sendProblem` — which renders the refusal as a page because
  * of the path it is on, not because this file did anything special.
+ *
+ * The interactive screens this file used to render (the persona selector, the Cra list and grid,
+ * the pré-facturier, the margin reveal) are gone — front-end plan Phase 9.3, once ADR-0062 moved
+ * them into `apps/web`'s SPA. What is left is what stays server-rendered on purpose: a document
+ * meant to be printed or read as a record, and the write verbs a form (or, since Phase 9, a direct
+ * HTTP client) still carries.
  */
 
 const NOT_FOUND = 404;
 const CONFLICT = 409;
 const NOT_MODIFIED = 304;
-/** A consultant's whole history fits well inside the repository's hard cap of fifty. */
-const MAX_MONTHS = 50;
-const SLOTS = [0, 1] as const;
 /**
  * What one slot of this form is worth, in the storage unit (ADR-0069). This screen keeps its
  * two-slot morning/afternoon shape — ADR-0070's matrix is `apps/web`'s, not this one's — so a
@@ -69,7 +60,6 @@ const SLOT_QUARTER_DAYS = 2;
  */
 export const ISSUES_INVOICE = forRoles('billing');
 
-const ConsultantParam = z.object({ consultantId: z.string().min(1).max(64) });
 const IdParam = z.object({ id: z.string().min(1).max(64) });
 
 /**
@@ -118,8 +108,17 @@ const Refusal = z.object({
 /** The month the manager was looking at, echoed back so the redirect returns to that view. */
 const ActedFrom = z.object(PeriodFilter.shape);
 
+/**
+ * The query key on the way out is `period`, not `periode` — the incoming form field this reads
+ * from (`Refusal`/`ActedFrom`'s `periode`, ADR-0026's French screen vocabulary) and the SPA
+ * route's own search param (`apps/web/src/routes/_shell/pre-facturier.tsx`, task 7.1) are two
+ * different things read by two different code bases, and only the second one is who now answers
+ * `GET /pre-facturier` (Phase 9.3's SPA fallback). Sending `periode` here would silently lose the
+ * period on redirect: the SPA reads `search.period`, sees it undefined, and falls back to the
+ * office's most recent month instead of the one this refusal or validation was decided from.
+ */
 function backToPreFacturier(periode: string | undefined): string {
-  return periode === undefined ? PATHS.preFacturier : `${PATHS.preFacturier}?periode=${periode}`;
+  return periode === undefined ? PATHS.preFacturier : `${PATHS.preFacturier}?period=${periode}`;
 }
 
 /**
@@ -148,38 +147,6 @@ function entriesOf(body: Record<string, unknown>): QuarterDayEntry[] {
   }
 
   return entries;
-}
-
-/** Every day of the month, workable or not, with what is recorded in each of its two slots. */
-function gridDays(periodIso: string, lines: readonly CraLine[]): GridDay[] {
-  const calendar = workingCalendar();
-
-  return daysOf(periodFromIso(periodIso)).map((date) => {
-    // A line worth a full day (or worth two slots' notice of the same activity) fills both slots;
-    // a line worth one slot fills one, in the order the record holds them. Which slot a
-    // quarter-day sits in is a fact about the form, never about the record — the domain has no
-    // morning. A line worth an odd number of quarter-days (possible since ADR-0069, and never
-    // produced by this form) rounds up to the nearest slot rather than being dropped: this legacy
-    // two-slot grid was never built to show a finer split than half a day, and `apps/web`'s matrix
-    // (ADR-0070) is where that split is shown exactly.
-    const slots: (SlotValue | null)[] = [null, null];
-    let next = 0;
-
-    for (const line of lines.filter((candidate) => candidate.day === date)) {
-      const value: SlotValue =
-        line.dayType === 'absence'
-          ? { kind: 'absence' }
-          : { kind: 'mission', missionId: line.missionId ?? '' };
-
-      const slotsForLine = Math.ceil(line.quarterDays / SLOT_QUARTER_DAYS);
-      for (let taken = 0; taken < slotsForLine && next < SLOTS.length; taken += 1) {
-        slots[next] = value;
-        next += 1;
-      }
-    }
-
-    return { date, nonWorkable: calendar.nonWorkableReason(date), slots };
-  });
 }
 
 /** The one refusal both manager verbs can produce that is an absence rather than a rule. */
@@ -212,12 +179,10 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
     },
   );
 
-  app.get(
-    PATHS.home,
-    { config: { access: PUBLIC('the selector must render before a persona is chosen') } },
-    async (request, reply) =>
-      sendPage(reply, personaSelectorPage(await dependencies.personas.list(), personaFor(request))),
-  );
+  // `GET /` no longer renders here: the SPA fallback (server.ts, front-end plan Phase 9.1) serves
+  // it, and the SPA is itself the persona selector now. This route registration is gone, not
+  // dead-code-eliminated — `PATHS.home` stays defined, still the redirect target below and in
+  // problem-page.ts (`ADR-0061`'s "back to safety" link, correct either way: the SPA renders `/`).
 
   app.post(
     PATHS.choosePersona,
@@ -245,78 +210,12 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
   );
 
   // ── The consultant's own months ───────────────────────────────────────────
-
-  app.get(
-    PATHS.consultantCra,
-    { config: { access: forRoles('consultant') } },
-    async (request, reply) => {
-      const query = parseInput(PeriodFilter, request.query);
-      if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
-
-      const actor = requireActor(request);
-      const wanted = query.value.periode;
-
-      const cras = await dependencies.transactionally((unit) =>
-        unit.cras.list({ actor, limit: MAX_MONTHS, offset: 0 }),
-      );
-
-      return sendPage(
-        reply,
-        craListPage(
-          {
-            // Filtered here rather than in the repository, and deliberately: the repository decides
-            // which records this actor may **see** (ADR-0003), and a period is not an authorization
-            // question. Pushing it down would blur the one distinction the scope matrix exists to
-            // keep sharp — and the cap above already bounds what is read.
-            cras: wanted === undefined ? cras : cras.filter((cra) => cra.period === wanted),
-            filter: wanted ?? null,
-            offeredPeriods: offeredPeriods(cras),
-          },
-          personaFor(request),
-        ),
-      );
-    },
-  );
-
-  app.get(
-    `${PATHS.consultantCra}/:period`,
-    { config: { access: forRoles('consultant') } },
-    async (request, reply) => {
-      const params = parseInput(PeriodParam, request.params);
-      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
-
-      const actor = requireActor(request);
-      const period = periodFromIso(params.value.period);
-
-      const view = await dependencies.transactionally(async (unit) => {
-        const grid = await craGridComposition(unit, {
-          actor,
-          period,
-          consultantId: actor.consultantId,
-        });
-        // A persona is always its own row in `public.consultants` (see the same guard on the
-        // `apps/v1` route this composition also serves) — this SSR screen never asks about anyone
-        // else either.
-        if (grid === null) {
-          throw new ApiFailure(`persona ${actor.consultantId} has no consultant record`);
-        }
-
-        return {
-          period: params.value.period,
-          craId: grid.craId,
-          status: grid.status,
-          days: gridDays(params.value.period, grid.lines),
-          missions: grid.missions,
-          flags: grid.flags,
-          totals: totalsOf(grid.lines),
-          editable: grid.editable,
-          refusal: grid.refusal,
-        };
-      });
-
-      return sendPage(reply, craGridPage(view, personaFor(request)));
-    },
-  );
+  //
+  // The two GET screens that used to live here (the list, the grid) are gone — the SPA renders
+  // `/cra` and `/cra/$period` instead (Phase 9.3). `POST` stays: it is the action the grid's save
+  // and submit buttons used to carry, still registered and still driving `recordMonth`, and still
+  // untouched by the split day / non-slot-field / replace-not-merge coverage that stays for it
+  // (routes.test.ts references it as `PATHS.consultantCra`, unchanged).
 
   app.post(
     `${PATHS.consultantCra}/:period`,
@@ -342,34 +241,20 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
         },
       );
 
-      // Back to the grid, so the month that was saved is the month that is shown. A refusal never
-      // reaches here: it is thrown, and `sendProblem` renders it as a page carrying the same
-      // typed reason the API would have returned.
-      return redirectTo(reply, `${PATHS.consultantCra}/${params.value.period}`);
+      // Back to the grid — but the grid is the SPA's now (`/cra/$period`, not
+      // `PATHS.consultantCra`'s own `/consultant/cra/:period`, which no route answers since
+      // Phase 9.3). A refusal never reaches here: it is thrown, and `sendProblem` renders it as a
+      // page carrying the same typed reason the API would have returned.
+      return redirectTo(reply, `${PATHS.spaCra}/${params.value.period}`);
     },
   );
 
-  // ── The pré-facturier, and the reveal behind it ───────────────────────────
-
-  app.get(
-    PATHS.preFacturier,
-    { config: { access: forRoles('manager', 'billing') } },
-    async (request, reply) => {
-      const query = parseInput(PeriodFilter, request.query);
-      if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
-
-      const actor = requireActor(request);
-      // One question for the clock, and only one: has the month ended? (ADR-0054.) An IsoDate
-      // compares lexicographically, which is why no Date arithmetic appears here.
-      const today = isoDateInFirmTimeZone(dependencies.clock.now());
-
-      const view = await dependencies.transactionally((unit) =>
-        preFacturierComposition(unit, { actor, requestedPeriod: query.value.periode, today }),
-      );
-
-      return sendPage(reply, preFacturierPage(view, personaFor(request)));
-    },
-  );
+  // ── The pré-facturier ──────────────────────────────────────────────────────
+  //
+  // The GET screen (rendered composition, the "reveal" margin screen behind it) is gone — the SPA
+  // renders `/pre-facturier` and `/marge/$consultantId` instead (Phase 9.3). `DECIDES_CRA`, from
+  // the same module as the now-unused `preFacturierComposition`, is what the two POST verbs below
+  // still need.
 
   /**
    * The month as a printable record (ADR-0056). All three roles may attempt it; the repository is
@@ -471,51 +356,10 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
     },
   );
 
-  /**
-   * The reveal (ADR-0052). A screen and not a link into `/api/v1`, because `representationOf`
-   * serves everything under `/api/` as `problem+json`.
-   *
-   * It is declared for `manager` alone, and the pré-facturier links to it for `billing` too. That
-   * is deliberate: `economics` is `none` for billing (ADR-0023), so following the link is a 403
-   * naming the rule, rendered as a page. BUILD-PLAN's phase-6 row asks for exactly that — "the
-   * refusal reason shown, not a greyed-out button".
-   */
-  app.get(
-    `${PATHS.margin}/:consultantId`,
-    { config: { access: forRoles('manager') } },
-    async (request, reply) => {
-      const params = parseInput(ConsultantParam, request.params);
-      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
-
-      const query = parseInput(PeriodFilter, request.query);
-      if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
-
-      const periode = query.value.periode;
-      if (periode === undefined) {
-        return sendProblem(reply, malformed({ periode: ['required'] }, contextOf(request)));
-      }
-
-      const actor = requireActor(request);
-      const economics = await dependencies.transactionally((unit) =>
-        consultantEconomics(
-          { client: unit.client, cras: unit.cras, log: request.log },
-          { consultantId: params.value.consultantId, period: periodFromIso(periode), actor },
-        ),
-      );
-
-      if (economics === null) {
-        return sendProblem(reply, {
-          type: API_PROBLEM_TYPES.notFound,
-          title: 'No such economics record',
-          status: NOT_FOUND,
-          detail: 'This consultant has no Cra for this month.',
-          ...contextOf(request),
-        });
-      }
-
-      return sendPage(reply, marginPage(economics, personaFor(request)));
-    },
-  );
+  // The reveal (ADR-0052) is gone too — the SPA renders `/marge/$consultantId` and reads
+  // `/api/v1/consultants/:id/economics` (or its equivalent) directly, same disclosure log
+  // (ADR-0052) and same 403-naming-the-rule refusal for billing, now through the JSON route
+  // rather than a rendered page.
 
   // ── The three verbs of the chain, on screen (ADR-0059) ────────────────────
 

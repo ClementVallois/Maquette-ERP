@@ -72,29 +72,22 @@ afterEach(async () => {
   await app.close();
 });
 
-describe('the persona selector', () => {
-  it('is the entry point, and it renders before any identity exists', async () => {
-    const response = await app.inject({ method: 'GET', url: PATHS.home });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.headers['content-type']).toContain('text/html');
-    expect(response.body).toContain(LABELS.persona.heading);
-  });
-
-  it('says on the page that this is not authentication', async () => {
-    const response = await app.inject({ method: 'GET', url: PATHS.home });
-
-    expect(response.body).toContain(LABELS.persona.warning);
-  });
-
-  it('offers every seeded persona, including the two managers of different offices', async () => {
-    const response = await app.inject({ method: 'GET', url: PATHS.home });
-
-    expect(response.body).toContain('Bruno Leroy');
-    expect(response.body).toContain('Emma Robert');
-    expect(response.body).toContain('Lyon');
-  });
-
+/**
+ * The persona **cookie**, not the selector: the selector itself is `apps/web`'s screen since
+ * front-end plan Phase 9.3, and `GET /` is answered by the SPA fallback (`server.ts`). What is
+ * still this file's to prove is the round trip the SPA cannot own — the two POST verbs that mint
+ * and clear the signed cookie, and the fact that a key this instance does not offer is refused as
+ * a page.
+ *
+ * Three tests are gone with the screen (the selector renders before an identity exists; it says
+ * it is not authentication; it offers every seeded persona). The first two are `apps/web`'s now;
+ * the catalogue behind the third is `GET /api/v1/personas` (`routes/session.ts`), covered by its
+ * own tests. A fourth — "shows the chosen persona in the header of the next page" — is dropped as
+ * redundant rather than moved: "still shows who the refused visitor is" below asserts the same
+ * cookie-to-chrome round trip on a page this file still renders, and the version that GET-ed
+ * `PATHS.home` for it kept passing after the route was unregistered, off the 404 page's own shell.
+ */
+describe('the persona cookie', () => {
   it('sets a signed cookie and redirects, so a refresh does not repost the choice', async () => {
     const response = await app.inject({
       method: 'POST',
@@ -108,17 +101,6 @@ describe('the persona selector', () => {
     expect(response.headers['set-cookie']).toContain(`${PERSONA_COOKIE}=manager-lyon.`);
     expect(response.headers['set-cookie']).toContain('HttpOnly');
     expect(response.headers['set-cookie']).toContain('SameSite=Strict');
-  });
-
-  it('shows the chosen persona in the header of the next page', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: PATHS.home,
-      headers: as('manager-lyon'),
-    });
-
-    expect(response.body).toContain('Emma Robert');
-    expect(response.body).toContain(LABELS.persona.current);
   });
 
   it('clears the persona through a POST, because a form cannot DELETE', async () => {
@@ -311,8 +293,13 @@ describe('the SPA build assets (Phase 9.1)', () => {
 
 describe('security headers', () => {
   it("sends exactly the string frozen in ADR-0064, admitting only the SPA's own bundle", async () => {
-    const response = await app.inject({ method: 'GET', url: PATHS.home });
+    // The stylesheet and not `PATHS.home`: since Phase 9.3 no route in this file answers `/`, and
+    // the version of this test that asked for it was asserting the header on a 404 page — true,
+    // but not the observation it claims to make. `STYLESHEET.path` is the one route left here
+    // that renders a 200 with no database.
+    const response = await app.inject({ method: 'GET', url: STYLESHEET.path });
 
+    expect(response.statusCode).toBe(200);
     expect(response.headers['content-security-policy']).toBe(CONTENT_SECURITY_POLICY);
     expect(CONTENT_SECURITY_POLICY).toBe(
       "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; " +

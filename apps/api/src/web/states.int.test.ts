@@ -14,8 +14,9 @@ import { LABELS } from './labels.ts';
 import { PATHS } from './paths.ts';
 
 /**
- * The three states `CLAUDE.md` calls deliverables rather than polish: empty, error, and permission
- * denied (BUILD-PLAN 6.6).
+ * Two of the three states `CLAUDE.md` calls deliverables rather than polish — error and permission
+ * denied (BUILD-PLAN 6.6). The third, empty, left with the lists that rendered it in Phase 9.3;
+ * the block below where it stood says where each of its two claims went.
  *
  * They are asserted here as **pages**, because that is where they are a deliverable. The same
  * refusals already have API tests; what these add is that a visitor is told, in French, which of
@@ -107,38 +108,35 @@ afterEach(async () => {
   await app.close();
 });
 
-describe('an empty state', () => {
-  it('says the list is genuinely empty, and that it is not a refusal', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.consultantCra}?periode=2026-01`,
-      headers: as('consultant-paris'),
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.body).toContain(LABELS.cra.emptyList);
-    expect(response.body).toContain(LABELS.cra.emptyListHint);
-  });
-
-  it('is reachable by URL, so a view can be shared as it was seen', async () => {
-    // BUILD-PLAN 6.6: filters live in the URL. The proof is that the filter round-trips — the
-    // month asked for comes back selected rather than being silently replaced by a default.
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.preFacturier}?periode=2026-01`,
-      headers: as('manager-paris'),
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.body).toContain('value="2026-01" selected="selected"');
-  });
-});
+/*
+ * `describe('an empty state')` stood here until Phase 9.3. Both of its tests read a rendered list,
+ * and neither list is rendered by this deployable any more:
+ *
+ * - "is reachable by URL, so a view can be shared as it was seen" (BUILD-PLAN 6.6's filter-in-the-
+ *   URL claim) is re-proved end to end by `apps/web/e2e/journeys.spec.ts`, task 7.6: a cold
+ *   `page.goto('/pre-facturier?period=2026-07')` renders that month and not a default, which is a
+ *   stronger form of the same claim — a browser, a router, and a real deep link.
+ * - "says the list is genuinely empty, and that it is not a refusal" is **not** re-proved anywhere.
+ *   `cra-list-screen.tsx` renders the `EmptyState`, and no spec reaches it: every seeded consultant
+ *   has months. Deleted with that gap named rather than silently, and carried as a row in
+ *   `docs/open-questions.md` for Phase 10.
+ *
+ * The third state of the three this file exists for — permission denied — is untouched below.
+ */
 
 describe('a refusal, rendered', () => {
+  /*
+   * The subject of the three tests below is `GET /facture/:id` and no longer `GET /pre-facturier`:
+   * the pré-facturier is `apps/web`'s screen since Phase 9.3, and the invoice document is the
+   * screen route left that a consultant's role does not carry. The id is deliberately nonsense —
+   * the route **declares** the roles that carry it (ADR-0023), so the refusal happens before any
+   * handler reads a record, which is the point being made. Same status, same `deniedBy`, same
+   * rendered page.
+   */
   it('says in French which rule refused, and never in English', async () => {
     const response = await app.inject({
       method: 'GET',
-      url: PATHS.preFacturier,
+      url: `${PATHS.invoice}/anything`,
       headers: as('consultant-paris'),
     });
 
@@ -152,7 +150,7 @@ describe('a refusal, rendered', () => {
   it('scopes its table headers and carries no title, like every other page (ADR-0061)', async () => {
     const response = await app.inject({
       method: 'GET',
-      url: PATHS.preFacturier,
+      url: `${PATHS.invoice}/anything`,
       headers: as('consultant-paris'),
     });
 
@@ -163,7 +161,7 @@ describe('a refusal, rendered', () => {
   it('keeps the machine-readable type alongside the sentence', async () => {
     const response = await app.inject({
       method: 'GET',
-      url: PATHS.preFacturier,
+      url: `${PATHS.invoice}/anything`,
       headers: as('consultant-paris'),
     });
 
@@ -191,7 +189,10 @@ describe('a refusal, rendered', () => {
   });
 
   it('tells a visitor with no persona to choose one, rather than showing a blank screen', async () => {
-    const response = await app.inject({ method: 'GET', url: PATHS.consultantCra });
+    // `PATHS.craPrint` and no longer `PATHS.consultantCra`, whose GET went with the grid in Phase
+    // 9.3 — any screen route that is not `PUBLIC` makes this point, and this is one of the two
+    // left. 401 before the record is looked for: no persona is not "not found".
+    const response = await app.inject({ method: 'GET', url: `${PATHS.craPrint}/anything` });
 
     expect(response.statusCode).toBe(401);
     expect(response.body).toContain(SENTENCES['/problems/no-persona'] ?? 'missing');

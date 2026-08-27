@@ -172,7 +172,7 @@ export function craPrintPage(view: CraPrintView, persona: Persona | undefined): 
       ${view.flags.length === 0 ? null : html`<p class="hint">${LABELS.craPrint.flaggedNote}</p>`}
       ${signatureBlock()}
       <p class="actions no-print">
-        <a href="${`${PATHS.consultantCra}/${view.period}`}">${LABELS.craPrint.back}</a>
+        <a href="${`${PATHS.spaCra}/${view.period}`}">${LABELS.craPrint.back}</a>
       </p>
     </article>`,
   );

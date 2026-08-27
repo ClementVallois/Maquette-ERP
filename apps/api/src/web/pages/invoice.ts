@@ -289,7 +289,7 @@ export function invoicePage(view: InvoiceView, persona: Persona | undefined): Ht
       ${lineTable(invoice)} ${vatTable(invoice.vatBreakdown, invoice)} ${mentionsBlock(invoice)}
       ${originBlock(invoice)} ${issuanceForm(view)}
       <p class="actions no-print">
-        <a href="${`${PATHS.preFacturier}?periode=${invoice.supplyPeriod}`}"
+        <a href="${`${PATHS.preFacturier}?period=${invoice.supplyPeriod}`}"
           >${LABELS.margin.back}</a
         >
       </p>

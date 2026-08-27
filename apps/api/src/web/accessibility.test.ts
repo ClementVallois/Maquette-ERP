@@ -1,9 +1,18 @@
+import {
+  billedParty,
+  client,
+  Invoice,
+  legalEntity,
+  legalMentions,
+  paymentTerms,
+  regieLine,
+} from '@erp/billing';
+import { period } from '@erp/platform';
 import { describe, expect, it } from 'vitest';
 
 import { STYLESHEET } from './assets.ts';
-import { LABELS } from './labels.ts';
-import { craGridPage } from './pages/cra-grid.ts';
-import { preFacturierPage } from './pages/pre-facturier.ts';
+import { craPrintPage } from './pages/cra-print.ts';
+import { invoicePage } from './pages/invoice.ts';
 import { html, renderToString } from './render/html.ts';
 import { shell } from './shell.ts';
 
@@ -18,6 +27,13 @@ import { shell } from './shell.ts';
  * What this file deliberately does **not** assert is conformance. ADR-0061 says there is no RGAA
  * audit, no assistive-technology run and no published contrast ratio, and a test suite that
  * implied otherwise would be the claim the ADR exists to avoid.
+ *
+ * Recentred on the two printables in front-end plan Phase 9.3: `craGridPage` and
+ * `preFacturierPage`, this file's original subjects, are gone with the interactive screens they
+ * rendered. `apps/web`'s own accessibility coverage (`e2e/axe.spec.ts`, task 9.6's exit gate) is
+ * where the SPA's controls — the entry grid's `<select>`s, the pré-facturier's filter and refusal
+ * reason — are asserted now; this file keeps only what the two documents that stay server-rendered
+ * still carry.
  */
 
 const persona = {
@@ -29,72 +45,95 @@ const persona = {
   displayName: 'Alice Martin',
 } as const;
 
-const manager = { ...persona, key: 'manager-paris', role: 'manager' } as const;
-
-const grid = renderToString(
-  craGridPage(
+const craPrint = renderToString(
+  craPrintPage(
     {
-      period: '2026-06',
       craId: 'a11y-cra',
-      status: 'draft',
-      days: [
-        { date: '2026-06-01', nonWorkable: null, slots: [null, null] },
-        { date: '2026-06-06', nonWorkable: 'weekend', slots: [null, null] },
-      ],
-      missions: [{ id: 'm-1', name: 'Audit DORA' }],
+      consultantName: 'Alice Martin',
+      officeName: 'Paris',
+      period: '2026-06',
+      status: 'validated',
+      lines: [{ day: '2026-06-01', dayType: 'worked', missionId: 'm-1', quarterDays: 4 }],
       flags: [],
-      totals: [],
-      editable: true,
-      refusal: null,
+      validatedBy: 'Bruno Leroy',
+      validatedAt: '2026-07-01',
+      missionNames: new Map([['m-1', 'Audit DORA']]),
     },
     persona,
   ),
 );
 
-const preFacturier = renderToString(
-  preFacturierPage(
+/**
+ * A real `Invoice`, built the same way `packages/billing`'s own domain tests do (its
+ * `testing/march-2026.ts` fixture is package-internal, not part of the public index `apps/api`
+ * may import — ADR-0015 — so the values are copied rather than shared) rather than a hand-typed
+ * object literal: this is the one page in this file whose view model wraps a domain class with a
+ * private constructor, and only the class's own factory produces one that type-checks.
+ */
+const a11yClient = client({
+  id: 'a11y-client',
+  name: 'Banque Nord SA',
+  siren: '552100554',
+  territoriality: 'metropolitanFrance',
+  billingAddress: {
+    line1: '12 rue de la Boétie',
+    line2: null,
+    postalCode: '75008',
+    city: 'Paris',
+    country: 'FR',
+  },
+});
+
+const invoice = renderToString(
+  invoicePage(
     {
-      period: '2026-06',
-      offeredPeriods: ['2026-06'],
-      billable: [
-        {
-          invoiceId: 'inv-1',
-          clientName: 'Banque Nord',
-          status: 'draft',
-          invoiceNumber: null,
-          totalExcludingVatCents: 100_000,
-          totalIncludingVatCents: 120_000,
-        },
-      ],
-      cras: [
-        {
-          craId: 'cra-1',
-          consultantId: 'c-1',
-          consultantName: 'Alice Martin',
-          status: 'submitted',
-          recordedQuarterDays: 80,
-          blocking: [],
-        },
-        {
-          craId: 'cra-2',
-          consultantId: 'c-2',
-          consultantName: 'Chloé Nguyen',
-          status: 'validated',
-          recordedQuarterDays: 80,
-          blocking: [],
-        },
-      ],
-      lateQuarterDays: 80,
-      periodClosed: true,
-      mayDecide: true,
+      invoice: Invoice.draft({
+        id: 'a11y-invoice',
+        officeId: 'a11y-office',
+        seller: legalEntity({
+          id: 'entity-fr',
+          name: 'Sécurité & Conseil',
+          legalForm: 'SAS',
+          shareCapitalCents: 15_000_000,
+          siren: '493296529',
+          intraCommunityVatNumber: 'FR23493296529',
+          rcsRegistration: 'RCS Paris 493 296 529',
+          address: a11yClient.billingAddress,
+          numberPrefix: 'SEC',
+        }),
+        billedTo: billedParty(a11yClient),
+        supplyPeriod: period(2026, 6),
+        lines: [
+          regieLine({
+            designation: 'Audit DORA — juin 2026',
+            missionId: 'a11y-mission',
+            craId: 'a11y-cra',
+            period: '2026-06',
+            quarterDays: 80,
+            tjmCents: 50_000,
+            vat: { kind: 'taxable', basisPoints: 2000 },
+          }),
+        ],
+        terms: paymentTerms({ kind: 'net', days: 30 }),
+        mentions: legalMentions({
+          latePaymentBasisPoints: 3000,
+          recoveryIndemnityCents: 4_000,
+          earlyPaymentDiscount: { kind: 'none' },
+          operationCategory: 'services',
+          vatOnDebitsOption: true,
+        }),
+        validatedBy: ['a11y-bruno'],
+      }),
+      dueDate: null,
+      issuanceKey: 'a11y-key',
     },
-    manager,
+    { ...persona, key: 'billing-paris', role: 'billing' },
   ),
 );
 
 describe('the document', () => {
   it('declares its language, so a screen reader pronounces it', () => {
-    expect(grid).toContain('<html lang="fr">');
+    expect(craPrint).toContain('<html lang="fr">');
   });
 
   it('puts the skip link before the header and points it at the content', () => {
@@ -115,32 +154,21 @@ describe('the document', () => {
   });
 });
 
-describe('form controls', () => {
-  it('labels every select in the entry grid, including the ones a mouse user never reads', () => {
-    const selects = [...grid.matchAll(/<select id="([^"]+)"/gu)].map(([, id]) => id ?? '');
-
-    expect(selects.length).toBeGreaterThan(0);
-    for (const id of selects) {
-      expect(grid).toContain(`for="${id}"`);
-    }
-  });
-
-  it('labels the period filter and the refusal reason', () => {
-    expect(preFacturier).toContain('<label for="periode">');
-    expect(preFacturier).toContain('for="refus-cra-1"');
-    expect(preFacturier).toContain('id="refus-cra-1"');
-  });
-
+describe('controls', () => {
   it('gives every button a text label rather than an icon', () => {
-    for (const [, text] of preFacturier.matchAll(/<button[^>]*>([\s\S]*?)<\/button>/gu)) {
-      expect((text ?? '').replace(/<[^>]*>/gu, '').trim().length).toBeGreaterThan(0);
+    // The invoice's issuance form (billing only) and the shell's own "change persona" button —
+    // the two buttons either printable can render.
+    for (const page of [craPrint, invoice]) {
+      for (const [, text] of page.matchAll(/<button[^>]*>([\s\S]*?)<\/button>/gu)) {
+        expect((text ?? '').replace(/<[^>]*>/gu, '').trim().length).toBeGreaterThan(0);
+      }
     }
   });
 });
 
 describe('tables', () => {
   it('gives every data table row and column headers with a scope', () => {
-    for (const page of [grid, preFacturier]) {
+    for (const page of [craPrint, invoice]) {
       expect(page).toContain('<th scope="col">');
       expect(page).toContain('<th scope="row">');
       // Every `th` is scoped: an unscoped header in a table with both dimensions is announced
@@ -152,19 +180,11 @@ describe('tables', () => {
   });
 });
 
-describe('links', () => {
-  it('disambiguates repeated link text with the row it belongs to', () => {
-    // Two "Marge" links and two "Version imprimable" links on one page. A screen reader's list of
-    // links is read out of table order, so the visible text alone would be four identical entries.
-    expect(preFacturier).toContain(`${LABELS.preFacturier.reveal}<span class="sr-only">`);
-    expect(preFacturier).toContain('Alice Martin');
-    expect(preFacturier).toContain('Chloé Nguyen');
-  });
-
+describe('the document, once more', () => {
   it('carries no title attribute, on any element', () => {
     // ADR-0061: `title` is not exposed on touch, not focusable and not announced consistently.
     // Nothing here may depend on it, and the way to keep that true is for none to exist.
-    for (const page of [grid, preFacturier]) {
+    for (const page of [craPrint, invoice]) {
       expect(page).not.toMatch(/<[a-z][^>]*\stitle="/u);
     }
   });

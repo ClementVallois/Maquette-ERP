@@ -299,6 +299,19 @@ describe('GET /api/v1/pre-facturier', () => {
     });
   });
 
+  it('counts nothing late on the month still running (ADR-0054)', async () => {
+    // Coverage moved here from the now-deleted `/pre-facturier` screen's own test (front-end
+    // plan Phase 9.3/9.4): July, with the clock in July — nothing recorded this month is due yet.
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/pre-facturier?period=2026-07',
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<PreFacturierBody>().summary.lateDays).toBe(0);
+  });
+
   it('offers a submitted Cra as decidable to the manager who may act on it', async () => {
     const response = await app.inject({
       method: 'GET',

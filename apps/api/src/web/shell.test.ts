@@ -72,6 +72,15 @@ describe('the shell', () => {
     expect(rendered(undefined)).not.toContain('navlist');
   });
 
+  it("points the consultant's nav at the SPA's own /cra, not the now-POST-only PATHS.consultantCra", () => {
+    // Front-end plan Phase 9.3: `PATHS.consultantCra` ('/consultant/cra') stays a registered
+    // route for the grid's save/submit POST, but no GET answers it any more — the SPA renders the
+    // grid at `/cra`, and this chrome (used only by the two printables now) has to link there
+    // instead, or a visitor following it lands nowhere any router recognises.
+    expect(rendered(alice)).toContain('href="/cra"');
+    expect(rendered(alice)).not.toContain('href="/consultant/cra"');
+  });
+
   it('escapes a persona name, because a name is data', () => {
     const injected = renderToString(
       shell(

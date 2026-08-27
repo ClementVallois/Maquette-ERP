@@ -10,16 +10,25 @@ import { inMemoryPersonas } from '../personas/testing/catalogue.ts';
 import { buildServer } from '../server.ts';
 import { savepointTransactionally } from '../testing/transaction.ts';
 
-import { LABELS } from './labels.ts';
 import { PATHS } from './paths.ts';
 
 /**
- * The entry grid and the write path behind it, against a real Postgres.
+ * The write path behind the entry grid, against a real Postgres — `POST` at
+ * `PATHS.consultantCra`, the one registration front-end plan Phase 9.3 kept (the two GET screens
+ * that used to render here, the list and the grid, are gone: `apps/web`'s SPA renders `/cra` and
+ * `/cra/$period` instead, and `e2e/axe.spec.ts`/`journeys.spec.ts` cover those).
  *
- * BUILD-PLAN's TDD table asks screens for "an integration test asserting the rendered HTML (status,
- * key text, denied reason)" — so these assert the page, not a JSON projection of it. The same
- * transaction, the same repositories and the same domain refusals as `/api/v1`; what differs is the
- * content type.
+ * What stays here is what Phase 9.4's checkpoint verified is **not** redundant with
+ * `apps/api/src/routes/api.int.test.ts`'s "recording a month through the API" section: the
+ * SSR-form-specific translation from `day:slot` field names into quarter-day entries
+ * (`entriesOf`/`SLOT_FIELD` in `routes.ts`), which the JSON API never has to do because it takes
+ * structured entries directly, and the domain behaviour with no JSON-side test at all (splitting
+ * one day across two missions, replacing rather than merging a month, and the Habilitation
+ * refusal surfacing through *this* route specifically — `api.int.test.ts` covers the same domain
+ * rule through `PUT /api/v1/cras/:period/entries`, but nothing there proves it also holds through
+ * this form-encoded route). Everything genuinely redundant (summing two slots into one line,
+ * flagging a worked Saturday, refusing an incomplete month, the read-only/transition refusal) was
+ * removed: `api.int.test.ts`'s own tests of the same names cover it, word for word.
  */
 
 const transaction = useTestTransaction();
@@ -162,57 +171,8 @@ afterEach(async () => {
   await app.close();
 });
 
-describe('the grid renders the month', () => {
-  it('offers a slot for every day of June, workable or not', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.consultantCra}/2026-06`,
-      headers: as('consultant-paris'),
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.headers['content-type']).toContain('text/html');
-    // The 6th is a Saturday, and it has a slot: a weekend worked is the manager's to accept, so
-    // the grid has to let it be entered before the flag can exist.
-    expect(response.body).toContain('name="2026-06-06:0"');
-    expect(response.body).toContain('name="2026-06-30:1"');
-  });
-
-  it('says the month has not been started, rather than rendering an empty table silently', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.consultantCra}/2026-06`,
-      headers: as('consultant-paris'),
-    });
-
-    expect(response.body).toContain(LABELS.cra.notStartedYet);
-  });
-
-  it('offers only the missions this consultant is staffed on', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.consultantCra}/2026-06`,
-      headers: as('consultant-paris'),
-    });
-
-    expect(response.body).toContain(`value="${MISSION}"`);
-    expect(response.body).toContain(`value="${MISSION_QUALIFIED}"`);
-  });
-
-  it('is not reachable by a manager: the role does not carry the action', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.consultantCra}/2026-06`,
-      headers: as('manager-paris'),
-    });
-
-    expect(response.statusCode).toBe(403);
-    expect(response.body).toContain('/problems/insufficient-role');
-  });
-});
-
 describe('saving a month', () => {
-  it('records it and comes back to the grid, so a refresh does not repost', async () => {
+  it('records it, redirects to the SPA grid, and does not repost on a refresh', async () => {
     const saved = await app.inject({
       method: 'POST',
       url: `${PATHS.consultantCra}/2026-06`,
@@ -220,36 +180,23 @@ describe('saving a month', () => {
       payload: fullMonthBody('save'),
     });
 
+    // `PATHS.spaCra`, not `PATHS.consultantCra`: since Phase 9.3 the grid a browser lands on
+    // after this redirect is the SPA's `/cra/$period` — `shell.test.ts`'s own dedicated
+    // assertion covers the chrome's link, this covers the write route's own redirect.
     expect(saved.statusCode).toBe(303);
-    expect(saved.headers.location).toBe(`${PATHS.consultantCra}/2026-06`);
-
-    const grid = await app.inject({
-      method: 'GET',
-      url: `${PATHS.consultantCra}/2026-06`,
-      headers: as('consultant-paris'),
-    });
-
-    expect(grid.body).toContain(LABELS.cra.totals);
-    expect(grid.body).not.toContain(LABELS.cra.notStartedYet);
+    expect(saved.headers.location).toBe(`${PATHS.spaCra}/2026-06`);
   });
 
-  it('sums two slots on one mission into one line of a full day', async () => {
-    // Each slot of this legacy form is worth two quarter-days (`SLOT_QUARTER_DAYS`); the same
-    // mission in both slots produces two entries of the same triplet, which `linesOf` sums into
-    // one line of four (ADR-0069/0070), not two lines of two.
-    await app.inject({
+  it('is not reachable by a manager: the role does not carry the action', async () => {
+    const response = await app.inject({
       method: 'POST',
       url: `${PATHS.consultantCra}/2026-06`,
-      headers: posting('consultant-paris'),
+      headers: posting('manager-paris'),
       payload: fullMonthBody('save'),
     });
 
-    const { rows } = await transaction.client.query<{ quarter_days: number; count: string }>(
-      `SELECT quarter_days, count(*) FROM timesheet.cra_lines ${OF_ALICE} GROUP BY quarter_days`,
-      [ALICE],
-    );
-
-    expect(rows).toStrictEqual([{ quarter_days: 4, count: String(workableDaysOfJune().length) }]);
+    expect(response.statusCode).toBe(403);
+    expect(response.body).toContain('/problems/insufficient-role');
   });
 
   it('keeps a day split across two missions as two lines of two quarter-days', async () => {
@@ -330,43 +277,12 @@ describe('saving a month', () => {
 });
 
 describe('submitting a month', () => {
-  it('flags a Saturday that was worked, without refusing it', async () => {
-    const withSaturday = `${fullMonthBody('submit')}&${encodeURIComponent('2026-06-06:0')}=${MISSION}&${encodeURIComponent('2026-06-06:1')}=${MISSION}`;
-
-    const submitted = await app.inject({
-      method: 'POST',
-      url: `${PATHS.consultantCra}/2026-06`,
-      headers: posting('consultant-paris'),
-      payload: withSaturday,
-    });
-
-    expect(submitted.statusCode).toBe(303);
-
-    const { rows } = await transaction.client.query<{ day: string; reason: string }>(
-      `SELECT day, reason FROM timesheet.cra_flags
-         WHERE cra_id IN (SELECT id FROM timesheet.cras WHERE consultant_id = $1)`,
-      [ALICE],
-    );
-
-    expect(rows).toStrictEqual([{ day: '2026-06-06', reason: 'weekend' }]);
-  });
-
-  it('refuses an incomplete month, and the page names the invariant', async () => {
-    const oneDay = `${encodeURIComponent('2026-06-01:0')}=${MISSION}&${encodeURIComponent('2026-06-01:1')}=${MISSION}&action=submit`;
-
-    const response = await app.inject({
-      method: 'POST',
-      url: `${PATHS.consultantCra}/2026-06`,
-      headers: posting('consultant-paris'),
-      payload: oneDay,
-    });
-
-    expect(response.statusCode).toBe(409);
-    expect(response.headers['content-type']).toContain('text/html');
-    expect(response.body).toContain('/problems/cra-incomplete');
-  });
-
   it('refuses a mission whose Habilitation the consultant does not hold (ADR-0051)', async () => {
+    // Not redundant with `api.int.test.ts`'s own `PUT /api/v1/cras/:period/entries` coverage,
+    // which never posts a habilitation-violating submission at all — this is the one HTTP-route
+    // integration test of the refusal anywhere in the repo (the domain rule itself is unit-tested
+    // in `packages/timesheet/src/domain/submission-checks.test.ts`, which proves the rule but not
+    // that a route wires it through).
     const response = await app.inject({
       method: 'POST',
       url: `${PATHS.consultantCra}/2026-06`,
@@ -376,98 +292,5 @@ describe('submitting a month', () => {
 
     expect(response.statusCode).toBe(409);
     expect(response.body).toContain('/problems/missing-habilitation');
-  });
-
-  it('makes the grid read-only once submitted, and says why', async () => {
-    await app.inject({
-      method: 'POST',
-      url: `${PATHS.consultantCra}/2026-06`,
-      headers: posting('consultant-paris'),
-      payload: fullMonthBody('submit'),
-    });
-
-    const grid = await app.inject({
-      method: 'GET',
-      url: `${PATHS.consultantCra}/2026-06`,
-      headers: as('consultant-paris'),
-    });
-
-    expect(grid.body).toContain(LABELS.cra.readOnly.submitted);
-    expect(grid.body).not.toContain('<select');
-  });
-
-  it('refuses a further save on a submitted month, from the domain and not from the screen', async () => {
-    await app.inject({
-      method: 'POST',
-      url: `${PATHS.consultantCra}/2026-06`,
-      headers: posting('consultant-paris'),
-      payload: fullMonthBody('submit'),
-    });
-
-    const again = await app.inject({
-      method: 'POST',
-      url: `${PATHS.consultantCra}/2026-06`,
-      headers: posting('consultant-paris'),
-      payload: fullMonthBody('save'),
-    });
-
-    expect(again.statusCode).toBe(409);
-    expect(again.body).toContain('/problems/cra-transition-not-allowed');
-  });
-});
-
-describe('the list, and the empty state that is not a refusal', () => {
-  it('is empty for a month the consultant simply did not work', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.consultantCra}?periode=2026-07`,
-      headers: as('consultant-paris'),
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.body).toContain(LABELS.cra.emptyList);
-    // The distinction ADR-0003 exists to keep sharp: nothing was refused here, and the page says
-    // so. An out-of-scope list is empty too, and that one is an authorization absence.
-    expect(response.body).toContain(LABELS.cra.emptyListHint);
-    expect(response.body).not.toContain('/problems/out-of-scope');
-  });
-
-  it('lists the month once it exists, and links to its grid', async () => {
-    await app.inject({
-      method: 'POST',
-      url: `${PATHS.consultantCra}/2026-06`,
-      headers: posting('consultant-paris'),
-      payload: fullMonthBody('save'),
-    });
-
-    const response = await app.inject({
-      method: 'GET',
-      url: PATHS.consultantCra,
-      headers: as('consultant-paris'),
-    });
-
-    expect(response.body).toContain('juin 2026');
-    expect(response.body).toContain(`href="${PATHS.consultantCra}/2026-06"`);
-  });
-
-  it('keeps the filter in the URL, so the view is shareable', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.consultantCra}?periode=2026-06`,
-      headers: as('consultant-paris'),
-    });
-
-    expect(response.statusCode).toBe(200);
-  });
-
-  it('refuses a malformed period rather than ignoring it', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.consultantCra}?periode=juin`,
-      headers: as('consultant-paris'),
-    });
-
-    expect(response.statusCode).toBe(400);
-    expect(response.body).toContain(LABELS.problem.heading.malformed);
   });
 });

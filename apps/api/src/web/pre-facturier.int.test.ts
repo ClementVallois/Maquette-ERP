@@ -15,14 +15,17 @@ import { LABELS } from './labels.ts';
 import { PATHS } from './paths.ts';
 
 /**
- * The pré-facturier, the reveal behind it, and the two refusals the reveal is there to
- * demonstrate.
+ * The two printables that survive the pré-facturier's own screen (front-end plan Phase 9.3): the
+ * invoice document and the Cra record, both reached from what used to be the pré-facturier's list
+ * and both still server-rendered on purpose (ADR-0055, ADR-0056). The three write verbs behind
+ * them — validate, refuse, issue — are POST-only now, kept for the same reason.
  *
- * The screen is where this repository's third claim — authorization by role **and** by scope — is
- * checked on HTML rather than on JSON. Two personas reach the same table and only one may open a
- * margin; a manager of another office may not open one at all, and the page says which rule
- * refused. Neither of those is provable from a list view, because a list is filtered rather than
- * refused (ADR-0003).
+ * The pré-facturier's own GET screen and the margin reveal behind it are gone: `apps/web`'s SPA
+ * renders `/pre-facturier` and `/marge/$consultantId`, and reads `GET /api/v1/pre-facturier` and
+ * `GET /api/v1/consultants/:id/economics` for the data — `apps/api/src/routes/pre-facturier.int.test.ts`
+ * and `apps/api/src/routes/api.int.test.ts`'s "the progressive-disclosure read" cover what those
+ * two screens' own tests used to (two facts moved there rather than being dropped: "nothing late
+ * on the month still running", and "a month with no Cra answers absence, not refusal").
  */
 
 const transaction = useTestTransaction();
@@ -227,8 +230,15 @@ afterEach(async () => {
   await app.close();
 });
 
-/** Validates Alice's June through the API, which is what puts a draft invoice on the screen. */
-async function validateAliceJune(): Promise<void> {
+/**
+ * Validates Alice's June through the API, which is what drafts the invoice, and returns its id.
+ *
+ * The id used to be scraped out of the pré-facturier list's rendered HTML (`/\/facture\/[\w-]+/u`
+ * against the page body) — that page is gone since Phase 9.3, and the validation response already
+ * carries the same id (`InvoiceListItem.id`, `apps/api/src/routes/api.ts`'s `POST
+ * /api/v1/cras/:id/validation`), one HTTP call earlier than the scrape ever needed it.
+ */
+async function validateAliceJune(): Promise<string> {
   const response = await app.inject({
     method: 'POST',
     url: `/api/v1/cras/${CRA_VALIDATED}/validation`,
@@ -236,126 +246,22 @@ async function validateAliceJune(): Promise<void> {
   });
 
   expect(response.statusCode).toBe(200);
+  const { invoices } = response.json<{ invoices: { id: string }[] }>();
+  expect(invoices).toHaveLength(1);
+
+  return invoices[0]!.id;
 }
 
-describe('the pré-facturier', () => {
-  it('shows what is billable, with the totals the document will carry', async () => {
-    await validateAliceJune();
-
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.preFacturier}?periode=2026-06`,
-      headers: as('manager-paris'),
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.headers['content-type']).toContain('text/html');
-    expect(response.body).toContain('Banque Nationale de Test');
-    // 21 workable days in June 2026 (the 1st is Pentecost Monday) minus the one worked on the
-    // Forfait mission = 20 days at 850 € = 17 000 € HT, 20 400 € TTC at 20 %. The total is read
-    // off the aggregate, not out of a SUM (ADR-0053): a draft's `total_ttc_cents` column is NULL,
-    // so a shape that read the column would render "—" here rather than a number.
-    // Through `frenchEuros` rather than as a literal: the thousands separator is U+202F, and a
-    // test that spells it with an ordinary space asserts the wrong string for the right number.
-    // What is asserted here is the cents; the formatting has its own tests.
-    expect(response.body).toContain(frenchEuros(1_700_000));
-    expect(response.body).toContain(frenchEuros(2_040_000));
-  });
-
-  it('names the blocking reason for the days that produced no line', async () => {
-    await validateAliceJune();
-
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.preFacturier}?periode=2026-06`,
-      headers: as('manager-paris'),
-    });
-
-    expect(response.body).toContain(LABELS.preFacturier.declineReasons.notRegie);
-    expect(response.body).toContain('Refonte SOC');
-  });
-
-  it('counts the days of a closed month that no validation has reached', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.preFacturier}?periode=2026-06`,
-      headers: as('manager-paris'),
-    });
-
-    // Chloé's draft carries five quarter-days; Alice's is submitted and carries the whole month.
-    // Both are late in July, and both are the consultant's or the manager's to move.
-    expect(response.body).toContain(LABELS.preFacturier.awaitingConsultant);
-    expect(response.body).toContain(LABELS.preFacturier.lateTag);
-  });
-
-  it('counts nothing late on the month still running', async () => {
-    // July, with the clock in July: nothing recorded this month is due yet (ADR-0054), so the
-    // counter is zero and the page says why rather than showing a bare zero.
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.preFacturier}?periode=2026-07`,
-      headers: as('manager-paris'),
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.body).toContain(LABELS.preFacturier.lateNoneYet);
-  });
-
-  it('shows a manager only their own office', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.preFacturier}?periode=2026-06`,
-      headers: as('manager-lyon'),
-    });
-
-    // Filtered, never refused — ADR-0003's first beat. Lyon has no Cra in June, so the page is
-    // the empty state and not a 403, and it says as much rather than rendering an empty table.
-    expect(response.statusCode).toBe(200);
-    expect(response.body).not.toContain('Alice Martin');
-    expect(response.body).toContain(LABELS.preFacturier.crasEmpty);
-  });
-
-  it('does not carry a Tjm, a Cjm or a margin anywhere in the page', async () => {
-    await validateAliceJune();
-
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.preFacturier}?periode=2026-06`,
-      headers: as('manager-paris'),
-    });
-
-    // 850 € is the Tjm and 420 € the Cjm. Asserted as the rendered strings rather than as absent
-    // field names: the screen renders French amounts, and a leak would arrive looking like one.
-    expect(response.body).not.toContain(frenchEuros(85_000));
-    expect(response.body).not.toContain(frenchEuros(42_000));
-  });
-
-  it('is not reachable by a consultant: the role does not carry the action', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: PATHS.preFacturier,
-      headers: as('consultant-paris'),
-    });
-
-    expect(response.statusCode).toBe(403);
-    expect(response.body).toContain('/problems/insufficient-role');
-  });
-});
-
 describe('the invoice as a printable document', () => {
-  /** The draft the validation produced, reached the way the screen reaches it. */
+  /** The draft the validation produced, at the address the SPA links to it by. */
   async function openTheInvoice(): Promise<string> {
-    await validateAliceJune();
+    const id = await validateAliceJune();
 
-    const listed = await app.inject({
+    const response = await app.inject({
       method: 'GET',
-      url: `${PATHS.preFacturier}?periode=2026-06`,
+      url: `${PATHS.invoice}/${id}`,
       headers: as('manager-paris'),
     });
-    const href = /\/facture\/[\w-]+/u.exec(listed.body)?.[0];
-    expect(href).toBeDefined();
-
-    const response = await app.inject({ method: 'GET', url: href!, headers: as('manager-paris') });
     expect(response.statusCode).toBe(200);
 
     return response.body;
@@ -425,16 +331,13 @@ describe('the invoice as a printable document', () => {
   });
 
   it('refuses a manager of another office, and does not answer 404 instead', async () => {
-    await validateAliceJune();
+    const id = await validateAliceJune();
 
-    const listed = await app.inject({
+    const response = await app.inject({
       method: 'GET',
-      url: `${PATHS.preFacturier}?periode=2026-06`,
-      headers: as('manager-paris'),
+      url: `${PATHS.invoice}/${id}`,
+      headers: as('manager-lyon'),
     });
-    const href = /\/facture\/[\w-]+/u.exec(listed.body)?.[0] ?? '';
-
-    const response = await app.inject({ method: 'GET', url: href, headers: as('manager-lyon') });
 
     // ADR-0003's second beat: the record exists and is refused by name, rather than being hidden
     // behind an absence that would say nothing about why.
@@ -523,9 +426,14 @@ describe('the Cra as a printable record', () => {
 
 /**
  * ADR-0061 states two claims universally — every data table scopes its headers, and no element
- * carries a `title`. `accessibility.test.ts` proves them on the two pages it can build fixtures
- * for; these four pages need a database, so the same two assertions run here on their rendered
- * bodies. A gate scoped to a third of the pages is a gate that stopped looking.
+ * carries a `title`. `accessibility.test.ts` proves them on fixtures it builds without a database;
+ * the two printables need one, so the same two assertions run here on their rendered bodies.
+ *
+ * "All four" until Phase 9.3: the pré-facturier list and the margin reveal were the other two, and
+ * they are `apps/web`'s screens now. The pré-facturier is re-covered by `apps/web/e2e/axe.spec.ts`
+ * (a real browser, a stronger claim than this string match). The margin screen is **not** — it is
+ * visited by `journeys.spec.ts` only, so ADR-0061's two claims lost their mechanical gate there;
+ * `docs/open-questions.md` carries that row, for Phase 10.
  */
 function assertMechanicalAccessibility(body: string): void {
   // `(?=[\\s>])` so the lookahead does not read `<thead>` as an unscoped `<th>`.
@@ -534,27 +442,14 @@ function assertMechanicalAccessibility(body: string): void {
 }
 
 describe('the pages ADR-0061 claims about, and only a database can render', () => {
-  it('scopes every table header and carries no title, on all four', async () => {
-    await validateAliceJune();
+  it('scopes every table header and carries no title, on both printables', async () => {
+    const id = await validateAliceJune();
 
-    const listed = await app.inject({
-      method: 'GET',
-      url: `${PATHS.preFacturier}?periode=2026-06`,
-      headers: as('manager-paris'),
-    });
-    const invoiceHref = /\/facture\/[\w-]+/u.exec(listed.body)?.[0] ?? '';
-
-    for (const url of [
-      invoiceHref,
-      `${PATHS.craPrint}/${CRA_VALIDATED}`,
-      `${PATHS.margin}/${ALICE}?periode=2026-06`,
-    ]) {
+    for (const url of [`${PATHS.invoice}/${id}`, `${PATHS.craPrint}/${CRA_VALIDATED}`]) {
       const response = await app.inject({ method: 'GET', url, headers: as('manager-paris') });
       expect(response.statusCode).toBe(200);
       assertMechanicalAccessibility(response.body);
     }
-
-    assertMechanicalAccessibility(listed.body);
   });
 });
 
@@ -571,14 +466,22 @@ describe('the three verbs of the chain, on screen', () => {
     // was looking at, not to the default one. BUILD-PLAN 6.6 puts the filter in the URL, and an
     // action that drops it makes every decision a jump somewhere else.
     expect(validated.statusCode).toBe(303);
-    expect(validated.headers.location).toBe(`${PATHS.preFacturier}?periode=2026-06`);
+    // `period`, not `periode`: the form field this verb reads is French (ADR-0026), the search
+    // param of the SPA route it redirects *to* is English (task 7.1), and `backToPreFacturier`
+    // translates between them. Sending `periode` would land the SPA on its own default month.
+    expect(validated.headers.location).toBe(`${PATHS.preFacturier}?period=2026-06`);
 
+    // "And the invoice appears" — read where the SPA reads it, the pré-facturier screen this
+    // file used to render being `apps/web`'s since Phase 9.3.
     const listed = await app.inject({
       method: 'GET',
-      url: `${PATHS.preFacturier}?periode=2026-06`,
+      url: '/api/v1/pre-facturier?period=2026-06',
       headers: as('manager-paris'),
     });
-    expect(listed.body).toContain(frenchEuros(1_700_000));
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json<{ summary: { billableCents: number } }>().summary.billableCents).toBe(
+      1_700_000,
+    );
   });
 
   it('lets the manager refuse it with a reason, and the consultant sees the reason', async () => {
@@ -590,15 +493,20 @@ describe('the three verbs of the chain, on screen', () => {
     });
 
     expect(refused.statusCode).toBe(303);
-    expect(refused.headers.location).toBe(`${PATHS.preFacturier}?periode=2026-06`);
+    expect(refused.headers.location).toBe(`${PATHS.preFacturier}?period=2026-06`);
 
+    // The consultant's grid is `apps/web`'s screen since Phase 9.3, so the reason is read from
+    // the endpoint it renders — the same `craGridComposition` the deleted screen composed, one
+    // representation later. That the SPA then *shows* it is `journeys.spec.ts`'s J2.
     const grid = await app.inject({
       method: 'GET',
-      url: `${PATHS.consultantCra}/2026-06`,
+      url: '/api/v1/cras/2026-06/grid',
       headers: as('consultant-paris'),
     });
-    expect(grid.body).toContain(LABELS.cra.refused);
-    expect(grid.body).toContain('le 12 est une mission terminée');
+    expect(grid.statusCode).toBe(200);
+    const body = grid.json<{ status: string; refusal: { reason: string } | null }>();
+    expect(body.status).toBe('refused');
+    expect(body.refusal?.reason).toBe('le 12 est une mission terminée');
   });
 
   it('refuses a refusal that says nothing, before the domain is reached', async () => {
@@ -628,15 +536,11 @@ describe('the three verbs of the chain, on screen', () => {
     }
   });
 
-  it('offers billing no decision on the pré-facturier, and refuses it if posted anyway', async () => {
-    const listed = await app.inject({
-      method: 'GET',
-      url: `${PATHS.preFacturier}?periode=2026-06`,
-      headers: as('billing-paris'),
-    });
-    expect(listed.body).not.toContain(LABELS.preFacturier.validate);
-
-    // The absence of the button is not the control. The route is.
+  it('refuses billing the decision, whatever the screen offered it', async () => {
+    // The offer half of this test moved with the screen: `decidable` on `GET
+    // /api/v1/pre-facturier` is what the SPA renders a button from, and
+    // `routes/pre-facturier.int.test.ts` asserts it is false for billing. What stays here is the
+    // half that was always the control — the absence of a button never was one. The route is.
     const posted = await app.inject({
       method: 'POST',
       url: `${PATHS.validateCra}/${CRA_VALIDATED}`,
@@ -647,15 +551,8 @@ describe('the three verbs of the chain, on screen', () => {
   });
 
   it('issues the invoice from the page, carrying the key in a hidden field', async () => {
-    await validateAliceJune();
-
-    const listed = await app.inject({
-      method: 'GET',
-      url: `${PATHS.preFacturier}?periode=2026-06`,
-      headers: as('billing-paris'),
-    });
-    const href = /\/facture\/[\w-]+/u.exec(listed.body)?.[0] ?? '';
-    const id = href.slice(`${PATHS.invoice}/`.length);
+    const id = await validateAliceJune();
+    const href = `${PATHS.invoice}/${id}`;
 
     const page = await app.inject({ method: 'GET', url: href, headers: as('billing-paris') });
     const key = /name="idempotencyKey" value="([\w-]+)"/u.exec(page.body)?.[1];
@@ -681,15 +578,7 @@ describe('the three verbs of the chain, on screen', () => {
   });
 
   it('answers a resubmission of the same key with the same document, not a second number', async () => {
-    await validateAliceJune();
-
-    const listed = await app.inject({
-      method: 'GET',
-      url: `${PATHS.preFacturier}?periode=2026-06`,
-      headers: as('billing-paris'),
-    });
-    const href = /\/facture\/[\w-]+/u.exec(listed.body)?.[0] ?? '';
-    const id = href.slice(`${PATHS.invoice}/`.length);
+    const id = await validateAliceJune();
     const key = 'a-stable-key-from-one-render';
 
     const first = await app.inject({
@@ -717,17 +606,13 @@ describe('the three verbs of the chain, on screen', () => {
   });
 
   it('refuses a manager the issuance, and offers them no form for it', async () => {
-    await validateAliceJune();
+    const id = await validateAliceJune();
 
-    const listed = await app.inject({
+    const page = await app.inject({
       method: 'GET',
-      url: `${PATHS.preFacturier}?periode=2026-06`,
+      url: `${PATHS.invoice}/${id}`,
       headers: as('manager-paris'),
     });
-    const href = /\/facture\/[\w-]+/u.exec(listed.body)?.[0] ?? '';
-    const id = href.slice(`${PATHS.invoice}/`.length);
-
-    const page = await app.inject({ method: 'GET', url: href, headers: as('manager-paris') });
     expect(page.body).not.toContain('idempotencyKey');
 
     // Separation of duties, second rule: whoever validates does not issue. Here it is the role
@@ -743,69 +628,19 @@ describe('the three verbs of the chain, on screen', () => {
   });
 });
 
-describe('the reveal behind the pré-facturier', () => {
-  it('serves the margin to a manager of the office, as a page', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.margin}/${ALICE}?periode=2026-06`,
-      headers: as('manager-paris'),
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.headers['content-type']).toContain('text/html');
-    expect(response.body).toContain(frenchEuros(42_000));
-    expect(response.body).toContain(frenchEuros(85_000));
-    expect(response.body).toContain(LABELS.margin.margin);
-  });
-
-  it('refuses a billing persona, and the page names the rule that refused', async () => {
-    // The link is rendered for billing on the pré-facturier and the refusal happens here, which
-    // is BUILD-PLAN's "the refusal reason shown, not a greyed-out button". `economics` is `none`
-    // for this role (ADR-0023), so the route declaration refuses before any rate is read.
-    const listed = await app.inject({
-      method: 'GET',
-      url: `${PATHS.preFacturier}?periode=2026-06`,
-      headers: as('billing-paris'),
-    });
-    expect(listed.body).toContain(`${PATHS.margin}/${ALICE}`);
-
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.margin}/${ALICE}?periode=2026-06`,
-      headers: as('billing-paris'),
-    });
-
-    expect(response.statusCode).toBe(403);
-    expect(response.headers['content-type']).toContain('text/html');
-    expect(response.body).toContain(LABELS.problem.heading.denied);
-    expect(response.body).toContain('/problems/insufficient-role');
-    expect(response.body).not.toContain(frenchEuros(42_000));
-  });
-
-  it('refuses a manager of another office, and the page names the scope rule', async () => {
-    // The claim this repository makes third, checked on HTML: "a manager in one office cannot
-    // read the margin of a mission in another office". Reached by typing the URL, because the
-    // list never offered it — which is exactly ADR-0003's second beat.
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.margin}/${ALICE}?periode=2026-06`,
-      headers: as('manager-lyon'),
-    });
-
-    expect(response.statusCode).toBe(403);
-    expect(response.body).toContain(LABELS.problem.heading.denied);
-    expect(response.body).toContain('/problems/out-of-scope');
-    expect(response.body).not.toContain(frenchEuros(42_000));
-  });
-
-  it('answers a month the consultant has no Cra for with an absence, not a refusal', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: `${PATHS.margin}/${ALICE}?periode=2026-05`,
-      headers: as('manager-paris'),
-    });
-
-    expect(response.statusCode).toBe(404);
-    expect(response.body).toContain(LABELS.problem.heading.notFound);
-  });
-});
+/*
+ * `describe('the reveal behind the pré-facturier')` stood here until Phase 9.3, and is deleted
+ * rather than moved: `/marge/:consultantId` was a rendered page and is now `apps/web`'s screen,
+ * reading `GET /api/v1/consultants/:consultantId/economics`. Its four claims were checked against
+ * that route before the deletion, and each one already had a test there — "the progressive-
+ * disclosure read" in `apps/api/src/routes/api.int.test.ts`: the margin served to a manager of the
+ * office, the 403 `insufficient-role` for billing (`economics: 'none'`, ADR-0023), the 403
+ * `out-of-scope` for a manager of another office (the repository's third claim, and the one
+ * BUILD-RULES names), and — the one fact that had no equivalent and was moved rather than found —
+ * a month with no Cra answering 404 and not a refusal.
+ *
+ * What is lost with the page is only the rendering: that the refusal is a **page** naming the rule
+ * is still asserted in this file (the invoice document, above) and in `states.int.test.ts`, so no
+ * claim of ADR-0052 or ADR-0003 rests on a test that no longer exists. The SPA's own rendering of
+ * the same two refusals is `apps/web/e2e/journeys.spec.ts` (task 7.6's deep-linked 403).
+ */

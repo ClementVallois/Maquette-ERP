@@ -10,20 +10,36 @@
  * is a code interface and takes the code's.
  */
 export const PATHS = {
-  /** The persona selector, and the entry point a cold reader lands on. */
+  /**
+   * The entry point a cold reader lands on. No route registers a GET here since front-end plan
+   * Phase 9.3 — the SPA fallback (`server.ts`) serves it, and the SPA is itself the persona
+   * selector now.
+   */
   home: '/',
   choosePersona: '/persona',
   clearPersona: '/persona/retrait',
-  /** The consultant's own months. A period appended to it is one month's grid. */
-  consultantCra: '/consultant/cra',
-  /** The pré-facturier, for a month given as `?periode=YYYY-MM`. */
-  preFacturier: '/pre-facturier',
   /**
-   * The reveal of `Tjm`, `Cjm` and margin for one consultant and one month (ADR-0052). A screen
-   * rather than a link into `/api/v1`, because `representationOf` sends everything under `/api/`
-   * to `problem+json` and a browser following that link would land on a JSON document.
+   * The consultant's own months, as a **registered route** — the POST that saves and submits a
+   * month still lives here (Phase 9.3 kept the action verb, only the two GET screens that used to
+   * render at this prefix and `${this}/:period` are gone). Not where the grid is read any more:
+   * `spaCra` below is.
    */
-  margin: '/marge',
+  consultantCra: '/consultant/cra',
+  /**
+   * The SPA's own `/cra` and `/cra/$period` (front-end plan §3, "Routes SPA épinglées") — never
+   * registered by this file, reached only through the SPA fallback (Phase 9.1). Named here anyway,
+   * the way every other link in this table is: the two printables link back to it, and a link and
+   * the route it points at are still two statements of the same fact even when this repository
+   * does not register the second one.
+   */
+  spaCra: '/cra',
+  /**
+   * The pré-facturier's two write verbs still register at this prefix (Phase 9.3 kept them); the
+   * SPA itself now renders `GET /pre-facturier` (the same literal path, `?period=YYYY-MM` —
+   * English, the SPA's own search param, not this file's `periode` form field) through the SPA
+   * fallback, so no `spa`-prefixed alias is needed the way `spaCra` is.
+   */
+  preFacturier: '/pre-facturier',
   /** One invoice, draft or issued, as the printable document of ADR-0055. */
   invoice: '/facture',
   /** One Cra as the printable record of ADR-0056. An id appended to it names the month. */
