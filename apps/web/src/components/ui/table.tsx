@@ -2,9 +2,30 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-function Table({ className, ...props }: React.ComponentProps<'table'>) {
+interface TableProps extends React.ComponentProps<'table'> {
+  /** An accessible name for the scrollable wrapper, when the table's own `<caption>` (if any)
+   * does not already say enough on its own — `aria-label`, not a visible label: the wrapper is a
+   * scroll affordance, not new content. */
+  readonly containerLabel?: string;
+}
+
+function Table({ className, containerLabel, ...props }: TableProps) {
   return (
-    <div data-slot="table-container" className="relative w-full overflow-x-auto">
+    <div
+      data-slot="table-container"
+      role="region"
+      // A table wider than its container scrolls horizontally on every screen this app builds
+      // (`DataTable`'s own tables, and every hand-built one that reuses this component) — axe's
+      // `scrollable-region-focusable` (WCAG 2.1.1/2.1.3) requires the scrollable region itself to
+      // be keyboard-reachable, not only the controls inside it. Found live (Phase 8, task 8.2's
+      // invoice line table, mobile-shell project) on the one shared component every table in this
+      // app already goes through — the CRA matrix's own identical fix
+      // (`cra-matrix-table.tsx`) never covered this one because that screen builds its own
+      // `<table>` by hand rather than through this component.
+      tabIndex={0}
+      {...(containerLabel === undefined ? {} : { 'aria-label': containerLabel })}
+      className="relative w-full overflow-x-auto"
+    >
       <table
         data-slot="table"
         className={cn('w-full caption-bottom text-sm', className)}

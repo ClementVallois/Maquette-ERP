@@ -71,6 +71,42 @@ export const LABELS = {
    */
   dashboard: {
     heading: 'Tableau de bord',
+    /** Task 8.4: one screen, three roles, never the same three cards — `DashboardScreen` picks
+     * the block below matching `data.role`, the wire's own discriminant. */
+    consultant: {
+      monthStatus: 'Statut du mois',
+      monthStatusNone: 'Non commencé',
+      recorded: 'Jours saisis',
+      remaining: 'Jours restants à saisir',
+      hints: {
+        none: 'Ce mois n’a pas encore été commencé.',
+        draft: 'Votre saisie est en brouillon : elle n’a pas encore été envoyée à votre manager.',
+        submitted: 'Votre mois est soumis, en attente de la décision de votre manager.',
+        validated: 'Votre mois est validé.',
+        refused: 'Votre mois a été refusé : une correction est attendue.',
+      },
+      open: 'Ouvrir mon CRA',
+    },
+    manager: {
+      pending: 'CRA en attente de décision',
+      billable: 'Facturable ce mois',
+      late: 'CRA en retard',
+      /** `{count}` interpolated — the plan's own example sentence (task 8.4: « 1 Cra en attente
+       * de votre décision »), singular/plural chosen at the call site. */
+      pendingSentenceOne: '1 CRA en attente de votre décision.',
+      pendingSentenceMany: '{count} CRA en attente de votre décision.',
+      pendingSentenceNone: 'Aucun CRA n’attend votre décision ce mois.',
+      open: 'Ouvrir le pré-facturier',
+    },
+    billing: {
+      draft: 'Factures en brouillon',
+      issued: 'Factures émises',
+      totalIssued: 'Total TTC émis',
+      draftSentenceOne: '1 facture en brouillon, prête à émettre.',
+      draftSentenceMany: '{count} factures en brouillon, prêtes à émettre.',
+      draftSentenceNone: 'Aucune facture en brouillon ce mois.',
+      open: 'Voir les factures',
+    },
   },
 
   cra: {
@@ -332,6 +368,7 @@ export const LABELS = {
       goods: 'Livraison de biens',
       mixed: 'Prestations et livraisons',
     },
+    lines: 'Lignes',
     designation: 'Désignation',
     quantity: 'Quantité',
     unitPrice: 'Prix unitaire (quart de journée)',
@@ -367,6 +404,52 @@ export const LABELS = {
       'L’émission alloue un numéro dans une série sans trou et fige le document : rien n’y bouge ensuite. Le formulaire porte sa clé d’idempotence, pour qu’un renvoi ne brûle pas un second numéro (ADR-0059).',
     cannotIssue:
       'Cette facture est déjà émise : elle porte un numéro et une date, et une facture émise ne se modifie pas.',
+
+    /** Task 8.1's list. `client`/`status`/`ttc` are the table's own column headers — `status`
+     * reuses no cross-feature import, `StatusBadge` already carries its own label
+     * (`LABELS.preFacturier.invoiceStatuses`, `components/status-badge.tsx`). */
+    client: 'Client',
+    ttc: 'TTC',
+    /** `GET /api/v1/invoices` has no server-side status filter (Annexe A: `limit`/`offset`
+     * only) — these are a client-side **view** over one fetched page, task 8.1's own "onglets de
+     * vue", not a query. */
+    filters: {
+      all: 'Toutes',
+      draft: 'Brouillon',
+      issued: 'Émises',
+      cancelledByCreditNote: 'Annulées',
+    },
+    emptyTitle: 'Aucune facture',
+    emptyBody:
+      'Cette implantation n’a encore validé aucun CRA facturable : une facture apparaît ici dès qu’un manager valide un mois en régie (task 7.2).',
+    /** The *other* empty case (task 8.1): invoices exist, none match the selected tab — a
+     * one-line `DataTable` `emptyState`, not the full designed-empty-state treatment 8.5 owns for
+     * "this implantation has never issued a single document". */
+    filterEmptyBody: 'Aucune facture dans cet état.',
+
+    /** Task 8.2's detail. `printable` opens the SSR `/facture/:id` (Annexe C.9: singular, never
+     * this route's own plural `/factures/$id`) in a new tab. `terms` renders the payment
+     * condition itself (`PaymentTerms`, on the wire) — never a computed due date:
+     * `Invoice.dueDateFrom` lives in `packages/billing`, off limits to `apps/web` (§2), and
+     * `docs/open-questions.md`'s Phase 3 checkpoint (point 3) already named `dueDate`'s absence
+     * from the route as a finding for whichever phase first needed it, not an invitation to
+     * recompute it client-side. */
+    printable: 'Version imprimable',
+    paymentTerms: 'Conditions',
+    terms: {
+      net: 'Net à {days} jours',
+      endOfMonth: 'Fin de mois, à {days} jours',
+    },
+
+    /** Task 8.3 — billing only. `{name}` interpolated with `billedToName`, the same convention
+     * `preFacturier.validateDialog.title`/`refuseDialog.title` already use. */
+    issueDialog: {
+      title: 'Émettre la facture de {name}',
+      confirm: 'Émettre',
+      cancel: 'Annuler',
+    },
+    issueSuccessToast: 'Facture émise : {number}.',
+    issueReplayedToast: 'Cette facture était déjà émise : numéro d’origine affiché.',
   },
 
   margin: {

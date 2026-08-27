@@ -1,13 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 
-import { ComingSoon } from '@/components/shell/coming-soon';
+import { InvoiceDetailScreen } from '@/features/factures/components/invoice-detail-screen';
 
-/** `/factures/$id` — Phase 8 (task 8.2, `GET /api/v1/invoices/:id`). */
+/** `/factures/$id` — task 8.2, `GET /api/v1/invoices/:id`. */
 export const Route = createFileRoute('/_shell/factures/$id')({
-  component: InvoiceDetailPlaceholder,
+  component: InvoiceDetailRoute,
 });
 
-function InvoiceDetailPlaceholder(): ReactElement {
-  return <ComingSoon />;
+function InvoiceDetailRoute(): ReactElement {
+  const { id } = Route.useParams();
+  const { persona } = Route.useRouteContext();
+
+  return <InvoiceDetailScreen id={id} role={persona.role} />;
 }
