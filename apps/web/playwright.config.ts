@@ -1,12 +1,23 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Dev topology (ADR-0063 §"Task 0.3"): Vite is the browser's origin, port 5173, proxying to the
-// API on 3000. Phase 6's journeys are the first specs that need the API running for real rather
-// than as a manual precondition documented in a spec's own header (`personas-live.spec.ts`,
-// `shell.spec.ts`) — both `webServer` entries below start it and reset the database first.
-const PORT = 5173;
-const BASE_URL = `http://127.0.0.1:${String(PORT)}`;
 const API_URL = 'http://127.0.0.1:3000';
+
+/**
+ * Which of ADR-0063's two topologies this run drives — the one thing about this file that is not
+ * fixed, and the reason front-end plan Phase 9.6 exists.
+ *
+ * Unset (the default, and every local `pnpm --filter @erp/web exec playwright test`): the **dev**
+ * topology. Vite on 5173 is the browser's origin and proxies to the API on 3000.
+ *
+ * `E2E_SERVED_BUILD=1`: the **prod/demo** topology. Vite is not started at all; the API serves
+ * `apps/web/dist` on 3000, which is the only origin, and that build is what every spec runs
+ * against. `routing.spec.ts` is written to hold in both — the plan's own words are that until this
+ * mode is wired, task 9.1 is not verified, because the SPA fallback it added lives one layer below
+ * the dev proxy the other topology exercises.
+ */
+const SERVED_BUILD = process.env['E2E_SERVED_BUILD'] === '1';
+
+const BASE_URL = SERVED_BUILD ? API_URL : 'http://127.0.0.1:5173';
 
 const JOURNEYS_SPEC = '**/journeys.spec.ts';
 
@@ -66,20 +77,50 @@ export default defineConfig({
   // out from under it. Chaining inside the command is what actually gets the ordering this
   // phase's Gate needs: the database is reset and reseeded, then migrated, then the API starts
   // against the settled result — never the other way around.
-  webServer: [
-    {
-      command: 'pnpm run db:reset && pnpm run api',
-      cwd: '../..',
-      url: `${API_URL}/readyz`,
-      reuseExistingServer: !process.env['CI'],
-      // `db:reset` (docker compose down -v, up --wait, migrate, seed) plus the API's own startup
-      // comfortably clears Playwright's 60s default on a cold run.
-      timeout: 120_000,
-    },
-    {
-      command: 'pnpm run dev',
-      url: BASE_URL,
-      reuseExistingServer: !process.env['CI'],
-    },
-  ],
+  //
+  // In CI there is no `docker compose` to reset: Postgres is a service container, and the
+  // workflow's own steps create the app role, migrate and seed before Playwright is invoked —
+  // exactly as the `test-integration` job does. `db:reset` is therefore chained only when `CI` is
+  // unset. This is the same split the `.github/workflows/ci.yml` `web-e2e` job documents on its
+  // own side; the two are one arrangement written in two files.
+  webServer: SERVED_BUILD
+    ? [
+        {
+          // One server, no Vite: the API serves `apps/web/dist` on 3000 and is the only origin
+          // (front-end plan Phase 9.6). The build is chained in rather than left to the caller —
+          // a `dist/` older than the sources is precisely the failure this Gate exists to catch,
+          // and it would pass silently against a stale one.
+          command: `${process.env['CI'] ? '' : 'pnpm run db:reset && '}pnpm --filter @erp/web build && pnpm run api`,
+          cwd: '../..',
+          url: `${API_URL}/readyz`,
+          // `API_PUBLIC_ORIGIN` must be the **browser's** origin, which is 3000 here and 5173 in
+          // the dev topology — and the local `.env` carries the dev value. Node's `--env-file`
+          // (`pnpm run api`) does not override a variable already in the environment, so setting
+          // it here wins over that file without editing it. Get this wrong and every write in
+          // `journeys.spec.ts` answers 403 `/problems/forbidden-origin` (ADR-0023).
+          env: { API_PUBLIC_ORIGIN: API_URL },
+          // Never reuse: a server already running is, on a developer's machine, the *dev*
+          // topology's API — same port, wrong `API_PUBLIC_ORIGIN`, and possibly no `dist` at all.
+          reuseExistingServer: false,
+          // The web build is a Vite production build on top of everything the dev-topology
+          // command already does.
+          timeout: 240_000,
+        },
+      ]
+    : [
+        {
+          command: `${process.env['CI'] ? '' : 'pnpm run db:reset && '}pnpm run api`,
+          cwd: '../..',
+          url: `${API_URL}/readyz`,
+          reuseExistingServer: !process.env['CI'],
+          // `db:reset` (docker compose down -v, up --wait, migrate, seed) plus the API's own
+          // startup comfortably clears Playwright's 60s default on a cold run.
+          timeout: 120_000,
+        },
+        {
+          command: 'pnpm run dev',
+          url: BASE_URL,
+          reuseExistingServer: !process.env['CI'],
+        },
+      ],
 });

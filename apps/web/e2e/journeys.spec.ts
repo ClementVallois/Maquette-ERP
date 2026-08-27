@@ -29,8 +29,27 @@ const DORA = 'Audit DORA — Banque Nationale';
 const PASSI = 'Audit PASSI — Banque Nationale';
 const EDIT_PERIOD = '2026-08';
 
-const DEV_ORIGIN = 'http://127.0.0.1:5173';
 const API_ORIGIN = 'http://127.0.0.1:3000';
+
+/**
+ * The `Origin` a state-changing request has to carry, which is the **browser's** origin and not a
+ * fixed port: 5173 in the dev topology (Vite), 3000 in the served build (front-end plan Phase 9.6,
+ * where the API serves `dist` and there is one origin). `API_PUBLIC_ORIGIN` follows the same value
+ * on the server side, so a hard-coded 5173 here answers 403 `/problems/forbidden-origin` against
+ * the served build — which is how this was found, running `journeys` in that topology for the
+ * first time.
+ *
+ * Read off the config rather than off a second env check, so this function and `baseURL` cannot
+ * disagree. `shell.spec.ts` already derives its own origin from `baseURL` the same way.
+ */
+function browserOrigin(): string {
+  const baseURL = test.info().project.use.baseURL;
+  if (baseURL === undefined) {
+    throw new FixtureAssumptionError('playwright.config.ts always sets a baseURL.');
+  }
+
+  return new URL(baseURL).origin;
+}
 
 interface GridResponseForAssertions {
   readonly craId: string | null;
@@ -99,7 +118,7 @@ async function switchPersonaViaUi(page: Page, personaKey: string): Promise<void>
 async function switchPersonaViaApi(page: Page, personaKey: string): Promise<void> {
   const response = await page.request.post('/api/v1/session/persona', {
     data: { key: personaKey },
-    headers: { origin: DEV_ORIGIN },
+    headers: { origin: browserOrigin() },
   });
   expect(response.ok()).toBe(true);
 }
@@ -293,7 +312,7 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     const reason = 'Le 03/08 doit être reventilé sur un seul projet — motif de démonstration e2e.';
     const refusal = await page.request.post(`${API_ORIGIN}/pre-facturier/refus/${craId}`, {
       form: { reason, periode: EDIT_PERIOD },
-      headers: { origin: DEV_ORIGIN },
+      headers: { origin: browserOrigin() },
       maxRedirects: 0,
     });
     expect(refusal.status()).toBe(303);
@@ -617,7 +636,7 @@ test.describe('J4 — billing-paris (Henri): issues the draft J2 created, with a
       throw new FixtureAssumptionError('Expected the detail route to carry the invoice id.');
     }
     const replay = await page.request.post(`/api/v1/invoices/${invoiceId}/issuance`, {
-      headers: { origin: DEV_ORIGIN, 'idempotency-key': idempotencyKey },
+      headers: { origin: browserOrigin(), 'idempotency-key': idempotencyKey },
     });
     expect(replay.ok()).toBe(true);
     const replayBody = (await replay.json()) as { replayed: boolean; invoiceNumber: string };

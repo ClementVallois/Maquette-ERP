@@ -97,10 +97,34 @@ jobs:
       - run: pnpm run test:cov
 
   web-e2e:
-    name: Playwright (apps/web)
+    name: Playwright (apps/web, against the served build)
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    # The Gate of front-end plan Phase 9.6: the suite runs against `apps/web/dist` **served by the
+    # API on 3000**, not against Vite. That is not a preference — it is the only topology that
+    # sends the application's own `Content-Security-Policy` (Vite's dev server sends none), and the
+    # only one that exercises the SPA fallback of task 9.1 rather than the dev proxy standing in
+    # for it. `E2E_SERVED_BUILD=1` on the last step is what selects it; `playwright.config.ts`
+    # documents the two topologies on its own side.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: erp_migration
+          POSTGRES_PASSWORD: erp_local_dev
+          POSTGRES_DB: erp
+          PGTZ: UTC
+          TZ: UTC
+          POSTGRES_INITDB_ARGS: '--data-checksums'
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U erp_migration -d erp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 10s
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -118,11 +142,44 @@ jobs:
       # the package, `pnpm-workspace.yaml`'s existing three entries all are).
       - run: pnpm --filter @erp/web exec playwright install --with-deps chromium
 
-      # No Postgres service, no migrate, no seed: Phase 1's smoke test asserts only that the
-      # toolchain boots (frontend-plan.md Phase 1.5), and never calls the API. The real six
-      # journeys (Annexe B) start needing the database from Phase 6 onward, at which point this
-      # job grows the same services block `test-integration` already carries below.
+      # `.env` is gitignored and never exists in CI, so `pnpm run api` (started by Playwright's
+      # `webServer`) would find no configuration at all. `env:init` copies the tracked
+      # `.env.example`, whose values are already the ones this job needs: `DATABASE_URL` on
+      # localhost:5433, matching the service container's port mapping, and
+      # `API_PUBLIC_ORIGIN=http://127.0.0.1:3000`, which is exactly the served topology (Phase 9.5
+      # is where `.env.example` says so out loud).
+      - run: pnpm run env:init
+
+      # The service container runs no init scripts. Identical to `test-integration`'s own step and
+      # to `docker/postgres/init/01-roles.sh`, and for the same reason: before the migrations, so
+      # tables created afterwards inherit the default privileges.
+      - name: Create app role, as the local init script does
+        run: |
+          psql "postgres://erp_migration:erp_local_dev@localhost:5433/erp" <<'EOSQL'
+            CREATE ROLE erp_app WITH LOGIN PASSWORD 'erp_local_dev';
+            GRANT CONNECT ON DATABASE erp TO erp_app;
+            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
+              GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO erp_app;
+            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
+              GRANT USAGE, SELECT ON SEQUENCES TO erp_app;
+          EOSQL
+        env:
+          PGPASSWORD: erp_local_dev
+
+      # Migrate and seed here rather than inside Playwright's `webServer` command: the local
+      # topology resets through `docker compose`, which does not exist in this job. The config
+      # chains `db:reset` only when `CI` is unset, and these two steps are its CI counterpart —
+      # the journeys (Annexe B) mutate seeded rows and need a database that holds them.
+      - run: pnpm run migrate
+      - run: pnpm run seed
+
+      # `E2E_SERVED_BUILD=1` makes `playwright.config.ts` start one server instead of two:
+      # `pnpm --filter @erp/web build && pnpm run api`, with the API serving `dist` on 3000 as the
+      # single origin. The build is chained into that command on purpose — a `dist/` older than the
+      # sources would let this Gate pass against a stale bundle.
       - run: pnpm --filter @erp/web exec playwright test
+        env:
+          E2E_SERVED_BUILD: '1'
 
       - name: Upload the Playwright HTML report
         if: ${{ !cancelled() }}
