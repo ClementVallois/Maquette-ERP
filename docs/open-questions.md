@@ -2753,3 +2753,87 @@ journeys 14 passed** — 0 failed, three passes in a row.
   gate: `visual-baseline.spec.ts` carries no comparison assertion at all — it is a capture, and
   its own header says Phase 10.6 is where the baseline gets frozen. The byte move is the expected
   consequence of this phase's `tabs.tsx`/`table.tsx` fixes.
+
+## Front-end Phase 9 checkpoint — `feat/web`, 27/08/2026
+
+The two questions `CLAUDE.md` requires, asked of the service integration
+(`docs/frontend-plan.md` Phase 9, tasks 9.1-9.6).
+
+### Which tasks ran
+
+All six. 9.1 and 9.2 landed in the previous session (`1b0c34a`, `9f95619`): `@fastify/static` with
+`serve: false`, one hand-registered `/assets/*` route and a not-found SPA fallback, and the
+ADR-0064 CSP string. 9.3 removed the five interactive server screens and their registrations. 9.4
+updated or deleted every test that named them — none skipped. 9.5 wrote `.env.example`'s
+two-topology comment, which also settled a row open since 24/08. 9.6 wired the served-build
+topology into `playwright.config.ts` and the `web-e2e` CI job, and is what produced the phase's one
+real defect.
+
+### Where I am least confident, and what it resolved to
+
+1. **The frozen CSP string broke the SPA in the only topology that ever sends it — `fix now`,
+   ADR-0072, commit `457a052`.** `style-src 'self'` blocks the `style` attributes Radix UI and
+   `sonner` write at render time. Nothing could see it before this phase: Vite's dev server sends
+   no CSP header, so eight phases of e2e ran green against a page carrying no policy at all. Not
+   cosmetic — `sonner`'s injected sheet is blocked, so `shell.spec.ts`'s mid-visit purge toast never
+   becomes visible, which is a state this repository calls a deliverable rather than polish. The
+   decision needed an ADR rather than a patch (BUILD-RULES: a rule that blocks you is either right
+   or needs a new ADR), and ADR-0072 supersedes ADR-0064 on that one clause, with the two stricter
+   options rejected on mechanism: a nonce cannot attach to a `style` **attribute** at all, and
+   `'unsafe-hashes'` needs values computed per render. `script-src` is untouched and now has a
+   negative assertion protecting it.
+
+2. **`journeys.spec.ts` hard-coded `Origin: http://127.0.0.1:5173` — `fix now`, commit `f8585f3`.**
+   Against the served build that is a foreign origin and every raw API call in the file answered
+   403 `/problems/forbidden-origin`. It derives the origin from `baseURL` now, the way
+   `shell.spec.ts` already did — the second time in this phase that a spec turned out to encode
+   the dev topology rather than the application.
+
+3. **Three tests were passing for the wrong reason, and only one of them was red — `fix now`,
+   commit `2d8ddf1`.** Unregistering `GET /` left `routes.test.ts`'s "shows the chosen persona in
+   the header of the next page" green: it read the name off the 404 page's own shell. The CSP
+   assertion had the same flaw and is repointed at the stylesheet, the one route in that file that
+   still renders a 200. The red tests announced themselves; these did not, and they are the failure
+   mode BUILD-RULES names — a green gate that stopped looking.
+
+4. **Two claims lost their only mechanical gate and gained no replacement — two rows above**,
+   Phase 10.4 and Phase 10.2. The Cra list's empty state, and ADR-0061's two universal claims on
+   the margin screen. Both are consequences of deleting screens, both are real, and neither is
+   this phase's to fix — the second is one test in `axe.spec.ts`, left out because Phase 9 removes
+   screens and does not extend the accessibility gate.
+
+5. **Deleting a test is the part of 9.4 that can go wrong quietly.** Every deletion was checked
+   against the endpoint that now carries the claim before it was made, not after: the four "reveal"
+   tests against `api.int.test.ts`'s progressive-disclosure section claim by claim, and the two
+   facts with no equivalent anywhere ("nothing late on the month still running", "a month with no
+   Cra answers absence, not refusal") moved rather than dropped. What is genuinely lost is the
+   _rendering_ of the margin refusal, and that is stated in the file where the block used to be
+   rather than left for a reader to notice.
+
+### In three months, what breaks if I leave it as it is
+
+- **The CSP is now tested in exactly one place.** ADR-0072's own Consequences section says it: a
+  header is only exercised by the topology that sends it, and the served-build e2e run is the only
+  gate that sees this one. If that job is ever skipped for speed, the next CSP regression is
+  invisible again for as long as the last one was.
+- **`vite.config.ts`'s `PROXIED_PATHS` and Fastify's route list are still kept in step by hand**,
+  which ADR-0063 already names as the topology's ongoing cost. Phase 9.3 removed five routes and
+  the proxy list did not need to change, so nothing exercised the coupling this time. It will.
+- **`PATHS.consultantCra` is a POST-only route whose name says nothing about that.** Three comments
+  in three files now explain that its GET went to the SPA. That is the shape of a name that has
+  outlived its meaning, and the next reader will link to it before reading them.
+
+### Which tasks did not run, and why
+
+None. What did not happen inside a task that ran: the margin screen's axe test (point 4, a row for
+Phase 10.2), and `docs/images/` is left untracked — the five source mockups of task 0.2, which are
+neither this phase's scope nor a deliverable of it.
+
+### Evidence
+
+`pnpm run check`: green — 596 unit tests in 50 files, coverage 99.41/97.12/99.52/99.49.
+`pnpm run test:int`: **188 passed in 16 files** (down from 211: the deletions of 9.4).
+Playwright, **served build** (`E2E_SERVED_BUILD=1`, the Gate): desktop **30 passed / 1 skipped**,
+mobile-shell **11 passed / 20 skipped**, journeys **14 passed**. Playwright, dev topology, so the
+daily path is not traded for the Gate: journeys **14 passed**. No review screenshot changed byte
+for byte in either topology — the dev captures stand, and the served run reproduces them.
