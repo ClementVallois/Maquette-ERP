@@ -36,6 +36,9 @@ moves down to "Settled" with its answer, so the record shows it was known rather
 
 | 27/08/2026 | **`GET /api/v1/pre-facturier` carries no per-invoice HT figure, but task 7.1's own prose asks for an "HT, TTC" pair of columns on the invoice table.** `composition/pre-facturier.ts` computes a `BillableRow` (HT **and** TTC) from the live aggregate, but the route hands back `composition.invoices` — the lighter `InvoiceListItem[]` `GET /api/v1/invoices` also answers — not `composition.billable`. Only the aggregate total (`summary.billableCents`, HT) survives onto the wire; no per-row HT does. Confirmed deliberate, not an oversight: `routes/pre-facturier.int.test.ts` asserts this exact shape. `features/pre-facturier/types.ts` was written against the real wire and its own header comment already explains the gap — but a comment in a types file is not the record `CLAUDE.md`'s double checkpoint requires; this row is that record. | The delivered screen renders TTC only on the invoice table, one column short of what the written plan describes — a reader who compares the running screen to `docs/frontend-plan.md` §7.1 finds a real, unexplained discrepancy unless this row exists. Silent, because the screen looks complete: nothing is broken, an EmptyState is never shown for a missing field, the column is just narrower than promised. | Not decided here — extending the API to carry a per-row HT means routing `composition.billable` (or a new, richer shape) onto the wire, a `billing`-adjacent composition change outside Phase 7's own scope (`api` work, and Phase 7's commit scope is `web` only per the plan). Two honest options: (a) extend `GET /api/v1/pre-facturier` to answer the richer `BillableRow` shape it already computes internally, or (b) correct task 7.1's prose to say TTC only, since the aggregate HT figure is already visible in the `Facturable ce mois` StatCard and a second, per-row HT may not earn its column. Resolve **whichever phase next touches `composition/pre-facturier.ts` or the invoice list wire** — Phase 8 (`factures`, `GET /api/v1/invoices`) is the nearest candidate, since it is the next phase to build a real screen against the same `InvoiceListItem` shape and will have to decide the HT question for its own table regardless. **Recommendation recorded 27/08/2026, in Phase 8 — not a unilateral resolution: this row asks Clement to accept or reject option (b), TTC-only on both list screens, staying as shipped.** Phase 8's commit scope is `web` only, so option (a) (extending the wire) is not taken here without its own `api`-scoped, test-first commit and ADR — the phase was explicitly told not to reach for that silently just to close a row, and the plan's own §1 pins `docs/frontend-plan.md` as Clement's, not reopened without a technical blocker; its §7.1/§8.1 prose is therefore left exactly as written, not corrected to match what shipped. The argument _for_ the recommendation is stronger now than it would have been in Phase 7: task 8.2 built `/factures/$id`, the invoice detail screen, in this same phase — a per-invoice HT figure is now one click away for every row on both list screens (the line table's own `amountCents`, summed, and — once issued — `totals.totalExcludingVatCents` directly), the same progressive-disclosure shape (ADR-0043) this application already uses everywhere else: a list shows what identifies and summarises a row, a detail read shows the rest. Still open until Clement decides: accepting closes this row as-is; rejecting means option (a), an `api`-scoped commit adding the field, in whichever phase takes it up. |
 
+| 27/08/2026 | **Task 8.5's empty-invoices state has no live persona to demonstrate it: every manager/billing persona in the seed reaches at least one invoice.** `scripts/seed.ts` inserts three draft invoices directly as part of seeding — deliberately, so the CRA→invoice chain visibly works from the first login rather than requiring a validation first — and no office a live persona belongs to (Paris, Lyon) has zero. `InvoiceListScreen`'s own `EmptyState` branch is real, reachable code, verified by reading; it is simply unproven by a screenshot. | A future regression in the empty-state branch (e.g. a filter applied before the length check) would ship with nothing to catch it — no e2e test exercises `data.invoices.length === 0`, and the axe/screenshot Gate does not either. | Not decided here — this is a seed/demo-data decision (the same shape as `SUBMITTED_NOT_VALIDATED_EMAIL`'s own existing row), Clement's to make: either a persona or office is added with zero invoices, or an existing seeded invoice is removed from one, or the state stays proven only by reading the code. Resolve **whichever phase next touches `scripts/seed.ts`'s invoice rows**, none currently scheduled. Dated 27/08/2026. |
+| 27/08/2026 | **`components/ui/table.tsx`'s new `containerLabel` prop (added this phase, fixing `scrollable-region-focusable`) is unused everywhere** — every table in the app is still an unlabelled scroll region to a screen reader beyond "region enter/exit". The axe rule that found the underlying defect checks focusability, not naming, so the gate is green without it. | A screen reader user hears "region" with no name for every table in the app — not a Gate failure, but short of what a labelled region would offer, and the prop exists without a single caller to prove its own shape is right. | Not decided here — threading a real label through every `DataTable` call site is a larger, cross-screen change unrelated to what Phase 8 was asked to build. Resolve **whichever phase next touches a table screen for an unrelated reason**, none currently scheduled — not invented on its own. Dated 27/08/2026. |
+
 ---
 
 ## Front-end Phase 1 checkpoint — `feat/web`, 24/08/2026
@@ -2487,3 +2490,130 @@ changes what shipped in substance; both are corrections to what this record says
    brief: no rebase over commits already built on top) — recorded here instead, as the correction
    the checkpoint discipline asks for when a defect surfaces in the deliverable itself, including
    its own history.
+
+## Front-end Phase 8 checkpoint — `feat/web`, 27/08/2026
+
+The two questions `CLAUDE.md` requires, asked of Factures, émission, and the dashboard
+(`docs/frontend-plan.md` Phase 8, tasks 8.1-8.5).
+
+### Which tasks ran
+
+All five ran. 8.1 (`/factures`, `GET /api/v1/invoices`, client-side status tabs — the route has no
+server-side status/period filter, confirmed against the handler). 8.2 (`/factures/$id`, seller/
+billed-to blocks, facts, line table, VAT recap, totals only when `issued`, the printable link).
+8.3 (the issuance dialog, billing-only, a generated `Idempotency-Key`, the `replayed` toast, a 409
+`invoice-transition-not-allowed` rendered inline rather than crashing). 8.4 (the dashboard, a
+discriminated union by role, verified live against the Phase 3 placeholder's guessed shape — two
+of three field sets had different names than task 5.3's prose implied). 8.5 (the empty-invoices
+state) built and coded correctly but not demonstrable live under the current seed — see point 3
+below, a finding rather than a task left undone.
+
+### Where I am least confident, and what it resolved to
+
+1. **`vite.config.ts`'s dev proxy silently broke every full navigation to `/factures`.** The proxy
+   matched `/facture` as a string prefix, which also matched `/factures` — a full `page.goto` or
+   browser refresh answered the API's own 404 page instead of the SPA shell, though a client-side
+   `<Link>` click was unaffected (it never leaves the SPA to be proxied). Found live building task
+   8.1, the first screen to actually need a full navigation to a plural invoice route. → **Fixed
+   now**, both `/facture` and `/releve` given a trailing slash (`/releve` had the identical latent
+   risk with no live collision yet); the exit Gate's own `page.goto('/factures')` calls are what
+   would have caught this at Gate time regardless, but it is better found while writing the screen.
+
+2. **Two real accessibility defects surfaced by axe on genuinely new UI**, not on anything Phase
+   6/7 already exercised: `Tabs`' inactive-trigger contrast (4.21:1 against this design system's
+   `--muted`, short of WCAG's 4.5:1 — light mode only, dark mode already used the right token) and
+   `Table`'s scrollable wrapper having no keyboard access (`scrollable-region-focusable`, the same
+   class of defect the CRA matrix's own hand-built table already fixed once, but that fix never
+   reached the shared `components/ui/table.tsx` every `DataTable` goes through, because the matrix
+   builds its own `<table>` rather than using it). → **Fixed now, at the vendored components**, not
+   worked around per call site — every future consumer of `Tabs`/`Table` inherits both fixes.
+
+3. **Task 8.5's empty-invoices state has no live persona to demonstrate it under the current
+   seed.** Checked directly rather than assumed: `GET /api/v1/invoices` was called as every
+   manager/billing persona (`manager-paris`, `billing-paris`, `manager-lyon`) against a freshly
+   reset database, and each answered at least one invoice — the seed inserts three draft invoices
+   directly (`scripts/seed.ts`'s own "Seeded 3 draft invoices" line), by design, so the CRA→invoice
+   chain is visibly working from the very first login rather than needing a validation first. No
+   office/role combination in the four-persona seed reaches zero. The `EmptyState` branch itself is
+   real code (`query.data.invoices.length === 0`), reachable and correct by reading it, the same
+   defensive-and-unproven shape Phase 7's `pre-facturier` `period === null` branch already has —
+   not a gap invented to excuse missing work, the identical situation recurring on a screen with no
+   period concept to fall back on for a live demonstration (`/factures` has no period filter at
+   all, so the "switch to an empty period" trick `pre-facturier` used does not exist here). No
+   `page.route()` interception was used to fake one: this repository's rule 0bis.8 ("pas de MSW,
+   pas de faker") has held everywhere else in this codebase's e2e suite (confirmed: `page.route` is
+   used nowhere in `apps/web/e2e/`), and introducing it once, here, to manufacture a screenshot
+   would be the first departure from that discipline for a task the Gate does not name by number.
+   **A row below**, since deciding whether the seed should carry an office with zero invoices is
+   Clement's call (a demo-data decision, the same shape as the row already closed for
+   `SUBMITTED_NOT_VALIDATED_EMAIL`), not one to make silently while writing a screen.
+
+4. **A real, deterministic test failure Phase 8 introduced into a Phase 6 test, found only by
+   running the full suite** (`shell.spec.ts`'s "a session that turns unknown mid-visit" guard) —
+   not a flake: reproduced on every run, single worker included, before the fix. The dashboard's
+   own `GET /api/v1/dashboard` call, previously nonexistent (a static placeholder), became eligible
+   to be the _first_ guarded request to reach a cookie the test corrupts immediately after
+   `choosePersona()` returns — which only waits for the URL, not for the new route's own data —
+   racing the test's own deliberate "Mes CRA" click and tearing the page down under it via the
+   global session guard's `window.location.assign('/')`. → **Fixed now, commit `24746d6`**: the
+   test now waits for the dashboard's first StatCard (settling that query on the still-valid
+   cookie) before corrupting it, restoring the sequence the test's own extensive comments already
+   described as load-bearing.
+
+5. **`dueDate` stays off `InvoiceDetail`, confirmed rather than merely inherited.** The Phase 3
+   checkpoint (point 3) already named this and deferred it to "whichever phase first needs it on a
+   screen" — this phase does render "Conditions" (the payment `terms` themselves) on the detail
+   screen, but not a due date, because `Invoice.dueDateFrom(issueDate)` lives in `packages/billing`
+   and computing it client-side would duplicate domain logic across the API boundary this
+   repository's own architecture forbids. Not a new finding, but the phase that could have quietly
+   reintroduced the gap by computing it anyway — recorded here that it did not.
+
+### In three months, what breaks if I leave it as it is
+
+1. **The row-tools "clear"/"remove" e2e-coverage gap (open since the reopened Phase 6 checkpoint,
+   26/08/2026) is still open, checked again as Phase 7's checkpoint said to.** Phase 8's own
+   footprint (`factures`, `dashboard`, `lib/period.ts`, the two shared components fixed above)
+   never touches `CraMatrixTable`/`RowTools` — `Table`/`Tabs` are shared UI primitives, not the
+   matrix, which still builds its own `<table>` by hand. Still no phase named to close it; still
+   left open rather than a phase invented on paper, per the same reasoning the Phase 7 checkpoint
+   already gave.
+
+2. **The empty-invoices state (point 3 above) has zero live coverage** — a regression in
+   `InvoiceListScreen`'s own `data.invoices.length === 0` branch (e.g., a filter condition
+   accidentally applied before that check) could ship undetected, since nothing exercises it.
+   Resolvable only by a seed change (a new office/persona with zero invoices, or removing an
+   existing seeded invoice from one) — **a row below**, Clement's decision.
+
+3. **`Table`'s new `containerLabel` prop is unused everywhere** (point 2 above fixed the
+   keyboard-access defect with `tabIndex`/`role="region"` alone, which is what the specific axe
+   rule found checks) — every table in this app is still an unlabelled scroll region to a screen
+   reader beyond "region enter/exit". Not fixed now: threading a real label through every
+   `DataTable` call site is a larger, cross-screen change unrelated to what Phase 8 was asked to
+   build, and the axe gate does not fail without it (the rule that flagged this is about
+   focusability, not naming). **A row below**, no phase named — worth doing the next time a table
+   screen is touched for an unrelated reason, not on its own.
+
+### Evidence
+
+**`pnpm run check`** (typecheck, lint, boundaries, format:check, test:cov): all green. `test:cov`
+— **586 tests in 48 files**, coverage 99.41/97.12/99.52/99.49, unchanged to four significant
+figures from every earlier front-end checkpoint — `apps/web` still outside the measured surface.
+
+**Full Playwright suite** (`desktop`, `mobile-shell`, `journeys`, unfiltered), against a freshly
+reset and reseeded database: **51 passed**, 17 skipped (per-project skips, expected), **0 failed**
+— including J4 (the exit Gate's own new journey) and the three new axe suites (factures list,
+invoice detail, dashboard × 3 roles).
+
+**Screenshots** (`tests/visual/review/`): `8.1-factures-list.png`, `8.2-facture-detail.png`,
+`8.3-issuance-dialog-success.png`, `8.4-dashboard-consultant.png`, `8.4-dashboard-manager.png`,
+`8.4-dashboard-billing.png` — six new, covering every task but 8.5 (point 3 above explains why).
+
+### Which tasks did not run, and why
+
+None of 8.1-8.5 were skipped outright; 8.5's own live demonstration did not run, for the reason
+point 3 above gives in full — the code is built, the screenshot is not, because no seeded persona
+reaches the state it would show. No new ADR: nothing in this phase reached BUILD-RULES' threshold
+for one — the two shared-component fixes (point 2) are accessibility corrections against an
+existing, already-adopted design system, not new structural decisions, and the HT/TTC question
+(the previous commit) is recorded as a recommendation for Clement precisely because it is his
+decision to make, not one an ADR written by this session could make on his behalf.
