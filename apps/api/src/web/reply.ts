@@ -20,16 +20,22 @@ const SEE_OTHER = 303;
  * it means an injected `<form action="https://…">` cannot exfiltrate a submission even if the
  * escaping of ADR-0025 were defeated.
  *
- * The exact string is frozen in ADR-0064 (front-end plan Phase 9.2): `script-src 'self'` is the
- * SPA's own self-hosted bundle and nothing else, `font-src 'self'` is Phase 2.2's self-hosted
- * interface font, `connect-src 'self'` is the SPA's own `fetch` calls to `/api/v1` — all three new
- * relative to ADR-0049's six. Changing any clause here without changing ADR-0064 in the same
- * commit is the drift that ADR itself was written to prevent.
+ * The exact string is frozen in ADR-0072 (front-end plan Phase 9.2, amended by 9.6):
+ * `script-src 'self'` is the SPA's own self-hosted bundle and nothing else, `font-src 'self'` is
+ * Phase 2.2's self-hosted interface font, `connect-src 'self'` is the SPA's own `fetch` calls to
+ * `/api/v1` — all three new relative to ADR-0049's six. Changing any clause here without changing
+ * ADR-0072 in the same commit is the drift ADR-0064 was written to prevent, and ADR-0072 inherits.
+ *
+ * `'unsafe-inline'` sits on `style-src` **only**, never on `script-src` (ADR-0072). Radix UI and
+ * `sonner` write `style` attributes at render time — `pointer-events: none`,
+ * `--radix-scroll-area-corner-width`, the toaster's own injected sheet — and a `style` **attribute**
+ * can carry no nonce, so no stricter clause admits them. Adding the keyword to `script-src` would
+ * undo ADR-0064's actual decision and is the one edit this line exists to make conspicuous.
  */
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'none'",
   "script-src 'self'",
-  "style-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
   "img-src 'self'",
   "font-src 'self'",
   "connect-src 'self'",

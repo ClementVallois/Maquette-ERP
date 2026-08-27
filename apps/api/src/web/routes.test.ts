@@ -292,7 +292,7 @@ describe('the SPA build assets (Phase 9.1)', () => {
 });
 
 describe('security headers', () => {
-  it("sends exactly the string frozen in ADR-0064, admitting only the SPA's own bundle", async () => {
+  it("sends exactly the string frozen in ADR-0072, admitting only the SPA's own bundle", async () => {
     // The stylesheet and not `PATHS.home`: since Phase 9.3 no route in this file answers `/`, and
     // the version of this test that asked for it was asserting the header on a 404 page — true,
     // but not the observation it claims to make. `STYLESHEET.path` is the one route left here
@@ -302,10 +302,14 @@ describe('security headers', () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers['content-security-policy']).toBe(CONTENT_SECURITY_POLICY);
     expect(CONTENT_SECURITY_POLICY).toBe(
-      "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; " +
+      "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; " +
         "font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; " +
         "frame-ancestors 'none'",
     );
+    // ADR-0072 relaxes `style-src` and nothing else. This is the assertion that fails if a future
+    // edit reaches for the same keyword one clause up, where it would undo ADR-0064's decision.
+    expect(CONTENT_SECURITY_POLICY).toContain("script-src 'self';");
+    expect(CONTENT_SECURITY_POLICY).not.toContain("script-src 'self' 'unsafe-inline'");
   });
 
   it('carries them on the API too, so the list has no exception to remember', async () => {

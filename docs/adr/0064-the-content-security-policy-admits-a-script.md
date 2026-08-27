@@ -1,7 +1,7 @@
 # ADR-0064 — The Content-Security-Policy admits a script, scoped to `'self'`
 
 - **Date**: 2026-08-24
-- **Status**: accepted
+- **Status**: superseded by ADR-0072
 
 ## Context
 
