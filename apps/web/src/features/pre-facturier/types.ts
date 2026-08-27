@@ -13,7 +13,8 @@
  *   the **aggregate** total (`summary.billableCents`, HT) survives onto the wire; no per-row HT
  *   does. Confirmed deliberate, not an oversight: `routes/pre-facturier.int.test.ts` asserts this
  *   exact shape with `totalTtcCents: null` on a draft row. Recorded in
- *   `docs/open-questions.md` (row dated 2026-08-26): task 7.1's own prose asks for an HT column
+ *   `docs/open-questions.md` (row dated 27/08/2026 — this comment is not that record on its own,
+ *   `CLAUDE.md`'s double checkpoint requires the row): task 7.1's own prose asks for an HT column
  *   this endpoint cannot fill; the table below renders TTC only.
  * - **`invoices[].totalTtcCents` is `null` until the invoice is issued** (Phase 8), which in
  *   Phase 7 is every row — validating a Cra only ever drafts an invoice, it does not issue one.
