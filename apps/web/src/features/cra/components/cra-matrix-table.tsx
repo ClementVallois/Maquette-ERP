@@ -387,8 +387,8 @@ export function CraMatrixTable({
               return (
                 <td
                   key={day.date}
+                  // No `title` (ADR-0061) — `aria-label` already carries the same sentence.
                   aria-label={tone === null ? label : `${label} : ${TOTAL_TONES[tone].sentence}`}
-                  title={tone === null ? undefined : TOTAL_TONES[tone].sentence}
                   className={cn(
                     'border-l border-border px-1 py-2 text-center tabular-nums',
                     tone !== null && TOTAL_TONES[tone].cellClass,

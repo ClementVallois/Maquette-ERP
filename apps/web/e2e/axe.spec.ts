@@ -16,14 +16,29 @@ import { expect, test, type Page } from '@playwright/test';
 
 const SEVERE = new Set(['critical', 'serious']);
 
-async function assertNoSeriousViolations(page: Page): Promise<void> {
+/**
+ * Both halves of ADR-0061's mechanical claim that axe-core alone cannot stand in for: severe
+ * violations, **and** the absolute "no element carries a `title` attribute" rule axe-core has no
+ * rule for (a `title` is not a WCAG violation in general — it is *this repository's own* stricter
+ * choice, "not exposed on touch, not focusable, not announced consistently"). Folded into one
+ * function rather than left as a second call site every test would have to remember to add: five
+ * real instances (three icon-button tooltips in `cra-grid-screen.tsx`, one matrix cell in
+ * `cra-matrix-table.tsx`, one invoice line in `invoice-detail-screen.tsx`) shipped and went
+ * unnoticed for exactly that reason — nothing checked for it once the SSR pages that used to
+ * (`pre-facturier.int.test.ts`) were deleted in Phase 9, and every one of this file's existing
+ * calls stayed green with a real regression already live. Verified by reintroducing one by hand
+ * (`title="x"` on the margin screen's mission cell) before this fix: `assertNoSeriousViolations`'s
+ * old, axe-only body stayed green against it.
+ */
+async function assertAccessible(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page }).analyze();
   const severe = results.violations.filter(
     (violation) =>
       violation.impact !== null && violation.impact !== undefined && SEVERE.has(violation.impact),
   );
-
   expect(severe, JSON.stringify(severe, null, 2)).toHaveLength(0);
+
+  await expect(page.locator('[title]')).toHaveCount(0);
 }
 
 async function choosePersona(page: Page, personaKey: string): Promise<void> {
@@ -41,7 +56,7 @@ test.describe('accessibility — Mon CRA', () => {
     await page.goto('/cra');
     await page.getByRole('columnheader', { name: 'Mois' }).waitFor({ state: 'visible' });
 
-    await assertNoSeriousViolations(page);
+    await assertAccessible(page);
   });
 
   test('the read-only, validated grid has no critical/serious violation', async ({ page }) => {
@@ -49,7 +64,7 @@ test.describe('accessibility — Mon CRA', () => {
     await page.goto('/cra/2026-06');
     await page.getByText('CRA validé', { exact: false }).waitFor({ state: 'visible' });
 
-    await assertNoSeriousViolations(page);
+    await assertAccessible(page);
   });
 
   test('the editable, empty grid has no critical/serious violation', async ({ page }) => {
@@ -57,7 +72,7 @@ test.describe('accessibility — Mon CRA', () => {
     await page.goto('/cra/2026-07');
     await page.locator('select').first().waitFor({ state: 'visible' });
 
-    await assertNoSeriousViolations(page);
+    await assertAccessible(page);
   });
 });
 
@@ -73,7 +88,7 @@ test.describe('accessibility — Pré-facturier', () => {
     await page.goto('/pre-facturier?period=2026-06');
     await page.getByRole('heading', { name: 'Les CRA du mois' }).waitFor({ state: 'visible' });
 
-    await assertNoSeriousViolations(page);
+    await assertAccessible(page);
   });
 
   test('a period with nothing in it (2026-07, task 7.6’s empty state) has no critical/serious violation', async ({
@@ -85,7 +100,7 @@ test.describe('accessibility — Pré-facturier', () => {
       .getByText('Aucun CRA sur ce mois dans cette implantation.')
       .waitFor({ state: 'visible' });
 
-    await assertNoSeriousViolations(page);
+    await assertAccessible(page);
   });
 });
 
@@ -103,7 +118,7 @@ test.describe('accessibility — Factures', () => {
     await page.goto('/factures');
     await page.getByText('Banque Nationale de Test', { exact: true }).waitFor({ state: 'visible' });
 
-    await assertNoSeriousViolations(page);
+    await assertAccessible(page);
     await page.screenshot({
       animations: 'disabled',
       path: 'tests/visual/review/8.1-factures-list.png',
@@ -118,7 +133,7 @@ test.describe('accessibility — Factures', () => {
     await page.getByRole('link', { name: 'Ouvrir la facture' }).first().click();
     await page.getByText('Émetteur').waitFor({ state: 'visible' });
 
-    await assertNoSeriousViolations(page);
+    await assertAccessible(page);
     await page.screenshot({
       animations: 'disabled',
       path: 'tests/visual/review/8.2-facture-detail.png',
@@ -143,7 +158,7 @@ test.describe('accessibility — Tableau de bord (task 8.4, three roles)', () =>
       await choosePersona(page, role.key);
       await page.getByText(role.anchor).waitFor({ state: 'visible' });
 
-      await assertNoSeriousViolations(page);
+      await assertAccessible(page);
       await page.screenshot({
         animations: 'disabled',
         path: `tests/visual/review/8.4-dashboard-${role.label}.png`,
@@ -163,7 +178,7 @@ test.describe('accessibility — Sélecteur de persona', () => {
     await page.goto('/');
     await page.getByRole('heading', { name: 'Choisir un persona' }).waitFor({ state: 'visible' });
 
-    await assertNoSeriousViolations(page);
+    await assertAccessible(page);
   });
 });
 
@@ -197,7 +212,7 @@ test.describe('accessibility — Marge', () => {
     await page.goto(`/marge/${aliceRow.consultantId}?period=${aliceRow.period}`);
     await page.getByRole('heading', { name: 'Alice Martin' }).waitFor({ state: 'visible' });
 
-    await assertNoSeriousViolations(page);
+    await assertAccessible(page);
   });
 });
 
@@ -229,7 +244,7 @@ test.describe('accessibility — États 403/404', () => {
     await page.getByText('Accès refusé', { exact: true }).waitFor({ state: 'visible' });
     await page.getByText('/problems/out-of-scope').waitFor({ state: 'visible' });
 
-    await assertNoSeriousViolations(page);
+    await assertAccessible(page);
   });
 
   test('insufficient-role (billing on a margin URL, denied) has no critical/serious violation', async ({
@@ -249,7 +264,7 @@ test.describe('accessibility — États 403/404', () => {
     await page.getByText('Accès refusé', { exact: true }).waitFor({ state: 'visible' });
     await page.getByText('/problems/insufficient-role').waitFor({ state: 'visible' });
 
-    await assertNoSeriousViolations(page);
+    await assertAccessible(page);
   });
 
   test('the styled 404 (no matching route) has no critical/serious violation', async ({ page }) => {
@@ -257,6 +272,6 @@ test.describe('accessibility — États 403/404', () => {
     await page.goto('/cette-route-n-existe-pas');
     await page.getByRole('heading', { name: 'Page introuvable' }).waitFor({ state: 'visible' });
 
-    await assertNoSeriousViolations(page);
+    await assertAccessible(page);
   });
 });

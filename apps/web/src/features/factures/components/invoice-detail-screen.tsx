@@ -92,11 +92,11 @@ function lineColumns(): ColumnDef<InvoiceLine>[] {
     {
       id: 'origin',
       header: LABELS.invoice.origin,
+      // No `title` (ADR-0061: not exposed on touch, not focusable, not announced consistently) —
+      // the Cra id it used to show on hover is not shown anywhere else on this row either, so it
+      // is simply not rendered rather than moved: nothing in this screen reads it today.
       cell: ({ row }) => (
-        <span
-          className="font-mono text-[0.75rem] text-muted-foreground"
-          title={row.original.origin.craId}
-        >
+        <span className="font-mono text-[0.75rem] text-muted-foreground">
           {frenchMonth(row.original.origin.period)}
         </span>
       ),

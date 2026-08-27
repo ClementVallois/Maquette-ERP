@@ -356,10 +356,11 @@ function RowTools({
 }): ReactElement {
   return (
     <>
+      {/* No `title` (ADR-0061: not exposed on touch, not focusable, not announced consistently)
+          — `aria-label` alone already carries the same words, disambiguated by row. */}
       <Button
         variant="ghost"
         size="icon-sm"
-        title={LABELS.cra.matrix.fillEmptyWorkdays}
         aria-label={`${LABELS.cra.matrix.fillEmptyWorkdays} — ${row.label}`}
         onClick={onFill}
       >
@@ -368,7 +369,6 @@ function RowTools({
       <Button
         variant="ghost"
         size="icon-sm"
-        title={LABELS.cra.matrix.clearRow}
         aria-label={`${LABELS.cra.matrix.clearRow} — ${row.label}`}
         onClick={onClear}
       >
@@ -378,7 +378,6 @@ function RowTools({
         <Button
           variant="ghost"
           size="icon-sm"
-          title={LABELS.cra.matrix.removeRow}
           aria-label={`${LABELS.cra.matrix.removeRow} — ${row.label}`}
           onClick={onRemove}
         >
