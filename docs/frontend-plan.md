@@ -903,6 +903,14 @@ frame-ancestors 'none'
 rejeté : deux politiques à tester pour un bénéfice nul). Reporter la chaîne dans ADR-0064. Les
 autres en-têtes (`nosniff`, `referrer-policy: same-origin`, `x-frame-options`) ne changent pas.
 
+> ⚠️ **La chaîne ci-dessus a été amendée le 27/08/2026, sur une clause et une seule** :
+> `style-src` devient `'self' 'unsafe-inline'` — **ADR-0072**, qui supersède ADR-0064. Motif : Radix
+> UI et `sonner` écrivent des attributs `style` au rendu, et un attribut `style` ne peut porter ni
+> nonce ni hash. La preuve n'existait pas avant 9.6 : le serveur de dev Vite n'envoie aucun
+> en-tête CSP, donc huit phases d'e2e sont passées au vert contre une page sans politique.
+> `script-src` reste `'self'` et un test l'assure négativement. La chaîne qui fait foi est celle
+> d'ADR-0072, pas celle de ce paragraphe.
+
 ### 9.3 Inventaire de retrait — écrans serveur remplacés
 
 **Supprimer** : `pages/persona-selector.ts`, `pages/cra-list.ts`, `pages/cra-grid.ts`,
