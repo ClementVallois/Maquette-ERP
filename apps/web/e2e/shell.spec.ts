@@ -225,12 +225,43 @@ test.describe('guards', () => {
   });
 });
 
+/**
+ * `choosePersona` returns on `waitForURL('/tableau-de-bord')`, and the nav renders from the
+ * session `beforeLoad` — both settle **before** `GET /api/v1/dashboard` answers. Every capture
+ * below therefore waits on the dashboard's own first real render, not on the shell's: waiting for
+ * the nav only (what these tests did through Phase 8) is a race, and it is a race that was
+ * silently lost — `4.2-shell-billing-paris.png` at `448f70b` is three grey skeleton blocks and no
+ * content, while `4.2-shell-consultant-paris.png` and `4.2-shell-manager-paris.png` came out
+ * byte-identical to their `8.4-dashboard-*` twins because those two happened to win it. The same
+ * diagnosis and the same treatment as the mid-visit session-guard test above (`24746d6`): Phase
+ * 8's dashboard query is what made a wait that used to be free load-bearing.
+ *
+ * The anchor is per **role**, and it is the string the card set of that role renders first —
+ * `e2e/axe.spec.ts` keys its own dashboard captures to the identical three, so the two files
+ * cannot drift into disagreeing about what "loaded" means for a role.
+ */
+const DASHBOARD_ANCHOR = {
+  consultant: 'Statut du mois',
+  manager: 'CRA en attente de décision',
+  billing: 'Factures en brouillon',
+} as const;
+
+/** Screenshots are compared by **bytes** in review, so a shot fired mid-transition churns the
+ * committed evidence for no change in what the screen says. `animations: 'disabled'` finishes
+ * CSS transitions and animations before the capture — the skeleton-to-content swap and the
+ * card's own shadow are both in flight at exactly the moment the anchor appears. */
+const REVIEW_CAPTURE = { fullPage: false, animations: 'disabled' } as const;
+
 test.describe('screenshots — the shell per persona (rule 0bis.10)', () => {
-  const personas: readonly { key: string; label: string }[] = [
-    { key: 'consultant-paris', label: 'consultant-paris' },
-    { key: 'manager-paris', label: 'manager-paris' },
-    { key: 'manager-lyon', label: 'manager-lyon' },
-    { key: 'billing-paris', label: 'billing-paris' },
+  const personas: readonly {
+    key: string;
+    label: string;
+    anchor: (typeof DASHBOARD_ANCHOR)[keyof typeof DASHBOARD_ANCHOR];
+  }[] = [
+    { key: 'consultant-paris', label: 'consultant-paris', anchor: DASHBOARD_ANCHOR.consultant },
+    { key: 'manager-paris', label: 'manager-paris', anchor: DASHBOARD_ANCHOR.manager },
+    { key: 'manager-lyon', label: 'manager-lyon', anchor: DASHBOARD_ANCHOR.manager },
+    { key: 'billing-paris', label: 'billing-paris', anchor: DASHBOARD_ANCHOR.billing },
   ];
 
   for (const persona of personas) {
@@ -239,10 +270,11 @@ test.describe('screenshots — the shell per persona (rule 0bis.10)', () => {
 
       await choosePersona(page, persona.key);
       await expect(sidebarNav(page).locator('a').first()).toBeVisible();
+      await page.getByText(persona.anchor).waitFor({ state: 'visible' });
 
       await page.screenshot({
         path: `tests/visual/review/4.2-shell-${persona.label}.png`,
-        fullPage: false,
+        ...REVIEW_CAPTURE,
       });
     });
   }
@@ -256,7 +288,7 @@ test.describe('screenshots — the shell per persona (rule 0bis.10)', () => {
 
     await page.screenshot({
       path: 'tests/visual/review/4.1-persona-selector.png',
-      fullPage: false,
+      ...REVIEW_CAPTURE,
     });
   });
 
@@ -266,13 +298,17 @@ test.describe('screenshots — the shell per persona (rule 0bis.10)', () => {
     test.skip(testInfo.project.name !== 'mobile-shell', 'this is the one responsive capture');
 
     await choosePersona(page, 'manager-paris');
+    // The dashboard behind the Sheet is part of this capture (the Sheet is an overlay, not a
+    // page), so it waits on the same anchor as every other one — it won the race at `448f70b`,
+    // which is not the same thing as not being in it.
+    await page.getByText(DASHBOARD_ANCHOR.manager).waitFor({ state: 'visible' });
     // The persistent aside is hidden below `md`; the topbar's menu button opens the Sheet.
     await page.getByRole('button', { name: 'Ouvrir le menu' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.screenshot({
       path: 'tests/visual/review/4.5-shell-mobile-sheet.png',
-      fullPage: false,
+      ...REVIEW_CAPTURE,
     });
   });
 });
