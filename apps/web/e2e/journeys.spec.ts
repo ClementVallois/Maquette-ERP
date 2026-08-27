@@ -123,6 +123,15 @@ async function switchPersonaViaApi(page: Page, personaKey: string): Promise<void
   expect(response.ok()).toBe(true);
 }
 
+test.describe('demo checklist — the opening beat: the selector, notice visible', () => {
+  test('the API’s own not-authentication notice renders on the first screen', async ({ page }) => {
+    await page.goto('/');
+    await page
+      .getByText('These are demonstration personas, not accounts', { exact: false })
+      .waitFor({ state: 'visible' });
+  });
+});
+
 test.describe('item 1 — switching persona drops stale data without a reload', () => {
   test("a manager switched to client-side sees the whole office, not the previous persona's own rows", async ({
     page,
@@ -496,6 +505,22 @@ test.describe('J2 — manager-paris (Bruno): validates Claire’s submitted June
     page,
   }) => {
     await choosePersona(page, 'manager-paris');
+
+    // The demo checklist's own opening beat for Bruno ("dashboard « en attente »"):
+    // `docs/open-questions.md`'s row of 27/08/2026 found this screen answering empty on any date
+    // after June 2026, because it read the wall-clock month against a seed frozen at `2026-06` —
+    // `?period=` (this same commit) is the fix, pinning the read to the seed's own period rather
+    // than depending on the day this suite happens to run. Claire's June Cra is still `submitted`
+    // at this point in the file (task 6.1's list, run earlier, only reads — it never decides
+    // anything), so this is the one real "pending" row the whole seed has.
+    await page.goto('/tableau-de-bord?period=2026-06');
+    await expect(statCardValue(page, 'CRA en attente de décision')).toHaveText('1');
+    await page.screenshot({
+      animations: 'disabled',
+      path: 'tests/visual/review/10.4-dashboard-manager-en-attente.png',
+      fullPage: false,
+    });
+
     // Explicit period: Bruno's own `/pre-facturier` (no `period`) defaults to the office's most
     // recent Cra period, which J1 (run earlier in this file) may have pushed to `2026-08` by now
     // — this journey is about the seed's June data specifically, so it never relies on that
@@ -625,6 +650,20 @@ test.describe('J4 — billing-paris (Henri): issues the draft J2 created, with a
     // then the footer button `IssuanceDialog` renders once `issued !== null`.
     await dialog.getByRole('button', { name: 'Fermer' }).last().click();
     await expect(dialog).toBeHidden();
+
+    // The demo checklist's own next beat: "version imprimable (onglet SSR)". `routing.spec.ts`
+    // already proves the link's `href` is the right one; this is the one place any spec actually
+    // opens it, in a real new tab (`target="_blank"`), and checks the document on the other end
+    // is the server-rendered printable, not the SPA (`main#contenu`, no `#root` — the same
+    // discriminator `routing.spec.ts` uses).
+    const printablePopup = page.waitForEvent('popup');
+    await page.getByRole('link', { name: 'Version imprimable' }).click();
+    const printable = await printablePopup;
+    await printable.waitForLoadState();
+    await expect(printable.locator('main#contenu')).toHaveCount(1);
+    await expect(printable.locator('#root')).toHaveCount(0);
+    await expect(printable.getByRole('heading', { name: 'SEC-2026-000001' })).toBeVisible();
+    await printable.close();
 
     // The replay itself: `IssuanceDialog` has nothing left to click a second time on an invoice
     // it now shows as issued (task 8.3's own "l'offre suit le statut" — same reasoning
