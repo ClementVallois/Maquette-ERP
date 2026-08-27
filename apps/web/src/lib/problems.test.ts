@@ -116,6 +116,27 @@ describe('classifyProblem', () => {
     });
   });
 
+  it('classifies a 409 as conflict even when it also carries errors, never field-errors', () => {
+    // The exact shape `problemFromBusinessError`'s CONFLICT branch sends whenever the business
+    // error has `details` — reproduced live against `POST /invoices/:id/issuance` on an
+    // already-issued invoice hit with a fresh key (Phase 8, task 8.3): `invariant` AND `errors`
+    // both set. The bug this guards: checking `errors` before `invariant` silently classifies
+    // this as `field-errors`, and no screen renders a designed conflict for that kind.
+    const problem: ProblemDetails = {
+      type: '/problems/invoice-transition-not-allowed',
+      title: 'InvoiceTransitionError',
+      status: 409,
+      invariant: '/problems/invoice-transition-not-allowed',
+      errors: { invoiceId: ['inv-1'], from: ['issued'], attempted: ['issued'] },
+      ...CONTEXT,
+    };
+
+    expect(classifyProblem(problem)).toStrictEqual({
+      kind: 'conflict',
+      invariant: '/problems/invoice-transition-not-allowed',
+    });
+  });
+
   it('classifies anything else as technical', () => {
     const problem: ProblemDetails = {
       type: API_PROBLEM_TYPES.internal,

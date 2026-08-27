@@ -41,8 +41,19 @@ export function classifyProblem(problem: ProblemDetails): ProblemAction {
   // carry `deniedBy` (BUILD-RULES § Authorization: "a 403 names the rule"), which is what a
   // `DeniedState` needs to render.
   if (problem.deniedBy !== undefined) return { kind: 'denied', deniedBy: problem.deniedBy };
-  if (problem.errors !== undefined) return { kind: 'field-errors', errors: problem.errors };
+
+  // `invariant` before `errors`, not after: every 409 this API sends carries both whenever the
+  // business error has `details` (`http/problem.ts`'s `problemFromBusinessError`, the CONFLICT
+  // branch — `invariant: error.problemType, ...asErrors(error.details)`), and a 422's own `errors`
+  // never comes with an `invariant` at all (the same function's UNPROCESSABLE branch sets only
+  // `errors`). Checking `errors` first — this file's own order until Phase 8 found it live,
+  // issuing an invoice a second time with a fresh key — silently swallowed every 409 that also
+  // carried structured detail fields into `field-errors`, a kind no screen renders as a designed
+  // conflict; `problems.test.ts`'s "conflict" fixture never set `errors` alongside `invariant`, so
+  // nothing caught it. `invariant` first is safe unconditionally: a 422 with `errors` never
+  // acquires one on the way here to be mis-ordered against.
   if (problem.invariant !== undefined) return { kind: 'conflict', invariant: problem.invariant };
+  if (problem.errors !== undefined) return { kind: 'field-errors', errors: problem.errors };
 
   return { kind: 'technical' };
 }
