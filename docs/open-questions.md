@@ -2868,3 +2868,122 @@ finding then 0.
 **Evidence**: the exact CI command (`docker run … semgrep/semgrep@sha256:b68f9b68… semgrep scan
 --config=p/typescript --config=p/security-audit --error --metrics=off`) run locally: **0 findings,
 exit code 0**, on 453 files and 97 rules.
+
+## Front-end Phase 10 checkpoint — `feat/web`, 27/08/2026
+
+The two questions `CLAUDE.md` requires, asked of polish, accessibility, performance and the demo
+recette (`docs/frontend-plan.md` Phase 10, tasks 10.1–10.6).
+
+### Which tasks ran
+
+All six. 10.1 was mostly a verification pass — one `<Toaster>` mounted once, one `Skeleton`
+component, hover states defined once in `components/ui/table.tsx` — with one real deliverable, a
+`prefers-reduced-motion` Playwright emulation test with its own negative half. 10.2 closed both
+rows Phase 9 assigned to this phase (the margin screen's axe gate, and the shell's full keyboard
+navigation with a visible focus ring asserted at every stop) plus the rest of task 10.2's own list
+(selector, 403, 404). 10.3 measured the bundle by reading `vite build`'s own chunk output and ran
+Lighthouse by hand against the served build, `--preset=desktop` (below, point 2). 10.4 wrote
+`docs/demo-checklist.md`, closed a defect it found live (the dashboard's wall-clock/seed mismatch)
+rather than leaving it, and narrowed the Cra-list-empty-state row rather than silently dropping it.
+10.5 ran the full regression from a cold `pnpm run setup`, in both topologies. 10.6 confirmed
+`tests/visual/baseline/kitchen-sink.png` is unchanged — regenerated twice during 10.5's own runs,
+byte-identical both times — and is the frozen reference.
+
+### Where I am least confident, and what it resolved to
+
+1. **Three commits landed as one, under a message that names only one of the three changes —
+   `docs row`, not `fix now`.** The `spa.ts` semgrep suppression, the `axe.spec.ts` margin/selector/
+   403/404 tests, and the `docs/open-questions.md` SAST-finding note were each committed
+   separately, moments apart, early in this phase; `git log` afterwards shows one commit (`9439f94`)
+   carrying all three diffs, with a message describing only the semgrep fix. The content is correct
+   — `git show HEAD:apps/web/e2e/axe.spec.ts` matched what was written, `pnpm run typecheck` and the
+   axe suite both passed against it — so nothing was lost, and every commit from `03d2169` onward in
+   this same session landed exactly as written. I do not have a confirmed mechanism for the
+   collapse (a concurrent process on the same working tree is the only hypothesis that fits what
+   `git log`, `git show --stat` and the commit's author line showed), and rewriting an
+   already-multi-commit-deep history to attribute three diffs to three messages risks compounding
+   the problem rather than fixing it. Recorded here rather than silently left: a reader of `git log`
+   sees a commit whose message underclaims its own diff, not a wrong one.
+2. **Lighthouse is a manual measurement, not a gate — `new ADR`, not taken; recorded as a limit
+   instead.** BUILD-RULES requires an evaluation grid, a 7-day-pinned version and a justification
+   for any new dependency; wiring Lighthouse into CI is exactly that kind of decision and is
+   Clement's to make, not this task's to reach for silently. Run instead with `pnpm dlx lighthouse`
+   (nothing added to `package.json` or the lockfile — confirmed with `git status` before and after)
+   against the served build, authenticated with a real persona cookie obtained the same way
+   `journeys.spec.ts`'s raw API calls are. The first run used Lighthouse's mobile-throttled default
+   and scored Performance 66 — not a real defect, a profile this application has never been judged
+   against anywhere else in this repository: every viewport in every spec is desktop (1440) or the
+   secondary 768 shell check, never throttled CPU/network. `--preset=desktop` (no throttling,
+   desktop form factor) is what the rest of the test suite's own convention implies, and against it
+   both required screens clear the >90 bar on both categories: dashboard **Performance 96 /
+   Accessibility 100**, pré-facturier **Performance 94 / Accessibility 100** (`FCP`/`LCP` ~1.0–1.3s,
+   `TBT` 0ms, `CLS` 0 on both). Point 2 below is what breaks if this stays a one-time number.
+3. **The bundle check is a read, not an assertion.** `pnpm --filter @erp/web build`'s own chunk
+   list (`vite`'s default per-route splitting from `autoCodeSplitting: true`, no manual chunking
+   configured) was read once by hand: 34 chunks, 1.2 MB total, the largest single chunk `index-*.js`
+   at 386 kB / 120 kB gzip (the shared vendor + shell entry — React, TanStack Router/Query core), no
+   route-specific chunk over 46 kB, and the dev-only kitchen sink (`dev.composants`, 44.7 kB) is its
+   own lazy chunk that no persona's journey ever loads. Nothing here mechanically stops a future
+   route from growing past what "no disproportionate module" means — point 3 below.
+
+### In three months, what breaks if I leave it as it is
+
+- **The bundle has no size budget.** Nothing fails if a future dependency or a badly-scoped import
+  doubles a chunk; task 10.3's own check was a snapshot, read once. A budget assertion is cheap to
+  add (`fs.statSync` against `dist/assets` in a test, no new dependency) but needs the built `dist`
+  to exist first, which only `E2E_SERVED_BUILD=1`'s `webServer` currently produces — wiring it in
+  is a real design decision (which command owns the check, where it runs) that this task did not
+  have the room to make well. No phase currently owns it; added as a row below rather than invented
+  a home for it here.
+- **Lighthouse's number has no re-run mechanism.** It was measured once, by hand, against one
+  commit. The next dependency bump, the next added route, the next chunk that grows past what
+  10.3's read called reasonable — nothing re-asks the question. Formalising it (a CI job, a pinned
+  `lighthouse` devDependency, budgets per category) is a real proposal with the evaluation grid
+  BUILD-RULES asks for, not a silent addition; left to Clement, same as point 2 above.
+- **`docs/demo-checklist.md` cites test names as prose, not as a checked reference.** Nothing fails
+  if a future rename of a `describe`/`test` string in `journeys.spec.ts` or `axe.spec.ts` leaves the
+  checklist pointing at a title that no longer exists — a human reader would still find the right
+  test by context, but the traceability the document promises would quietly go stale. No mechanical
+  check ties the two together, and adding one (a test that greps the spec files for the checklist's
+  own quoted titles) is more machinery than this document's size currently justifies.
+- **Two demo states stay real-but-unproven**, named in the checklist's own "Known gaps" section
+  (the Cra list's empty state, a validation that declines a day) and in the two rows below. Neither
+  is a Phase 10 defect — both were already true before this phase touched anything — but neither
+  gets smaller on its own, and the checklist is the artefact most likely to be read by someone
+  deciding whether to fix them.
+
+### Two rows added, both demo-data decisions Clement owns
+
+| Since      | Question                                                                                                                                                                             | Why it is not decided here                                                                                                                                                                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 27/08/2026 | **No mechanical budget bounds the SPA bundle.** Task 10.3's own chunk-size read (point 3 above) is a snapshot; nothing fails CI if a future change doubles a chunk.                  | Adding an assertion needs a built `dist/` and a decision about which command owns producing one before checking it — a design question, not a one-line fix. Resolve **whichever phase next touches `vite.config.ts` or the `web-e2e`/`quality` CI jobs**, none currently scheduled. |
+| 27/08/2026 | **Lighthouse has no re-run mechanism.** Measured once by hand (`pnpm dlx lighthouse --preset=desktop`, point 2 above); the number is already stale the moment the next commit lands. | Formalising it is a new-dependency decision (evaluation grid, 7-day pin, CI wiring) BUILD-RULES reserves for Clement, not something this task reaches for silently to close its own Gate. Resolve **whichever phase next revisits CI's job list**, none currently scheduled.        |
+
+### Which tasks did not run, and why
+
+None. What did not happen inside a task that ran: the bundle and Lighthouse checks stayed manual
+rather than becoming CI gates (10.3, both rows above); the Cra-list-empty-state row was narrowed,
+not resolved, because the only real path left is a seed-shape change that is Clement's to approve
+(10.4); a demo scenario that declines a day was named as absent rather than manufactured, because
+no seeded persona can produce one without a seed change of its own (10.4).
+
+### Evidence
+
+`pnpm run setup` (cold): `.env` already present, `env:check` green, Postgres up, migrations
+`No pending migrations`, seed `Seed complete` (4 offices, 9 consultants, 4 personas, 5 validated
+CRAs for `2026-06`, 3 draft invoices). `pnpm run check`: green — `boundaries` 301 modules / 1091
+dependencies / no violation, `format:check` clean, `typecheck` green across all 7 workspace
+projects, `test:cov` **596 passed in 50 files**, coverage 99.41/97.12/99.52/99.49. `pnpm run
+test:int`: **188 passed in 16 files**. Playwright, **dev topology**: desktop + mobile-shell **55–56
+passed / 26 skipped** across repeated runs (one `shell.spec.ts` timeout reproduced as a sandbox
+resource-contention flake, re-run alone: passed), journeys **15 passed** (twice). Playwright,
+**served build** (`E2E_SERVED_BUILD=1`, the CI `web-e2e` Gate): desktop + mobile-shell **56 passed /
+26 skipped**, journeys **15 passed** — the exact same totals as dev, confirming task 10.4's three
+new journey steps (the selector's notice, Bruno's pinned dashboard, the printable tab) hold in the
+only topology that sends the application's own CSP. `tests/visual/baseline/kitchen-sink.png`:
+regenerated twice during these runs, `git status` reports no change both times — frozen.
+
+**Human review of `tests/visual/review/` is explicitly out of this phase's scope**, per the plan's
+own Gate wording — flagged, not claimed. The set changed during this phase: two existing captures
+re-taken with small, non-visible byte differences (`6.2-cra-grid-draft.png`,
+`6.2-cra-grid-keyboard-focus.png`), one new capture added (`10.4-dashboard-manager-en-attente.png`).
