@@ -2459,3 +2459,31 @@ threshold `docs/BUILD-RULES.md` sets for one — the "Marge" link is a UI comple
 decided disclosure model (ADR-0052), not a new structural decision, and the HT/TTC gap (point 1
 above) is recorded as an open question precisely because it is not yet decided, which is what the
 open-questions file is for rather than an ADR pre-empting a decision nobody has made.
+
+### Correction, 27/08/2026 — two findings from an external review of this phase
+
+Two points the review of this branch raised after the checkpoint above was written. Neither
+changes what shipped in substance; both are corrections to what this record says about it.
+
+1. **The margin screen's own point 4 above ("least confident") undersold a real gap.** J2's
+   revenue/cost/margin assertions used `.first()` against two renders the test's own comment said
+   "must read the same amount for this assertion to mean anything" — without ever checking that.
+   The two renders read different fields on the wire (`marge-screen.tsx`'s StatCards read the
+   server's own aggregate, `data.revenueCents`/`costCents`/`marginCents`; the mission row reads a
+   separate array, `row.original.*`), so a miscomputed aggregate would have passed this test —
+   on the one screen ADR-0052 logs every disclosure of. **Fixed now, commit `e091ac5`**: both
+   renders are asserted to the same exact value, each scoped to where it actually appears (the
+   mission row via `getByRole('cell')` position, the StatCard via a new `statCardValue()` helper).
+
+2. **Commit `6bef73c`'s message states something false about three of its own files.** It says the
+   regenerated screenshots had "pixel content unchanged, bytes re-committed regardless — the same
+   convention `visual-baseline.spec.ts`'s own comment already states." That citation holds for
+   `tests/visual/baseline/kitchen-sink.png` (an unchanged component, and that spec re-captures
+   rather than asserts). It does **not** hold for `4.2-shell-manager-lyon.png`,
+   `4.2-shell-manager-paris.png` and `4.5-shell-mobile-sheet.png` in the same commit: each shows
+   the "Marge" sidebar entry present before and gone after, all three ~1.2 KB smaller — the direct
+   visual evidence of task 7.5's own nav decision, not noise. The commit message tells a reader to
+   disregard exactly the proof they should look at. **Not amended** (rule 0bis of this phase's own
+   brief: no rebase over commits already built on top) — recorded here instead, as the correction
+   the checkpoint discipline asks for when a defect surfaces in the deliverable itself, including
+   its own history.
