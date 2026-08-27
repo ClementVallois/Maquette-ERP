@@ -2967,6 +2967,41 @@ not resolved, because the only real path left is a seed-shape change that is Cle
 (10.4); a demo scenario that declines a day was named as absent rather than manufactured, because
 no seeded persona can produce one without a seed change of its own (10.4).
 
+### Correction, 27/08/2026 — three findings from a review of this checkpoint
+
+The checkpoint above was written, then reviewed before being treated as final. Three points came
+out of that review, all resolved the same day rather than left for a later phase to trip over.
+
+1. **Row 44 (the margin screen's axe gate) was never moved to reflect its own resolution, and the
+   fix it named turned out to be half of the real one — `fix now`.** `CLAUDE.md`'s own instruction
+   was explicit: "when done, move the row to 'Settled' with its answer." The margin axe test had
+   shipped, but the row still read as open. Fixing that led to testing the row's own premise rather
+   than trusting it — axe-core has no rule for a stray `title` attribute (ADR-0061's own absolute
+   ban is this repository's stricter choice, not a WCAG requirement), so `assertNoSeriousViolations`
+   stayed green when `title="x"` was added by hand to the margin screen's mission cell. Five real
+   instances had shipped and gone unnoticed across the whole SPA since Phase 9 deleted the SSR pages
+   that used to check this. All five are removed, the shared axe helper (renamed `assertAccessible`)
+   now asserts zero `[title]` elements at all thirteen of its call sites, and row 44 carries the
+   full answer. Commit `939ded4`; row updated in commit `87cf76d`.
+2. **Row 42 (the duplicate `4.2-shell-*`/`8.4-dashboard-*` captures) was never touched, and this
+   phase changed the exact set it is about — `docs row`, restated rather than resolved.** Deciding
+   which of two real, non-identical intents (nav-per-persona vs. cards-per-role) earns a kept
+   duplicate is the human review the plan's own Gate puts outside this agent's scope; the row is
+   restated to say so explicitly and to record that 10.5's regression re-touched the review set
+   (two byte-different re-captures, one new capture) without changing the `4.2`/`8.4` overlap it
+   names — still seven captures, still three byte-identical pairs.
+3. **The dashboard `?period=` override (point in "Which tasks ran" above) was a decision made
+   implicitly, and `CLAUDE.md`'s four-outcome rule names that shape by name — `new ADR`, not a
+   comment.** Choosing option (b) over the row's other two was reached inside task 10.4 rather than
+   left to Clement, on the reasoning that a spec depending on the calendar date it runs on is not a
+   spec — and a choice made between rejected alternatives, with a reconsideration threshold, is
+   exactly what `docs/adr/0000-template.md` exists for. **ADR-0073** now carries it;
+   `tableau-de-bord.tsx`'s comment links to the ADR instead of arguing the case inline.
+
+None of the three changed anything already reported as evidence below — the full regression
+(`pnpm run check`, `test:int`, both Playwright topologies) was re-run after all three fixes and is
+what the numbers below reflect.
+
 ### Evidence
 
 `pnpm run setup` (cold): `.env` already present, `env:check` green, Postgres up, migrations
