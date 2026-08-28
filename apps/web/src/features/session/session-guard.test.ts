@@ -9,14 +9,6 @@ import {
   SESSION_INVALIDATED_SEARCH,
 } from './session-guard';
 
-/**
- * These tests exercise the module directly, against a manufactured `ApiProblemError` — the same
- * shape `apps/api/src/personas/access.ts` actually sends — rather than through a real guarded
- * request. That is one of two proofs, not the only one (ADR-0074's own "Consequences"):
- * `e2e/shell.spec.ts` proves the same reason is *rendered*, after a live redirect, on the page a
- * real visitor is looking at.
- */
-
 function jsonResponse(body: unknown, status: number, contentType: string): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': contentType } });
 }
@@ -69,11 +61,6 @@ describe('installSessionGuard', () => {
       '/api/v1/session/persona',
       expect.objectContaining({ method: 'DELETE' }),
     );
-    // The argument is the whole point of ADR-0074 and is asserted here rather than left implied:
-    // this branch redirects **with** the reason, so the selector can say why. Until 28/08/2026 the
-    // reason was a `toast.error` on the document `window.location.assign` was about to destroy —
-    // and this test, despite its own name, never asserted that toast at any point, which is how a
-    // 1-in-12 race shipped through nine phases with a green suite over it.
     expect(redirect).toHaveBeenCalledWith(SESSION_INVALIDATED_SEARCH);
   });
 
@@ -89,8 +76,6 @@ describe('installSessionGuard', () => {
     });
 
     expect(redirect).toHaveBeenCalledTimes(1);
-    // No reason carried, and that is the decision, not an omission: nothing was invalidated, so
-    // the selector has nothing to explain (ADR-0074's own "Consequences").
     expect(redirect).toHaveBeenCalledWith();
   });
 

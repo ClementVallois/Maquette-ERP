@@ -41,11 +41,6 @@ export const LABELS = {
   },
 
   persona: {
-    // The heading of the notice the selector shows when `session-guard.ts` sent the visitor
-    // here because their cookie stopped resolving (ADR-0074). The sentence itself is
-    // `shell.sessionInvalidated`, rendered by this same banner — the only reader of either
-    // string; `session-guard.test.ts` asserts the search value the guard redirects with, not
-    // this copy.
     sessionInvalidatedTitle: 'Session interrompue',
     heading: 'Choisir un persona',
     lead: 'Cette maquette n’a pas d’authentification : on choisit une identité, et tout le monde peut choisir n’importe laquelle.',
@@ -601,9 +596,7 @@ export const LABELS = {
   /**
    * The shell itself (frontend-plan.md Phase 4, tasks 4.2-4.4): the sidebar's collapse control,
    * the mobile `Sheet` trigger, the "à venir" placeholder every Phase 6-8 route renders until its
-   * own phase builds it, the styled 404, and the copy for a session that stopped resolving after
-   * the shell had already rendered — rendered by `routes/index.tsx`, the destination the guard
-   * (`features/session/session-guard.ts`) redirects to, not by that guard itself (ADR-0074).
+   * own phase builds it, the styled 404, and the invalidated-session copy (ADR-0074).
    */
   shell: {
     collapse: 'Réduire la navigation',

@@ -211,13 +211,7 @@ test.describe('guards', () => {
     await page.getByRole('link', { name: 'Mes CRA' }).click();
     await unauthorized;
 
-    // The reason is asserted **on the selector**, after the redirect, not on the page being torn
-    // down (ADR-0074). Until 28/08/2026 this waited for a toast that `window.location.assign`
-    // destroyed as it fired: green wherever the DELETE round-trip happened to outlast one React
-    // render, red where it did not — 3/3 in CI run `33152831346` at one worker, 1 in 12 locally
-    // against the served build. Nothing about the wait was wrong; it was waiting for something the
-    // next line of production code was racing to delete. Carrying the reason in the URL makes the
-    // same claim deterministic, because the message now lives on the page that survives.
+    // ADR-0074 carries the reason to the page that survives the hard navigation.
     await page.waitForURL('/?session=invalidated');
     await expect(page.getByRole('heading', { name: 'Choisir un persona' })).toBeVisible();
     await expect(

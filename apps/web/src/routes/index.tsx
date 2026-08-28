@@ -15,11 +15,6 @@ import { ApiProblemError } from '@/lib/api-client';
 import { LABELS } from '@/lib/labels';
 import { headingFor, sentenceFor } from '@/lib/problems';
 
-/**
- * `/` — the persona selector (frontend-plan.md task 4.1). "C'est le premier écran de la démo :
- * niveau de finition maximal." Not authentication, and the notice returned by the API in `notice`
- * says so in place, above the grid — never softened, never called a login.
- */
 const PersonaSelectorSearch = z.object({
   // The one value `features/session/session-guard.ts` sends (`SESSION_INVALIDATED_SEARCH`).
   // A literal rather than a free string: an unrecognised `?session=` must not be able to put words
@@ -63,14 +58,7 @@ function PersonaSelectorPage(): ReactElement {
         <p className="text-sm text-muted-foreground">{LABELS.persona.lead}</p>
       </header>
 
-      {/* Why the session guard's message arrives here rather than as a toast on the page the
-          visitor was thrown off (ADR-0074): that redirect is a hard navigation, and it destroys the
-          document the toast lives in. Reproduced 1 visit in 12 — the explanation lost to the
-          redirect it exists to explain. `role="status"` and not `alert`: this is the consequence of
-          something that already happened, and the visitor is not being interrupted. Passed
-          explicitly — `components/ui/alert.tsx` hardcodes `role="alert"` on the element, and only
-          works here because its `{...props}` spread lands after that attribute in JSX, so the last
-          one written wins. */}
+      {/* Alert spreads props after its default role, so this explicit status role wins. ADR-0074. */}
       {session === 'invalidated' && (
         <Alert variant="destructive" role="status">
           <TriangleAlertIcon />
@@ -79,10 +67,7 @@ function PersonaSelectorPage(): ReactElement {
         </Alert>
       )}
 
-      {/* The API's own `notice` field, not the copy deck's paraphrase of it (frontend-plan.md
-          task 4.1: "La notice … (renvoyée par l'API dans notice) est affichée en évidence") —
-          `LABELS.persona.warning` says the same thing and stays as the lead's supporting line
-          above; this banner is what actually renders the server's own words. */}
+      {/* This contract requires the API's notice verbatim, not a local label. */}
       {personas.data !== undefined && (
         <div className="rounded-xl border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
           {personas.data.notice}
