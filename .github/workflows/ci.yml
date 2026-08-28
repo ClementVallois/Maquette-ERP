@@ -352,13 +352,16 @@ jobs:
       # says nothing about whether the least-privilege role the API actually uses can read what
       # was written. Phase 4's checkpoint deferred this here by name. Every table the API reads is
       # queried as `erp_app`, and the counts are asserted rather than merely printed — a `SELECT`
-      # that answers zero rows also "succeeds". `erp_app`'s password and the port are the
-      # `.env.example` values `setup`'s own `env:init` just copied to `.env` — not redeclared here,
-      # so a value that drifted in one place would fail loudly in the other instead of matching by
-      # coincidence.
+      # that answers zero rows also "succeeds". The connection string is `DATABASE_URL` read out of
+      # the `.env` that `setup`'s own `env:init` just wrote, rather than a second copy of the same
+      # credentials pasted here: a value that drifted in `.env.example` would then fail loudly here
+      # instead of being masked by a hard-coded literal that still happens to match.
       - name: The app role can read what the seed wrote
         run: |
-          psql -v ON_ERROR_STOP=1 "postgres://erp_app:erp_local_dev@localhost:5433/erp" <<'EOSQL'
+          set -a
+          . ./.env
+          set +a
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" <<'EOSQL'
             DO $$
             DECLARE
               expected CONSTANT text[][] := ARRAY[
@@ -379,8 +382,6 @@ jobs:
             END
             $$;
           EOSQL
-        env:
-          PGPASSWORD: erp_local_dev
 
   secrets:
     name: Secret scan

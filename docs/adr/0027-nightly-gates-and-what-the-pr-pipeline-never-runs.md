@@ -13,8 +13,9 @@ it have to prove itself?** All three are decided here together rather than split
 documents that would each answer a third of one question.
 
 1. **What runs on every push, and what runs once a day.** The PR pipeline (`ci.yml`) already
-   carries nine jobs: boundary, lint/format/types, unit tests with a 90 %/85 % coverage gate,
-   integration tests against a real Postgres, two migration-replay checks, three security scans.
+   carries ten jobs: boundary, lint/format/types, unit tests with a 90 %/85 % coverage gate, an
+   end-to-end Playwright suite against the served build, integration tests against a real
+   Postgres, two migration-replay checks, three security scans.
    Coverage says **how much** of the domain a test touches. It cannot say **whether** the
    assertion that touched a line would actually catch a wrong answer — an agent-produced test
    that calls a function and asserts nothing passes coverage and proves nothing. Mutation testing
@@ -49,8 +50,9 @@ Consequences). Scope is `packages/*/src/domain/**/*.ts` only, via `stryker.confi
 nothing else joins it: no end-to-end suite, no volumetry mode. Both are absent from this
 repository entirely (README, "Ce que je ne construis pas") and neither is a mutation-testing
 question — naming them here would imply a nightly tier exists to eventually hold them, and it
-does not. The PR pipeline is unchanged: nine jobs stays nine (task 7.3 gives the tenth,
-`web-e2e`, its overdue README row — a documentation fix, not a new job).
+does not. The PR pipeline is unchanged: ten jobs stays ten, because this ADR adds no job to it —
+the tenth, `web-e2e`, has been running since the front-end plan's Phase 9.6 and is only _counted_
+by this phase, in the README row task 7.3 owed it. A documentation fix, not a new job.
 
 **On ADR-0003's testability claim (row 1 of 19/08/2026):** narrowed to what is actually true,
 rather than built out to make the original sentence hold. `readScope`/`assertMayRead`
@@ -141,9 +143,9 @@ cross-cutting setup cost, not a coincidence of two tests happening to use the sa
 
 ## Consequences
 
-**Easy.** The PR pipeline stays at nine jobs and a few more minutes at most (task 7.3 documents
-the actual current count, ten, which is `web-e2e` getting the README row it was always owed — not
-a job this ADR adds). A slow, high-signal proof gets a home that does not threaten to be bypassed.
+**Easy.** The PR pipeline stays at ten jobs and a few more minutes at most — task 7.3 corrects
+the README's stale count of nine, which is `web-e2e` getting the README row it was always owed,
+not a job this ADR adds. A slow, high-signal proof gets a home that does not threaten to be bypassed.
 ADR-0003's claim is now fully defensible instead of half-true, and the repository's own discipline
 of narrowing a claim rather than building around it to keep a sentence intact (ADR-0045, ADR-0050,
 ADR-0073) extends to a testability argument instead of only to prose.

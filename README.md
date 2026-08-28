@@ -482,6 +482,12 @@ l'aurait fait disparaître de la liste sans erreur).
 > `Playwright (apps/web)` arrive avec la phase 9.6 du plan front-end. Historique complet →
 > `docs/open-questions.md`.
 >
+> ⚠️ Une réserve datée du 28/08/2026, sur une seule des dix : `Cold setup (migrate + seed)` vient
+> d'être réécrite pour lancer le composite réel, et cette version-là **n'a pas encore tourné sur un
+> runner GitHub** — la branche qui la porte ne peut pas déclencher sa propre pull request. Elle est
+> vérifiée en local et recoupée avec la liste logicielle documentée d'`ubuntu-latest`, pas
+> observée verte sur la plateforme. La ligne est ouverte dans `docs/open-questions.md`.
+>
 > ⚠️ Aucune de ces dix n'empêche un merge aujourd'hui, pour la raison donnée plus haut : la
 > protection de branche n'est pas disponible sur ce plan. C'est une limite assumée et datée
 > (ADR-0040), pas une case oubliée.
@@ -512,10 +518,10 @@ que ce gate existe justement à rendre visible plutôt qu'à masquer. Le seuil d
 (`break: 70` dans `stryker.config.json`) est fixé quelques points sous ce score réel, pas abaissé
 pour le faire passer. ⚠️ **`schedule:` ne se déclenche pas tant que ce fichier n'est pas sur la
 branche par défaut** — GitHub n'exécute pas un cron sur une branche qui n'est pas `main`. Ce
-workflow n'a donc **jamais tourné sur son propre horaire** ; `workflow_dispatch` le rend
-déclenchable à la main, et c'est ce mode qui a produit le score ci-dessus, en local et non par la
-plateforme. Ne pas lire « dix jobs verts » plus haut comme couvrant ce onzième mécanisme — il n'y
-figure pas.
+workflow n'a donc **jamais tourné**, ni sur son horaire ni autrement : `workflow_dispatch` le rend
+déclenchable à la main dès qu'il sera sur `main`, mais le score ci-dessus vient d'un
+`pnpm exec stryker run` lancé en local, avec la même configuration et non par la plateforme. Ne pas
+lire « dix jobs verts » plus haut comme couvrant ce onzième mécanisme — il n'y figure pas.
 
 ### Renovate, et la procédure de gestion des vulnérabilités
 
@@ -526,7 +532,8 @@ moment**, sans attendre la cadence. Décision, option écartée et seuil →
 
 ⚠️ **L'application GitHub Renovate n'est pas installée sur ce dépôt** — vérifié le 28/08/2026 :
 aucun webhook, aucune pull request ouverte par le bot, dépôt privé. Installer une App GitHub est
-une action de plateforme qu'un agent ne peut pas effectuer à la place de Clement. Ce README dit
+une action de plateforme, à faire depuis github.com : ni la CI ni un script de ce dépôt ne peut la
+déclencher, et elle n'est pas faite. Ce README dit
 donc ce qui est vrai — la configuration est committée et correcte — et pas ce qui ne l'est pas
 encore — que Renovate tourne. C'est le précédent d'ADR-0040 appliqué une seconde fois plutôt que
 réinventé : ce dépôt a déjà affirmé une porte qui n'a jamais été réellement active (la protection
