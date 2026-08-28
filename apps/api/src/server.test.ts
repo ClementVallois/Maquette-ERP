@@ -12,6 +12,11 @@ import { PUBLIC } from './personas/access.ts';
 import { inMemoryPersonas } from './personas/testing/catalogue.ts';
 import { buildServer } from './server.ts';
 
+/**
+ * The fixture routes live under `/api/v1` on purpose: `web/representation.ts` makes HTML the
+ * default representation and JSON the exception, so a refusal on `/boom` is a rendered page and a
+ * refusal on `/api/v1/boom` is the problem document this file is about.
+ */
 const config: ApiConfig = {
   databaseUrl: 'postgres://erp_app:hunter2@localhost:5433/erp',
   host: '127.0.0.1',
@@ -124,19 +129,22 @@ describe('the HTTP edge', () => {
   });
 
   it('answers an unknown route with a problem document, not the framework own shape', async () => {
-    const response = await app.inject({ method: 'GET', url: '/nope' });
+    const response = await app.inject({ method: 'GET', url: '/api/v1/nope' });
 
     expect(response.statusCode).toBe(404);
     expect(response.headers['content-type']).toContain(PROBLEM_JSON);
-    expect(response.json()).toMatchObject({ type: '/problems/not-found', instance: '/nope' });
+    expect(response.json()).toMatchObject({
+      type: '/problems/not-found',
+      instance: '/api/v1/nope',
+    });
   });
 
   it('turns a business refusal into its mapped status', async () => {
-    app.get('/boom', { config: { access: PUBLIC('a fixture route') } }, () => {
+    app.get('/api/v1/boom', { config: { access: PUBLIC('a fixture route') } }, () => {
       throw new CraIncomplete('3 workable days are unaccounted for', { missing: 3 });
     });
 
-    const response = await app.inject({ method: 'GET', url: '/boom' });
+    const response = await app.inject({ method: 'GET', url: '/api/v1/boom' });
 
     expect(response.statusCode).toBe(409);
     expect(response.json()).toMatchObject({
@@ -147,11 +155,11 @@ describe('the HTTP edge', () => {
   });
 
   it('names the rule that denied a 403 and publishes no business field', async () => {
-    app.get('/denied', { config: { access: PUBLIC('a fixture route') } }, () => {
+    app.get('/api/v1/denied', { config: { access: PUBLIC('a fixture route') } }, () => {
       throw new NotTheManager("March is validated by March's manager", { managerId: 'mgr-7' });
     });
 
-    const response = await app.inject({ method: 'GET', url: '/denied' });
+    const response = await app.inject({ method: 'GET', url: '/api/v1/denied' });
 
     expect(response.statusCode).toBe(403);
     expect(response.json()).toMatchObject({ deniedBy: '/problems/not-the-manager' });
@@ -159,11 +167,11 @@ describe('the HTTP edge', () => {
   });
 
   it('publishes nothing but the correlation id when something unexpected fails', async () => {
-    app.get('/crash', { config: { access: PUBLIC('a fixture route') } }, () => {
+    app.get('/api/v1/crash', { config: { access: PUBLIC('a fixture route') } }, () => {
       throw new DriverBlewUp('connection string postgres://erp_app:hunter2@localhost/erp');
     });
 
-    const response = await app.inject({ method: 'GET', url: '/crash' });
+    const response = await app.inject({ method: 'GET', url: '/api/v1/crash' });
 
     expect(response.statusCode).toBe(500);
     expect(response.json()).toMatchObject({ type: '/problems/internal' });
@@ -172,11 +180,13 @@ describe('the HTTP edge', () => {
   });
 
   it('answers a body that is not JSON with a malformed-request problem', async () => {
-    app.post('/echo', { config: { access: PUBLIC('a fixture route') } }, () => ({ ok: true }));
+    app.post('/api/v1/echo', { config: { access: PUBLIC('a fixture route') } }, () => ({
+      ok: true,
+    }));
 
     const response = await app.inject({
       method: 'POST',
-      url: '/echo',
+      url: '/api/v1/echo',
       // The origin check runs on `onRequest`, before the body is parsed, so a POST without it
       // never reaches the parser. That ordering is deliberate — a cross-site request is refused
       // before anything reads its payload.
@@ -191,7 +201,7 @@ describe('the HTTP edge', () => {
   it('echoes the correlation id on every answer, including a refusal', async () => {
     const supplied = '019ec893-f400-7000-8000-0000000000ff';
 
-    for (const url of ['/healthz', '/nope']) {
+    for (const url of ['/healthz', '/api/v1/nope']) {
       const response = await app.inject({
         method: 'GET',
         url,

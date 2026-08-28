@@ -1,9 +1,9 @@
 import {
   type Actor,
   assertMayRead,
-  type HalfDays,
+  type QuarterDays,
   type Period,
-  halfDays,
+  quarterDays,
   isoDateOf,
   periodFromIso,
   readScope,
@@ -82,13 +82,25 @@ export class PgCraRepository implements CraRepository {
     if (scope === 'none') return [];
 
     const { rows } = await this.#client.query<CraListRow>(
-      `SELECT id, consultant_id, office_id, period, status
-       FROM timesheet.cras
-       WHERE office_id = $1
-         AND ($2::text IS NULL OR consultant_id = $2)
-       ORDER BY period DESC, consultant_id
+      // LEFT JOIN, and the `COALESCE` with it: a month opened and never filled is precisely the
+      // row the pré-facturier exists to show, and an inner join would drop it.
+      `SELECT c.id, c.consultant_id, c.office_id, c.period, c.status,
+              COALESCE(SUM(l.quarter_days), 0)::int AS recorded_quarter_days
+       FROM timesheet.cras c
+       LEFT JOIN timesheet.cra_lines l ON l.cra_id = c.id
+       WHERE c.office_id = $1
+         AND ($2::text IS NULL OR c.consultant_id = $2)
+         AND ($5::text IS NULL OR c.period = $5)
+       GROUP BY c.id, c.consultant_id, c.office_id, c.period, c.status
+       ORDER BY c.period DESC, c.consultant_id
        LIMIT $3 OFFSET $4`,
-      [actor.officeId, scope === 'own' ? actor.consultantId : null, limit, query.offset],
+      [
+        actor.officeId,
+        scope === 'own' ? actor.consultantId : null,
+        limit,
+        query.offset,
+        query.period ?? null,
+      ],
     );
 
     return rows.map((row) => ({
@@ -97,6 +109,11 @@ export class PgCraRepository implements CraRepository {
       officeId: row.office_id,
       period: row.period,
       status: row.status,
+      // `::int` in the query rather than a string-to-integer helper here: `SUM` is `bigint` and
+      // `pg` hands a `bigint` back as a string, while an `int` arrives as a number. A month of
+      // quarter-days cannot approach the 32-bit bound, and `quarterDays` refuses anything that is
+      // not a whole non-negative count if the cast ever stops holding.
+      recordedQuarterDays: quarterDays(row.recorded_quarter_days),
     }));
   }
 
@@ -135,9 +152,9 @@ export class PgCraRepository implements CraRepository {
 
     for (const line of cra.lines) {
       await this.#client.query(
-        `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
+        `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, quarter_days)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [this.#newId(), cra.id, line.day, line.dayType, line.missionId, line.halfDays],
+        [this.#newId(), cra.id, line.day, line.dayType, line.missionId, line.quarterDays],
       );
     }
 
@@ -152,7 +169,7 @@ export class PgCraRepository implements CraRepository {
 
   async #reconstitute(row: CraRow): Promise<Cra> {
     const { rows: lineRows } = await this.#client.query<CraLineRow>(
-      `SELECT day, day_type, mission_id, half_days FROM timesheet.cra_lines WHERE cra_id = $1 ORDER BY day, mission_id`,
+      `SELECT day, day_type, mission_id, quarter_days FROM timesheet.cra_lines WHERE cra_id = $1 ORDER BY day, mission_id`,
       [row.id],
     );
 
@@ -165,7 +182,7 @@ export class PgCraRepository implements CraRepository {
       day: isoDateOf(lineRow.day),
       dayType: lineRow.day_type as RecordedDayType,
       missionId: (lineRow.mission_id ?? null) as MissionId | null,
-      halfDays: halfDays(lineRow.half_days) as HalfDays,
+      quarterDays: quarterDays(lineRow.quarter_days) as QuarterDays,
     }));
 
     const flags: CraFlag[] = flagRows.map((flagRow) => ({
@@ -214,13 +231,14 @@ interface CraListRow {
   office_id: string;
   period: string;
   status: string;
+  recorded_quarter_days: number;
 }
 
 interface CraLineRow {
   day: Date | string;
   day_type: string;
   mission_id: string | null;
-  half_days: number;
+  quarter_days: number;
 }
 
 interface CraFlagRow {

@@ -1,4 +1,4 @@
-import { type Actor, halfDays, OutOfScopeError, period } from '@erp/platform';
+import { type Actor, quarterDays, OutOfScopeError, period } from '@erp/platform';
 import { useTestTransaction } from '@erp/test-harness';
 import { describe, expect, it } from 'vitest';
 
@@ -146,7 +146,7 @@ describe('PgInvoiceRepository', () => {
           missionId: 'mission-audit',
           craId: 'cra-1',
           period: '2026-03',
-          halfDays: halfDays(42),
+          quarterDays: quarterDays(84),
           tjmCents: 65_000,
           vat: { kind: 'taxable', basisPoints: 2000 },
         }),
@@ -465,7 +465,7 @@ describe('PgInvoiceRepository', () => {
           missionId: 'mission-audit',
           craId: 'cra-multi',
           period: '2026-03',
-          halfDays: halfDays(20),
+          quarterDays: quarterDays(40),
           tjmCents: 55_000,
           vat: { kind: 'taxable', basisPoints: 2000 },
         }),
@@ -514,15 +514,15 @@ describe('PgInvoiceRepository', () => {
     await seedReferenceData();
 
     await repo().saveDeclinedDays(PARIS, [
-      { craId: 'cra-1', missionId: 'mission-forfait', halfDays: 6, reason: 'notRegie' },
-      { craId: 'cra-1', missionId: 'mission-ghost', halfDays: 2, reason: 'unknownMission' },
+      { craId: 'cra-1', missionId: 'mission-forfait', quarterDays: 12, reason: 'notRegie' },
+      { craId: 'cra-1', missionId: 'mission-ghost', quarterDays: 4, reason: 'unknownMission' },
     ]);
 
-    const declined = await repo().findDeclinedDays('cra-1', parisManager);
+    const declined = await repo().findDeclinedDays(['cra-1'], parisManager);
 
     expect(declined).toStrictEqual([
-      { craId: 'cra-1', missionId: 'mission-forfait', halfDays: 6, reason: 'notRegie' },
-      { craId: 'cra-1', missionId: 'mission-ghost', halfDays: 2, reason: 'unknownMission' },
+      { craId: 'cra-1', missionId: 'mission-forfait', quarterDays: 12, reason: 'notRegie' },
+      { craId: 'cra-1', missionId: 'mission-ghost', quarterDays: 4, reason: 'unknownMission' },
     ]);
   });
 
@@ -532,30 +532,108 @@ describe('PgInvoiceRepository', () => {
     await seedReferenceData();
 
     await repo().saveDeclinedDays(PARIS, [
-      { craId: 'cra-1', missionId: 'mission-forfait', halfDays: 6, reason: 'notRegie' },
+      { craId: 'cra-1', missionId: 'mission-forfait', quarterDays: 12, reason: 'notRegie' },
     ]);
     // The replay does not throw — the unique index alone would make it throw — and it does not
     // overwrite either: `DO NOTHING` rather than `DO UPDATE`, because a decline is a fact about a
     // Cra that was validated once, and there is nothing about it that can legitimately change.
     await repo().saveDeclinedDays(PARIS, [
-      { craId: 'cra-1', missionId: 'mission-forfait', halfDays: 999, reason: 'notRegie' },
+      { craId: 'cra-1', missionId: 'mission-forfait', quarterDays: 1998, reason: 'notRegie' },
     ]);
 
-    const declined = await repo().findDeclinedDays('cra-1', parisManager);
+    const declined = await repo().findDeclinedDays(['cra-1'], parisManager);
 
     expect(declined).toHaveLength(1);
-    expect(declined[0]!.halfDays).toBe(6);
+    expect(declined[0]!.quarterDays).toBe(12);
   });
 
   it('findDeclinedDays answers nothing for another office, and nothing for a consultant', async () => {
     await seedReferenceData();
 
     await repo().saveDeclinedDays(PARIS, [
-      { craId: 'cra-1', missionId: 'mission-forfait', halfDays: 6, reason: 'notRegie' },
+      { craId: 'cra-1', missionId: 'mission-forfait', quarterDays: 12, reason: 'notRegie' },
     ]);
 
-    expect(await repo().findDeclinedDays('cra-1', lyonManager)).toStrictEqual([]);
-    expect(await repo().findDeclinedDays('cra-1', parisConsultant)).toStrictEqual([]);
+    expect(await repo().findDeclinedDays(['cra-1'], lyonManager)).toStrictEqual([]);
+    expect(await repo().findDeclinedDays(['cra-1'], parisConsultant)).toStrictEqual([]);
+  });
+
+  // ── The pré-facturier's reads (ADR-0053) ──────────────────────────────────
+
+  it('findDeclinedDays answers for several Cras at once, each row naming its own', async () => {
+    // The shape ADR-0053 chose over a `supply_period` column on `billing.declined_days`: the
+    // composition root asks `timesheet` which Cras the month has and hands the ids over, so
+    // `billing` never learns what a period is and the screen still costs one query.
+    await seedReferenceData();
+
+    await repo().saveDeclinedDays(PARIS, [
+      { craId: 'cra-1', missionId: 'mission-forfait', quarterDays: 12, reason: 'notRegie' },
+      { craId: 'cra-2', missionId: 'mission-ghost', quarterDays: 4, reason: 'unknownMission' },
+    ]);
+
+    const declined = await repo().findDeclinedDays(['cra-1', 'cra-2'], parisManager);
+
+    expect(declined.map((row) => [row.craId, row.quarterDays])).toStrictEqual([
+      ['cra-1', 12],
+      ['cra-2', 4],
+    ]);
+  });
+
+  it('findDeclinedDays given no Cra answers nothing, rather than everything', async () => {
+    // The failure mode an `IN` list has when the caller passes an empty month: a query that
+    // degenerates into "no filter" returns the whole office. `= ANY('{}')` matches nothing, and
+    // this is the test that keeps it that way.
+    await seedReferenceData();
+
+    await repo().saveDeclinedDays(PARIS, [
+      { craId: 'cra-1', missionId: 'mission-forfait', quarterDays: 12, reason: 'notRegie' },
+    ]);
+
+    expect(await repo().findDeclinedDays([], parisManager)).toStrictEqual([]);
+  });
+
+  it('list narrows to one supply period when asked, and to every period when not', async () => {
+    await seedReferenceData();
+
+    await repo().saveDraft(makeDraftInvoice('invoice-march'), 'cra-march');
+    const april = Invoice.draft({
+      id: 'invoice-april',
+      officeId: PARIS,
+      seller: SELLER,
+      billedTo: billedParty(parisClient),
+      supplyPeriod: period(2026, 4),
+      lines: [
+        regieLine({
+          designation: 'Prestation de conseil — avril 2026',
+          missionId: 'mission-audit',
+          craId: 'cra-april',
+          period: '2026-04',
+          quarterDays: quarterDays(4),
+          tjmCents: 60_000,
+          vat: { kind: 'taxable', basisPoints: 2000 },
+        }),
+      ],
+      terms: TERMS,
+      mentions: MENTIONS,
+      validatedBy: ['bruno'],
+    });
+    await repo().saveDraft(april, 'cra-april');
+
+    const march = await repo().list({
+      actor: parisManager,
+      limit: 10,
+      offset: 0,
+      period: '2026-03',
+    });
+    expect(march.map((row) => row.id)).toStrictEqual(['invoice-march']);
+
+    // The filter is pushed into the query rather than applied to a capped page (ADR-0053), so
+    // asking for a month with nothing in it is an empty answer and not a short one.
+    const may = await repo().list({ actor: parisManager, limit: 10, offset: 0, period: '2026-05' });
+    expect(may).toStrictEqual([]);
+
+    const every = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
+    expect(every).toHaveLength(2);
   });
 
   it('findIssuedWithKey answers the document the key issued', async () => {

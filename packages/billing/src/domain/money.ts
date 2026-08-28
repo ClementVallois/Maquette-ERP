@@ -1,4 +1,4 @@
-import { HALF_DAYS_PER_DAY, type HalfDays, InvalidValueError } from '@erp/platform';
+import { QUARTER_DAYS_PER_DAY, type QuarterDays, InvalidValueError } from '@erp/platform';
 
 /**
  * Every arithmetic operation this module performs on a monetary value, and the only place a
@@ -64,28 +64,36 @@ export function applyRate(amountCents: number, basisPoints: number): number {
 }
 
 /**
- * What a count of half-days on one mission is worth: `(halfDays * tjmCents) / 2`.
+ * What a count of quarter-days on one mission is worth: `(quarterDays * tjmCents) / 4`.
  *
- * Multiply first, divide last — and the assertion that `tjmCents` is even is the precondition of
- * the single division this repository allows, not a formality. A Tjm is a whole number of euros
- * (ADR-0002), so it is a multiple of 100 and the division is exact; a rate that reached here
- * without passing `tjmCentsFromEuros` would not be, and the refusal names it.
+ * Multiply first, divide last — and the assertion that `tjmCents` is a multiple of 4 is the
+ * precondition of the single division this repository allows, not a formality. A Tjm is a whole
+ * number of euros (ADR-0002), so it is a multiple of 100 and the division is exact (ADR-0069); a
+ * rate that reached here without passing `tjmCentsFromEuros` would not be, and the refusal names it.
  */
-export function lineAmountCents(quantity: HalfDays, tjmCents: number): number {
-  assertExactInteger('lineAmountCents.halfDays', quantity);
+export function lineAmountCents(quantity: QuarterDays, tjmCents: number): number {
+  assertExactInteger('lineAmountCents.quarterDays', quantity);
   assertExactInteger('lineAmountCents.tjmCents', tjmCents);
 
-  if (tjmCents % HALF_DAYS_PER_DAY !== 0) {
-    throw new InvalidValueError('lineAmountCents.tjmCents', tjmCents, 'an even number of cents');
+  if (tjmCents % QUARTER_DAYS_PER_DAY !== 0) {
+    throw new InvalidValueError(
+      'lineAmountCents.tjmCents',
+      tjmCents,
+      'a number of cents divisible by four',
+    );
   }
   if (quantity < 0) {
-    throw new InvalidValueError('lineAmountCents.halfDays', quantity, 'zero or more half-days');
+    throw new InvalidValueError(
+      'lineAmountCents.quarterDays',
+      quantity,
+      'zero or more quarter-days',
+    );
   }
   if (tjmCents < 0) {
     throw new InvalidValueError('lineAmountCents.tjmCents', tjmCents, 'zero or more cents');
   }
 
-  return (quantity * tjmCents) / HALF_DAYS_PER_DAY;
+  return (quantity * tjmCents) / QUARTER_DAYS_PER_DAY;
 }
 
 /**

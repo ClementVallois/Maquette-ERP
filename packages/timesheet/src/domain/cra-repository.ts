@@ -9,12 +9,24 @@ export interface CraListItem {
   readonly officeId: OfficeId;
   readonly period: string;
   readonly status: string;
+  /**
+   * The quarter-days the Cra records, summed. A quantity and not a rate, so it does not reach the
+   * line `Cjm`, `Tjm` and margin are held behind (BUILD-RULES § Authorization); it is here so the
+   * pré-facturier can sum a month without fetching every Cra in full (ADR-0053).
+   */
+  readonly recordedQuarterDays: number;
 }
 
 export interface CraListQuery {
   readonly actor: Actor;
   readonly limit: number;
   readonly offset: number;
+  /**
+   * One period, or every one. Pushed into the query rather than applied to a capped page
+   * (ADR-0053), for the same reason as `InvoiceListQuery.period`: an office holding more than a
+   * page of Cras across all months would otherwise see the month itself truncated.
+   */
+  readonly period?: string;
 }
 
 export interface CraRepository {

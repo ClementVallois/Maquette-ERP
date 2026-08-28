@@ -34,13 +34,13 @@ const STANDARD: VatTreatment = { kind: 'taxable', basisPoints: 2000 };
 const OVERSEAS: VatTreatment = { kind: 'taxable', basisPoints: 850 };
 const REVERSE_CHARGE: VatTreatment = { kind: 'notCharged', reason: 'reverseChargeEuB2b' };
 
-function lineOf(amountBase: number, vat: VatTreatment, halfDays = 2): InvoiceLine {
+function lineOf(amountBase: number, vat: VatTreatment, quarterDays = 4): InvoiceLine {
   return regieLine({
     designation: 'Prestation d’audit — mars 2026',
     missionId: REGIE_MISSION,
     craId: 'cra-1',
     period: '2026-03',
-    halfDays,
+    quarterDays,
     tjmCents: amountBase,
     vat,
   });
@@ -101,7 +101,7 @@ describe('a draft invoice', () => {
       missionId: REGIE_MISSION,
       craId: 'cra-0',
       period: '2026-02',
-      halfDays: 2,
+      quarterDays: 4,
       tjmCents: 62_000,
       vat: STANDARD,
     });
@@ -131,8 +131,8 @@ describe('the VAT recapitulative', () => {
     // on the summed base, 8,5 % of 2 010 is 170,85 → 171. One cent, and it is the cent accounting
     // reports. A test built on two lines of 1 010 would answer 172 either way and prove nothing.
     const invoice = invoiceOf([
-      regieLine({ ...base(), halfDays: 1, tjmCents: 2010, vat: OVERSEAS }),
-      regieLine({ ...base(), halfDays: 1, tjmCents: 2010, vat: OVERSEAS }),
+      regieLine({ ...base(), quarterDays: 1, tjmCents: 4020, vat: OVERSEAS }),
+      regieLine({ ...base(), quarterDays: 1, tjmCents: 4020, vat: OVERSEAS }),
     ]);
 
     expect(invoice.lines.map((line) => line.amountCents)).toStrictEqual([1005, 1005]);
@@ -259,7 +259,7 @@ function base() {
     missionId: REGIE_MISSION,
     craId: 'cra-1',
     period: '2026-03',
-    halfDays: 2,
+    quarterDays: 4,
     tjmCents: 65_000,
     vat: STANDARD,
   };
@@ -272,7 +272,7 @@ it('bills a client of La Réunion at its own rate, end to end', () => {
     seller: SELLER,
     billedTo: billedParty(reunionClient),
     supplyPeriod: period(2026, 3),
-    lines: [regieLine({ ...base(), tjmCents: 58_000, halfDays: 42, vat: OVERSEAS })],
+    lines: [regieLine({ ...base(), tjmCents: 58_000, quarterDays: 84, vat: OVERSEAS })],
     terms: TERMS,
     mentions: MENTIONS,
     validatedBy: ['bruno'],

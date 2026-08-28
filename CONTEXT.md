@@ -13,7 +13,7 @@ The monthly record of a consultant's worked days. Kept in French: "timesheet" dr
 _Avoid_: Timesheet, TimeSheet, ActivityReport
 
 **CraLine**:
-Part of one day of a `Cra`: a count of `HalfDays`, the day type the consultant recorded — `worked` or `absence`, never `weekend` or `publicHoliday`, which the `WorkingCalendar` already knows — and, when worked, the `Mission` it was worked on. A day carries several lines when it is split between two missions, which is why the mission sits on the line and not on the day.
+Part of one day of a `Cra`: a count of `QuarterDays`, the day type the consultant recorded — `worked` or `absence`, never `weekend` or `publicHoliday`, which the `WorkingCalendar` already knows — and, when worked, the `Mission` it was worked on. A day carries several lines when it is split between two missions, which is why the mission sits on the line and not on the day.
 _Avoid_: Entry, TimeEntry
 
 **CraStatus**:
@@ -40,9 +40,9 @@ _Avoid_: Rejected, Denied, Returned
 The month a `Cra` covers, written `YYYY-MM`. Every dated rule of the chain resolves against a day inside the period — the manager who validates March's `Cra` is March's manager, the `Tjm` applied is the one in force in March — never against the day the screen was opened.
 _Avoid_: Month, Range, Interval
 
-**HalfDays**:
-A count of half-days: the single unit in which worked time is recorded, stored and transported (ADR-0012). Never hours, never a fraction of a day. A full day is two half-days, which is what keeps `Tjm ÷ 2` exact in integer cents.
-_Avoid_: Days, Duration, Hours, Workload
+**QuarterDays**:
+A count of quarter-days: the single unit in which worked time is recorded, stored and transported (ADR-0069, superseding the half-day of ADR-0012). Never hours, never a fraction of a day. A full day is four quarter-days, which is what keeps `Tjm ÷ 4` exact in integer cents.
+_Avoid_: Days, Duration, Hours, Workload, HalfDays
 
 **DayType**:
 What a calendar day counts as for a consultant: worked, absence, public holiday, weekend. Only worked days reach an invoice.
@@ -51,6 +51,10 @@ _Avoid_: Category, Kind
 **CraFlag**:
 A day of a `Cra` that carries an entry although the `WorkingCalendar` says it is not workable — a worked Saturday, a worked public holiday. Computed at submission and carried to the manager, who decides. It is not a refusal: weekend work happens in this business, and refusing it only teaches consultants to record it on the Monday.
 _Avoid_: Warning, Anomaly, Exception, Alert
+
+**LateDays**:
+Quarter-days recorded on a `Cra` whose `Period` has closed and whose `CraStatus` is not `Validated` — work delivered that the chain cannot invoice yet (ADR-0054). Counted in quarter-days like everything else, summed over the `Cra`s the actor may read, and zero for the month still running: nothing recorded this month is late, because nothing this month is due. It is deliberately **not** a count of days elapsed past a deadline — this mockup has no submission deadline and inventing one would put a fabricated obligation on a screen.
+_Avoid_: Overdue, Backlog, Pending, Delay, Retard
 
 **WorkingCalendar**:
 The authority on which dates are workable in France (Europe/Paris, weekends, public holidays). Not a utility: it decides what may be billed.
@@ -91,7 +95,7 @@ What is being sold, as the VAT rules see it. One value here — a consulting ser
 _Avoid_: Kind, ProductType, Category
 
 **Tjm** (🇫🇷 kept):
-_Taux journalier moyen_ — the daily rate agreed with the client for a consultant on a mission. Kept in French: it is the term written into the contract and opposable to the client. Always a **whole number of euros**, and dated: work done in June bills at June's `Tjm`. The whole-euro premise is what keeps half-day billing exact in integer cents (ADR-0002, ADR-0010).
+_Taux journalier moyen_ — the daily rate agreed with the client for a consultant on a mission. Kept in French: it is the term written into the contract and opposable to the client. Always a **whole number of euros**, and dated: work done in June bills at June's `Tjm`. The whole-euro premise is what keeps quarter-day billing exact in integer cents (ADR-0002, ADR-0010, ADR-0069).
 _Avoid_: DailyRate, Rate, Price
 
 ## People and reach
@@ -155,12 +159,16 @@ A demand for payment issued to a client, derived from validated `Cra` days on a 
 _Avoid_: Bill, Facture
 
 **InvoiceLine**:
-One line of an `Invoice`, frozen at the moment it is drafted. Carries its quantity in `HalfDays` and its unit price per half-day — so no quantity is ever a decimal — the daily rate that applied, **copied** rather than referenced, its `VatTreatment`, and its origin.
+One line of an `Invoice`, frozen at the moment it is drafted. Carries its quantity in `QuarterDays` and its unit price per quarter-day — so no quantity is ever a decimal — the daily rate that applied, **copied** rather than referenced, its `VatTreatment`, and its origin.
 _Avoid_: LineItem, Item, Ligne
 
 **RegieDays**:
-The origin of an `InvoiceLine` that came from validated `Cra` days on a `Regie` mission: the mission, the `Cra`, the month worked, the count of `HalfDays` and the `Tjm` in force then. The only origin this mockup produces, and a tagged one from the first line written (ADR-0013) — a second origin is a variant, not a migration over documents that are legally immutable. It is also what makes the CRA → line → invoice chain checkable rather than claimed.
+The origin of an `InvoiceLine` that came from validated `Cra` days on a `Regie` mission: the mission, the `Cra`, the month worked, the count of `QuarterDays` and the `Tjm` in force then. The only origin this mockup produces, and a tagged one from the first line written (ADR-0013) — a second origin is a variant, not a migration over documents that are legally immutable. It is also what makes the CRA → line → invoice chain checkable rather than claimed.
 _Avoid_: Source, Reference, Provenance
+
+**Pré-facturier** (🇫🇷 kept):
+The screen that answers, for one `Period` and one `Office`, what is billable and — for every quarter-day that is not — why. Kept in French: it is the name the firm's finance people use for the pre-invoicing review, and "draft invoice list" describes a table rather than the monthly act of checking one. It is a **view and never a writer**: nothing is decided on it, and the two things it shows come from two modules that never meet in a query (ADR-0053). What blocks a quarter-day is either a `DeclinedDays` reason (the `Cra` was validated and the day still produced no line) or the `CraStatus` itself, which is what `LateDays` counts.
+_Avoid_: PreBilling, DraftInvoices, BillingReview, Prefacturation
 
 **Piste d'audit fiable** (🇫🇷 kept):
 The reliable audit trail French tax law requires between a delivered service and the invoice that bills it (art. 289-VII du CGI): a documented, permanent and chronological link, each step tied to the one before. Kept in French because "audit trail" in English is a logging term and loses the legal obligation entirely — this is the reason the phrase is the load-bearing one in ADR-0013 and ADR-0020 rather than decoration. Here it is materialised by two things and not by a claim: an `InvoiceLine` carries its `RegieDays` origin down to the `Cra` it came from, and every domain event is written to `domain_events` in **the same transaction** as the change that emitted it, carrying its `correlationId` and `causationId`.
@@ -195,12 +203,12 @@ What an invoice covers in the reform's terms — a supply of services, of goods,
 _Avoid_: Type, Nature, Kind
 
 **DeclinedDays**:
-Half-days a validated `Cra` carried that did **not** become an `InvoiceLine`, with the reason: the mission is not `Regie`, the mission is unknown to billing, no `Tjm` was agreed for that date, or the client is missing. Reported rather than skipped (ADR-0037) — every half-day the validation carried is in either the invoices or this list, and a day that vanishes between validation and invoicing is the discrepancy this whole chain exists to remove.
-One row of it — the half-days one `Mission` on one `Cra` declined, for one reason — is a **`DeclinedDaysRecord`** on the repository port and in `billing.declined_days`. The two names are one term: the plural is the concept, the record is a row of it.
+Quarter-days a validated `Cra` carried that did **not** become an `InvoiceLine`, with the reason: the mission is not `Regie`, the mission is unknown to billing, no `Tjm` was agreed for that date, or the client is missing. Reported rather than skipped (ADR-0037) — every quarter-day the validation carried is in either the invoices or this list, and a day that vanishes between validation and invoicing is the discrepancy this whole chain exists to remove.
+One row of it — the quarter-days one `Mission` on one `Cra` declined, for one reason — is a **`DeclinedDaysRecord`** on the repository port and in `billing.declined_days`. The two names are one term: the plural is the concept, the record is a row of it.
 _Avoid_: Skipped, Ignored, Rejected, Errors
 
 **CraAlreadyProcessedError**:
-The refusal returned when a `Cra` that has already produced a draft invoice for a client is processed again. A **business** error and not a technical one: replaying a `timesheet.TimesheetValidated` event is expected — at-least-once delivery, a retried request, a manual replay — and the right answer is a named refusal, not a second invoice and not a crash. Enforced twice on purpose (ADR-0021): a unique constraint in the draft table, and the domain guard in front of it, so the invariant does not rest on the database alone. Destined for a `409 Conflict` when Phase 5 puts an API in front of it.
+The refusal returned when a `Cra` that has already produced a draft invoice for a client is processed again. A **business** error and not a technical one: replaying a `timesheet.TimesheetValidated` event is expected — at-least-once delivery, a retried request, a manual replay — and the right answer is a named refusal, not a second invoice and not a crash. Enforced twice on purpose (ADR-0021): a unique constraint in the draft table, and the domain guard in front of it, so the invariant does not rest on the database alone. Rendered as a `409 Conflict` since Phase 5 put an API in front of it (`apps/api/src/http/problem.ts`), and named in French on a screen since Phase 6 (ADR-0060).
 _Avoid_: DuplicateInvoice, AlreadyBilled, ConflictError
 
 **InvoiceNumber**:

@@ -13,7 +13,7 @@ The pair is two files for the same reason the clock fixture is: the rule is **na
 and a narrowing is what a guard gets wrong. The calls — `parseFloat`, `Number()`, `Math.round` —
 are refused in both scopes, because a `Math.round` added to make an assertion pass is the failure
 itself. The decimal **literal** is refused only in shipped domain code: a negative test proves a
-factory refuses a float by handing it one, and `halfDays(1.5)` is that test.
+factory refuses a float by handing it one, and `quarterDays(1.5)` is that test.
 
 `lint-rules.test.ts` lints both files and asserts the violations are rejected. If it fails, the
 rule is dead again; the fixtures are not the problem.

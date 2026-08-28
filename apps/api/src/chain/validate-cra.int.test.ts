@@ -40,15 +40,15 @@ const clock = { now: () => new Date('2026-07-02T09:00:00.000Z') };
 let transactionally: Transactionally;
 
 /** Every workable day of June 2026 worked on one mission: the shape `submit` requires. */
-function workedDaysOfJune(): { day: string; halfDays: number }[] {
-  const days: { day: string; halfDays: number }[] = [];
+function workedDaysOfJune(): { day: string; quarterDays: number }[] {
+  const days: { day: string; quarterDays: number }[] = [];
   const holidays = new Set(['2026-06-01']);
 
   for (let day = 1; day <= 30; day++) {
     const iso = `2026-06-${String(day).padStart(2, '0')}`;
     const weekday = new Date(`${iso}T00:00:00.000Z`).getUTCDay();
     if (weekday === 0 || weekday === 6 || holidays.has(iso)) continue;
-    days.push({ day: iso, halfDays: 2 });
+    days.push({ day: iso, quarterDays: 4 });
   }
 
   return days;
@@ -113,9 +113,9 @@ beforeEach(async () => {
   );
   for (const line of workedDaysOfJune()) {
     await client.query(
-      `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
+      `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, quarter_days)
        VALUES ($1, $2, $3, 'worked', $4, $5)`,
-      [uuidv7(), CRA, line.day, MISSION, line.halfDays],
+      [uuidv7(), CRA, line.day, MISSION, line.quarterDays],
     );
   }
 });
@@ -231,7 +231,7 @@ describe('validating a Cra drafts its invoices', () => {
     );
 
     expect(outcome.declined).toStrictEqual([
-      { craId: CRA, missionId: 'chain-forfait', halfDays: 2, reason: 'notRegie' },
+      { craId: CRA, missionId: 'chain-forfait', quarterDays: 4, reason: 'notRegie' },
     ]);
   });
 

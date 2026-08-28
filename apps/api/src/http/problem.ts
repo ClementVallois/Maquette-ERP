@@ -43,6 +43,7 @@ const STATUS_BY_PROBLEM_TYPE: Readonly<Record<string, number>> = {
   '/problems/cra-transition-not-allowed': CONFLICT,
   '/problems/mission-not-running': CONFLICT,
   '/problems/not-assigned': CONFLICT,
+  '/problems/missing-habilitation': CONFLICT,
   '/problems/cra-incomplete': CONFLICT,
   // Separation of duties, rule 1 (ADR-0006): whoever records a Cra does not validate it.
   '/problems/self-validation-forbidden': FORBIDDEN,

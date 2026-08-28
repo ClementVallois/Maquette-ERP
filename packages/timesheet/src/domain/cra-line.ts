@@ -1,6 +1,6 @@
 import {
-  halfDays as toHalfDays,
-  type HalfDays,
+  quarterDays as toQuarterDays,
+  type QuarterDays,
   InvalidValueError,
   type IsoDate,
 } from '@erp/platform';
@@ -12,26 +12,30 @@ import type { MissionId } from './ids.ts';
 /**
  * One entry of a `Cra`: a part of a day, on one mission when it is worked.
  *
- * A day can carry more than one line — half a day of audit on one mission, half a day on another —
+ * A day can carry more than one line — a quarter of audit on one mission, a quarter on another —
  * which is why the mission sits on the line and not on the day. The quantity is a count of
- * half-days (ADR-0012), so a line is one or two of them and never anything else.
+ * quarter-days (ADR-0069), so a line is one to four of them and never anything else.
  */
 export interface CraLine {
   readonly day: IsoDate;
   readonly dayType: RecordedDayType;
   readonly missionId: MissionId | null;
-  readonly halfDays: HalfDays;
+  readonly quarterDays: QuarterDays;
 }
 
 export function craLine(input: {
   day: IsoDate;
   dayType: RecordedDayType;
   missionId: MissionId | null;
-  halfDays: number;
+  quarterDays: number;
 }): CraLine {
-  const quantity = toHalfDays(input.halfDays);
-  if (quantity < 1 || quantity > 2) {
-    throw new InvalidValueError('craLine.halfDays', input.halfDays, 'one or two half-days');
+  const quantity = toQuarterDays(input.quarterDays);
+  if (quantity < 1 || quantity > 4) {
+    throw new InvalidValueError(
+      'craLine.quarterDays',
+      input.quarterDays,
+      'one to four quarter-days',
+    );
   }
 
   if (input.dayType === 'worked' && input.missionId === null) {
@@ -45,6 +49,6 @@ export function craLine(input: {
     day: input.day,
     dayType: input.dayType,
     missionId: input.missionId,
-    halfDays: quantity,
+    quarterDays: quantity,
   };
 }

@@ -29,11 +29,11 @@ ADR and moves to the README's "Ce que je ne construis pas" — never a silent om
 - **Never a float on a monetary value.** Every intermediate result stays an integer. If a computation
   cannot, stop: it means a decision changed and ADR-0002's threshold is reached.
 - A `Tjm` is a whole number of euros, so `tjmCents` is a multiple of 100. Quantity is stored as an
-  **integer count of half-days**.
-- Line amount is `(halfDays * tjmCents) / 2` — **multiply first, divide last**. Exact because
-  `tjmCents` is even, and the guard is an assertion that it is (`tjmCents % 2 === 0`), not a ban on
-  `/`. Writing it as `halfDays * (tjmCents / 2)` is also exact today but inverts the safe order, so
-  the rule is the one above.
+  **integer count of quarter-days** (**ADR-0069**, superseding the half-day of ADR-0012).
+- Line amount is `(quarterDays * tjmCents) / 4` — **multiply first, divide last**. Exact because
+  `tjmCents` is a multiple of four, and the guard is an assertion that it is
+  (`tjmCents % 4 === 0`), not a ban on `/`. Writing it as `quarterDays * (tjmCents / 4)` is also
+  exact today but inverts the safe order, so the rule is the one above.
 - The lint rule therefore forbids **float-producing arithmetic on money** — no `parseFloat`, no
   `Number()` on a decimal string, no `Math.round` used to recover from one — and the division above is
   the single allowed one, at the single call site that asserts its precondition.
@@ -129,13 +129,17 @@ ADR and moves to the README's "Ce que je ne construis pas" — never a silent om
 
 ## Stack — decided, do not substitute
 
-Fastify · server-rendered HTML with no client framework and no front build step · `pg` with
+Fastify · the two printable documents (`/facture/:id`, `/releve/:id`) server-rendered, with no
+build step · the interactive UI a **React + TypeScript SPA** built by **Vite** in `apps/web` and
+served by the same Fastify process, same origin, no CORS (ADR-0062, ADR-0063) — **TanStack** for
+routing, data, tables and forms, **Tailwind + shadcn/ui** for the kit, **Playwright + axe-core**
+for the end-to-end pass; `docs/frontend-plan.md` §1 is the authority on the exact list · `pg` with
 hand-written SQL and numbered `.sql` migrations · Zod at the boundaries only · Vitest · pino ·
 pnpm workspaces · a persona selector instead of authentication, announced as such.
 
 **Not in this repository**, and the choice is written with its threshold: Redis, Kafka, RabbitMQ,
 Elasticsearch, Terraform, Kubernetes, microservices, any ORM, any decimal library, any job queue,
-React, Vue, PDF generation, OpenTelemetry, Testcontainers.
+Vue, PDF generation, OpenTelemetry, Testcontainers.
 
 ## Working discipline
 
@@ -172,7 +176,10 @@ React, Vue, PDF generation, OpenTelemetry, Testcontainers.
   a directory reached by a relative path. `rootDir` is `src` in every package, and a climb out of it
   fails the per-package `tsc --noEmit` — which the `quality` CI job runs.
 - Every foreign key is indexed in the migration that creates it. Migrations are additive and are
-  replayed twice in CI.
+  replayed twice in CI. **One bounded exception exists** (**ADR-0057**, migration 010): a table that
+  was created, never read and never held a row may be dropped, because leaving it would make the
+  schema state a rule the domain does not. The exception is the ADR's, not a licence — a table
+  holding data is migrated, never dropped.
 - A worked day is a `date`; an event is a `timestamptz`. Never a bare `timestamp`.
 - Ids are UUIDv7 generated in the application, so an aggregate can be built without touching the
   database. The legal invoice number is a **separate** field from the internal id.

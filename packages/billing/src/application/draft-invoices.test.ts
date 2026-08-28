@@ -1,6 +1,6 @@
 import {
-  halfDays,
-  type MissionHalfDays,
+  quarterDays,
+  type MissionQuarterDays,
   TIMESHEET_VALIDATED,
   TIMESHEET_VALIDATED_VERSION,
   type TimesheetValidated,
@@ -30,7 +30,7 @@ import { draftInvoicesFrom, onTimesheetValidated } from './draft-invoices.ts';
  * That absence is the property ADR-0001 bought, and it is asserted by there being no mock.
  */
 function validated(
-  missions: readonly MissionHalfDays[],
+  missions: readonly MissionQuarterDays[],
   validatedBy = 'bruno',
 ): TimesheetValidated {
   return {
@@ -64,11 +64,11 @@ const dependencies = {
 
 describe('drafting from a validated Cra', () => {
   it('bills the régie days of the month at the rate in force then', () => {
-    // 42 half-days at 650 €, and the rate is March's — the mission was renegotiated on 1 March,
+    // 84 quarter-days at 650 €, and the rate is March's — the mission was renegotiated on 1 March,
     // and February's 620 € is what a resolution against "today" would have used.
     const { invoices } = draftInvoicesFrom(
       dependencies,
-      validated([{ missionId: REGIE_MISSION, halfDays: halfDays(42) }]),
+      validated([{ missionId: REGIE_MISSION, quarterDays: quarterDays(84) }]),
     );
 
     expect(invoices).toHaveLength(1);
@@ -80,7 +80,7 @@ describe('drafting from a validated Cra', () => {
   it('resolves the VAT of each client from its own territoriality', () => {
     const { invoices } = draftInvoicesFrom(
       dependencies,
-      validated([{ missionId: OVERSEAS_MISSION, halfDays: halfDays(42) }]),
+      validated([{ missionId: OVERSEAS_MISSION, quarterDays: quarterDays(84) }]),
     );
 
     expect(invoices[0]?.billedTo.clientId).toBe(REUNION_CLIENT);
@@ -93,8 +93,8 @@ describe('drafting from a validated Cra', () => {
     const { invoices } = draftInvoicesFrom(
       dependencies,
       validated([
-        { missionId: REGIE_MISSION, halfDays: halfDays(20) },
-        { missionId: OVERSEAS_MISSION, halfDays: halfDays(22) },
+        { missionId: REGIE_MISSION, quarterDays: quarterDays(40) },
+        { missionId: OVERSEAS_MISSION, quarterDays: quarterDays(44) },
       ]),
     );
 
@@ -111,15 +111,15 @@ describe('drafting from a validated Cra', () => {
     const { invoices, declined } = draftInvoicesFrom(
       dependencies,
       validated([
-        { missionId: REGIE_MISSION, halfDays: halfDays(20) },
-        { missionId: FORFAIT_MISSION, halfDays: halfDays(22) },
+        { missionId: REGIE_MISSION, quarterDays: quarterDays(40) },
+        { missionId: FORFAIT_MISSION, quarterDays: quarterDays(44) },
       ]),
     );
 
     expect(invoices).toHaveLength(1);
     expect(invoices[0]?.lines).toHaveLength(1);
     expect(declined).toStrictEqual([
-      { missionId: FORFAIT_MISSION, halfDays: 22, reason: 'notRegie' },
+      { missionId: FORFAIT_MISSION, quarterDays: 44, reason: 'notRegie' },
     ]);
   });
 
@@ -128,7 +128,7 @@ describe('drafting from a validated Cra', () => {
     // record of why — not an empty document, which the invoice itself refuses anyway.
     const { invoices, declined } = draftInvoicesFrom(
       dependencies,
-      validated([{ missionId: FORFAIT_MISSION, halfDays: halfDays(42) }]),
+      validated([{ missionId: FORFAIT_MISSION, quarterDays: quarterDays(84) }]),
     );
 
     expect(invoices).toStrictEqual([]);
@@ -138,7 +138,7 @@ describe('drafting from a validated Cra', () => {
   it('declines a mission the commercial projection does not hold', () => {
     const { invoices, declined } = draftInvoicesFrom(
       dependencies,
-      validated([{ missionId: 'mission-unknown', halfDays: halfDays(2) }]),
+      validated([{ missionId: 'mission-unknown', quarterDays: quarterDays(4) }]),
     );
 
     expect(invoices).toStrictEqual([]);
@@ -163,12 +163,12 @@ describe('drafting from a validated Cra', () => {
 
     const { invoices, declined } = draftInvoicesFrom(
       { ...dependencies, reference: rateless },
-      validated([{ missionId: REGIE_MISSION, halfDays: halfDays(2) }]),
+      validated([{ missionId: REGIE_MISSION, quarterDays: quarterDays(4) }]),
     );
 
     expect(invoices).toStrictEqual([]);
     expect(declined).toStrictEqual([
-      { missionId: REGIE_MISSION, halfDays: 2, reason: 'noAgreedRate' },
+      { missionId: REGIE_MISSION, quarterDays: 4, reason: 'noAgreedRate' },
     ]);
   });
 
@@ -189,37 +189,39 @@ describe('drafting from a validated Cra', () => {
 
     const { invoices, declined } = draftInvoicesFrom(
       { ...dependencies, reference: clientless },
-      validated([{ missionId: REGIE_MISSION, halfDays: halfDays(2) }]),
+      validated([{ missionId: REGIE_MISSION, quarterDays: quarterDays(4) }]),
     );
 
     expect(invoices).toStrictEqual([]);
     expect(declined).toStrictEqual([
-      { missionId: REGIE_MISSION, halfDays: 2, reason: 'unknownClient' },
+      { missionId: REGIE_MISSION, quarterDays: 4, reason: 'unknownClient' },
     ]);
   });
 
-  it('accounts for every half-day the event carried, in one list or the other', () => {
+  it('accounts for every quarter-day the event carried, in one list or the other', () => {
     // The claim ADR-0037 makes, asserted as arithmetic rather than as prose.
     const event = validated([
-      { missionId: REGIE_MISSION, halfDays: halfDays(20) },
-      { missionId: FORFAIT_MISSION, halfDays: halfDays(14) },
-      { missionId: 'mission-unknown', halfDays: halfDays(8) },
+      { missionId: REGIE_MISSION, quarterDays: quarterDays(40) },
+      { missionId: FORFAIT_MISSION, quarterDays: quarterDays(28) },
+      { missionId: 'mission-unknown', quarterDays: quarterDays(16) },
     ]);
     const { invoices, declined } = draftInvoicesFrom(dependencies, event);
 
-    const billed = invoices.flatMap((invoice) => invoice.lines.map((line) => line.origin.halfDays));
-    const total = [...billed, ...declined.map((entry) => entry.halfDays)].reduce(
+    const billed = invoices.flatMap((invoice) =>
+      invoice.lines.map((line) => line.origin.quarterDays),
+    );
+    const total = [...billed, ...declined.map((entry) => entry.quarterDays)].reduce(
       (sum, count) => sum + count,
       0,
     );
 
-    expect(total).toBe(42);
+    expect(total).toBe(84);
   });
 
   it('carries the validator onto every invoice it drafts', () => {
     const { invoices } = draftInvoicesFrom(
       dependencies,
-      validated([{ missionId: REGIE_MISSION, halfDays: halfDays(2) }], 'bruno'),
+      validated([{ missionId: REGIE_MISSION, quarterDays: quarterDays(4) }], 'bruno'),
     );
     const [invoice] = invoices;
 
@@ -234,7 +236,7 @@ describe('drafting from a validated Cra', () => {
   it('names every line with the record it came from', () => {
     const { invoices } = draftInvoicesFrom(
       dependencies,
-      validated([{ missionId: REGIE_MISSION, halfDays: halfDays(2) }]),
+      validated([{ missionId: REGIE_MISSION, quarterDays: quarterDays(4) }]),
     );
 
     expect(invoices[0]?.lines[0]?.origin).toMatchObject({
@@ -258,7 +260,7 @@ describe('the subscriber', () => {
       seen.push(result.invoices.length);
     });
 
-    await handler(validated([{ missionId: REGIE_MISSION, halfDays: halfDays(2) }]));
+    await handler(validated([{ missionId: REGIE_MISSION, quarterDays: quarterDays(4) }]));
 
     expect(seen).toStrictEqual([1]);
   });

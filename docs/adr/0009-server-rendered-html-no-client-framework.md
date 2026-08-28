@@ -1,7 +1,7 @@
 # ADR-0009 — Server-rendered HTML, with no client framework
 
 - **Date**: 2026-08-17
-- **Status**: accepted
+- **Status**: superseded by ADR-0062
 
 ## Context
 

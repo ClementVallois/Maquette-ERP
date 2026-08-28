@@ -91,7 +91,7 @@ export function draftInvoicesFrom(
         missionId: mission.id,
         craId: payload.craId,
         period: payload.period,
-        halfDays: worked.halfDays,
+        quarterDays: worked.quarterDays,
         tjmCents,
         vat: resolveVat({ serviceNature: 'consultingService', client, on }),
       }),

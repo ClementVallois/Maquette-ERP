@@ -1,3 +1,5 @@
+const path = require('node:path');
+
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
@@ -139,7 +141,34 @@ module.exports = {
     // The fixtures are deliberate violations, kept alive to test the rules themselves:
     // see packages/billing/src/__boundary-fixture__/README.md
     exclude: { path: '(^|/)packages/[^/]+/node_modules/|__boundary-fixture__' },
-    tsConfig: { fileName: 'tsconfig.base.json' },
+    // Points at `apps/web/tsconfig.json`, not the root `tsconfig.base.json`: this is what feeds
+    // dependency-cruiser's `@/`-alias resolution (it loads exactly this one file into
+    // `tsconfig-paths-webpack-plugin`, see resolve-options/normalize.mjs), and `apps/web`'s own
+    // `paths` + `baseUrl` are what the plugin needs to turn `@/lib/x` into `apps/web/src/lib/x`.
+    // `enhancedResolveOptions` has no `alias` key of its own for this — checked against the schema
+    // of both dependency-cruiser 17.0.1 (this repo's version until this change) and 18.2.0
+    // (`additionalProperties:false`, no `alias` among its `properties`) — so an alias map passed
+    // there fails config validation outright; `paths`/`baseUrl` on the tsconfig is the only wired
+    // mechanism. Absolute, not relative: `dependency-cruiser/src/config-utl/extract-ts-config.mjs`
+    // hands this string straight to `ts.parseJsonConfigFileContent` as the `configFileName` used to
+    // resolve `extends` — with a relative path, TypeScript's own extends resolution drops the
+    // `../../` and looks for `tsconfig.base.json` inside `apps/web/`, failing outright (confirmed
+    // directly against `typescript@6.0.3`; an absolute path resolves the chain correctly).
+    // Scoped to `apps/web` deliberately: the other workspace members have no `@/`, so pointing the
+    // cruise's one tsConfig at `apps/web/tsconfig.json` costs them nothing — dependency-cruiser
+    // does not run `tsc` against it (no `parser: 'tsc'` here), so its `jsx`/`moduleResolution`/
+    // `include` never apply to any file outside `apps/web`; only `paths` and `baseUrl` are read,
+    // and `@/*` cannot collide with `@erp/*` (a literal-prefix match, not a glob). A second member
+    // declaring its own `@/` needs this widened — one shared `paths` map, or `references` (the
+    // plugin option this version supports for a second tsconfig) — not a second flat entry.
+    // (docs/open-questions.md, row dated 24/08/2026.)
+    // This config is why `dependency-cruiser` moved 17.0.1 → 18.2.0 in the same commit, and the
+    // bump is load-bearing rather than housekeeping: measured directly, 17.0.1 fails to resolve
+    // `@/lib/utils` from `apps/web/src/` even with this `tsConfig` and `baseUrl` in place
+    // (`error not-in-allowed: apps/web/src/AliasProbe.tsx → @/lib/utils`), and 18.2.0 resolves the
+    // identical probe clean. A boundary gate is not upgraded as a side effect of a front-end
+    // phase, so the measurement is recorded here rather than left to be re-derived.
+    tsConfig: { fileName: path.resolve(__dirname, 'apps/web/tsconfig.json') },
     enhancedResolveOptions: {
       exportsFields: ['exports'],
       conditionNames: ['import', 'require', 'node', 'default', 'types'],

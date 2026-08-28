@@ -1,5 +1,5 @@
 import { lineAmountCents } from '@erp/billing';
-import { type Actor, assertMayRead, lastDayOf, type Period } from '@erp/platform';
+import { type Actor, assertMayRead, lastDayOf, type Period, periodToIso } from '@erp/platform';
 import type { CraRepository } from '@erp/timesheet';
 
 import { ApiFailure } from '../errors.ts';
@@ -28,7 +28,7 @@ import type { PgReadClient } from '../persistence/pg-client.ts';
 export interface MissionEconomics {
   readonly missionId: string;
   readonly missionName: string;
-  readonly halfDays: number;
+  readonly quarterDays: number;
   readonly tjmCents: number;
   readonly revenueCents: number;
   readonly costCents: number;
@@ -62,10 +62,24 @@ interface TjmRow {
   tjm_cents: string | number;
 }
 
+/**
+ * The one method of pino's logger this module uses. A structural narrowing of a third-party type,
+ * not a port (BUILD-RULES § Boundary and layering) — there is one implementation and no test
+ * injects a second to prove anything a real logger could not.
+ */
+export interface DisclosureLog {
+  info(payload: object, message: string): void;
+}
+
 export interface EconomicsDependencies {
   readonly client: PgReadClient;
   readonly cras: CraRepository;
+  /** The request's logger, so the disclosure line carries the request's `correlationId`. */
+  readonly log: DisclosureLog;
 }
+
+/** The fields this read discloses, named once. Names only — never their values (ADR-0024). */
+const DISCLOSED_FIELDS = ['cjmCents', 'tjmCents', 'marginCents'] as const;
 
 /**
  * Returns `null` when the consultant has no Cra for the period — an empty state, not a refusal.
@@ -98,6 +112,7 @@ export async function consultantEconomics(
 
   // The close of the period, which is the date both dated references resolve at (ADR-0034).
   const on = lastDayOf(input.period);
+  const periodIso = periodToIso(input.period);
 
   const { rows: cjmRows } = await dependencies.client.query<CjmRow>(
     `SELECT cjm_cents FROM public.consultant_grades
@@ -111,12 +126,12 @@ export async function consultantEconomics(
   }
   const cjmCents = exactCents('cjm_cents', cjmRow.cjm_cents);
 
-  const halfDaysByMission = new Map<string, number>();
+  const quarterDaysByMission = new Map<string, number>();
   for (const line of cra.lines) {
     if (line.dayType !== 'worked' || line.missionId === null) continue;
-    halfDaysByMission.set(
+    quarterDaysByMission.set(
       line.missionId,
-      (halfDaysByMission.get(line.missionId) ?? 0) + line.halfDays,
+      (quarterDaysByMission.get(line.missionId) ?? 0) + line.quarterDays,
     );
   }
 
@@ -130,7 +145,7 @@ export async function consultantEconomics(
   const rates = new Map(tjmRows.map((row) => [row.mission_id, row]));
 
   const missions: MissionEconomics[] = [];
-  for (const [missionId, halfDays] of [...halfDaysByMission].sort()) {
+  for (const [missionId, quarterDays] of [...quarterDaysByMission].sort()) {
     const rate = rates.get(missionId);
     // A Forfait mission has no dated Tjm. It is skipped rather than counted at zero, which would
     // report a loss equal to its cost on a mission that is not sold by the day.
@@ -140,13 +155,13 @@ export async function consultantEconomics(
     // Through `billing`'s helper, which is the single call site allowed to divide and the one
     // that asserts its precondition (BUILD-RULES § Money). The API does no money arithmetic of
     // its own beyond adding these integers together.
-    const revenueCents = lineAmountCents(halfDays, tjmCents);
-    const costCents = lineAmountCents(halfDays, cjmCents);
+    const revenueCents = lineAmountCents(quarterDays, tjmCents);
+    const costCents = lineAmountCents(quarterDays, cjmCents);
 
     missions.push({
       missionId,
       missionName: rate.mission_name,
-      halfDays,
+      quarterDays,
       tjmCents,
       revenueCents,
       costCents,
@@ -157,10 +172,27 @@ export async function consultantEconomics(
   const revenueCents = missions.reduce((total, mission) => total + mission.revenueCents, 0);
   const costCents = missions.reduce((total, mission) => total + mission.costCents, 0);
 
+  // The line that makes the disclosure attributable: **who** read **which fields** about **whom**.
+  // It is here rather than in the two routes that serve this record (ADR-0052) so that a third
+  // caller cannot exist without one — and it fires only on the path that returns data, because a
+  // refusal is not a disclosure and every early return above is a refusal or an absence.
+  dependencies.log.info(
+    {
+      disclosure: {
+        actor: input.actor.consultantId,
+        role: input.actor.role,
+        target: input.consultantId,
+        period: periodIso,
+        fields: DISCLOSED_FIELDS,
+      },
+    },
+    'sensitive fields disclosed',
+  );
+
   return {
     consultantId: input.consultantId,
     displayName: `${consultant.first_name} ${consultant.last_name}`,
-    period: `${String(input.period.year)}-${String(input.period.month).padStart(2, '0')}`,
+    period: periodIso,
     cjmCents,
     missions,
     revenueCents,

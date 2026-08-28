@@ -9,4 +9,6 @@ export type CraId = string;
 /** A person of the firm. A manager is one too, which is why validation is typed with this one. */
 export type ConsultantId = string;
 export type MissionId = string;
+/** A certification-backed clearance (`CONTEXT.md` § Habilitation), e.g. PASSI. */
+export type HabilitationId = string;
 export type OfficeId = string;

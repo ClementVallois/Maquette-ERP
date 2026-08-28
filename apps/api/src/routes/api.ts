@@ -1,13 +1,24 @@
 import { API_PROBLEM_TYPES } from '@erp/contracts';
-import { periodFromIso } from '@erp/platform';
+import { daysOf, isoDateInFirmTimeZone, periodFromIso, QUARTER_DAYS_PER_DAY } from '@erp/platform';
+import { workingCalendar } from '@erp/timesheet';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { issueInvoice } from '../chain/issue-invoice.ts';
+import { recordMonth } from '../chain/record-month.ts';
+import { refuseCra } from '../chain/refuse-cra.ts';
 import { validateCraAndDraftInvoices } from '../chain/validate-cra.ts';
+import { type CraGridComposition, craGridComposition } from '../composition/cra-grid.ts';
+import {
+  type Blocking,
+  type CraRow,
+  preFacturierComposition,
+} from '../composition/pre-facturier.ts';
 import type { ServerDependencies } from '../dependencies.ts';
 import { consultantEconomics } from '../economics/consultant-economics.ts';
+import { ApiFailure } from '../errors.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
+import { PgReferenceReader } from '../persistence/reference-reader.ts';
 import { forRoles, requireActor } from '../personas/access.ts';
 import { malformed, parseInput } from '../validation.ts';
 
@@ -48,8 +59,50 @@ const PeriodQuery = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$
 const IdParam = z.object({ id: z.string().min(1).max(64) });
 const ConsultantParams = z.object({ consultantId: z.string().min(1).max(64) });
 
+/**
+ * The month, as a body. One entry per **matrix cell** (ADR-0069 makes the quarter-day the unit,
+ * ADR-0070 makes one cell one `(day, dayType, missionId)` triplet, and ADR-0050 makes the whole
+ * month the unit of write), so a day split across two missions is two entries and needs no special
+ * case. Each entry carries its own `quarterDays`, one to four.
+ *
+ * The cap is 124 — 4 × 31, the longest month at its maximum density — so a body longer than it is
+ * not a month however it is spelled. It is enforced here and, on the web path, by the domain
+ * instead: `DayOverbookedError` refuses a fifth quarter-day on a day, which is the same bound
+ * reached by the rule rather than by the schema.
+ */
+const MAX_ENTRIES = 124;
+const MIN_QUARTER_DAYS = 1;
+const MAX_QUARTER_DAYS = 4;
+
+const MonthEntries = z.object({
+  submit: z.boolean().default(false),
+  entries: z
+    .array(
+      z.object({
+        day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+        dayType: z.union([z.literal('worked'), z.literal('absence')]),
+        missionId: z.string().min(1).max(64).nullable().default(null),
+        quarterDays: z.number().int().min(MIN_QUARTER_DAYS).max(MAX_QUARTER_DAYS),
+      }),
+    )
+    .max(MAX_ENTRIES),
+});
+
+const PeriodParam = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u) });
+const ConsultantPeriodParams = z.object({
+  consultantId: z.string().min(1).max(64),
+  period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u),
+});
+
 const IDEMPOTENCY_KEY_HEADER = 'idempotency-key';
 const IdempotencyKey = z.string().min(8).max(200);
+
+/**
+ * The bound is a schema check — "is this a request" — and it stops short of trimming: a
+ * whitespace-only reason of the right length still reaches `refuse()`, whose own
+ * `RefusalReasonRequiredError` is the "is this a legitimate refusal" half of ADR-0042.
+ */
+const RefusalBody = z.object({ reason: z.string().min(1).max(500) });
 
 function notFound(
   request: FastifyRequest,
@@ -69,8 +122,89 @@ function notFound(
   };
 }
 
+/** Every day of the month, workable or not — the calendar half of front-end plan Phase 5.2's grid read. */
+function gridDaysSkeleton(periodIso: string): { date: string; nonWorkable: string | null }[] {
+  const calendar = workingCalendar();
+
+  return daysOf(periodFromIso(periodIso)).map((date) => ({
+    date,
+    nonWorkable: calendar.nonWorkableReason(date),
+  }));
+}
+
+/**
+ * The wire shape both grid routes answer (ADR-0071) — `consultantId`/`consultantName` are added on
+ * top of this by the manager route only, since the consultant route's caller already knows who
+ * they are and Annexe A never named those two fields on the existing endpoint.
+ */
+function gridResponseOf(
+  period: string,
+  grid: CraGridComposition,
+): {
+  period: string;
+  craId: string | null;
+  status: CraGridComposition['status'];
+  days: { date: string; nonWorkable: string | null }[];
+  missions: {
+    missionId: string;
+    name: string;
+    clientName: string;
+    assignableDays: readonly string[];
+  }[];
+  lines: CraGridComposition['lines'];
+  flags: CraGridComposition['flags'];
+  refusal: CraGridComposition['refusal'];
+  editable: boolean;
+  validatedBy: string | null;
+} {
+  return {
+    period,
+    craId: grid.craId,
+    status: grid.status,
+    days: gridDaysSkeleton(period),
+    missions: grid.missions.map((mission) => ({
+      missionId: mission.id,
+      name: mission.name,
+      clientName: mission.clientName,
+      assignableDays: mission.assignableDays,
+    })),
+    lines: grid.lines,
+    flags: grid.flags,
+    refusal: grid.refusal,
+    editable: grid.editable,
+    validatedBy: grid.validatedBy,
+  };
+}
+
+/**
+ * The declared-reason half of a Cra row's `blocking` (ADR-0037): a `notValidated` block already
+ * has its own field on the row (`status`, `late`), so it is not repeated here as a string nobody
+ * would parse back into those two facts — only a validated Cra's typed decline reasons are.
+ */
+function blockingReasonsOf(row: CraRow): string[] {
+  return row.blocking
+    .filter(
+      (item): item is { quarterDays: number; why: Extract<Blocking, { kind: 'declined' }> } =>
+        item.why.kind === 'declined',
+    )
+    .map((item) => item.why.reason);
+}
+
 export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDependencies): void {
   // ── Reads ─────────────────────────────────────────────────────────────────
+
+  /**
+   * The working calendar's own coverage (ADR-0004: a written table, 2026 only today). Not a Cra
+   * read at all — it exists so `/cra`'s month picker can offer exactly the months
+   * `workingCalendar()` can answer about, instead of a hard-coded upper bound the calendar itself
+   * would silently outgrow. Every connected role may ask; the answer carries nothing scoped to an
+   * office or a consultant.
+   */
+  app.get(
+    '/api/v1/calendar',
+    { config: { access: forRoles('consultant', 'manager', 'billing') } },
+    () => ({ years: workingCalendar().years }),
+  );
 
   app.get(
     '/api/v1/cras',
@@ -83,9 +217,25 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
 
       // Filtered, not refused: a consultant sees their own months, a manager the office's. The
       // empty state is ADR-0003's first beat and it is what this route can answer.
-      return dependencies.transactionally(async (unit) => ({
-        cras: await unit.cras.list({ actor, limit: query.value.limit, offset: query.value.offset }),
-      }));
+      return dependencies.transactionally(async (unit) => {
+        const cras = await unit.cras.list({
+          actor,
+          limit: query.value.limit,
+          offset: query.value.offset,
+        });
+
+        // `consultantName`, presentation rather than a rule — the same source and the same
+        // justification `preFacturierComposition` already uses (ADR-0071): a manager's row needs a
+        // name to pick a consultant by, and a consultant's own rows just get their own name back.
+        const consultantNames = await new PgReferenceReader(unit.client).consultantNames();
+
+        return {
+          cras: cras.map((cra) => ({
+            ...cra,
+            consultantName: consultantNames.get(cra.consultantId) ?? cra.consultantId,
+          })),
+        };
+      });
     },
   );
 
@@ -180,9 +330,12 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
 
       const actor = requireActor(request);
+      // The disclosure log lives inside `consultantEconomics` (ADR-0052), not here: this route and
+      // the `/marge` screen serve the same record, and a control written once per handler is a
+      // control the second handler forgets.
       const economics = await dependencies.transactionally((unit) =>
         consultantEconomics(
-          { client: unit.client, cras: unit.cras },
+          { client: unit.client, cras: unit.cras, log: request.log },
           {
             consultantId: params.value.consultantId,
             period: periodFromIso(query.value.period),
@@ -193,28 +346,245 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
 
       if (economics === null) return sendProblem(reply, notFound(request, 'economics record'));
 
-      // The log line that makes the disclosure attributable: **who** read **which fields** about
-      // **whom**. It names the fields and never their values — ADR-0024's allowlist is what keeps
-      // a `cjmCents` out of the log, and a disclosure record that published the amount would be
-      // the very leak this control exists to make expensive.
-      request.log.info(
-        {
-          disclosure: {
-            actor: actor.consultantId,
-            role: actor.role,
-            target: params.value.consultantId,
-            period: query.value.period,
-            fields: ['cjmCents', 'tjmCents', 'marginCents'],
-          },
-        },
-        'sensitive fields disclosed',
-      );
-
       return economics;
     },
   );
 
+  // ── The pré-facturier, and the Cra grid (front-end plan Phase 5.1 and 5.2) ─
+
+  app.get(
+    '/api/v1/pre-facturier',
+    { config: { access: forRoles('manager', 'billing') } },
+    async (request, reply) => {
+      const query = parseInput(PeriodQuery, request.query);
+      if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
+
+      const actor = requireActor(request);
+      const today = isoDateInFirmTimeZone(dependencies.clock.now());
+
+      // The same composition the pré-facturier screen renders (ADR-0053, ADR-0065): the numbers on
+      // this JSON payload and the numbers on `GET /pre-facturier` come from one function, so they
+      // cannot answer a different question for the same period.
+      const composition = await dependencies.transactionally((unit) =>
+        preFacturierComposition(unit, { actor, requestedPeriod: query.value.period, today }),
+      );
+
+      return {
+        period: composition.period,
+        summary: {
+          billableCents: composition.billable.reduce(
+            (total, row) => total + row.totalExcludingVatCents,
+            0,
+          ),
+          // Quarter-days, despite the name Annexe A pins for this field — the unit every quantity
+          // on the wire uses, and what `frenchDays` (both copies) takes as its argument. A
+          // consumer that divides by four before formatting prints a quarter of the truth.
+          lateDays: composition.lateQuarterDays,
+          craCount: composition.cras.length,
+        },
+        invoices: composition.invoices,
+        cras: composition.cras.map((row) => ({
+          craId: row.craId,
+          consultantId: row.consultantId,
+          consultantName: row.consultantName,
+          status: row.status,
+          late: composition.periodClosed && row.status !== 'validated',
+          recordedQuarterDays: row.recordedQuarterDays,
+          blockingReasons: blockingReasonsOf(row),
+          decidable: composition.mayDecide && row.status === 'submitted',
+        })),
+      };
+    },
+  );
+
+  app.get(
+    '/api/v1/cras/:period/grid',
+    { config: { access: forRoles('consultant') } },
+    async (request, reply) => {
+      const params = parseInput(PeriodParam, request.params);
+      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
+
+      const actor = requireActor(request);
+
+      const grid = await dependencies.transactionally((unit) =>
+        craGridComposition(unit, {
+          actor,
+          period: periodFromIso(params.value.period),
+          consultantId: actor.consultantId,
+        }),
+      );
+      // A persona is always its own row in `public.consultants` — this route never asks about
+      // anyone else, so `null` (no such consultant) cannot happen here. Guarded rather than
+      // asserted with `!`, so a broken fixture fails loudly instead of reading `undefined`.
+      if (grid === null) {
+        throw new ApiFailure(`persona ${actor.consultantId} has no consultant record`);
+      }
+
+      return gridResponseOf(params.value.period, grid);
+    },
+  );
+
+  /**
+   * ADR-0071: a manager reads a **named** consultant's grid, read-only. Same composition as the
+   * route above, the same 404-vs-403 split as every other single-record read in this file
+   * (ADR-0003) — a `consultantId` matching nobody is a 404, one matching a consultant of another
+   * office is a 403 `out-of-scope`, raised by `assertMayRead` inside `craGridComposition` itself.
+   */
+  app.get(
+    '/api/v1/consultants/:consultantId/cras/:period/grid',
+    { config: { access: forRoles('manager') } },
+    async (request, reply) => {
+      const params = parseInput(ConsultantPeriodParams, request.params);
+      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
+
+      const actor = requireActor(request);
+
+      const grid = await dependencies.transactionally((unit) =>
+        craGridComposition(unit, {
+          actor,
+          period: periodFromIso(params.value.period),
+          consultantId: params.value.consultantId,
+        }),
+      );
+      if (grid === null) return sendProblem(reply, notFound(request, 'consultant'));
+
+      return {
+        ...gridResponseOf(params.value.period, grid),
+        consultantId: grid.consultantId,
+        consultantName: grid.consultantName,
+      };
+    },
+  );
+
+  // ── The dashboard (front-end plan Phase 5.3) ───────────────────────────────
+
+  /**
+   * Honest, role-scoped aggregates — every field computed from a repository this file already
+   * calls elsewhere, none invented for this route (front-end plan Phase 5.3's own instruction). The response
+   * carries only the fields of the caller's own role: a manager's payload has no consultant-only
+   * key sitting at `null`, and neither branch can carry `Cjm`, `Tjm` or a margin field, because
+   * neither branch ever reads one.
+   */
+  app.get(
+    '/api/v1/dashboard',
+    { config: { access: forRoles('consultant', 'manager', 'billing') } },
+    async (request, reply) => {
+      const query = parseInput(PeriodQuery, request.query);
+      if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
+
+      const actor = requireActor(request);
+      const period = periodFromIso(query.value.period);
+
+      if (actor.role === 'consultant') {
+        const calendar = workingCalendar();
+        const workableDays = daysOf(period).filter(
+          (day) => calendar.nonWorkableReason(day) === null,
+        );
+
+        const cra = await dependencies.transactionally((unit) =>
+          unit.cras.findByConsultantAndPeriod(actor.consultantId, period, actor),
+        );
+
+        const recordedByDay = new Map<string, number>();
+        for (const line of cra?.lines ?? []) {
+          recordedByDay.set(line.day, (recordedByDay.get(line.day) ?? 0) + line.quarterDays);
+        }
+
+        return {
+          period: query.value.period,
+          role: 'consultant' as const,
+          myMonthStatus: cra?.status ?? null,
+          recordedQuarterDays: cra?.lines.reduce((total, line) => total + line.quarterDays, 0) ?? 0,
+          // A day short of its four quarter-days still counts as not entered — a day recorded
+          // once is not a day recorded.
+          remainingWorkableDays: workableDays.filter(
+            (day) => (recordedByDay.get(day) ?? 0) < QUARTER_DAYS_PER_DAY,
+          ).length,
+        };
+      }
+
+      if (actor.role === 'manager') {
+        const today = isoDateInFirmTimeZone(dependencies.clock.now());
+        // The same composition `GET /api/v1/pre-facturier` answers from (ADR-0053, ADR-0065): the
+        // dashboard's three manager figures are read off it rather than recomputed, so they cannot
+        // disagree with the screen that already shows them in full. That also means this branch
+        // inherits ADR-0053's own fifty-row cap on the office's Cras for the period — its
+        // reconsideration threshold ("reopen when the office page exceeds the cap") is the one that
+        // governs here too, not a second one for the dashboard.
+        const composition = await dependencies.transactionally((unit) =>
+          preFacturierComposition(unit, { actor, requestedPeriod: query.value.period, today }),
+        );
+
+        return {
+          period: query.value.period,
+          role: 'manager' as const,
+          pendingDecisions: composition.cras.filter((row) => row.status === 'submitted').length,
+          billableCents: composition.billable.reduce(
+            (total, row) => total + row.totalExcludingVatCents,
+            0,
+          ),
+          lateCras: composition.cras.filter(
+            (row) => composition.periodClosed && row.status !== 'validated',
+          ).length,
+        };
+      }
+
+      // One page of the office's invoices for the month, not a `COUNT(*)`: the three figures
+      // below are bounded by `MAX_PAGE_SIZE`, the cap every list read in this file shares. The
+      // seed reaches three invoices in a month; an office that reached fifty-one would read the
+      // fifty-first as absent, and the fix then is a counting query, not a larger page.
+      const invoices = await dependencies.transactionally((unit) =>
+        unit.invoices.list({ actor, limit: MAX_PAGE_SIZE, offset: 0, period: query.value.period }),
+      );
+
+      return {
+        period: query.value.period,
+        role: 'billing' as const,
+        draftInvoices: invoices.filter((invoice) => invoice.status === 'draft').length,
+        issuedInvoices: invoices.filter((invoice) => invoice.status === 'issued').length,
+        totalTtcIssuedCents: invoices
+          .filter((invoice) => invoice.status === 'issued')
+          .reduce((total, invoice) => total + (invoice.totalTtcCents ?? 0), 0),
+      };
+    },
+  );
+
   // ── Writes ────────────────────────────────────────────────────────────────
+
+  /**
+   * Replaces the month, and submits it if asked (ADR-0050). `PUT` and not `POST`: sending the same
+   * body twice leaves the same month, which is what `PUT` means and what a form resubmission does.
+   *
+   * The path names the **period**, never a consultant: the consultant is the actor. There is no
+   * "someone else's month" to reach, so there is no check here that could be forgotten.
+   */
+  app.put(
+    '/api/v1/cras/:period/entries',
+    { config: { access: forRoles('consultant') } },
+    async (request, reply) => {
+      const params = parseInput(PeriodParam, request.params);
+      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
+
+      const body = parseInput(MonthEntries, request.body);
+      if (!body.ok) return sendProblem(reply, malformed(body.errors, contextOf(request)));
+
+      const outcome = await recordMonth(
+        {
+          transactionally: dependencies.transactionally,
+          clock: dependencies.clock,
+          newId: dependencies.newId,
+        },
+        {
+          actor: requireActor(request),
+          period: periodFromIso(params.value.period),
+          entries: body.value.entries,
+          submit: body.value.submit,
+        },
+      );
+
+      return reply.code(200).send(outcome);
+    },
+  );
 
   app.post(
     '/api/v1/cras/:id/validation',
@@ -247,6 +617,36 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         invoices: outcome.invoices,
         declined: outcome.declined,
       });
+    },
+  );
+
+  app.post(
+    '/api/v1/cras/:id/refusal',
+    { config: { access: forRoles('manager') } },
+    async (request, reply) => {
+      const params = parseInput(IdParam, request.params);
+      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
+
+      const body = parseInput(RefusalBody, request.body);
+      if (!body.ok) return sendProblem(reply, malformed(body.errors, contextOf(request)));
+
+      // The symmetric twin of `/validation` above: same `findById` scoping (a Cra outside the
+      // manager's office throws `OutOfScopeError`, caught by the global handler as ADR-0003's
+      // second beat), same `notFound` shape for one that does not exist at all. Every other
+      // refusal — wrong status, blank reason after trim, wrong manager — is the domain's own
+      // typed error, thrown by `cra.refuse()` and mapped by `problemFromBusinessError`.
+      const outcome = await refuseCra(
+        { transactionally: dependencies.transactionally, clock: dependencies.clock },
+        {
+          craId: params.value.id,
+          actor: requireActor(request),
+          reason: body.value.reason,
+        },
+      );
+
+      if (outcome.kind === 'notFound') return sendProblem(reply, notFound(request, 'Cra'));
+
+      return reply.code(200).send({ craId: outcome.craId, status: 'refused' });
     },
   );
 

@@ -7,7 +7,17 @@ import { join } from 'node:path';
 // Its imports are package-root and correct today; the point is that the gate the README calls
 // "la moitié la plus facile à perdre" was not looking at them, so a deep import added there would
 // have cruised clean.
-const GLOBS = ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts', 'scripts/**/*.ts'];
+// `apps/*/src/**/*.tsx` is its own entry, not folded into the `.ts` glob's brace expansion:
+// `apps/web` (ADR-0062) is the first member whose entry point (`src/main.tsx`) is TSX-only, and a
+// glob that stopped matching `.tsx` would make that member green by omission — exactly the
+// failure `workspaceMembers()` below exists to catch. `packages/*` has no `.tsx` today, but the
+// glob is written to be right rather than to be minimal to today's tree.
+const GLOBS = [
+  'packages/*/src/**/*.ts',
+  'apps/*/src/**/*.ts',
+  'apps/*/src/**/*.tsx',
+  'scripts/**/*.ts',
+];
 const TIERS = ['packages', 'apps'];
 
 /**

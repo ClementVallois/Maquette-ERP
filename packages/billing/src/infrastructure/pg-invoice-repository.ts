@@ -1,4 +1,4 @@
-import { type Actor, assertMayRead, halfDays, isoDateOf, readScope } from '@erp/platform';
+import { type Actor, assertMayRead, quarterDays, isoDateOf, readScope } from '@erp/platform';
 
 import type { DocumentTotals } from '../domain/document.ts';
 import { CraAlreadyProcessedError } from '../domain/errors.ts';
@@ -73,9 +73,10 @@ export class PgInvoiceRepository implements InvoiceRepository {
       `SELECT id, status, supply_period, billed_to_name, invoice_number, issue_date, total_ttc_cents
        FROM billing.invoices
        WHERE office_id = $1
+         AND ($4::text IS NULL OR supply_period = $4)
        ORDER BY supply_period DESC, billed_to_name
        LIMIT $2 OFFSET $3`,
-      [actor.officeId, limit, query.offset],
+      [actor.officeId, limit, query.offset, query.period ?? null],
     );
 
     return rows.map(toListItem);
@@ -126,29 +127,42 @@ export class PgInvoiceRepository implements InvoiceRepository {
   ): Promise<void> {
     for (const record of declined) {
       await this.#client.query(
-        `INSERT INTO billing.declined_days (id, cra_id, mission_id, half_days, reason, office_id)
+        `INSERT INTO billing.declined_days (id, cra_id, mission_id, quarter_days, reason, office_id)
          VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (cra_id, mission_id, reason) DO NOTHING`,
-        [this.#newId(), record.craId, record.missionId, record.halfDays, record.reason, officeId],
+        [
+          this.#newId(),
+          record.craId,
+          record.missionId,
+          record.quarterDays,
+          record.reason,
+          officeId,
+        ],
       );
     }
   }
 
-  async findDeclinedDays(craId: string, actor: Actor): Promise<readonly DeclinedDaysRecord[]> {
+  async findDeclinedDays(
+    craIds: readonly string[],
+    actor: Actor,
+  ): Promise<readonly DeclinedDaysRecord[]> {
     if (readScope(actor, 'invoice') === 'none') return [];
 
     const { rows } = await this.#client.query<DeclinedDaysRow>(
-      `SELECT cra_id, mission_id, half_days, reason
+      // `= ANY($1)` rather than a built `IN (…)` list: an empty array matches nothing, where a
+      // hand-assembled `IN ()` is a syntax error and the usual repair for it — dropping the
+      // clause when the list is empty — returns the whole office.
+      `SELECT cra_id, mission_id, quarter_days, reason
        FROM billing.declined_days
-       WHERE cra_id = $1 AND office_id = $2
-       ORDER BY mission_id`,
-      [craId, actor.officeId],
+       WHERE cra_id = ANY($1) AND office_id = $2
+       ORDER BY cra_id, mission_id`,
+      [craIds, actor.officeId],
     );
 
     return rows.map((row) => ({
       craId: row.cra_id as CraId,
       missionId: row.mission_id as MissionId,
-      halfDays: exactInteger('half_days', row.half_days),
+      quarterDays: exactInteger('quarter_days', row.quarter_days),
       reason: row.reason as DeclinedDaysRecord['reason'],
     }));
   }
@@ -279,8 +293,8 @@ export class PgInvoiceRepository implements InvoiceRepository {
       await this.#client.query(
         `INSERT INTO billing.invoice_lines (
           id, invoice_id, line_order, designation,
-          origin_kind, origin_mission_id, origin_cra_id, origin_period, origin_half_days, origin_tjm_cents,
-          quantity_half_days, unit_price_cents, amount_cents,
+          origin_kind, origin_mission_id, origin_cra_id, origin_period, origin_quarter_days, origin_tjm_cents,
+          quantity_quarter_days, unit_price_cents, amount_cents,
           vat_kind, vat_basis_points, vat_not_charged_reason
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
         [
@@ -292,9 +306,9 @@ export class PgInvoiceRepository implements InvoiceRepository {
           line.origin.missionId,
           line.origin.craId,
           line.origin.period,
-          line.origin.halfDays,
+          line.origin.quarterDays,
           line.origin.tjmCents,
-          line.quantityHalfDays,
+          line.quantityQuarterDays,
           line.unitPriceCents,
           line.amountCents,
           line.vat.kind,
@@ -330,7 +344,9 @@ export class PgInvoiceRepository implements InvoiceRepository {
     const lines: InvoiceLine[] = lineRows.map((lr) => ({
       designation: lr.designation,
       origin: this.#reconstructOrigin(lr),
-      quantityHalfDays: halfDays(exactInteger('quantity_half_days', lr.quantity_half_days)),
+      quantityQuarterDays: quarterDays(
+        exactInteger('quantity_quarter_days', lr.quantity_quarter_days),
+      ),
       unitPriceCents: exactInteger('unit_price_cents', lr.unit_price_cents),
       amountCents: exactInteger('amount_cents', lr.amount_cents),
       vat: this.#reconstructVat(lr),
@@ -443,7 +459,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
       missionId: lr.origin_mission_id! as MissionId,
       craId: lr.origin_cra_id! as CraId,
       period: lr.origin_period!,
-      halfDays: halfDays(lr.origin_half_days!),
+      quarterDays: quarterDays(lr.origin_quarter_days!),
       tjmCents: exactInteger('origin_tjm_cents', lr.origin_tjm_cents!),
     };
   }
@@ -513,7 +529,7 @@ function toListItem(row: InvoiceListRow): InvoiceListItem {
 interface DeclinedDaysRow {
   cra_id: string;
   mission_id: string;
-  half_days: string | number;
+  quarter_days: string | number;
   reason: string;
 }
 
@@ -536,9 +552,9 @@ interface InvoiceLineRow {
   origin_mission_id: string | null;
   origin_cra_id: string | null;
   origin_period: string | null;
-  origin_half_days: number | null;
+  origin_quarter_days: number | null;
   origin_tjm_cents: string | number | null;
-  quantity_half_days: string | number;
+  quantity_quarter_days: string | number;
   unit_price_cents: string | number;
   amount_cents: string | number;
   vat_kind: string;

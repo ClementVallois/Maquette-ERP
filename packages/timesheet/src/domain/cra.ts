@@ -1,10 +1,10 @@
 import {
   type Clock,
   containsDay,
-  HALF_DAYS_PER_DAY,
+  QUARTER_DAYS_PER_DAY,
   type IsoDate,
   isoDate,
-  type MissionHalfDays,
+  type MissionQuarterDays,
   type Period,
   periodToIso,
   type TimesheetValidatedPayload,
@@ -39,7 +39,7 @@ export interface RecordDayInput {
   readonly day: IsoDate;
   readonly dayType: RecordedDayType;
   readonly missionId?: MissionId | null;
-  readonly halfDays: number;
+  readonly quarterDays: number;
 }
 
 /**
@@ -152,11 +152,11 @@ export class Cra {
     return this.#refusal;
   }
 
-  /** Half-days recorded on one day, all missions and absences together. */
-  halfDaysOn(day: IsoDate): number {
+  /** Quarter-days recorded on one day, all missions and absences together. */
+  quarterDaysOn(day: IsoDate): number {
     return this.#lines
       .filter((line) => line.day === day)
-      .reduce((total, line) => total + line.halfDays, 0);
+      .reduce((total, line) => total + line.quarterDays, 0);
   }
 
   recordDay(input: RecordDayInput): void {
@@ -171,12 +171,12 @@ export class Cra {
       day,
       dayType: input.dayType,
       missionId: input.missionId ?? null,
-      halfDays: input.halfDays,
+      quarterDays: input.quarterDays,
     });
 
-    const recorded = this.halfDaysOn(day) + line.halfDays;
-    if (recorded > HALF_DAYS_PER_DAY) {
-      throw new DayOverbookedError(day, recorded, HALF_DAYS_PER_DAY);
+    const recorded = this.quarterDaysOn(day) + line.quarterDays;
+    if (recorded > QUARTER_DAYS_PER_DAY) {
+      throw new DayOverbookedError(day, recorded, QUARTER_DAYS_PER_DAY);
     }
 
     this.#lines.push(line);
@@ -258,31 +258,54 @@ export class Cra {
       officeId: this.#officeId,
       period: periodToIso(this.#period),
       validatedBy: input.by,
-      missions: this.#billableHalfDaysByMission(),
+      missions: this.#billableQuarterDaysByMission(),
     };
   }
 
   /** Worked days only, grouped by mission, in a stable order so two runs produce the same event. */
-  #billableHalfDaysByMission(): MissionHalfDays[] {
+  #billableQuarterDaysByMission(): MissionQuarterDays[] {
     const perMission = new Map<MissionId, number>();
 
     for (const line of this.#lines) {
       if (!isBillable(line.dayType) || line.missionId === null) continue;
-      perMission.set(line.missionId, (perMission.get(line.missionId) ?? 0) + line.halfDays);
+      perMission.set(line.missionId, (perMission.get(line.missionId) ?? 0) + line.quarterDays);
     }
 
     return [...perMission]
-      .map(([missionId, halfDays]) => ({ missionId, halfDays }))
+      .map(([missionId, quarterDays]) => ({ missionId, quarterDays }))
       .sort((left, right) => left.missionId.localeCompare(right.missionId));
   }
 
-  refuse(input: { by: ConsultantId; reason: string; clock: Clock }): void {
+  /**
+   * Sends the record back, with a reason the consultant can act on.
+   *
+   * It is guarded exactly like `validate`, and the symmetry is the point: refusing a month is an
+   * act on someone's record of working time by someone with authority over it, and "who may act"
+   * has one answer per Cra (ADR-0006), not one per verb. Until 21/08/2026 this method checked only
+   * the status and the reason, so any manager of the office could send back a month they do not
+   * manage — the gap surfaced when the screen gained the button.
+   */
+  refuse(input: { by: ConsultantId; reason: string; clock: Clock; hierarchy: Hierarchy }): void {
     this.#assertNotValidated('refuse');
     if (this.#status !== 'submitted') {
       throw new CraTransitionError(this.#id, this.#status, 'refused');
     }
     if (input.reason.trim() === '') {
       throw new RefusalReasonRequiredError(this.#id);
+    }
+    if (input.by === this.#consultantId) {
+      throw new SelfValidationForbiddenError(this.#id, this.#consultantId);
+    }
+
+    const manager = input.hierarchy.managerOf(this.#consultantId, this.#period);
+    if (input.by !== manager) {
+      throw new NotTheManagerError({
+        craId: this.#id,
+        consultantId: this.#consultantId,
+        period: periodToIso(this.#period),
+        attempted: input.by,
+        manager,
+      });
     }
 
     this.#status = 'refused';

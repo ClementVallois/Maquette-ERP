@@ -58,7 +58,7 @@ describe('validating a Cra', () => {
       officeId: OFFICE,
       period: '2026-03',
       validatedBy: MANAGER,
-      missions: [{ missionId: MISSION, halfDays: 44 }],
+      missions: [{ missionId: MISSION, quarterDays: 88 }],
     });
   });
 
@@ -71,20 +71,26 @@ describe('validating a Cra', () => {
 
     for (const [index, day] of workable.entries()) {
       if (index === 0) {
-        cra.recordDay({ day, dayType: 'absence', missionId: null, halfDays: 2 });
+        cra.recordDay({ day, dayType: 'absence', missionId: null, quarterDays: 4 });
       } else if (index < 5) {
-        cra.recordDay({ day, dayType: 'worked', missionId: 'soc-run', halfDays: 2 });
+        cra.recordDay({ day, dayType: 'worked', missionId: 'soc-run', quarterDays: 4 });
       } else {
-        cra.recordDay({ day, dayType: 'worked', missionId: MISSION, halfDays: 2 });
+        cra.recordDay({ day, dayType: 'worked', missionId: MISSION, quarterDays: 4 });
       }
     }
     cra.submit({
       clock,
       calendar,
       reference: {
-        mission: (id) => ({ id, startDate: '2026-01-05', endDate: null }),
+        mission: (id) => ({
+          id,
+          startDate: '2026-01-05',
+          endDate: null,
+          requiredHabilitations: [],
+        }),
         runsOn: () => true,
         isAssigned: () => true,
+        missingHabilitations: () => [],
       },
     });
 
@@ -95,8 +101,8 @@ describe('validating a Cra', () => {
 
     expect(published[0]?.payload).toMatchObject({
       missions: [
-        { missionId: MISSION, halfDays: 34 },
-        { missionId: 'soc-run', halfDays: 8 },
+        { missionId: MISSION, quarterDays: 68 },
+        { missionId: 'soc-run', quarterDays: 16 },
       ],
     });
   });

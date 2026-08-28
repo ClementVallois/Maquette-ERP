@@ -12,7 +12,7 @@ describe('exactInteger', () => {
   });
 
   it('reads an integer column, which pg has already parsed', () => {
-    expect(exactInteger('quantity_half_days', 4)).toBe(4);
+    expect(exactInteger('quantity_quarter_days', 4)).toBe(4);
   });
 
   it('reads a negative amount, which a credit-note total is', () => {

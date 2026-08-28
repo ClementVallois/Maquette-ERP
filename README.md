@@ -1,15 +1,15 @@
 # CRA → facture : maquette d'un module d'ERP interne
 
-> ⚠️ Coquille initialisée le 07/08/2026. Ce README se remplit **au fil de la construction**, pas à
+> ⚠️ Ossature initialisée le 07/08/2026. Ce README se remplit **au fil de la construction**, pas à
 > la fin : une section décrit ce qui existe le jour où elle est écrite, et une section absente est
 > une chose non construite. Les chiffres portent leur date ou la commande qui les recompte — un
 > nombre écrit une fois est faux quelques commits plus tard, et ce README en a porté quatre.
 
 ## Où en est cette maquette
 
-**Phases 1 à 5 terminées** — le plan en compte onze, numérotées 0 à 10
+**Phases 1 à 6 terminées** — le plan en compte onze, numérotées 0 à 10
 ([`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md)). Les phases 1 à 3 datent du 19/08/2026, la 4 et la 5
-du 21/08/2026.
+du 21/08/2026, la 6 du 22/08/2026.
 
 Les **domaines**, en TypeScript pur et sans base de données : `timesheet` — CRA, cycle de vie,
 calendrier ouvré, règles de soumission, validation et événement de domaine — et `billing` —
@@ -30,8 +30,8 @@ authentification (ADR-0023), et la chaîne complète CRA → facture en une tran
 lancer : section « Démarrer » plus bas.
 
 Les compteurs de tests se recomptent plutôt qu'ils ne se croient : `pnpm run test` pour les tests
-unitaires, `pnpm run test:int` pour ceux qui tournent contre un vrai PostgreSQL. Au **21/08/2026**,
-395 et 93.
+unitaires, `pnpm run test:int` pour ceux qui tournent contre un vrai PostgreSQL. Au **22/08/2026**,
+511 et 167.
 
 **La chaîne franchit déjà la frontière** : `billing` réagit à `timesheet.TimesheetValidated` et
 produit un projet de facture par client. **Aucun fichier livré de `billing` — tests compris —
@@ -46,12 +46,29 @@ méritent d'être nommés : `packages/billing/src/__boundary-fixture__/` viole l
 qu'aucune règle ne mentionne — il prouve que la liste `allowed` **refuse par défaut**, ce qui est la
 moitié la plus facile à perdre.
 
-Ce qui n'existe **pas encore** : les écrans (phase 6), le durcissement de la CI (phase 7),
-l'instance hébergée (phase 8). Il n'y a donc **aucune interface web** : tout se voit en HTTP, et la
-section « Démarrer » dit comment.
+Les **écrans** existent depuis la phase 6. Sept pages rendues par le serveur — sélecteur de
+persona, mois d'un consultant, grille de saisie, pré-facturier, marge, facture imprimable, relevé de
+CRA imprimable — plus la page qui rend un refus. Aucune étape de build front, aucun script envoyé
+au navigateur (ADR-0009, ADR-0025) : c'est vrai du code d'aujourd'hui, et **la décision a bougé le
+24/08/2026** — ADR-0062 remplace ADR-0009 et fait passer l'interface interactive en SPA React (les
+deux imprimables restent rendus par le serveur). Rien n'en est écrit ; voir « pas encore » juste en
+dessous. **Le point d'entrée est `http://127.0.0.1:3000/`**, le sélecteur de persona : tout le reste
+s'atteint en cliquant depuis là. La section « Démarrer » dit comment lancer l'instance, et la même
+chaîne se voit en HTTP ou à l'écran, au choix.
 
-Quatre fichiers répondent aux questions qu'on se pose en arrivant.
-[`CONTEXT.md`](CONTEXT.md) définit le vocabulaire — métier (`Tjm`, `régie`, `intercontrat`, `avoir`,
+Ce qui n'existe **pas encore** : le durcissement de la CI (phase 7), l'instance hébergée
+(phase 8), la passe de relecture documentaire (phase 9) et le gel (phase 10). La phase 0 —
+outillage, CI, règles d'écriture — précède les autres et est faite.
+
+N'existe pas encore non plus, et c'est la décision du 24/08/2026 : **l'interface interactive en
+SPA React**, dont aucune ligne n'est écrite. Elle a son propre plan de construction
+([`docs/frontend-plan.md`](docs/frontend-plan.md), en français comme ce README), sa direction
+visuelle ([`docs/direction-visuelle.md`](docs/direction-visuelle.md)) et ses trois arbitrages
+— ADR-0062 (React), ADR-0063 (servie par la même instance Fastify, même origine) et ADR-0064 (la
+CSP admet un script). Les deux documents imprimables, eux, ne bougent pas.
+
+Quatre fichiers répondent aux questions qu'on se pose en arrivant. [`CONTEXT.md`](CONTEXT.md)
+définit le vocabulaire — métier (`Tjm`, `Cjm`, `pré-facturier`, `régie`, `intercontrat`, `avoir`,
 `PASSI`…) et technique (`Persona`, `Role`, `Actor`) ; [`docs/adr/`](docs/adr/README.md) contient les
 arbitrages avec, pour chacun, l'option écartée et le seuil de réouverture ;
 [`docs/BUILD-RULES.md`](docs/BUILD-RULES.md) est la forme vérifiable de ces arbitrages — ce qu'on a
@@ -62,6 +79,15 @@ qui le tranchera.
 ⚠️ Ces quatre fichiers sont **en anglais**, ce README seul est en français. C'est délibéré et la
 règle est dans `CLAUDE.md` : le code, les commits et les arbitrages en anglais, le README dans la
 langue du lecteur qui ouvre ce dépôt sans brief.
+
+Le reste de `docs/` est du **journal de construction**, pas de la documentation d'arrivée :
+[`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md) est l'ordre et le calendrier des phases,
+[`docs/PHASE-4-5-CLOSURE.md`](docs/PHASE-4-5-CLOSURE.md) est le relevé des revues de ces deux
+phases-là (les suivantes sont closes dans `open-questions.md`, ce qui est une incohérence de forme
+assumée), [`docs/frontend-plan.md`](docs/frontend-plan.md) et
+[`docs/direction-visuelle.md`](docs/direction-visuelle.md) sont le plan et la direction visuelle de
+la SPA à construire, et [`docs/agents/`](docs/agents/) décrit l'outillage d'agents utilisé pour
+construire le dépôt. Rien n'y est nécessaire pour comprendre la maquette.
 
 Pour vérifier soi-même plutôt que me croire. Les versions sont **strictes** (`engine-strict` est
 activé, donc la première commande échoue au lieu d'avertir) : **Node ≥ 24.13.1** — la version exacte
@@ -78,6 +104,12 @@ pnpm run boundaries # la frontière de modules seule
 s'arrête s'il n'existe pas. Aucune de ces trois commandes ne demande Docker. Pour la base de
 données et les tests d'intégration, voir « Démarrer » plus bas.
 
+ℹ️ **Le conteneur PostgreSQL publie `POSTGRES_PORT`, `5433` par défaut** — et non `5432`, pour ne
+pas entrer en conflit avec une instance déjà installée. Si `pnpm run setup` échoue sur
+`Bind for 0.0.0.0:5433 failed: port is already allocated`, c'est qu'autre chose l'occupe : changez
+`POSTGRES_PORT` dans `.env`, `DATABASE_URL` porte le même port et `pnpm run env:check` vérifie que
+les deux concordent.
+
 ## Le problème métier
 
 Le cabinet modélisé ici est une **société de conseil en cybersécurité** — audit, SOC, GRC, IAM,
@@ -85,15 +117,27 @@ sécurité offensive — d'environ 300 consultants, répartis en 5 pôles et 4 i
 n'est pas décoratif : c'est lui qui porte les contraintes que l'argumentaire de fin de page oppose
 à un ERP du marché (habilitation PASSI, indépendance auditeur/remédiation, export SIEM).
 
-Dans une société de conseil, le **compte rendu d'activité** (CRA) est le pivot : le même relevé de jours alimente le suivi d'avancement d'une mission, le staffing, et la facturation du client. Tant qu'il vit dans un tableur ou dans trois outils qui ne se parlent pas, chaque fin de mois est une ressaisie — et chaque ressaisie est une source d'écart entre ce qui a été produit et ce qui est facturé.
+Dans une société de conseil, le **compte rendu d'activité** (CRA) est le pivot : le même relevé de
+jours alimente le suivi d'avancement d'une mission, le staffing, et la facturation du client. Tant
+qu'il vit dans un tableur ou dans trois outils qui ne se parlent pas, chaque fin de mois est une
+ressaisie — et chaque ressaisie est une source d'écart entre ce qui a été produit et ce qui est
+facturé.
 
-Cette maquette prend **une seule chaîne, de bout en bout** : un consultant saisit son CRA, son manager le valide, et cette validation **déclenche la génération des projets de facture en régie** — au pluriel, parce qu'un mois se travaille sur plusieurs missions et que deux missions peuvent être vendues à deux clients différents. Une facture s'adresse à un client et tire sa TVA de la territorialité de celui-ci ; il n'existe donc pas de facture pour deux clients (**ADR-0038**).
+Cette maquette prend **une seule chaîne, de bout en bout** : un consultant saisit son CRA, son
+manager le valide, et cette validation **déclenche la génération des projets de facture en régie** —
+au pluriel, parce qu'un mois se travaille sur plusieurs missions et que deux missions peuvent être
+vendues à deux clients différents. Une facture s'adresse à un client et tire sa TVA de la
+territorialité de celui-ci ; il n'existe donc pas de facture pour deux clients (**ADR-0038**).
 
 Périmètre volontairement étroit : deux modules, et **une seule flèche qui franchit la frontière** entre eux.
 
 ## Ce que la maquette cherche à démontrer
 
-1. **Une frontière de module réelle, et vérifiée par la CI** — pas une convention de nommage. Le module de facturation (`packages/billing`) ne peut pas importer l'intérieur du module de saisie des temps (`packages/timesheet`) ; il réagit à un événement publié par celui-ci, dont le contrat vit dans un noyau partagé (`packages/platform`). Casser la frontière fait **échouer le job**, pas produire un warning. Où le vérifier sans me
+1. **Une frontière de module réelle, et vérifiée par la CI** — pas une convention de nommage. Le
+   module de facturation (`packages/billing`) ne peut pas importer l'intérieur du module de saisie des
+   temps (`packages/timesheet`) ; il réagit à un événement publié par celui-ci, dont le contrat vit
+   dans un noyau partagé (`packages/platform`). Casser la frontière fait **échouer le job**, pas
+   produire un warning. Où le vérifier sans me
    croire : la règle est dans [`.dependency-cruiser.cjs`](.dependency-cruiser.cjs) — dont la liste
    `allowed` est ce qui fait échouer aussi une flèche que personne n'a pensé à interdire — et
    [`tests/boundary-rule.test.ts`](tests/boundary-rule.test.ts) prouve, sur des fichiers de violation
@@ -116,7 +160,24 @@ UPDATE` sur la ligne de compteur, dans la transaction d'émission. Jamais une `S
      (**ADR-0010**). ⚠️ Les taux, seuils et mentions obligatoires retenus sont ceux connus au
      **17/08/2026** et **n'ont pas été validés par un expert-comptable** : cette maquette n'émet
      rien à un vrai client, et rien ici ne doit être repris en production sans cette validation.
-3. **L'autorisation est construite et testée par rôle _et_ par périmètre.** Le filtrage vit dans le dépôt de données (**ADR-0003**), au seul endroit par où les données entrent, et la règle est écrite **une fois** dans le noyau partagé (`readScope`) parce que les deux modules l'appliquent. Trois rôles — `consultant`, `manager`, `billing` (**ADR-0023**) — croisés avec l'implantation : un consultant ne voit que ses propres mois, un manager ceux de son implantation, personne d'autre qu'un manager ne voit une marge. La démonstration a **les deux temps** que l'ADR-0003 exige, et elle se rejoue en trois requêtes (section « Démarrer ») : la même URL répond `200` sous `manager-paris` et **`403` sous `manager-lyon`, en nommant la règle qui a refusé** (`deniedBy`), et un enregistrement qui n'existe pas répond `404` — trois faits différents, trois réponses différentes. `manager-paris` et `manager-lyon` sont deux **personas** : des identités sélectionnables au lieu d'une authentification, chacune un rôle exercé dans une implantation (`Persona` et `Role` dans [`CONTEXT.md`](CONTEXT.md), 🇬🇧). Deux d'entre elles partagent le rôle `manager` dans deux implantations différentes, et c'est précisément ce qui rend le refus reproductible en trois clics au lieu d'être affirmé. Le 403 ne publie **rien** de ce qu'il cache (**ADR-0042**), et un test l'assure. `Cjm`, `Tjm` et marge n'apparaissent dans aucune projection de liste : ils ne sont servis que par une **lecture unitaire dédiée dont chaque accès est journalisé** — acteur, rôle, cible, et le **nom** des champs lus, jamais leur valeur (**ADR-0043**, **ADR-0024**). La pagination est plafonnée dans la route _et_ dans le dépôt.
+3. **L'autorisation est construite et testée par rôle _et_ par périmètre.** Le filtrage vit dans le
+   dépôt de données (**ADR-0003**), au seul endroit par où les données entrent, et la règle est écrite
+   **une fois** dans le noyau partagé (`readScope`) parce que les deux modules l'appliquent. Trois
+   rôles — `consultant`, `manager`, `billing` (**ADR-0023**) — croisés avec l'implantation : un
+   consultant ne voit que ses propres mois, un manager ceux de son implantation, personne d'autre qu'un
+   manager ne voit une marge. La démonstration a **les deux temps** que l'ADR-0003 exige, et elle se
+   rejoue en trois requêtes (section « Démarrer ») : la même URL répond `200` sous `manager-paris` et
+   **`403` sous `manager-lyon`, en nommant le refus dans un champ dédié** (`deniedBy`), et un enregistrement
+   qui n'existe pas répond `404` — trois faits différents, trois réponses différentes. `manager-paris`
+   et `manager-lyon` sont deux **personas** : des identités sélectionnables au lieu d'une
+   authentification, chacune un rôle exercé dans une implantation (`Persona` et `Role` dans
+   [`CONTEXT.md`](CONTEXT.md), 🇬🇧). Deux d'entre elles partagent le rôle `manager` dans deux
+   implantations différentes, et c'est précisément ce qui rend le refus reproductible en trois clics au
+   lieu d'être affirmé. Le 403 ne publie **rien** de ce qu'il cache (**ADR-0042**), et un test
+   l'assure. `Cjm`, `Tjm` et marge n'apparaissent dans aucune projection de liste : ils ne sont servis
+   que par une **lecture unitaire dédiée dont chaque accès est journalisé** — acteur, rôle, cible, et
+   le **nom** des champs lus, jamais leur valeur (**ADR-0043**, **ADR-0024**). La pagination est
+   plafonnée dans la route _et_ dans le dépôt.
 
 4. **Des arbitrages écrits au moment où ils sont pris** → `docs/adr/`. Chaque ADR nomme l'option écartée et le seuil auquel on changerait d'avis.
 
@@ -130,22 +191,27 @@ décision.
 
 **Écarté, avec le seuil auquel je changerais d'avis :**
 
-| Sujet                                                                       | Pourquoi pas ici                                                                                                                                                                                                                      | Seuil de réouverture                                                                                       |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Objet `Money`, bibliothèque décimale                                        | Un `Tjm` est un nombre entier d'euros, la quantité un nombre entier de demi-journées : l'arithmétique entière est exacte et une classe autour de `+` est du cérémonial                                                                | Deuxième devise · prix unitaire à plus de deux décimales · proration (ADR-0002)                            |
-| Multi-devise, remises, acomptes, proration                                  | Chacun introduit un arrondi à répartir, donc casse l'exactitude entière ci-dessus                                                                                                                                                     | Voir ADR-0002                                                                                              |
-| Forfait, unité d'œuvre, abonnement, astreinte                               | Trois moteurs de facturation existent, un seul est démontré. La `InvoiceLine` porte déjà une **origine**, parce que c'est ce qui se rétrofitte le plus mal                                                                            | Première mission SOC facturée à l'heure ou à l'unité                                                       |
-| Génération de PDF, Factur-X                                                 | La facture est une page HTML imprimable. Un moteur de gabarits est la première source de bugs de Dolibarr                                                                                                                             | Dépôt réel sur une plateforme agréée                                                                       |
-| Read model, cache, file de jobs, outbox                                     | Deux modules, aucune requête lourde, aucun consommateur hors du processus. Postgres tient le verrou                                                                                                                                   | Le premier abonné qui fait un appel réseau (outbox) · un écran qui joint plus de trois tables (read model) |
-| Redis, Kafka, RabbitMQ, Elasticsearch, Terraform, Kubernetes, microservices | Aucun n'est justifié par le besoin. **Ne pas ajouter est un choix d'architecture**, pas une lacune                                                                                                                                    | Un besoin mesuré, pas anticipé                                                                             |
-| ORM (Drizzle, Prisma, Kysely, TypeORM)                                      | `FOR UPDATE`, schémas par module et types Postgres doivent être exprimables sans échappatoire, et aucun ORM ne doit pouvoir remonter dans le domaine                                                                                  | —                                                                                                          |
-| Framework front (React, Vue), design system, thème sombre                   | Quatre écrans : aucun ne s'amortit. 640 combinaisons visuelles sur un outil de facturation, c'est de l'effort qui ne produit rien                                                                                                     | —                                                                                                          |
-| Avoir partiel                                                               | Une réduction partielle d'une facture émise est arithmétiquement indiscernable d'une remise, et la remise réintroduit un montant à répartir avant arrondi — donc casse l'exactitude entière. Seule l'annulation totale est construite | Voir ADR-0002 et ADR-0036                                                                                  |
-| Client hors Union européenne                                                | Quatre territorialités sont modélisées (métropole, DOM avec TVA, DOM hors champ, UE), parce que chacune porte une mention obligatoire différente. Un client suisse ou britannique en porterait une cinquième, non vérifiée ici        | Première mission vendue hors UE                                                                            |
-| Undo sur une facture émise                                                  | **Et c'est la démonstration** : la seule correction d'une facture émise est un avoir                                                                                                                                                  | Jamais : c'est une règle légale                                                                            |
-| Notes de frais, agenda, ticketing, GED, BPMN, marketplace de modules        | À acheter, déjà en place, ou dérive de périmètre caractérisée                                                                                                                                                                         | —                                                                                                          |
-| Stock, achats de biens, point de vente, fabrication                         | Sans objet pour du conseil — c'est la moitié de la surface d'Odoo et de Dolibarr qui disparaît                                                                                                                                        | —                                                                                                          |
-| Mutation testing, e2e, Testcontainers, mode volumétrie                      | Le pipeline de PR doit rester court, sinon il se contourne. Ce qui part en nightly est une décision, pas un reste                                                                                                                     | Domaine stable → Stryker sur `domain/` en nightly                                                          |
+| Sujet                                                                         | Pourquoi pas ici                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Seuil de réouverture                                                                                                                                                                                                                             |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Types d'absence (congé payé, RTT, maladie)                                    | Le domaine ne connaît que `worked` et `absence`, et la grille de saisie colore les deux — plus le week-end et le jour férié, que le calendrier sait déjà. Distinguer un CP d'un RTT, c'est une valeur de plus, une migration, un seed et des écrans, pour **zéro conséquence sur la facturation** : une absence ne produit aucune ligne de facture, quel que soit son motif. La demande a été posée le 26/08/2026 et refusée ici plutôt que rabotée en silence en une seule couleur « absence »                                             | Premier solde de congés à tenir dans l'outil, ou première règle métier qui dépend du motif (un RTT décompté d'un compteur, un arrêt maladie qui suspend une mission) — à ce moment-là le motif porte une conséquence et cesse d'être une couleur |
+| Grille de grades et `Tjm` par défaut                                          | Les tables `public.grades` et `public.grade_tjm_defaults` sont créées et seedées, et **rien ne les lit** : le `Tjm` qui facture est celui de la mission, daté, jamais un défaut de grade. Une grille de tarifs par séniorité est une décision commerciale, pas une règle de la chaîne CRA → facture. `public.consultant_grades` a un lecteur, lui — c'est le `Cjm` que la marge lit (ADR-0043)                                                                                                                                              | Première négociation tarifaire menée dans l'outil, ou premier devis calculé depuis une grille (ADR-0051)                                                                                                                                         |
+| Objet `Money`, bibliothèque décimale                                          | Un `Tjm` est un nombre entier d'euros, la quantité un nombre entier de quarts de journée : l'arithmétique entière est exacte et une classe autour de `+` est du cérémonial                                                                                                                                                                                                                                                                                                                                                                  | Deuxième devise · prix unitaire à plus de deux décimales · proration (ADR-0002)                                                                                                                                                                  |
+| Multi-devise, remises, acomptes, proration                                    | Chacun introduit un arrondi à répartir, donc casse l'exactitude entière ci-dessus                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Voir ADR-0002                                                                                                                                                                                                                                    |
+| Forfait, unité d'œuvre, abonnement, astreinte                                 | Trois moteurs de facturation existent, un seul est démontré. La `InvoiceLine` porte déjà une **origine**, parce que c'est ce qui se rétrofitte le plus mal                                                                                                                                                                                                                                                                                                                                                                                  | Première mission SOC facturée à l'heure ou à l'unité                                                                                                                                                                                             |
+| Génération de PDF, Factur-X                                                   | La facture est une page HTML imprimable. Un moteur de gabarits est la première source de bugs de Dolibarr                                                                                                                                                                                                                                                                                                                                                                                                                                   | Dépôt réel sur une plateforme agréée                                                                                                                                                                                                             |
+| Read model, cache, file de jobs, outbox                                       | Deux modules, aucune requête lourde, aucun consommateur hors du processus. Postgres tient le verrou                                                                                                                                                                                                                                                                                                                                                                                                                                         | Le premier abonné qui fait un appel réseau (outbox) · un écran qui joint plus de trois tables (read model)                                                                                                                                       |
+| Redis, Kafka, RabbitMQ, Elasticsearch, Terraform, Kubernetes, microservices   | Aucun n'est justifié par le besoin. **Ne pas ajouter est un choix d'architecture**, pas une lacune                                                                                                                                                                                                                                                                                                                                                                                                                                          | Un besoin mesuré, pas anticipé                                                                                                                                                                                                                   |
+| ORM (Drizzle, Prisma, Kysely, TypeORM)                                        | `FOR UPDATE`, schémas par module et types Postgres doivent être exprimables sans échappatoire, et aucun ORM ne doit pouvoir remonter dans le domaine                                                                                                                                                                                                                                                                                                                                                                                        | —                                                                                                                                                                                                                                                |
+| Thème sombre (bascule utilisateur clair/sombre)                               | Ce plan construit une seule palette. Un second jeu de tokens testé sur chaque composant double l'effort visuel pour un outil à usage interne, pas pour un produit grand public                                                                                                                                                                                                                                                                                                                                                              | Première demande réelle d'un utilisateur en usage prolongé, ou premier composant shadcn où les deux jeux de tokens existent déjà sans coût supplémentaire                                                                                        |
+| Avoir partiel                                                                 | Une réduction partielle d'une facture émise est arithmétiquement indiscernable d'une remise, et la remise réintroduit un montant à répartir avant arrondi — donc casse l'exactitude entière. Seule l'annulation totale est construite                                                                                                                                                                                                                                                                                                       | Voir ADR-0002 et ADR-0036                                                                                                                                                                                                                        |
+| Client hors Union européenne                                                  | Quatre territorialités sont modélisées (métropole, DOM avec TVA, DOM hors champ, UE), parce que chacune porte une mention obligatoire différente. Un client suisse ou britannique en porterait une cinquième, non vérifiée ici                                                                                                                                                                                                                                                                                                              | Première mission vendue hors UE                                                                                                                                                                                                                  |
+| Undo sur une facture émise                                                    | **Et c'est la démonstration** : une facture émise ne se modifie pas, et le domaine refuse la transition. La seule correction possible est un avoir                                                                                                                                                                                                                                                                                                                                                                                          | Jamais : c'est une règle légale                                                                                                                                                                                                                  |
+| Émission d'un avoir : persistance et écran                                    | La règle **est** construite et testée — `Invoice.cancelByCreditNote()` refuse tout ce qui n'est pas une facture émise, et c'est ce refus qui tient l'immutabilité — mais rien ne persiste ni n'affiche l'avoir. La chaîne démontrée s'arrête à la facture ; corriger est en aval, et la table `billing.credit_notes`, écrite par personne, est partie avec ADR-0057                                                                                                                                                                         | Première facture émise à corriger sur une instance — même seuil que le premier document _envoyé_ (ADR-0055, ADR-0056)                                                                                                                            |
+| Pagination du pré-facturier au-delà d'une page                                | La liste est plafonnée à cinquante lignes, comme toute lecture ici (ADR-0003) : il n'y a pas de « tout afficher ». Le sélecteur de mois est lui aussi lu sur une page de CRA triée par mois décroissant — il peut donc omettre un mois **ancien**, jamais un mois récent, ce qui est le comportement attendu d'un sélecteur de période. Une implantation de neuf consultants tient très largement dedans                                                                                                                                    | Une implantation dont les CRA dépassent une page — c'est le seuil que nomme déjà ADR-0053 pour cet écran, et le correctif est une requête dédiée pour le sélecteur plus une pagination visible, pas un plafond plus haut                         |
+| Audit RGAA, déclaration de conformité, test avec une technologie d'assistance | L'accessibilité **mécanique** est tenue et testée : une langue déclarée, un lien d'évitement en tête de tabulation, un anneau de focus visible jamais supprimé, un label par contrôle, un `scope` par en-tête de tableau, un texte de lien désambiguïsé par sa ligne (ADR-0061). Ce qui n'est **pas** tenu : aucun audit des 106 critères RGAA, aucune déclaration de conformité, aucun passage sous NVDA / JAWS / VoiceOver, aucun ratio de contraste publié — la palette a été choisie pour le contraste, le chiffre n'est pas revendiqué | Premier usage réel en interne, pilote ou déploiement en cabinet · ou premier composant que HTML natif ne fournit pas (combobox, arbre, modale), là où ARIA devient nécessaire plutôt que décoratif                                               |
+| Notes de frais, agenda, ticketing, GED, BPMN, marketplace de modules          | À acheter, déjà en place, ou dérive de périmètre caractérisée                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | —                                                                                                                                                                                                                                                |
+| Stock, achats de biens, point de vente, fabrication                           | Sans objet pour du conseil — c'est la moitié de la surface d'Odoo et de Dolibarr qui disparaît                                                                                                                                                                                                                                                                                                                                                                                                                                              | —                                                                                                                                                                                                                                                |
+| Mutation testing, Testcontainers, mode volumétrie                             | Le pipeline de PR doit rester court, sinon il se contourne. Ce qui part en nightly est une décision, pas un reste                                                                                                                                                                                                                                                                                                                                                                                                                           | Domaine stable → Stryker sur `domain/` en nightly                                                                                                                                                                                                |
 
 **Renvoyé à l'ERP cible** (identifié, modélisé quand c'est gratuit, non construit) : facturation
 électronique et plateforme agréée · comptabilité, trésorerie, FEC · congés et absences comme module ·
@@ -207,20 +273,20 @@ et le test négatif prouve qu'elle **refuse**.
 
 Chaque ligne vient d'un arbitrage écrit, avec l'option écartée et le seuil de réouverture.
 
-| Choix                                                   | ADR      | Option écartée                                                                   |
-| ------------------------------------------------------- | -------- | -------------------------------------------------------------------------------- |
-| **TypeScript** strict, **Node.js** ≥ 24.13.1            | —        | —                                                                                |
-| **Fastify**                                             | ADR-0008 | NestJS — un conteneur d'injection et des décorateurs pour une douzaine de routes |
-| **HTML rendu serveur**, aucun framework front           | ADR-0009 | React/Vue et une étape de build front pour quatre écrans                         |
-| **PostgreSQL 18**, SQL écrit à la main                  | ADR-0011 | Un ORM — `FOR UPDATE` et les schémas par module doivent rester lisibles          |
-| Migrations : fichiers `.sql` numérotés + runner         | ADR-0011 | Un outil de migration tiers                                                      |
-| **Montants en centimes entiers**                        | ADR-0002 | Un objet `Money`, une bibliothèque décimale                                      |
-| **Zod** aux frontières, et nulle part ailleurs          | ADR-0042 | Une validation qui redescend dans le domaine                                     |
-| **Vitest** · **pino** · **pnpm** workspaces             | —        | —                                                                                |
-| **Sélecteur de persona** au lieu d'une authentification | ADR-0023 | Un vrai IdP, qui rendrait l'autorisation invisible en démonstration              |
+| Choix                                                                                                             | ADR                          | Option écartée                                                                                  |
+| ----------------------------------------------------------------------------------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------- |
+| **TypeScript** strict, **Node.js** ≥ 24.13.1                                                                      | —                            | —                                                                                               |
+| **Fastify**                                                                                                       | ADR-0008                     | NestJS — un conteneur d'injection et des décorateurs pour une douzaine de routes                |
+| **HTML rendu serveur** pour les deux imprimables ; **React + TypeScript** en SPA pour l'interactif (à construire) | ADR-0062 (remplace ADR-0009) | Vue — shadcn/ui n'y existe qu'en portage communautaire, et ce code-là est recopié dans le dépôt |
+| **PostgreSQL 18**, SQL écrit à la main                                                                            | ADR-0011                     | Un ORM — `FOR UPDATE` et les schémas par module doivent rester lisibles                         |
+| Migrations : fichiers `.sql` numérotés + runner                                                                   | ADR-0011                     | Un outil de migration tiers                                                                     |
+| **Montants en centimes entiers**                                                                                  | ADR-0002                     | Un objet `Money`, une bibliothèque décimale                                                     |
+| **Zod** aux frontières, et nulle part ailleurs                                                                    | ADR-0042                     | Une validation qui redescend dans le domaine                                                    |
+| **Vitest** · **pino** · **pnpm** workspaces                                                                       | —                            | —                                                                                               |
+| **Sélecteur de persona** au lieu d'une authentification                                                           | ADR-0023                     | Un vrai IdP, qui rendrait l'autorisation invisible en démonstration                             |
 
 **Absents, et c'est un choix** : Redis, Kafka, RabbitMQ, Elasticsearch, Terraform, Kubernetes,
-microservices, tout ORM, toute bibliothèque décimale, toute file de jobs, React, Vue, génération de
+microservices, tout ORM, toute bibliothèque décimale, toute file de jobs, Vue, génération de
 PDF, OpenTelemetry, Testcontainers. La section « Ce que je ne construis pas » donne le seuil de
 chacun.
 
@@ -235,13 +301,17 @@ pnpm run setup      # env:init + env:check + docker compose + migrate + seed
 pnpm run api        # l'API sur http://127.0.0.1:3000
 ```
 
+Les **deux topologies** — dev (Vite sur 5173, deux processus) et prod/démo (Fastify seul sur 3000,
+ADR-0063) — leurs commandes, et le `403 /problems/forbidden-origin` qui suit quand on les mélange :
+[`docs/running.md`](docs/running.md).
+
 `pnpm run db:reset` rejoue les trois dernières étapes depuis une base vide. Les étapes séparément,
 si l'une échoue :
 
 ```sh
 pnpm run db:up      # PostgreSQL 18 via docker compose, attend qu'il soit healthy
 pnpm run migrate    # applique les migrations en attente, rejouable sans effet
-pnpm run seed       # le jeu de données déterministe (ADR-0022)
+pnpm run seed       # ⚠️ VIDE les trois schémas, puis réécrit le jeu déterministe (ADR-0022)
 pnpm run test:int   # les tests d'intégration contre ce PostgreSQL
 ```
 
@@ -255,10 +325,20 @@ demandent Docker.
 
 ### Voir la chaîne, et voir l'autorisation refuser
 
-Il n'y a **pas encore d'écrans** — ils arrivent en phase 6. Tout se voit en HTTP, sur
+Deux façons de voir la même chaîne : **à l'écran**, ou en HTTP. Les deux passent par
 `http://127.0.0.1:3000`.
 
-⚠️ **`127.0.0.1` et non `localhost`.** Ce sont la même machine et **deux origines différentes** :
+**À l'écran** — ouvrez **<http://127.0.0.1:3000/>** dans un navigateur. Vous arrivez sur le
+sélecteur de persona ; choisissez `manager-paris`, et la navigation mène au pré-facturier, d'où un
+mois se valide ou se refuse. `billing-paris` est la persona qui émet une facture ;
+`consultant-paris` est celle qui saisit un mois. Changer de persona se fait depuis l'en-tête de
+chaque page. Rien à installer côté navigateur : les pages sont du HTML rendu par le serveur, sans
+script.
+
+⚠️ **`127.0.0.1` et non `localhost`.** La panne est trompeuse : sous `localhost` les pages
+s'affichent normalement (`200`), et seule la **première écriture** est refusée — un bouton qui ne
+fait rien sur une application qui a l'air de marcher. Ce sont la même machine et **deux origines
+différentes** :
 une requête d'écriture venue d'une autre origine que `API_PUBLIC_ORIGIN` est refusée
 `403 /problems/forbidden-origin`, ce qui est la posture CSRF assumée (ADR-0023). Les deux valeurs
 doivent coïncider dans `.env`, et l'API imprime au démarrage l'origine à ouvrir.
@@ -284,18 +364,43 @@ renvoyé ci-dessus :
 
 ```sh
 # 1. manager-paris le lit                       → 200
-# 2. la même URL sous manager-lyon              → 403, avec "deniedBy" qui nomme la règle
+# 2. la même URL sous manager-lyon              → 403, avec "deniedBy" qui porte le refus
 # 3. un id qui n'existe pas, sous manager-paris → 404
 ```
 
 Trois faits différents, trois réponses différentes — et le `403` ne publie **rien** de ce qu'il
-cache. Puis la chaîne elle-même : `POST /api/v1/cras/{id}/validation` valide le mois et fait
-apparaître les projets de facture **dans la même transaction**, et
-`POST /api/v1/invoices/{id}/issuance` — avec un en-tête `Idempotency-Key`, obligatoire parce que
-c'est la seule route qui consomme un numéro d'une série sans trou — émet le document.
+cache. Puis la chaîne elle-même, en deux écritures :
 
-Les routes complètes sont dans [`apps/api/src/routes/`](apps/api/src/routes/), et chacune **déclare
-les rôles qui la portent** au lieu de les comparer dans son corps.
+```sh
+# 1. Le manager valide le mois. Les projets de facture apparaissent dans la MÊME transaction,
+#    un par client. `{cra-id}` est l'`id` d'un CRA `submitted` renvoyé par la commande précédente.
+curl -s -b jar.txt -X POST http://127.0.0.1:3000/api/v1/cras/{cra-id}/validation \
+  -H 'Origin: http://127.0.0.1:3000'
+
+# 2. Les projets ainsi créés, pour en prendre un `id`
+curl -s -b jar.txt http://127.0.0.1:3000/api/v1/invoices
+
+# 3. L'émission est portée par `billing`, pas par `manager` : il faut changer de persona
+curl -s -c jar.txt -X POST http://127.0.0.1:3000/api/v1/session/persona \
+  -H 'Origin: http://127.0.0.1:3000' -H 'Content-Type: application/json' \
+  -d '{"key":"billing-paris"}'
+
+# 4. Émission. L'en-tête `Idempotency-Key` est obligatoire — c'est la seule route qui consomme
+#    un numéro d'une série sans trou. Rejouez la commande telle quelle : même numéro, "replayed".
+curl -s -b jar.txt -X POST http://127.0.0.1:3000/api/v1/invoices/{invoice-id}/issuance \
+  -H 'Origin: http://127.0.0.1:3000' -H 'Idempotency-Key: demo-0001'
+```
+
+⚠️ **Deux en-têtes, et les oublier donne un refus qui ressemble à une panne.** `Origin` est
+obligatoire sur **toute** écriture (`403 /problems/forbidden-origin`, posture CSRF d'ADR-0023), et
+`Idempotency-Key` l'est sur l'émission (`400 /problems/idempotency-key-required`). Les deux refus
+nomment eux-mêmes leur correctif dans leur `detail` — mais ils sont attendus, pas cassés. De même,
+l'étape 4 sous `manager-paris` répond `403 /problems/insufficient-role` : c'est l'autorisation par
+rôle qui fonctionne, et c'est pour cela que l'étape 3 existe.
+
+Les routes complètes sont dans [`apps/api/src/routes/`](apps/api/src/routes/) pour l'API et dans
+[`apps/api/src/web/routes.ts`](apps/api/src/web/routes.ts) pour les écrans, et chacune **déclare les
+rôles qui la portent** au lieu de les comparer dans son corps.
 
 ## Jeu de données
 
@@ -316,9 +421,18 @@ Deux propriétés en font un livrable et pas un script de confort (**ADR-0022**)
   (`pnpm run seed:fingerprint`) — un hash de contenu et un compte de lignes par table. Une passe
   non idempotente déplace un compte, une passe non déterministe déplace tous les identifiants.
 
-Ce que le jeu de données **n'exerce pas encore** est suivi dans
-[`docs/open-questions.md`](docs/open-questions.md) : le mois seedé est uniforme, donc aucun samedi
-signalé, aucune absence, aucune journée partagée entre deux affectations. La phase 6 tranche.
+Le mois d'Alice est **volontairement irrégulier** : une journée partagée entre ses deux missions
+(deux quarts de journée sur chacune), une journée d'absence, un **samedi travaillé donc signalé**,
+et une seconde journée partagée à trois quarts contre un (ADR-0069). Ce n'est pas de la décoration
+— la journée partagée est la raison structurelle pour laquelle la mission est portée par la _ligne_
+et non par le _jour_, et le jeu de données ne l'exerçait pas jusqu'à la phase 6 ; le partage 3/1
+est ce qui fait qu'une ligne de facture porte une quantité qui n'est pas un multiple de quatre, et
+qui prouve donc la facturation au quart plutôt que de l'illustrer. Les deux missions d'Alice étant
+vendues au **même client**, chaque journée partagée produit une seconde _ligne_ sur une facture,
+pas une seconde facture (ADR-0038).
+
+Ce que juin 2026 ne peut pas montrer : un **jour férié** signalé. Il n'y en a aucun ce mois-là
+(ADR-0004 place l'Ascension au 14/05 et la Pentecôte au 25/05) ; c'est le calendrier, pas un oubli.
 
 ## Tests et portes de CI
 
@@ -340,7 +454,8 @@ plateforme. Ce README a affirmé le contraire — « cinq sont exigées » — d
 c'était faux : la bascule n'était pas en attente, elle était indisponible. Décision, option écartée
 et seuil → **[ADR-0040](docs/adr/0040-ci-gates-are-advisory-while-the-repository-is-private.md)**.
 La bascule est gratuite le jour où le dépôt devient public, et coûte alors une case à cocher par
-job (`grep -E '^  [a-z-]+:$' .github/workflows/ci.yml` les liste ; neuf au 21/08/2026).
+job (`sed -n '/^jobs:/,$p' .github/workflows/ci.yml | grep -E '^  [a-z-]+:$'` les liste ; neuf au
+22/08/2026 — la borne `/^jobs:/` compte, sans elle `on: push:` s'ajoute à la liste).
 
 | Porte (job CI)                  | Commande                                            | Ce qu'elle fait passer au rouge                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -367,7 +482,9 @@ job (`grep -E '^  [a-z-]+:$' .github/workflows/ci.yml` les liste ; neuf au 21/08
 > protection de branche n'est pas disponible sur ce plan. C'est une limite assumée et datée
 > (ADR-0040), pas une case oubliée.
 
-Les hooks locaux (lefthook) rejouent une partie de ces portes **avant** le commit et le push — et depuis ADR-0040 ils ne les doublent plus, ils sont **le seul arrêt mécanique** qui précède un merge, puisque aucun des neuf ne le bloque. ⚠️ Ils
+Les hooks locaux (lefthook) rejouent une partie de ces portes **avant** le commit et le push — et
+depuis ADR-0040 ils ne les doublent plus, ils sont **le seul arrêt mécanique** qui précède un merge,
+puisque aucun des neuf ne le bloque. ⚠️ Ils
 ne s'installent pas tout seuls : `ignore-scripts` est activé, donc un clone frais n'en a aucun tant
 qu'on n'a pas lancé `pnpm exec lefthook install`. Ce qu'ils font :
 gitleaks sur ce qui est indexé — le seul des deux qui empêche réellement la fuite, la CI ne scannant

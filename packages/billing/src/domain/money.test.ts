@@ -92,33 +92,36 @@ describe('a rate in basis points', () => {
 });
 
 describe('the amount of a line of régie', () => {
-  it('is half-days times the daily rate, halved', () => {
+  it('is quarter-days times the daily rate, quartered', () => {
     // Ten worked days at 650 € — the shape every line of this mockup has.
-    expect(lineAmountCents(20, 65_000)).toBe(650_000);
+    expect(lineAmountCents(40, 65_000)).toBe(650_000);
   });
 
-  it('is exact on an odd count of half-days', () => {
-    expect(lineAmountCents(1, 65_000)).toBe(32_500);
-    expect(lineAmountCents(21, 65_000)).toBe(682_500);
+  it('is exact on an odd count of quarter-days', () => {
+    expect(lineAmountCents(1, 65_000)).toBe(16_250);
+    expect(lineAmountCents(21, 65_000)).toBe(341_250);
   });
 
   it('multiplies first and divides last', () => {
-    // The order BUILD-RULES fixes. `halfDays * (tjmCents / 2)` is also exact while the rate is a
-    // whole number of euros, and it inverts the safe order: the assertion below is what holds.
-    expect(lineAmountCents(3, 33_300)).toBe(49_950);
+    // The order BUILD-RULES fixes. `quarterDays * (tjmCents / 4)` is also exact while the rate is
+    // a whole number of euros — every multiple of 100 is a multiple of 4 too — so this is not the
+    // case that discriminates the two orders; it is the reference value for the order BUILD-RULES
+    // still names, recomputed for the new divisor.
+    expect(lineAmountCents(3, 33_300)).toBe(24_975);
   });
 
-  it('refuses a daily rate that is not an even number of cents', () => {
-    // The precondition of the single division this repository allows. A Tjm of 150,50 € reaches
-    // here as 15 050 and would make a half-day 75,25 € — exact — but 15 001 would not.
-    expect(() => lineAmountCents(1, 15_001)).toThrow(InvalidValueError);
+  it('refuses a daily rate that is not a number of cents divisible by four', () => {
+    // The precondition of the single division this repository allows, and the test that proves
+    // the divisor actually moved: 15 050 is even, so it would have passed ADR-0012's `% 2` guard,
+    // but 15 050 % 4 is 2 — a Tjm of 150,50 € still does not clear the new bar.
+    expect(() => lineAmountCents(1, 15_050)).toThrow(InvalidValueError);
   });
 
-  it('refuses a count of half-days that is not a whole number', () => {
+  it('refuses a count of quarter-days that is not a whole number', () => {
     expect(() => lineAmountCents(1.5, 65_000)).toThrow(InvalidValueError);
   });
 
-  it('refuses a negative count of half-days, and a negative daily rate', () => {
+  it('refuses a negative count of quarter-days, and a negative daily rate', () => {
     // Neither can arrive from the event or from the reference data, and both are guards rather
     // than checks for that reason: an amount is never negative in this domain (ADR-0036), and a
     // line that quietly billed −650 € would be the correction nobody asked for.
@@ -126,7 +129,7 @@ describe('the amount of a line of régie', () => {
     expect(() => lineAmountCents(2, -65_000)).toThrow(InvalidValueError);
   });
 
-  it('bills nothing for no half-day', () => {
+  it('bills nothing for no quarter-day', () => {
     expect(lineAmountCents(0, 65_000)).toBe(0);
   });
 });

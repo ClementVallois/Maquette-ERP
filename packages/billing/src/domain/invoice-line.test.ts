@@ -13,7 +13,7 @@ function line(overrides: Partial<Parameters<typeof regieLine>[0]> = {}) {
     missionId: REGIE_MISSION,
     craId: 'cra-1',
     period: '2026-03',
-    halfDays: 42,
+    quarterDays: 84,
     tjmCents: 65_000,
     vat: STANDARD,
     ...overrides,
@@ -21,23 +21,23 @@ function line(overrides: Partial<Parameters<typeof regieLine>[0]> = {}) {
 }
 
 describe('a line of régie', () => {
-  it('is priced by the half-day, so no quantity is ever a decimal', () => {
-    // ADR-0012 all the way through: 21 worked days are 42 half-days at 325,00 €, not 21 days at
-    // 650,00 € — and a half-day worked alone is 1 × 325,00 €, not a quantity of 0,5.
+  it('is priced by the quarter-day, so no quantity is ever a decimal', () => {
+    // ADR-0069 all the way through: 21 worked days are 84 quarter-days at 162,50 €, not 21 days
+    // at 650,00 € — and a quarter-day worked alone is 1 × 162,50 €, not a quantity of 0,25.
     const result = line();
 
-    expect(result.quantityHalfDays).toBe(42);
-    expect(result.unitPriceCents).toBe(32_500);
+    expect(result.quantityQuarterDays).toBe(84);
+    expect(result.unitPriceCents).toBe(16_250);
     expect(result.amountCents).toBe(1_365_000);
   });
 
   it('has a unit price and a quantity that multiply back to its amount', () => {
     // The reference test for the first two steps of the order of operations. It holds because a
-    // Tjm is an even number of cents, which is the precondition the arithmetic asserts.
-    for (const halfDays of [1, 2, 3, 41, 42]) {
-      const result = line({ halfDays, tjmCents: 33_300 });
+    // Tjm is a multiple of four cents, which is the precondition the arithmetic asserts.
+    for (const quarterDays of [2, 4, 6, 82, 84]) {
+      const result = line({ quarterDays, tjmCents: 33_300 });
 
-      expect(result.quantityHalfDays * result.unitPriceCents).toBe(result.amountCents);
+      expect(result.quantityQuarterDays * result.unitPriceCents).toBe(result.amountCents);
     }
   });
 
@@ -53,7 +53,7 @@ describe('a line of régie', () => {
   it('copies the rate that applied, rather than pointing at the reference', () => {
     // The documentary freeze. February's rate stays on February's line after the renegotiation of
     // 1 March, because the line holds the number and not a lookup.
-    const february = line({ period: '2026-02', tjmCents: 62_000, halfDays: 40 });
+    const february = line({ period: '2026-02', tjmCents: 62_000, quarterDays: 80 });
 
     expect(february.origin.tjmCents).toBe(62_000);
     expect(february.amountCents).toBe(1_240_000);
@@ -67,12 +67,12 @@ describe('a line of régie', () => {
     });
   });
 
-  it('refuses a line with no designation, and a line worth no half-day', () => {
+  it('refuses a line with no designation, and a line worth no quarter-day', () => {
     expect(() => line({ designation: '   ' })).toThrow(InvalidValueError);
-    expect(() => line({ halfDays: 0 })).toThrow(InvalidValueError);
+    expect(() => line({ quarterDays: 0 })).toThrow(InvalidValueError);
   });
 
-  it('refuses a daily rate that is not an even number of cents', () => {
+  it('refuses a daily rate that is not a number of cents divisible by four', () => {
     expect(() => line({ tjmCents: 65_001 })).toThrow(InvalidValueError);
   });
 });

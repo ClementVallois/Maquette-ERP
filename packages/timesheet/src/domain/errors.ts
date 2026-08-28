@@ -43,13 +43,13 @@ export class DayOutsidePeriodError extends BusinessError {
   }
 }
 
-/** Nobody works three half-days in a day. Two lines of two half-days each is the classic double entry. */
+/** Nobody works more than a full day. Two lines of four quarter-days each is the classic double entry. */
 export class DayOverbookedError extends BusinessError {
   readonly problemType = '/problems/day-overbooked';
 
   constructor(day: string, recorded: number, limit: number) {
     super(
-      `${day} already carries ${String(recorded)} half-days, and a day holds ${String(limit)}`,
+      `${day} already carries ${String(recorded)} quarter-days, and a day holds ${String(limit)}`,
       {
         day,
         recorded,
@@ -130,6 +130,25 @@ export class NotAssignedError extends BusinessError {
 }
 
 /**
+ * A day recorded on a mission that requires an `Habilitation` the consultant did not hold on that
+ * day. It is a 409 and not a 422 for the reason ADR-0042 gives: the day and the mission are both
+ * perfectly good values, and what refuses them is the state of the world on that date.
+ *
+ * The missing clearances are named. A refusal that says only "not qualified" leaves the consultant
+ * to guess which certificate to go and get, and the manager to guess what to chase.
+ */
+export class MissingHabilitationError extends BusinessError {
+  readonly problemType = '/problems/missing-habilitation';
+
+  constructor(day: string, consultantId: string, missionId: string, missing: readonly string[]) {
+    super(
+      `${consultantId} does not hold ${missing.join(', ')} on ${day}, which mission ${missionId} requires`,
+      { day, consultantId, missionId, missing },
+    );
+  }
+}
+
+/**
  * The month does not add up against the working calendar. Every workable day is accounted for —
  * worked or absent — or the Cra is not a record of the month, and the days nobody can explain are
  * the ones that quietly never get billed.
@@ -140,11 +159,11 @@ export class IncompleteCraError extends BusinessError {
   constructor(input: {
     craId: string;
     missingDays: readonly string[];
-    recordedHalfDays: number;
-    expectedHalfDays: number;
+    recordedQuarterDays: number;
+    expectedQuarterDays: number;
   }) {
     super(
-      `${input.craId} accounts for ${String(input.recordedHalfDays)} of ${String(input.expectedHalfDays)} half-days; ${String(input.missingDays.length)} workable days are not accounted for`,
+      `${input.craId} accounts for ${String(input.recordedQuarterDays)} of ${String(input.expectedQuarterDays)} quarter-days; ${String(input.missingDays.length)} workable days are not accounted for`,
       { ...input },
     );
   }
@@ -159,7 +178,10 @@ export class SelfValidationForbiddenError extends BusinessError {
   readonly problemType = '/problems/self-validation-forbidden';
 
   constructor(craId: string, consultantId: string) {
-    super(`${consultantId} recorded ${craId} and cannot validate it`, { craId, consultantId });
+    // "answer" rather than "validate": since 21/08/2026 `refuse` is guarded by the same rule, and
+    // the message is what a log line shows. The problem type keeps its name — renaming a published
+    // identifier is a breaking change for a caller that branches on it (ADR-0016).
+    super(`${consultantId} recorded ${craId} and cannot answer it`, { craId, consultantId });
   }
 }
 

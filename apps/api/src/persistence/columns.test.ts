@@ -17,7 +17,7 @@ describe('exactCents', () => {
   });
 
   it('reads an integer column, which pg has already parsed', () => {
-    expect(exactCents('half_days', 42)).toBe(42);
+    expect(exactCents('quarter_days', 42)).toBe(42);
   });
 
   it('reads a negative amount, which a margin can be', () => {

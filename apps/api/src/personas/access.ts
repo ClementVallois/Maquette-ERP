@@ -6,8 +6,9 @@ import type { ServerDependencies } from '../dependencies.ts';
 import { ApiFailure } from '../errors.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
 
-import { actorOf, type Persona } from './catalogue.ts';
+import { actorOf } from './catalogue.ts';
 import { PERSONA_COOKIE, readCookie, unsignPersonaKey } from './cookie.ts';
+import { personaFor, rememberPersona } from './resolved.ts';
 
 /**
  * The third locus of authorization (ADR-0023): **does this actor's role carry this action at
@@ -28,21 +29,20 @@ export type Access =
 export const PUBLIC = (why: string): Access => ({ kind: 'public', why });
 export const forRoles = (...roles: Role[]): Access => ({ kind: 'roles', roles });
 
+/**
+ * Does this declaration carry this role? The `preHandler` below asks it to refuse a request; a
+ * screen asks it to decide whether to offer the button at all. Both readings come off the **same**
+ * `Access` value, so a verb that moves between roles moves its button with it — a screen may never
+ * answer that question by comparing a role itself.
+ */
+export function carries(access: Access, role: Role): boolean {
+  return access.kind === 'public' || access.roles.includes(role);
+}
+
 declare module 'fastify' {
   interface FastifyContextConfig {
     access?: Access;
   }
-}
-
-/**
- * The resolved persona, associated with the request rather than written onto it. A `WeakMap`
- * keeps the request object exactly as the framework built it — nothing downstream can mistake a
- * decoration for something the client sent — and the entry disappears with the request.
- */
-const resolved = new WeakMap<FastifyRequest, Persona>();
-
-export function personaFor(request: FastifyRequest): Persona | undefined {
-  return resolved.get(request);
 }
 
 const UNAUTHORIZED = 401;
@@ -54,7 +54,7 @@ const FORBIDDEN = 403;
  * is a wiring fault, not a request the caller can fix.
  */
 export function requireActor(request: FastifyRequest): Actor {
-  const persona = resolved.get(request);
+  const persona = personaFor(request);
   if (persona === undefined) {
     throw new ApiFailure(`${request.url} ran without a persona; its Access declaration is wrong`);
   }
@@ -88,7 +88,7 @@ export function registerAccessControl(
       signed === null ? null : unsignPersonaKey(signed, dependencies.config.sessionSigningKey);
     const persona = key === null ? null : await dependencies.personas.byKey(key);
 
-    if (persona !== null) resolved.set(request, persona);
+    if (persona !== null) rememberPersona(request, persona);
 
     if (access === undefined || access.kind === 'public') return;
 
@@ -138,6 +138,34 @@ export function registerAccessControl(
 const STATE_CHANGING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
+ * A browser that has been told not to disclose its origin sends the literal string `null` rather
+ * than omitting the header. Fetch decides that from the **referrer policy** — under `no-referrer`
+ * every non-`GET` navigation gets `Origin: null`, same-origin submissions included — which is how
+ * this application spent 23/08/2026 refusing its own forms (`web/reply.ts` now sends
+ * `same-origin`). A profile-level `network.http.sendOriginHeader=0` produces the same string.
+ *
+ * It is refused like any other non-matching origin; what this constant buys is that the refusal
+ * can *say* so instead of reporting a header that is merely present.
+ */
+const ORIGIN_SUPPRESSED = 'null';
+
+/**
+ * Why the refusal happened, as three cases rather than one boolean, because the three have three
+ * different fixes: a client that forgot the header, a browser configured to withhold it, and a
+ * genuine cross-origin write. A `boolean` collapsed the first two — and `Origin: null` fell on the
+ * *present* side of it, so the log said the opposite of what was happening.
+ *
+ * It records the shape, never the value: `config.ts` states the convention that nothing read from
+ * the outside is echoed back, and a header is the outside.
+ */
+function originShape(origin: string | undefined): 'absent' | 'suppressed' | 'mismatched' {
+  if (origin === undefined) return 'absent';
+  if (origin === ORIGIN_SUPPRESSED) return 'suppressed';
+
+  return 'mismatched';
+}
+
+/**
  * CSRF, second control (ADR-0023). `SameSite=Strict` on the cookie is the first; this one closes
  * the gap for any client that does not honour it.
  *
@@ -154,7 +182,7 @@ export function registerOriginCheck(app: FastifyInstance, dependencies: ServerDe
     if (origin === dependencies.config.publicOrigin) return;
 
     request.log.warn(
-      { originPresent: origin !== undefined },
+      { origin: originShape(origin) },
       'a state-changing request was refused on its origin',
     );
 

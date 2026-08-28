@@ -1,7 +1,7 @@
 # ADR-0012 — The half-day is the single storage unit for recorded time
 
 - **Date**: 2026-08-18
-- **Status**: accepted
+- **Status**: superseded by ADR-0069
 
 ## Context
 

@@ -1,4 +1,4 @@
-import { halfDays, period } from '@erp/platform';
+import { quarterDays, period } from '@erp/platform';
 import { closePool, getPool, useTestTransaction } from '@erp/test-harness';
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -240,7 +240,7 @@ function makeDraftInvoice(): Invoice {
         missionId: 'mission-audit',
         craId: 'cra-composition-test',
         period: '2026-03',
-        halfDays: halfDays(42),
+        quarterDays: quarterDays(84),
         tjmCents: 65_000,
         vat: { kind: 'taxable', basisPoints: 2000 },
       }),

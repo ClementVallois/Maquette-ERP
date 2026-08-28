@@ -19,6 +19,7 @@ export {
   DayOutsidePeriodError,
   DayOverbookedError,
   IncompleteCraError,
+  MissingHabilitationError,
   MissionNotRunningError,
   MissionOnNonWorkedDayError,
   MissionRequiredError,
@@ -31,9 +32,10 @@ export {
   ValidatedCraIsImmutableError,
 } from './domain/errors.ts';
 export { type Hierarchy, hierarchy, type ManagerAttachment } from './domain/hierarchy.ts';
-export type { ConsultantId, CraId, MissionId, OfficeId } from './domain/ids.ts';
+export type { ConsultantId, CraId, HabilitationId, MissionId, OfficeId } from './domain/ids.ts';
 export {
   type Assignment,
+  type HeldHabilitation,
   type Mission,
   type TimesheetReference,
   timesheetReference,

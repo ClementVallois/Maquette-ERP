@@ -13,6 +13,7 @@ import { type IsoDate, isoDateOf } from '@erp/platform';
 import {
   type Hierarchy,
   hierarchy,
+  type HeldHabilitation,
   type TimesheetReference,
   timesheetReference,
 } from '@erp/timesheet';
@@ -88,6 +89,18 @@ interface LegalEntityRow {
   number_prefix: string;
 }
 
+interface MissionHabilitationRow {
+  mission_id: string;
+  habilitation_id: string;
+}
+
+interface HeldHabilitationRow {
+  consultant_id: string;
+  habilitation_id: string;
+  obtained_at: Date | string;
+  expires_at: Date | string | null;
+}
+
 interface AttachmentRow {
   consultant_id: string;
   manager_id: string;
@@ -109,7 +122,16 @@ export class PgReferenceReader {
     this.#client = client;
   }
 
-  /** What `timesheet`'s rules read: which missions run when, and who is staffed on them. */
+  /**
+   * What `timesheet`'s rules read: which missions run when, who is staffed on them, what clearance
+   * each mission requires, and which clearances each consultant holds and until when.
+   *
+   * The last two joined this projection in Phase 6 and closed a hole the open-questions file had
+   * been carrying since 21/08: migration 007 created `mission_habilitations` and
+   * `consultant_habilitations`, the seed filled them, and nothing read them — so `CLAUDE.md`
+   * § Dataset shape required an habilitation that "constrains an assignment" while no code
+   * constrained anything (ADR-0051).
+   */
   async timesheet(): Promise<TimesheetReference> {
     const { rows: missions } = await this.#client.query<MissionRow>(
       `SELECT id, client_id, billing_model, start_date, end_date FROM public.missions`,
@@ -117,17 +139,32 @@ export class PgReferenceReader {
     const { rows: assignments } = await this.#client.query<AssignmentRow>(
       `SELECT consultant_id, mission_id, from_date, to_date FROM public.assignments`,
     );
+    const { rows: required } = await this.#client.query<MissionHabilitationRow>(
+      `SELECT mission_id, habilitation_id FROM public.mission_habilitations`,
+    );
+    const { rows: held } = await this.#client.query<HeldHabilitationRow>(
+      `SELECT consultant_id, habilitation_id, obtained_at, expires_at
+         FROM public.consultant_habilitations`,
+    );
 
     return timesheetReference({
       missions: missions.map((row) => ({
         id: row.id,
         startDate: isoDateOf(row.start_date),
         endDate: row.end_date === null ? null : isoDateOf(row.end_date),
+        requiredHabilitations: required
+          .filter((requirement) => requirement.mission_id === row.id)
+          .map((requirement) => requirement.habilitation_id),
       })),
       assignments: assignments.map((row) => ({
         consultantId: row.consultant_id,
         missionId: row.mission_id,
         ...bounds(row.from_date, row.to_date),
+      })),
+      held: held.map((row): HeldHabilitation => ({
+        consultantId: row.consultant_id,
+        habilitationId: row.habilitation_id,
+        ...bounds(row.obtained_at, row.expires_at),
       })),
     });
   }
@@ -189,6 +226,26 @@ export class PgReferenceReader {
     });
   }
 
+  /** Consultant names, for the rows the pré-facturier lists. Presentation, not a rule. */
+  async consultantNames(): Promise<ReadonlyMap<string, string>> {
+    const { rows } = await this.#client.query<{
+      id: string;
+      first_name: string;
+      last_name: string;
+    }>(`SELECT id, first_name, last_name FROM public.consultants`);
+
+    return new Map(rows.map((row) => [row.id, `${row.first_name} ${row.last_name}`]));
+  }
+
+  /** Office names, for the record a printable Cra carries. Presentation, not a rule. */
+  async officeNames(): Promise<ReadonlyMap<string, string>> {
+    const { rows } = await this.#client.query<{ id: string; name: string }>(
+      `SELECT id, name FROM public.offices`,
+    );
+
+    return new Map(rows.map((row) => [row.id, row.name]));
+  }
+
   /** Mission names, for the designation a line prints. Presentation, not a rule. */
   async missionNames(): Promise<ReadonlyMap<string, string>> {
     const { rows } = await this.#client.query<{ id: string; name: string }>(
@@ -196,6 +253,15 @@ export class PgReferenceReader {
     );
 
     return new Map(rows.map((row) => [row.id, row.name]));
+  }
+
+  /** Mission → client name, for the grid's mission picker (front-end plan Phase 5.2). Presentation, not a rule. */
+  async missionClientNames(): Promise<ReadonlyMap<string, string>> {
+    const { rows } = await this.#client.query<{ id: string; client_name: string }>(
+      `SELECT m.id, c.name AS client_name FROM public.missions m JOIN public.clients c ON c.id = m.client_id`,
+    );
+
+    return new Map(rows.map((row) => [row.id, row.client_name]));
   }
 
   /** The dated manager attachment: March's Cra is validated by March's manager (ADR-0034). */

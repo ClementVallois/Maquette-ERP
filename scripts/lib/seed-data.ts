@@ -636,6 +636,55 @@ export const managerAttachments = [
  */
 export const SUBMITTED_NOT_VALIDATED_EMAIL = 'claire.dubois@secureco.test';
 
+/**
+ * The month that is **not** uniform.
+ *
+ * Every other seeded June is every workable day, four quarter-days, one mission — which is a
+ * legible default and exercises none of the five things the model spends structure on.
+ * `CONTEXT.md` § Records of time gives the split day as the *structural reason* the mission sits
+ * on the line rather than on the day, and until this existed no dataset contained one;
+ * `timesheet.cra_flags` was created, indexed and read by nothing because no seeded day was ever
+ * flaggable; no `absence` existed, so a non-billable recorded day was a code path with no
+ * example; and a 2/2 split proves nothing about the quarter-day unit ADR-0069 introduced — it
+ * round-trips unchanged through the half-day model it replaced, which is why `quarterProofDay`
+ * exists as a second, distinct day rather than being folded into `splitDay`.
+ *
+ * `splitDay` stays an even 2/2 split on purpose: it is the physical shape ADR-0012 always gave a
+ * day worked on two missions (half a day each), now spelled in quarters, and it is the one shape
+ * every screen still active during this phase — including the legacy two-slot grid,
+ * `apps/web/src/features/cra/slots.ts` — can still render exactly as it always has.
+ * `quarterProofDay`'s 3/1 split is what a whole number of half-days cannot express, and what
+ * makes at least one seeded invoice line carry a quantity that is not a multiple of four; the
+ * legacy two-slot grid cannot display it exactly (documented at `slotsFor`), which is expected
+ * and untested, because nothing reads that day's cell content — only the totals and the invoice
+ * line the chain produces from it.
+ *
+ * Alice carries all five because she is the one consultant staffed on two missions, and both are
+ * sold to the same client — so each split day produces a second **line** on one invoice rather
+ * than a second invoice, which is the shape ADR-0038 says to expect and is what a reader should
+ * see first.
+ *
+ * There is no flagged **public holiday**, and that is the calendar rather than an omission: June
+ * 2026 has none (ADR-0004's table puts Ascension on 14/05 and Pentecost on 25/05). The weekend
+ * half of the rule is what June can demonstrate.
+ */
+export const VARIED_MONTH = {
+  email: 'alice.martin@secureco.test',
+  /** Two quarter-days on each mission — half a day each, the shape every screen can still render. */
+  splitDay: '2026-06-11',
+  /** A full day off. Recorded, so the month still adds up; not billable, so no line comes of it. */
+  absenceDay: '2026-06-18',
+  /** A Saturday worked. Not a refusal — it is the manager's to accept — so it is flagged. */
+  flaggedSaturday: '2026-06-13',
+  /**
+   * Three quarter-days on the primary mission, one on the second. Friday, an ordinary workable
+   * day, distinct from `splitDay`. Not an even 2/2 split on purpose (ADR-0069): a 2/2 split
+   * collapses to the same two half-days the old model already recorded and proves nothing about
+   * the unit that replaced it.
+   */
+  quarterProofDay: '2026-06-12',
+} as const;
+
 // ── Personas ────────────────────────────────────────────────────────────────
 // The four selectable identities of ADR-0023. Four entries over three roles, and the fourth is
 // the point: `manager-lyon` is what makes an out-of-scope refusal reproducible by switching

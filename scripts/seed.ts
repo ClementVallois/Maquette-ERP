@@ -67,6 +67,7 @@ import {
   SEED_CLOCK_INSTANT,
   SEED_TIMESTAMP_MS,
   SUBMITTED_NOT_VALIDATED_EMAIL,
+  VARIED_MONTH,
 } from './lib/seed-data.ts';
 
 const { Client: PgClient } = pg;
@@ -318,7 +319,6 @@ async function seed(): Promise<void> {
     await client.query('DELETE FROM billing.invoices');
     await client.query('DELETE FROM billing.numbering_series');
     await client.query('DELETE FROM billing.declined_days');
-    await client.query('DELETE FROM billing.credit_notes');
     await client.query('DELETE FROM public.domain_events');
     await client.query('DELETE FROM timesheet.cra_flags');
     await client.query('DELETE FROM timesheet.cra_lines');
@@ -531,12 +531,21 @@ async function seed(): Promise<void> {
         id: m.id,
         startDate: m.startDate,
         endDate: m.endDate,
+        requiredHabilitations: validatedMissionHabilitations
+          .filter((mh) => mh.missionId === m.id)
+          .map((mh) => mh.habilitationId),
       })),
       assignments: validatedAssignments.map((a): TimesheetAssignment => ({
         consultantId: a.consultantId,
         missionId: a.missionId,
         from: a.fromDate,
         to: a.toDate,
+      })),
+      held: validatedConsultantHabilitations.map((ch) => ({
+        consultantId: ch.consultantId,
+        habilitationId: ch.habilitationId,
+        from: ch.obtainedAt,
+        to: ch.expiresAt,
       })),
     });
 
@@ -608,21 +617,94 @@ async function seed(): Promise<void> {
           (a.toDate === null || a.toDate >= '2026-06-01'),
       );
 
-      // Record every workable day as worked on the first active assignment
+      // Record every workable day as worked on the first active assignment — except for the one
+      // consultant whose month is deliberately varied (VARIED_MONTH), so that a split day, an
+      // absence and a flagged Saturday exist in the data the screens render rather than only in
+      // the model that permits them.
       const primaryAssignment = activeAssignments[0];
+      const secondAssignment = activeAssignments[1];
+      const varied = consultant.email === VARIED_MONTH.email;
+
       if (primaryAssignment !== undefined) {
         for (const day of workableDays) {
           if (
-            day >= primaryAssignment.fromDate &&
-            (primaryAssignment.toDate === null || day <= primaryAssignment.toDate)
+            day < primaryAssignment.fromDate ||
+            (primaryAssignment.toDate !== null && day > primaryAssignment.toDate)
           ) {
+            continue;
+          }
+
+          if (varied && day === VARIED_MONTH.absenceDay) {
+            // No mission: a day not worked is not worked *on* anything (`craLine` refuses the
+            // combination), and it produces no invoice line while still making the month add up.
+            cra.recordDay({ day, dayType: 'absence', missionId: null, quarterDays: 4 });
+            continue;
+          }
+
+          if (varied && day === VARIED_MONTH.splitDay && secondAssignment !== undefined) {
+            // Two quarters and two: the physical shape ADR-0012's split day always had (half a
+            // day on each mission), re-expressed in the new unit. This day stays the one every
+            // screen — including the legacy two-slot grid `apps/web/src/features/cra/slots.ts`
+            // still renders during the phase this seed serves — can display exactly as before.
+            // The quantity that actually exercises quarter-day granularity is
+            // `quarterProofDay`, below: a 2/2 split here would prove nothing new (ADR-0069).
             cra.recordDay({
               day,
               dayType: 'worked',
               missionId: primaryAssignment.missionId,
-              halfDays: 2,
+              quarterDays: 2,
             });
+            cra.recordDay({
+              day,
+              dayType: 'worked',
+              missionId: secondAssignment.missionId,
+              quarterDays: 2,
+            });
+            continue;
           }
+
+          if (varied && day === VARIED_MONTH.quarterProofDay && secondAssignment !== undefined) {
+            // Three quarters and one: a split that cannot be expressed as a whole number of
+            // half-days, so the invoice line it produces genuinely needs the quarter-day unit
+            // rather than merely being spelled in it (ADR-0069). Pushes both missions' monthly
+            // totals off a multiple of four. Not a day the legacy two-slot grid can display
+            // exactly — the second slot has nowhere to put a line worth more than half a day
+            // once the first one has claimed both — which is expected and documented at
+            // `slotsFor` (`apps/web/src/features/cra/slots.ts`): no test reads this day's cell
+            // content, only the totals and the invoice line the chain produces from it.
+            cra.recordDay({
+              day,
+              dayType: 'worked',
+              missionId: primaryAssignment.missionId,
+              quarterDays: 3,
+            });
+            cra.recordDay({
+              day,
+              dayType: 'worked',
+              missionId: secondAssignment.missionId,
+              quarterDays: 1,
+            });
+            continue;
+          }
+
+          cra.recordDay({
+            day,
+            dayType: 'worked',
+            missionId: primaryAssignment.missionId,
+            quarterDays: 4,
+          });
+        }
+
+        // Outside `workableDays` by construction, which is exactly why it ends up in
+        // `timesheet.cra_flags`: the calendar says the day is not workable, the record says it was
+        // worked, and the submission checks surface the disagreement instead of refusing it.
+        if (varied) {
+          cra.recordDay({
+            day: VARIED_MONTH.flaggedSaturday,
+            dayType: 'worked',
+            missionId: primaryAssignment.missionId,
+            quarterDays: 4,
+          });
         }
       }
 
@@ -776,7 +858,7 @@ async function seed(): Promise<void> {
         result.declined.map((entry) => ({
           craId: payload.craId,
           missionId: entry.missionId,
-          halfDays: entry.halfDays,
+          quarterDays: entry.quarterDays,
           reason: entry.reason,
         })),
       );

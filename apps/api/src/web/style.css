@@ -1,0 +1,587 @@
+/*
+ * The one stylesheet (ADR-0009). Hand-written, no build step, no framework.
+ *
+ * It is deliberately small and deliberately boring: this repository is judged on its boundaries,
+ * its invariants and its refusals, and a screen that looks designed but reads a margin it should
+ * not have proves nothing. What it does spend effort on is the part CLAUDE.md calls a deliverable
+ * — the empty, error and permission-denied states — and contrast, which is the accessibility
+ * criterion of BUILD-PLAN 6.7 that a stylesheet can actually hold.
+ */
+
+:root {
+  --ink: #1b1f24;
+  --ink-soft: #4a5560;
+  --paper: #fbfbfa;
+  --panel: #ffffff;
+  --rule: #d8dce1;
+  --accent: #1f4d7a;
+  --accent-soft: #eaf1f8;
+  --refused: #8a1c1c;
+  --refused-soft: #fbeceb;
+  --held: #7a5a10;
+  --held-soft: #fdf4e0;
+  --settled: #1d5c33;
+  --settled-soft: #e9f4ec;
+
+  --space: 1rem;
+  --radius: 4px;
+  --measure: 68ch;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    sans-serif;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+/* Visible only once focused: a keyboard user needs to get past the header, a mouse user does not
+   need to see the link. `clip` alone would hide it from assistive technology too. */
+.skip {
+  position: absolute;
+  left: -999px;
+  top: 0;
+  z-index: 10;
+  padding: 0.5rem 1rem;
+  background: var(--accent);
+  color: #fff;
+}
+
+.skip:focus {
+  left: 0;
+}
+
+/* One focus ring, everywhere, and it is never removed. BUILD-PLAN 6.7 asks for full keyboard
+   navigation, and an invisible focus ring is the single most common way to lose it. */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+header.site {
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space);
+  justify-content: space-between;
+  margin: 0 auto;
+  max-width: 72rem;
+  padding: 0.75rem var(--space);
+}
+
+.wordmark {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.wordmark small {
+  display: block;
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  letter-spacing: 0;
+}
+
+.who {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.who strong {
+  color: var(--ink);
+}
+
+main {
+  margin: 0 auto;
+  max-width: 72rem;
+  padding: calc(var(--space) * 1.5) var(--space) calc(var(--space) * 3);
+}
+
+h1 {
+  font-size: 1.5rem;
+  line-height: 1.25;
+  margin: 0 0 0.25rem;
+}
+
+h2 {
+  font-size: 1.125rem;
+  margin: calc(var(--space) * 1.5) 0 0.5rem;
+}
+
+.lead {
+  color: var(--ink-soft);
+  max-width: var(--measure);
+  margin: 0 0 var(--space);
+}
+
+a {
+  color: var(--accent);
+}
+
+nav.bar {
+  padding-top: 0;
+  padding-bottom: 0.5rem;
+}
+
+ul.navlist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.9375rem;
+}
+
+ul.navlist a[aria-current='page'] {
+  font-weight: 600;
+  text-decoration-thickness: 2px;
+}
+
+/* Panels ------------------------------------------------------------------ */
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: var(--space);
+}
+
+.grid {
+  display: grid;
+  gap: var(--space);
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.note {
+  border-left: 3px solid var(--held);
+  background: var(--held-soft);
+  padding: 0.75rem var(--space);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  max-width: var(--measure);
+}
+
+.note.refused {
+  border-left-color: var(--refused);
+  background: var(--refused-soft);
+}
+
+/* Forms and actions ------------------------------------------------------- */
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #fff;
+  padding: 0.4rem 0.9rem;
+}
+
+button.quiet {
+  background: transparent;
+  color: var(--accent);
+}
+
+form.inline {
+  display: inline;
+}
+
+/* Tags -------------------------------------------------------------------- */
+
+.tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  border: 1px solid currentcolor;
+}
+
+.tag.role-consultant {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.tag.role-manager {
+  color: var(--held);
+  background: var(--held-soft);
+}
+
+.tag.role-billing {
+  color: var(--settled);
+  background: var(--settled-soft);
+}
+
+/* Definition lists, used by the problem page and every record header ------- */
+
+dl.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  margin: var(--space) 0 0;
+}
+
+dl.facts dt {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+dl.facts dd {
+  margin: 0;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+footer.site {
+  border-top: 1px solid var(--rule);
+  background: var(--panel);
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+}
+
+footer.site div {
+  margin: 0 auto;
+  max-width: 72rem;
+  padding: var(--space);
+}
+
+footer.site p {
+  margin: 0 0 0.25rem;
+  max-width: var(--measure);
+}
+
+@media print {
+  header.site,
+  footer.site,
+  .no-print {
+    display: none;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  main {
+    padding: 0;
+    max-width: none;
+  }
+}
+
+/* Tables ------------------------------------------------------------------ */
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+caption {
+  text-align: left;
+  font-weight: 600;
+  padding: 0.5rem 0;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: baseline;
+}
+
+thead th {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+tbody tr:last-child th,
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+td.num,
+th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+table.grid-days tr.off {
+  background: color-mix(in srgb, var(--rule) 25%, transparent);
+}
+
+table.grid-days th[scope='row'] {
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.weekday {
+  display: inline-block;
+  min-width: 5.5em;
+  color: var(--ink-soft);
+}
+
+.tag.off-tag {
+  color: var(--ink-soft);
+}
+
+.tag.flagged {
+  color: var(--held);
+  background: var(--held-soft);
+}
+
+select {
+  font: inherit;
+  padding: 0.15rem 0.25rem;
+  max-width: 22ch;
+}
+
+table.totals {
+  max-width: 32rem;
+  margin-top: calc(var(--space) * 1.5);
+}
+
+p.actions {
+  display: flex;
+  gap: 0.5rem;
+  margin: var(--space) 0;
+}
+
+form.filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem;
+  margin-bottom: var(--space);
+}
+
+/* Present to assistive technology, absent from the page. Every select in the entry grid needs a
+   label, and 62 visible ones would drown the grid the labels exist to explain. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+caption .hint {
+  display: block;
+  font-weight: 400;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  max-width: var(--measure);
+}
+
+/* The pré-facturier's three figures. A description list rather than divs with headings: each one
+   is a term and its value, which is what a `dl` is for and what a screen reader announces. */
+dl.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space);
+  margin: var(--space) 0 calc(var(--space) * 1.5);
+  padding: 0;
+}
+
+dl.summary > div {
+  flex: 1 1 12rem;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+}
+
+dl.summary dt {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+dl.summary dd {
+  margin: 0.2rem 0 0;
+  font-size: 1.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+dl.summary dd .hint {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+/* The base of the three `.hint` rules. The two scoped ones above only add `display: block`;
+   without this, a hint outside a caption or a summary would inherit its neighbour's weight. */
+.hint {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+/* The blocking-reason cell. A list because a Cra can be blocked for several reasons at once —
+   two missions declined for two different reasons is the ordinary case, not the exception. */
+ul.reasons {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+ul.reasons li + li {
+  margin-top: 0.2rem;
+}
+
+tfoot th,
+tfoot td {
+  border-top: 2px solid var(--rule);
+  font-weight: 600;
+}
+
+/* The document (ADR-0055): the invoice and the printable Cra. Sized for A4 rather than for a
+   screen — a document that reflows to the window width prints at a measure nobody reads. */
+article.document {
+  max-width: 46rem;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: calc(var(--space) * 1.5);
+}
+
+.parties {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space);
+  margin-bottom: var(--space);
+}
+
+.party {
+  flex: 1 1 18rem;
+}
+
+.party h2,
+.mentions h2,
+.origin h2 {
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft);
+  margin-bottom: 0.25rem;
+}
+
+.address {
+  font-style: normal;
+}
+
+table.lines,
+table.vat {
+  margin: var(--space) 0;
+}
+
+table.vat {
+  max-width: 30rem;
+}
+
+.mentions ul,
+.origin ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.mentions li,
+.origin li {
+  margin-bottom: 0.2rem;
+  max-width: var(--measure);
+}
+
+.origin li {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+@media print {
+  /* On paper the panel chrome is noise: the sheet edge is the border. */
+  article.document {
+    border: none;
+    padding: 0;
+    max-width: none;
+  }
+}
+
+/* The countersignature block. The rules are `dd` borders rather than input fields: nothing here
+   is submitted, and a form control that goes nowhere is a promise the page cannot keep. */
+dl.signature-fields {
+  display: grid;
+  grid-template-columns: minmax(8rem, max-content) 1fr;
+  gap: 0.4rem 1rem;
+  align-items: end;
+  max-width: 34rem;
+}
+
+dl.signature-fields dt {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+dl.signature-fields dd {
+  margin: 0;
+  border-bottom: 1px solid var(--ink-soft);
+  min-height: 1.4rem;
+}
+
+dl.signature-fields dd.tall {
+  min-height: 4rem;
+}
+
+/* The manager's two answers, side by side in one cell. The refusal keeps its reason field in the
+   same form as its button: a two-step flow is a step at which the reason gets skipped. */
+form.refusal {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+  margin-top: 0.3rem;
+}
+
+form.refusal input[type='text'] {
+  font: inherit;
+  padding: 0.15rem 0.3rem;
+  min-width: 12rem;
+  flex: 1 1 auto;
+}

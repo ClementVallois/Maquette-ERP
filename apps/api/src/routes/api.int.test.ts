@@ -117,6 +117,18 @@ function workedDaysOfJune(): string[] {
   return days;
 }
 
+/** July 2026, for the month the write tests create: the seeded Cra above is June's. */
+function workedDaysOfJuly(): string[] {
+  const days: string[] = [];
+  for (let day = 1; day <= 31; day += 1) {
+    const iso = `2026-07-${String(day).padStart(2, '0')}`;
+    const weekday = new Date(`${iso}T00:00:00.000Z`).getUTCDay();
+    if (weekday !== 0 && weekday !== 6 && iso !== '2026-07-14') days.push(iso);
+  }
+
+  return days;
+}
+
 beforeEach(async () => {
   const { client } = transaction;
 
@@ -201,8 +213,8 @@ beforeEach(async () => {
   );
   for (const day of workedDaysOfJune()) {
     await client.query(
-      `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, half_days)
-       VALUES ($1, $2, $3, 'worked', $4, 2), ($5, $6, $3, 'worked', $7, 2)`,
+      `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, quarter_days)
+       VALUES ($1, $2, $3, 'worked', $4, 4), ($5, $6, $3, 'worked', $7, 4)`,
       [uuidv7(), CRA, day, MISSION, uuidv7(), CRA_TWO, MISSION_TWO],
     );
   }
@@ -210,6 +222,47 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await app.close();
+});
+
+describe('GET /api/v1/calendar', () => {
+  it("answers the working calendar's own coverage", async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/calendar',
+      headers: as('consultant-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    // ADR-0004: a written table, 2026 only, today — asserted as "contains 2026" rather than
+    // "equals [2026]" so this test does not itself need editing the day a second year is added.
+    expect(response.json<{ years: number[] }>().years).toContain(2026);
+  });
+
+  it('refuses a request with no persona at all', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/v1/calendar' });
+
+    expect(response.statusCode).toBe(401);
+  });
+});
+
+describe('GET /api/v1/cras — consultantName (ADR-0071)', () => {
+  it("names each row's consultant, for a manager's office-wide list", async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras',
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    const { cras } = response.json<{ cras: { consultantId: string; consultantName: string }[] }>();
+
+    expect(cras).toContainEqual(
+      expect.objectContaining({ consultantId: ALICE, consultantName: 'Alice Martin' }),
+    );
+    expect(cras).toContainEqual(
+      expect.objectContaining({ consultantId: CHLOE, consultantName: 'Chloé Dubois' }),
+    );
+  });
 });
 
 describe('ADR-0003, both beats', () => {
@@ -333,6 +386,131 @@ describe('the chain, through the API', () => {
 
     expect(response.statusCode).toBe(403);
     expect(response.json()).toMatchObject({ type: '/problems/insufficient-role' });
+  });
+});
+
+describe('the refusal, through the API', () => {
+  it("sends a submitted month back, with the manager's reason", async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('manager-paris'),
+      payload: { reason: 'jours incomplets' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toStrictEqual({ craId: CRA, status: 'refused' });
+
+    const read = await app.inject({
+      method: 'GET',
+      url: `/api/v1/cras/${CRA}`,
+      headers: as('manager-paris'),
+    });
+    expect(read.json<{ status: string }>().status).toBe('refused');
+  });
+
+  it('refuses a consultant the refusal route on its role alone', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('consultant-paris'),
+      payload: { reason: 'jours incomplets' },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ type: '/problems/insufficient-role' });
+  });
+
+  it('refuses billing the refusal route on its role alone', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('billing-paris'),
+      payload: { reason: 'jours incomplets' },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ type: '/problems/insufficient-role' });
+  });
+
+  it("refuses a manager of another office, naming the rule (ADR-0003's second beat)", async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('manager-lyon'),
+      payload: { reason: 'jours incomplets' },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({
+      type: '/problems/out-of-scope',
+      deniedBy: '/problems/out-of-scope',
+    });
+  });
+
+  it('refuses a body with no reason, before the domain is reached', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('manager-paris'),
+      payload: {},
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('refuses a reason that is longer than the bound the domain accepts', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('manager-paris'),
+      payload: { reason: 'x'.repeat(501) },
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('refuses a reason that is only whitespace, as the typed domain error it is', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('manager-paris'),
+      payload: { reason: '   ' },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toMatchObject({ type: '/problems/refusal-reason-required' });
+  });
+
+  it('refuses a Cra that is not in the submitted state', async () => {
+    const first = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('manager-paris'),
+      payload: { reason: 'jours incomplets' },
+    });
+    expect(first.statusCode).toBe(200);
+
+    const second = await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/refusal`,
+      headers: writingAs('manager-paris'),
+      payload: { reason: 'encore' },
+    });
+
+    expect(second.statusCode).toBe(409);
+    expect(second.json()).toMatchObject({ type: '/problems/cra-transition-not-allowed' });
+  });
+
+  it('answers 404 for a Cra that does not exist at all', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/cras/api-does-not-exist/refusal',
+      headers: writingAs('manager-paris'),
+      payload: { reason: 'jours incomplets' },
+    });
+
+    expect(response.statusCode).toBe(404);
   });
 
   it('issues the invoice, and refuses to issue it twice under a new key', async () => {
@@ -497,6 +675,20 @@ describe('the progressive-disclosure read', () => {
     expect(response.json()).toMatchObject({ type: '/problems/insufficient-role' });
   });
 
+  it('answers a month the consultant has no Cra for with an absence, not a refusal', async () => {
+    // Coverage moved here from the now-deleted `/marge` screen's own test (front-end plan
+    // Phase 9.3/9.4): the same route, the same fact — a month nobody ever recorded is a 404
+    // naming the record, not a 403 naming a rule nobody broke.
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/v1/consultants/${ALICE}/economics?period=2026-05`,
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({ type: '/problems/not-found' });
+  });
+
   it('never puts Cjm in a list projection, which is what makes the extra request the control', async () => {
     await app.inject({
       method: 'POST',
@@ -536,5 +728,230 @@ describe('pagination', () => {
     });
 
     expect(response.statusCode).toBe(200);
+  });
+});
+
+/**
+ * The write half of the chain, which did not exist until Phase 6. The open-questions row of
+ * 19/08 named the gap precisely: "the consultant persona can therefore see its own month and
+ * change nothing about it; the seeded `submitted` Cra exists because the seed wrote it, not
+ * because anyone could."
+ */
+describe('recording a month through the API (ADR-0050)', () => {
+  const JULY = workedDaysOfJuly();
+
+  /** One entry per day, each a full day (ADR-0069): one matrix cell per triplet (ADR-0070). */
+  function entries(
+    mission = MISSION,
+  ): { day: string; dayType: 'worked'; missionId: string; quarterDays: number }[] {
+    return JULY.map((day) => ({
+      day,
+      dayType: 'worked' as const,
+      missionId: mission,
+      quarterDays: 4,
+    }));
+  }
+
+  it('replaces the month and reports the status it left it in', async () => {
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: { submit: false, entries: entries() },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ status: string }>().status).toBe('draft');
+  });
+
+  it('is the same operation the screen performs, so sending it twice leaves one month', async () => {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await app.inject({
+        method: 'PUT',
+        url: '/api/v1/cras/2026-07/entries',
+        headers: writingAs('consultant-paris'),
+        payload: { submit: false, entries: entries() },
+      });
+    }
+
+    const { rows } = await transaction.client.query<{ count: string }>(
+      `SELECT count(*) FROM timesheet.cras WHERE consultant_id = $1 AND period = '2026-07'`,
+      [ALICE],
+    );
+
+    expect(rows[0]?.count).toBe('1');
+  });
+
+  it('names the period and never a consultant: there is no other month to reach', async () => {
+    // The path carries `2026-07` and nothing else. `?consultantId=` and a body field are both
+    // ignored, because neither is read — the actor is the consultant, always.
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/cras/2026-07/entries?consultantId=${CHLOE}`,
+      headers: writingAs('consultant-paris'),
+      payload: { submit: false, entries: entries(), consultantId: CHLOE },
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    const { rows } = await transaction.client.query(
+      `SELECT 1 FROM timesheet.cras WHERE consultant_id = $1 AND period = '2026-07'`,
+      [CHLOE],
+    );
+
+    expect(rows).toHaveLength(0);
+  });
+
+  it('does not carry the action for a manager', async () => {
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('manager-paris'),
+      payload: { submit: false, entries: [] },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ deniedBy: '/problems/insufficient-role' });
+  });
+
+  it('refuses a body longer than a month can be', async () => {
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: {
+        submit: false,
+        // 124 is 4 × 31, the longest month at its maximum density (ADR-0069): one entry per
+        // quarter-day cell. 125 is one more than the cap however the body is spelled.
+        entries: Array.from({ length: 125 }, () => ({
+          day: '2026-07-01',
+          dayType: 'worked',
+          missionId: MISSION,
+          quarterDays: 1,
+        })),
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('sums two entries for the same day, type and mission into one line, not two', async () => {
+    // ADR-0069/0070: a quantity now lives on the entry, so two entries for the same
+    // (day, dayType, missionId) triplet are not a normal write — the matrix has exactly one cell
+    // for it. They sum into one line rather than producing two, which is the lossy round trip
+    // ADR-0066 existed to prevent, reappeared one layer down had this gone unhandled.
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: {
+        submit: false,
+        entries: [
+          { day: '2026-07-01', dayType: 'worked', missionId: MISSION, quarterDays: 1 },
+          { day: '2026-07-01', dayType: 'worked', missionId: MISSION, quarterDays: 3 },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const { craId } = response.json<{ craId: string }>();
+
+    const found = await app.inject({
+      method: 'GET',
+      url: `/api/v1/cras/${craId}`,
+      headers: as('consultant-paris'),
+    });
+
+    expect(
+      found.json<{
+        lines: { day: string; dayType: string; missionId: string; quarterDays: number }[];
+      }>().lines,
+    ).toStrictEqual([{ day: '2026-07-01', dayType: 'worked', missionId: MISSION, quarterDays: 4 }]);
+  });
+
+  it('submits the month, and the flags come back with it', async () => {
+    const saturday = '2026-07-04';
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: {
+        submit: true,
+        entries: [
+          ...entries(),
+          { day: saturday, dayType: 'worked', missionId: MISSION, quarterDays: 4 },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ status: string }>().status).toBe('submitted');
+    expect(response.json<{ flags: { day: string }[] }>().flags).toStrictEqual([
+      { day: saturday, reason: 'weekend' },
+    ]);
+  });
+
+  it('refuses an incomplete month with the invariant that refused it', async () => {
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: {
+        submit: true,
+        entries: [{ day: '2026-07-01', dayType: 'worked', missionId: MISSION, quarterDays: 4 }],
+      },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ invariant: '/problems/cra-incomplete' });
+  });
+});
+
+describe('the edges of the write route', () => {
+  it('refuses a month whose year the working calendar does not cover', async () => {
+    // The holiday table is dated (ADR-0004) and holds 2026 alone. 2030 is a perfectly good
+    // `Period` — the value object's own floor is the year 2000, and `1999-01` is refused one layer
+    // earlier as `/problems/invalid-value` — so this is the case that reaches the calendar. Refused
+    // before anything is written, and not only at submission: a month the firm has no calendar for
+    // is a month no rule can judge, so a draft in it would be a row nothing could ever validate.
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2030-01/entries',
+      headers: writingAs('consultant-paris'),
+      payload: { submit: false, entries: [] },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toMatchObject({ type: '/problems/unknown-calendar-year' });
+  });
+
+  it('refuses a replay of a submission, which is the one body PUT is not idempotent for', async () => {
+    const july = workedDaysOfJuly().map((day) => ({
+      day,
+      dayType: 'worked' as const,
+      missionId: MISSION,
+      quarterDays: 4,
+    }));
+
+    const first = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: { submit: true, entries: july },
+    });
+    expect(first.statusCode).toBe(200);
+
+    // ADR-0050 says a repeated body leaves the same month. That holds while the month is a draft
+    // and stops holding the moment it is submitted, because ADR-0005 takes the Cra out of the
+    // consultant's hands — the ADR says so rather than claiming an idempotency it does not have.
+    const again = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: { submit: true, entries: july },
+    });
+
+    expect(again.statusCode).toBe(409);
+    expect(again.json()).toMatchObject({ invariant: '/problems/cra-transition-not-allowed' });
   });
 });

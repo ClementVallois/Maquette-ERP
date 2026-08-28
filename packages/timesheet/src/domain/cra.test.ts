@@ -11,6 +11,7 @@ import {
   MissionRequiredError,
   NotTheManagerError,
   RefusalReasonRequiredError,
+  SelfValidationForbiddenError,
   ValidatedCraIsImmutableError,
 } from './errors.ts';
 import { hierarchy } from './hierarchy.ts';
@@ -51,38 +52,58 @@ describe('a Cra', () => {
   it('records a day on a mission', () => {
     const cra = emptyCra();
 
-    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: MISSION, halfDays: 2 });
+    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: MISSION, quarterDays: 4 });
 
     expect(cra.lines).toStrictEqual([
-      { day: '2026-03-02', dayType: 'worked', missionId: MISSION, halfDays: 2 },
+      { day: '2026-03-02', dayType: 'worked', missionId: MISSION, quarterDays: 4 },
     ]);
   });
 
   it('splits a day between two missions', () => {
     const cra = emptyCra();
 
-    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-a', halfDays: 1 });
-    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-b', halfDays: 1 });
+    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-a', quarterDays: 2 });
+    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-b', quarterDays: 2 });
 
-    expect(cra.halfDaysOn('2026-03-02')).toBe(2);
+    expect(cra.quarterDaysOn('2026-03-02')).toBe(4);
+  });
+
+  it('carries four quarter-days of one day as four lines', () => {
+    // The bound on a day is a sum over its lines, not a count of them: four separate quarters
+    // fill a day exactly, and none of the four is the one that overflows it (ADR-0069). A `2 + 2`
+    // split passes even where the rule is written as "at most two lines", which is what this case
+    // is here to tell apart.
+    const cra = emptyCra();
+
+    for (const mission of ['mission-a', 'mission-b', 'mission-c', 'mission-d']) {
+      cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: mission, quarterDays: 1 });
+    }
+
+    expect(cra.lines).toHaveLength(4);
+    expect(cra.quarterDaysOn('2026-03-02')).toBe(4);
   });
 
   it('hands out its lines as a copy', () => {
     // An aggregate whose caller can push into its own array holds no invariant at all.
     const cra = emptyCra();
-    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: MISSION, halfDays: 2 });
+    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: MISSION, quarterDays: 4 });
 
     (cra.lines as { length: number }).length = 0;
 
     expect(cra.lines).toHaveLength(1);
   });
 
-  it('refuses more than two half-days on one day', () => {
+  it('refuses more than four quarter-days on one day', () => {
     const cra = emptyCra();
-    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-a', halfDays: 2 });
+    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-a', quarterDays: 4 });
 
     expect(() => {
-      cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-b', halfDays: 1 });
+      cra.recordDay({
+        day: '2026-03-02',
+        dayType: 'worked',
+        missionId: 'mission-b',
+        quarterDays: 1,
+      });
     }).toThrow(DayOverbookedError);
   });
 
@@ -90,7 +111,7 @@ describe('a Cra', () => {
     const cra = emptyCra();
 
     expect(() => {
-      cra.recordDay({ day: '2026-04-01', dayType: 'worked', missionId: MISSION, halfDays: 2 });
+      cra.recordDay({ day: '2026-04-01', dayType: 'worked', missionId: MISSION, quarterDays: 4 });
     }).toThrow(DayOutsidePeriodError);
   });
 
@@ -98,33 +119,43 @@ describe('a Cra', () => {
     const cra = emptyCra();
 
     expect(() => {
-      cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: null, halfDays: 2 });
+      cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: null, quarterDays: 4 });
     }).toThrow(MissionRequiredError);
     expect(() => {
-      cra.recordDay({ day: '2026-03-03', dayType: 'absence', missionId: MISSION, halfDays: 2 });
+      cra.recordDay({
+        day: '2026-03-03',
+        dayType: 'absence',
+        missionId: MISSION,
+        quarterDays: 4,
+      });
     }).toThrow(MissionOnNonWorkedDayError);
   });
 
-  it('refuses a quantity that is not one or two half-days', () => {
+  it('refuses a quantity that is not one to four quarter-days', () => {
     const cra = emptyCra();
 
     expect(() => {
-      cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: MISSION, halfDays: 3 });
+      cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: MISSION, quarterDays: 5 });
     }).toThrow(InvalidValueError);
     expect(() => {
-      cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: MISSION, halfDays: 0.5 });
+      cra.recordDay({
+        day: '2026-03-02',
+        dayType: 'worked',
+        missionId: MISSION,
+        quarterDays: 0.5,
+      });
     }).toThrow(InvalidValueError);
   });
 
   it('clears a day so a correction is remove-then-record', () => {
     const cra = emptyCra();
-    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-a', halfDays: 1 });
-    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-b', halfDays: 1 });
-    cra.recordDay({ day: '2026-03-03', dayType: 'absence', missionId: null, halfDays: 2 });
+    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-a', quarterDays: 2 });
+    cra.recordDay({ day: '2026-03-02', dayType: 'worked', missionId: 'mission-b', quarterDays: 2 });
+    cra.recordDay({ day: '2026-03-03', dayType: 'absence', missionId: null, quarterDays: 4 });
 
     cra.clearDay('2026-03-02');
 
-    expect(cra.halfDaysOn('2026-03-02')).toBe(0);
+    expect(cra.quarterDaysOn('2026-03-02')).toBe(0);
     expect(cra.lines).toHaveLength(1);
   });
 });
@@ -151,7 +182,7 @@ describe('the Cra lifecycle', () => {
     // The flags are a deliverable of the manager's screen, not a by-product: a Saturday that was
     // worked has to be visible to the person accepting the month.
     const cra = completeCra();
-    cra.recordDay({ day: '2026-03-14', dayType: 'worked', missionId: MISSION, halfDays: 2 });
+    cra.recordDay({ day: '2026-03-14', dayType: 'worked', missionId: MISSION, quarterDays: 4 });
 
     cra.submit({ clock: fixedClock(), calendar, reference });
 
@@ -165,6 +196,7 @@ describe('the Cra lifecycle', () => {
       by: MANAGER,
       reason: 'the 12th is a mission that ended in February',
       clock: fixedClock(),
+      hierarchy: managers,
     });
 
     expect(cra.status).toBe('refused');
@@ -174,10 +206,15 @@ describe('the Cra lifecycle', () => {
 
   it('lets a refused Cra be corrected and resubmitted, and drops the stale refusal', () => {
     const cra = submittedCra();
-    cra.refuse({ by: MANAGER, reason: 'the 3rd was leave, not a worked day', clock: fixedClock() });
+    cra.refuse({
+      by: MANAGER,
+      reason: 'the 3rd was leave, not a worked day',
+      clock: fixedClock(),
+      hierarchy: managers,
+    });
 
     cra.clearDay('2026-03-03');
-    cra.recordDay({ day: '2026-03-03', dayType: 'absence', missionId: null, halfDays: 2 });
+    cra.recordDay({ day: '2026-03-03', dayType: 'absence', missionId: null, quarterDays: 4 });
     cra.submit({ clock: fixedClock(), calendar, reference });
 
     expect(cra.status).toBe('submitted');
@@ -188,7 +225,7 @@ describe('the Cra lifecycle', () => {
     const cra = submittedCra();
 
     expect(() => {
-      cra.refuse({ by: MANAGER, reason: '   ', clock: fixedClock() });
+      cra.refuse({ by: MANAGER, reason: '   ', clock: fixedClock(), hierarchy: managers });
     }).toThrow(RefusalReasonRequiredError);
   });
 
@@ -196,7 +233,7 @@ describe('the Cra lifecycle', () => {
     const cra = submittedCra();
 
     expect(() => {
-      cra.recordDay({ day: '2026-03-03', dayType: 'worked', missionId: MISSION, halfDays: 2 });
+      cra.recordDay({ day: '2026-03-03', dayType: 'worked', missionId: MISSION, quarterDays: 4 });
     }).toThrow(CraTransitionError);
     expect(() => {
       cra.clearDay('2026-03-02');
@@ -214,11 +251,40 @@ describe('the Cra lifecycle', () => {
     }).toThrow(CraTransitionError);
   });
 
+  it('refuses a refusal from a manager who is not this consultant’s manager', () => {
+    // The symmetry with `validate`: who may act on a Cra has one answer per record (ADR-0006),
+    // not one per verb. Until 21/08/2026 any manager of the office could send back a month they
+    // do not manage, because only `validate` consulted the dated attachment (ADR-0034).
+    const cra = submittedCra();
+
+    expect(() => {
+      cra.refuse({
+        by: 'another-manager',
+        reason: 'not mine to judge',
+        clock: fixedClock(),
+        hierarchy: managers,
+      });
+    }).toThrow(NotTheManagerError);
+  });
+
+  it('refuses a consultant refusing their own month', () => {
+    const cra = submittedCra();
+
+    expect(() => {
+      cra.refuse({
+        by: CONSULTANT,
+        reason: 'I changed my mind',
+        clock: fixedClock(),
+        hierarchy: managers,
+      });
+    }).toThrow(SelfValidationForbiddenError);
+  });
+
   it('refuses to refuse a Cra that is not submitted', () => {
     const cra = emptyCra();
 
     expect(() => {
-      cra.refuse({ by: MANAGER, reason: 'no', clock: fixedClock() });
+      cra.refuse({ by: MANAGER, reason: 'no', clock: fixedClock(), hierarchy: managers });
     }).toThrow(CraTransitionError);
   });
 });
@@ -231,7 +297,7 @@ describe('a validated Cra', () => {
 
     for (const attempt of [
       () => {
-        cra.recordDay({ day: '2026-03-07', dayType: 'worked', missionId: MISSION, halfDays: 2 });
+        cra.recordDay({ day: '2026-03-07', dayType: 'worked', missionId: MISSION, quarterDays: 4 });
       },
       () => {
         cra.clearDay('2026-03-02');
@@ -240,7 +306,12 @@ describe('a validated Cra', () => {
         cra.submit({ clock: fixedClock(), calendar, reference });
       },
       () => {
-        cra.refuse({ by: MANAGER, reason: 'changed my mind', clock: fixedClock() });
+        cra.refuse({
+          by: MANAGER,
+          reason: 'changed my mind',
+          clock: fixedClock(),
+          hierarchy: managers,
+        });
       },
       () => {
         cra.validate({ by: MANAGER, clock: fixedClock(), hierarchy: managers });

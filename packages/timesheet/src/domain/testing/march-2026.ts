@@ -28,7 +28,7 @@ export function fixedClock(iso = '2026-04-02T09:00:00.000Z'): Clock {
 export const calendar: WorkingCalendar = workingCalendar();
 
 export const reference: TimesheetReference = timesheetReference({
-  missions: [{ id: MISSION, startDate: '2026-01-05', endDate: null }],
+  missions: [{ id: MISSION, startDate: '2026-01-05', endDate: null, requiredHabilitations: [] }],
   assignments: [{ consultantId: CONSULTANT, missionId: MISSION, from: '2026-01-05', to: null }],
 });
 
@@ -45,7 +45,7 @@ export function completeCra(id = 'cra-1'): Cra {
   const cra = emptyCra(id);
 
   for (const day of calendar.workableDaysOf(MARCH)) {
-    cra.recordDay({ day, dayType: 'worked', missionId: MISSION, halfDays: 2 });
+    cra.recordDay({ day, dayType: 'worked', missionId: MISSION, quarterDays: 4 });
   }
 
   return cra;
