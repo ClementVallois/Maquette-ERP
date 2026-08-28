@@ -3185,10 +3185,25 @@ the full served-build Playwright suite (73 passed, 26 intentionally skipped). Th
 `tests/visual/review/8.3-issuance-dialog-success.png`; it was restored as known capture jitter and
 was not recommitted.
 
-One history-only finding remains visible rather than silently called fixed: 14 existing commits in
-`main..feat/web` use scopes outside the current closed enum. One is `17b9128`, the separately handled
-change to `.claude/agents/rules-auditor.md`; the other 13 use the earlier `repo`, `db`, `timesheet`,
-`seed`, `billing`, `platform` or `boundaries` scopes. No additive commit can change an existing
-message, while this pass was expressly forbidden to rewrite history. There is no co-author trailer
-in the range. The working tree and every new audit-fix commit comply; Clement must either accept the
-historical messages as grandfathered or explicitly authorize a history rewrite before merge.
+One claim of that audit stood as a history-only finding, and it is **withdrawn**: it read that 14
+existing commits in `main..feat/web` use scopes outside the current closed enum — `17b9128` plus
+13 using `repo`, `db`, `timesheet`, `seed`, `billing`, `platform` or `boundaries` — and it asked
+whether to grandfather them or rewrite history before merge. Neither is needed, because there is no
+violation. All seven scopes are in the enum in `commitlint.config.js`, which is byte-identical on
+`main` and on this branch and was not touched by this phase. Checked three ways rather than by
+reading the list: `npx commitlint --from main --to feat/web` reports **0 errors** over all 169
+commits; the scope tally sums to exactly 169 with every scope in the enum; and `17b9128`, the commit
+the finding named first, lints clean on its own. What the range does carry is **24
+`footer-leading-blank` warnings** from `@commitlint/config-conventional` — warnings, not errors,
+on a rule this repository has never gated on, and the only genuine commitlint output in the range.
+
+The lesson is the one the Phase 4 checkpoint already recorded in the other direction: a reviewer's
+absolute claim is evidence, not a verdict. This one was very nearly acted on — the alternative it
+posed would have rewritten 169 SHAs and invalidated every short-hash citation in this file and in
+the pull request. **A finding that names a rule is checked against the file that states the rule
+before it is believed**, and the command that checks it is written down so the next reader re-runs
+it instead of re-deciding it.
+
+The audit's other absolute claim was verified rather than taken: there is **no co-author trailer in
+the range** (`git log --format='%(trailers:key=Co-authored-by)' main..feat/web` is empty), and every
+one of the 169 commits is authored by `Clement Vallois <clement.vallois.pro@proton.me>`.
