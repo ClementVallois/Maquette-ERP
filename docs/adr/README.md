@@ -98,6 +98,7 @@ retouched, so what was decided stays visible next to what replaced it.
 | [0071](./0071-a-manager-reads-a-named-consultants-grid-through-a-new-scoped-route.md)        | A manager reads a named consultant's grid through a new, scoped route              | accepted   |
 | [0072](./0072-style-src-admits-inline-because-the-kit-writes-style-attributes.md)            | `style-src` admits `'unsafe-inline'`, because the UI kit writes `style` attributes | accepted   |
 | [0073](./0073-the-dashboard-reads-an-optional-period-override.md)                            | The dashboard reads an optional `?period=` override, defaulting to the wall clock  | accepted   |
+| [0074](./0074-the-session-guard-hands-its-reason-to-the-destination.md)                      | The session guard hands its reason to the destination, not to the page it destroys | accepted   |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
@@ -243,6 +244,16 @@ with no picker — turned out wrong once the seed's frozen `2026-06` (ADR-0022) 
 keeps moving, and task 10.4's demo checklist forced the question rather than leaving it latent. The
 override changes nothing a visitor can see; it exists for the one caller (`journeys.spec.ts`) that
 needs a period a re-run of the suite does not depend on the day it happens to run.
+
+0074 is Phase 10's second, and the only one on this branch written because **CI went red on a push
+that was meant to be the last one**. It is 0072's subject a second time and from the other side: the
+toast telling a visitor their persona is gone was blocked by a CSP in one phase, and destroyed by
+its own redirect in this one. Twice fragile in two different ways is a sign about the _placement_ of
+a message, not about either mechanism — so the message moved to the page that survives, and the
+guard now hands its reason to the destination instead of shouting it at a document already being
+torn down. The rejected option is the interesting half: the obvious client-side navigate would have
+kept the toast and quietly broken the purge, because the hard reload turns out to be what resets
+the guard's own latch and the session cache `_shell.tsx` reads.
 
 ## Identified, not yet decided
 

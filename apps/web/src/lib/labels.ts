@@ -41,6 +41,11 @@ export const LABELS = {
   },
 
   persona: {
+    // The heading of the notice the selector shows when `session-guard.ts` sent the visitor
+    // here because their cookie stopped resolving (ADR-0074). The sentence itself is
+    // `shell.sessionInvalidatedToast`, kept where it was so the two readers of that string —
+    // this banner and `session-guard.test.ts` — still read one label.
+    sessionInvalidatedTitle: 'Session interrompue',
     heading: 'Choisir un persona',
     lead: 'Cette maquette n’a pas d’authentification : on choisit une identité, et tout le monde peut choisir n’importe laquelle.',
     warning:

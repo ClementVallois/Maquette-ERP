@@ -3,7 +3,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiProblemError } from '@/lib/api-client';
 
-import { installSessionGuard, resetSessionGuardForTest } from './session-guard';
+import {
+  installSessionGuard,
+  resetSessionGuardForTest,
+  SESSION_INVALIDATED_SEARCH,
+} from './session-guard';
 
 /**
  * `session-guard.ts`'s own header explains why this is the only proof this phase can offer: no
@@ -39,7 +43,7 @@ afterEach(() => {
 });
 
 describe('installSessionGuard', () => {
-  it('purges the cookie, toasts, and redirects on unknown-persona', async () => {
+  it('purges the cookie and redirects to the selector, carrying the reason, on unknown-persona', async () => {
     const fetchMock = vi.fn(() =>
       Promise.resolve(jsonResponse({ persona: null }, 200, 'application/json')),
     );
@@ -64,6 +68,12 @@ describe('installSessionGuard', () => {
       '/api/v1/session/persona',
       expect.objectContaining({ method: 'DELETE' }),
     );
+    // The argument is the whole point of ADR-0074 and is asserted here rather than left implied:
+    // this branch redirects **with** the reason, so the selector can say why. Until 28/08/2026 the
+    // reason was a `toast.error` on the document `window.location.assign` was about to destroy —
+    // and this test, despite its own name, never asserted that toast at any point, which is how a
+    // 1-in-12 race shipped through nine phases with a green suite over it.
+    expect(redirect).toHaveBeenCalledWith(SESSION_INVALIDATED_SEARCH);
   });
 
   it('redirects without a purge on no-persona', async () => {
@@ -78,6 +88,9 @@ describe('installSessionGuard', () => {
     });
 
     expect(redirect).toHaveBeenCalledTimes(1);
+    // No reason carried, and that is the decision, not an omission: nothing was invalidated, so
+    // the selector has nothing to explain (ADR-0074's own "Consequences").
+    expect(redirect).toHaveBeenCalledWith();
   });
 
   it('does nothing for an ordinary refusal — this is not a catch-all error handler', async () => {

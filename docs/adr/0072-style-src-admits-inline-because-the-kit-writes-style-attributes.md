@@ -38,6 +38,14 @@ and redirected" fails in the served topology: `sonner`'s stylesheet is blocked, 
 tells a visitor their persona is gone never becomes visible. A state this repository calls a
 deliverable rather than polish does not render in production.
 
+> **Note, 2026-08-28 — this example is stale; the decision below is not.** **ADR-0074** removed that
+> toast: the session guard now carries its reason to the selector in the URL, because the hard
+> redirect destroyed the toast as reliably as the CSP did. The test named above is renamed and no
+> longer depends on `sonner`. The decision here stands on the rest of the table — Radix's `Tabs` and
+> `ScrollArea` write style attributes with no toast involved — and `sonner` is still mounted and
+> still used elsewhere (the selector's own `selectError`). Recorded rather than silently corrected:
+> an ADR's context is what was true when it was written.
+
 ## Decision
 
 **`style-src` becomes `'self' 'unsafe-inline'`. Every other clause is unchanged, and

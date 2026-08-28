@@ -151,7 +151,7 @@ test.describe('guards', () => {
     await expect(page.getByRole('heading', { name: 'Choisir un persona' })).toBeVisible();
   });
 
-  test('a session that turns unknown mid-visit is purged, toasted, and redirected (task 6.1)', async ({
+  test('a session that turns unknown mid-visit is purged, redirected, and told why (task 6.1)', async ({
     page,
     context,
     baseURL,
@@ -211,11 +211,18 @@ test.describe('guards', () => {
     await page.getByRole('link', { name: 'Mes CRA' }).click();
     await unauthorized;
 
-    await page
-      .getByText('Votre persona n’est plus reconnue', { exact: false })
-      .waitFor({ state: 'visible' });
-    await page.waitForURL('/');
+    // The reason is asserted **on the selector**, after the redirect, not on the page being torn
+    // down (ADR-0074). Until 28/08/2026 this waited for a toast that `window.location.assign`
+    // destroyed as it fired: green wherever the DELETE round-trip happened to outlast one React
+    // render, red where it did not — 3/3 in CI run `33152831346` at one worker, 1 in 12 locally
+    // against the served build. Nothing about the wait was wrong; it was waiting for something the
+    // next line of production code was racing to delete. Carrying the reason in the URL makes the
+    // same claim deterministic, because the message now lives on the page that survives.
+    await page.waitForURL('/?session=expired');
     await expect(page.getByRole('heading', { name: 'Choisir un persona' })).toBeVisible();
+    await expect(
+      page.getByText('Votre persona n’est plus reconnue', { exact: false }),
+    ).toBeVisible();
 
     // The purge is real, not only the client-side redirect: a fresh read confirms the cookie no
     // longer resolves to anything, server-side.
