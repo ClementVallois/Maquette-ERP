@@ -10,10 +10,11 @@ import {
 } from './session-guard';
 
 /**
- * `session-guard.ts`'s own header explains why this is the only proof this phase can offer: no
- * screen built in Phase 4 calls a `forRoles`-guarded endpoint, so `unknown-persona` never reaches
- * a real request. These tests exercise the module directly, against a manufactured
- * `ApiProblemError`, the same shape `apps/api/src/personas/access.ts` actually sends.
+ * These tests exercise the module directly, against a manufactured `ApiProblemError` — the same
+ * shape `apps/api/src/personas/access.ts` actually sends — rather than through a real guarded
+ * request. That is one of two proofs, not the only one (ADR-0074's own "Consequences"):
+ * `e2e/shell.spec.ts` proves the same reason is *rendered*, after a live redirect, on the page a
+ * real visitor is looking at.
  */
 
 function jsonResponse(body: unknown, status: number, contentType: string): Response {

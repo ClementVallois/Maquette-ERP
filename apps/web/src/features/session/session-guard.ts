@@ -28,15 +28,12 @@ export const SESSION_INVALIDATED_SEARCH = '?session=invalidated';
  * describes; this lives in `features/session` because purging a persona is a session concern, not
  * a query-client one.
  *
- * **Not exercised end-to-end in Phase 4.** Every route `_shell` guards calls only
- * `GET /api/v1/session`, which is `PUBLIC` (`apps/api/src/routes/session.ts`) and therefore never
- * answers with either problem type — confirmed by reading the route, not assumed. No screen built
- * in this phase calls a `forRoles`-guarded endpoint, which is the only kind of request that can
- * produce `unknown-persona` (verified in `apps/api/src/personas/access.ts`: the check only runs
- * when `access.kind !== 'public'`). This module is therefore proven only at the unit level
- * (`session-guard.test.ts`, against a manufactured `ApiProblemError`) until the phase that first
- * calls a guarded route from the SPA (Phase 5/6) can trigger it live. Recorded in the Phase 4
- * checkpoint (`docs/open-questions.md`) rather than left to be rediscovered as a gap in coverage.
+ * `unknown-persona` only ever comes from a `forRoles`-guarded endpoint (`apps/api/src/personas/
+ * access.ts`: the check runs only when `access.kind !== 'public'`) — `GET /api/v1/session`, which
+ * `_shell.tsx`'s own guard calls, is `PUBLIC` and never answers with it. Proven at the unit level
+ * (`session-guard.test.ts`, against a manufactured `ApiProblemError`) and, since `GET /api/v1/cras`
+ * (task 6.1) gave the SPA its first guarded call, live end-to-end (`e2e/shell.spec.ts`, "a session
+ * that turns unknown mid-visit is purged, redirected, and told why").
  */
 let handled = false;
 
