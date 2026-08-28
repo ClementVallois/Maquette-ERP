@@ -67,9 +67,12 @@ function PersonaSelectorPage(): ReactElement {
           visitor was thrown off (ADR-0074): that redirect is a hard navigation, and it destroys the
           document the toast lives in. Reproduced 1 visit in 12 — the explanation lost to the
           redirect it exists to explain. `role="status"` and not `alert`: this is the consequence of
-          something that already happened, and the visitor is not being interrupted. */}
+          something that already happened, and the visitor is not being interrupted. Passed
+          explicitly — `components/ui/alert.tsx` hardcodes `role="alert"` on the element, and only
+          works here because its `{...props}` spread lands after that attribute in JSX, so the last
+          one written wins. */}
       {session === 'invalidated' && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" role="status">
           <TriangleAlertIcon />
           <AlertTitle>{LABELS.persona.sessionInvalidatedTitle}</AlertTitle>
           <AlertDescription>{LABELS.shell.sessionInvalidated}</AlertDescription>

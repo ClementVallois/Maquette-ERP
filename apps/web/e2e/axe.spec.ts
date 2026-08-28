@@ -180,6 +180,23 @@ test.describe('accessibility — Sélecteur de persona', () => {
 
     await assertAccessible(page);
   });
+
+  /**
+   * The one conditional state the bare selector above never reaches: `?session=invalidated`
+   * (ADR-0074) renders an `Alert` above the grid. Its own `role="status"` (not `alert` — the
+   * default `components/ui/alert.tsx` hardcodes) is what this pass exists to check axe-core has
+   * no opinion on either way; the point is that the notice itself introduces no new violation.
+   */
+  test('the selector with the session-invalidated notice has no critical/serious violation', async ({
+    page,
+  }) => {
+    await page.goto('/?session=invalidated');
+    await page
+      .getByText('Votre persona n’est plus reconnue', { exact: false })
+      .waitFor({ state: 'visible' });
+
+    await assertAccessible(page);
+  });
 });
 
 /**
