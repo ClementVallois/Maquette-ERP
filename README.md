@@ -301,6 +301,10 @@ pnpm run setup      # env:init + env:check + docker compose + migrate + seed
 pnpm run api        # l'API sur http://127.0.0.1:3000
 ```
 
+Les **deux topologies** — dev (Vite sur 5173, deux processus) et prod/démo (Fastify seul sur 3000,
+ADR-0063) — leurs commandes, et le `403 /problems/forbidden-origin` qui suit quand on les mélange :
+[`docs/running.md`](docs/running.md).
+
 `pnpm run db:reset` rejoue les trois dernières étapes depuis une base vide. Les étapes séparément,
 si l'une échoue :
 
