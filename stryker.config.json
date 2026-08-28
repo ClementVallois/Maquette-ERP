@@ -1,0 +1,29 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/api/schema/stryker-schema.json",
+  "_comment": "Reasoning lives in ADR-0027, not here (BUILD-RULES.md: reasoning belongs in an ADR, a comment states only a mechanical fact). Thresholds are the real first score, not lowered to pass: 72.80% overall on 2026-08-28 (billing 67.75%, timesheet 79.07%).",
+  "packageManager": "pnpm",
+  "plugins": ["@stryker-mutator/vitest-runner"],
+  "testRunner": "vitest",
+  "vitest": {
+    "configFile": "stryker.vitest.config.ts"
+  },
+  "coverageAnalysis": "perTest",
+  "mutate": [
+    "packages/*/src/domain/**/*.ts",
+    "!packages/*/src/domain/**/*.test.ts",
+    "!packages/*/src/domain/**/testing/**",
+    "!packages/*/src/domain/**/__boundary-fixture__/**"
+  ],
+  "reporters": ["html", "clear-text", "progress"],
+  "htmlReporter": {
+    "fileName": "reports/mutation/mutation.html"
+  },
+  "tempDirName": ".stryker-tmp",
+  "thresholds": {
+    "high": 85,
+    "low": 70,
+    "break": 70
+  },
+  "timeoutMS": 15000,
+  "concurrency": 4
+}
