@@ -301,24 +301,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_USER: erp_migration
-          POSTGRES_PASSWORD: erp_local_dev
-          POSTGRES_DB: erp
-          PGTZ: UTC
-          TZ: UTC
-          POSTGRES_INITDB_ARGS: '--data-checksums'
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U erp_migration -d erp"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-          --health-start-period 10s
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -330,41 +312,25 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      - name: Create app role, as the local init script does
-        run: |
-          psql "postgres://erp_migration:erp_local_dev@localhost:5433/erp" <<'EOSQL'
-            CREATE ROLE erp_app WITH LOGIN PASSWORD 'erp_local_dev';
-            GRANT CONNECT ON DATABASE erp TO erp_app;
-            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
-              GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO erp_app;
-            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
-              GRANT USAGE, SELECT ON SEQUENCES TO erp_app;
-          EOSQL
-        env:
-          PGPASSWORD: erp_local_dev
-
-      - name: Environment template sanity check
-        run: pnpm run env:init && pnpm run env:check
-
-      - name: Run migrations
-        run: pnpm run migrate
-        env:
-          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
-
-      - name: Run seed (first pass)
-        run: pnpm run seed
-        env:
-          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
+      # The composite `pnpm run setup` itself, exactly as the README's "Démarrer" section points a
+      # reader at — env:init, env:check, `docker compose up -d --wait`, migrate, seed — nothing
+      # re-implemented against a stand-in. Every other database job in this file uses a
+      # `services:` Postgres container, because a `services:` container has no `docker compose`
+      # for `setup`'s own second step to call. This job deliberately does not use `services:`, so
+      # `docker compose up -d --wait` is reachable: `ubuntu-latest` ships Docker Engine and the
+      # Compose v2 plugin on the runner directly (verified locally — same command, same image,
+      # same `.env.example` — not on an actual Actions run, which this branch cannot trigger
+      # before it merges). A `setup` broken by a typo in `package.json` — the first command a
+      # stranger to this repository types — now ships red instead of green: the row of
+      # 21/08/2026 in `docs/open-questions.md`.
+      - name: The composite pnpm run setup, exactly as the README names it
+        run: pnpm run setup
 
       - name: Fingerprint the database the first pass produced
         run: pnpm run seed:fingerprint | tee "$RUNNER_TEMP/first-pass.txt"
-        env:
-          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
 
       - name: Run seed (second pass)
         run: pnpm run seed
-        env:
-          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
 
       # What "prove idempotency" needs and running the seed twice does not give. The seed clears
       # every table inside one transaction and re-inserts, so a second pass **cannot** exit
@@ -381,14 +347,15 @@ jobs:
         run: |
           pnpm run seed:fingerprint > "$RUNNER_TEMP/second-pass.txt"
           diff -u "$RUNNER_TEMP/first-pass.txt" "$RUNNER_TEMP/second-pass.txt"
-        env:
-          MIGRATION_DATABASE_URL: postgres://erp_migration:erp_local_dev@localhost:5433/erp
 
       # The half the seed itself cannot prove: it runs as the schema OWNER, so a successful seed
       # says nothing about whether the least-privilege role the API actually uses can read what
       # was written. Phase 4's checkpoint deferred this here by name. Every table the API reads is
       # queried as `erp_app`, and the counts are asserted rather than merely printed — a `SELECT`
-      # that answers zero rows also "succeeds".
+      # that answers zero rows also "succeeds". `erp_app`'s password and the port are the
+      # `.env.example` values `setup`'s own `env:init` just copied to `.env` — not redeclared here,
+      # so a value that drifted in one place would fail loudly in the other instead of matching by
+      # coincidence.
       - name: The app role can read what the seed wrote
         run: |
           psql -v ON_ERROR_STOP=1 "postgres://erp_app:erp_local_dev@localhost:5433/erp" <<'EOSQL'
