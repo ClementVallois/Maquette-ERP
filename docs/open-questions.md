@@ -3158,3 +3158,10 @@ this fix can reach the issuance dialog. So the jitter is a property of the captu
 files in it. All three are reverted rather than re-committed, for the reason already given: a
 reference that churns on every run is not a reference. This is a fourth input to the human review of
 `tests/visual/review/` the Gate reserves, alongside row 42's duplicate pairs.
+
+### Correction, 28/08/2026 (third) — the destination value is `invalidated`
+
+The option table and the paragraph recording Clement's choice above say `?session=expired`. That
+value was never implemented: ADR-0074, `SESSION_INVALIDATED_SEARCH`, the route search schema and
+both proofs consistently use `?session=invalidated`. The record is corrected here, append-only,
+rather than by rewriting the text that captured the option as it was discussed.
