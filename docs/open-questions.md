@@ -3124,5 +3124,37 @@ fixes, and choosing between them is a decision about a demo screen three days be
 | **(b) Drop the toast-visibility assertion**, keep the live-403, the redirect and the server-side purge check (all three deterministic), and leave the UX defect recorded. Coverage of `toast.error` firing survives at unit level in `session-guard.test.ts`.                | Green CI bought by deleting the assertion that found a real defect — the shape BUILD-RULES names as "a green gate that stopped looking". Defensible only _because_ the defect is written down here rather than absorbed.                                                |
 | ~~(c) Client-side `router.navigate('/')`~~ — **rejected on inspection, not on taste.**                                                                                                                                                                                       | The hard reload is load-bearing twice over: it is what resets `session-guard.ts`'s module-level `handled` latch, and what clears the still-warm `sessionQueryOptions` cache (30 s `staleTime`) that `_shell.tsx`'s `beforeLoad` would otherwise readmit the visitor on. |
 
-Until it is chosen, **`feat/web`'s CI is red on this one test** and the PR is not opened. Resolve
-**in Phase 10 itself**, as the last act of the phase — it is not deferred to a later one.
+**Chosen by Clement, 28/08/2026: option (a).** **ADR-0074** records it. `session-guard.ts` exports
+`SESSION_INVALIDATED_SEARCH` and redirects to `/?session=expired` with no toast; `routes/index.tsx`
+validates `session` as the literal `'expired'` (`.catch(undefined)`, so a hand-typed value cannot
+put words on the demo's first screen) and renders the existing sentence in an `Alert`. Option (c)'s
+rejection is written into the ADR, because it is the half a reader will want: the hard reload is
+load-bearing twice — it resets the guard's own module-level `handled` latch and clears the warm
+`sessionQueryOptions` cache `_shell.tsx`'s `beforeLoad` resolves from — so the obvious client-side
+navigate would have kept the toast and quietly broken the purge.
+
+**Two further gaps surfaced while fixing it, both fixed in the same commit rather than filed.**
+`session-guard.test.ts`'s own test was named `purges the cookie, toasts, and redirects` and
+**never asserted the toast** — so the only mechanical proof a visitor is ever told why was the
+racing e2e line, which is how this shipped through nine phases under a green suite. It now asserts
+the reason is carried (`expect(redirect).toHaveBeenCalledWith(SESSION_INVALIDATED_SEARCH)`), and the
+`no-persona` branch asserts it is _not_ — that branch has nothing to explain. Separately,
+**ADR-0072 was written about this same toast** (blocked by `style-src` in the served topology, Phase
+9): its cited example is now stale, and it carries a dated note saying so and why the decision still
+stands on the rest of its table — Radix's `Tabs` and `ScrollArea` write style attributes with no
+toast involved, and `sonner` is still mounted and used. Twice fragile in two unrelated ways is a
+fact about where the message was placed, not about either mechanism.
+
+**Verified**: the renamed test (`… is purged, redirected, and told why`) passes **12/12** against
+the served build where the old one was 11/12; `pnpm run check` green (596 tests / 50 files,
+boundaries 301 modules / 1091 dependencies / no violation); the **full served-build suite — the CI
+`web-e2e` Gate — 71 passed / 26 skipped**, the same totals as the last green CI run.
+
+**One more capture measured while confirming this**, and it widens the second point of the previous
+correction rather than repeating it: `8.3-issuance-dialog-success.png` also came back byte-different
+from that run — **851 pixels of 1 296 000, maximum channel delta 15**, along a horizontal band at
+y≈379 on the dialog's right edge. Larger than the 6.2 pair's 40 pixels at delta 1, and nothing in
+this fix can reach the issuance dialog. So the jitter is a property of the capture set, not of two
+files in it. All three are reverted rather than re-committed, for the reason already given: a
+reference that churns on every run is not a reference. This is a fourth input to the human review of
+`tests/visual/review/` the Gate reserves, alongside row 42's duplicate pairs.
