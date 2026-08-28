@@ -66,6 +66,7 @@ retouched, so what was decided stays visible next to what replaced it.
 | [0025](./0025-html-rendered-without-a-template-engine.md)                                    | HTML from a tag that refuses the holes it cannot escape, and no engine             | accepted   |
 | [0026](./0026-one-screen-language-with-centralised-labels.md)                                | One screen language, French, with every visible string in one file                 | accepted   |
 | [0042](./0042-which-status-a-business-refusal-takes.md)                                      | Which HTTP status a business refusal takes, and what it may publish                | accepted   |
+| [0027](./0027-nightly-gates-and-what-the-pr-pipeline-never-runs.md)                          | Nightly gates, what the PR pipeline never runs, and what belongs in which suite    | accepted   |
 | [0023](./0023-persona-selector-instead-of-authentication.md)                                 | A persona selector instead of authentication, and where authorization is decided   | accepted   |
 | [0043](./0043-economics-is-read-at-the-composition-root.md)                                  | Margin is read at the composition root, because it belongs to neither module       | accepted   |
 | [0044](./0044-idempotency-key-is-stored-not-merely-required.md)                              | `Idempotency-Key` is stored, not merely required                                   | accepted   |
@@ -99,6 +100,7 @@ retouched, so what was decided stays visible next to what replaced it.
 | [0072](./0072-style-src-admits-inline-because-the-kit-writes-style-attributes.md)            | `style-src` admits `'unsafe-inline'`, because the UI kit writes `style` attributes | accepted   |
 | [0073](./0073-the-dashboard-reads-an-optional-period-override.md)                            | The dashboard reads an optional `?period=` override, defaulting to the wall clock  | accepted   |
 | [0074](./0074-the-session-guard-hands-its-reason-to-the-destination.md)                      | The session guard hands its reason to the destination, not to the page it destroys | accepted   |
+| [0075](./0075-the-vulnerability-management-procedure-and-where-it-lives.md)                  | The vulnerability-management procedure, and where it lives                         | accepted   |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
@@ -254,6 +256,22 @@ guard now hands its reason to the destination instead of shouting it at a docume
 torn down. The rejected option is the interesting half: the obvious client-side navigate would have
 kept the toast and quietly broken the purge, because the hard reload turns out to be what resets
 the guard's own latch and the session cache `_shell.tsx` reads.
+
+0027 is Phase 7's, and it consumes the number `docs/BUILD-PLAN.md` reserved for it on 17/08/2026 —
+the only ADR in this run written against a number that was waiting rather than taken fresh. It
+does three things under one title because two rows of `docs/open-questions.md` (19/08/2026) named
+it as the phase to settle them and both turned out to be the same question the reserved subject
+already asks — what belongs in which suite. Nightly gets Stryker on `domain/`; ADR-0003's
+testability claim is narrowed to the half that was always true (the rule is unit-tested, the SQL
+wiring around it is not, and cannot be without a database); ADR-0019's own reconsideration
+threshold, crossed since before this phase started, is answered by keeping per-test rollback and
+replacing the threshold that fired uselessly with two measured signals instead.
+
+0075 continues the unplanned sequence, for a decision Phase 7's own task 7.2 forced that the plan
+had described only as "the written vulnerability-management procedure": where a Renovate
+configuration that is committed but not installed is stated as such rather than implied to be
+live, on ADR-0040's own precedent — this repository has already shipped one claim of a gate that
+was never real, and did not want to ship a second.
 
 ## Identified, not yet decided
 
