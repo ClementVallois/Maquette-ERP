@@ -36,10 +36,10 @@ explanation at all**.
 ## Decision
 
 **The guard carries its reason in the URL and the destination renders it.**
-`session-guard.ts` exports `SESSION_INVALIDATED_SEARCH = '?session=expired'`, redirects to
-`/?session=expired`, and emits no toast; `routes/index.tsx` validates `session` as the literal
-`'expired'` (`.catch(undefined)`, so a hand-typed value cannot put words on the demo's first
-screen) and renders the existing `LABELS.shell.sessionInvalidatedToast` in an `Alert`.
+`session-guard.ts` exports `SESSION_INVALIDATED_SEARCH = '?session=invalidated'`, redirects to
+`/?session=invalidated`, and emits no toast; `routes/index.tsx` validates `session` as the literal
+`'invalidated'` (`.catch(undefined)`, so a hand-typed value cannot put words on the demo's first
+screen) and renders the existing `LABELS.shell.sessionInvalidated` in an `Alert`.
 
 The race is gone by construction rather than by timing: the message now lives on the page that
 survives the navigation, so there is nothing for the navigation to destroy. `/problems/no-persona`
@@ -63,7 +63,7 @@ as "a green gate that stopped looking".
 
 ## Reconsideration threshold
 
-If a second reason to bounce a visitor to the selector appears, `?session=expired` stops being one
+If a second reason to bounce a visitor to the selector appears, `?session=invalidated` stops being one
 literal and becomes an enumeration — at which point the query parameter is a small protocol and
 deserves to be typed once next to the problem types it mirrors, rather than grown a value at a
 time. Equally, if the guard ever stops hard-navigating (which would require solving the latch and

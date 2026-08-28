@@ -25,7 +25,7 @@ const PersonaSelectorSearch = z.object({
   // A literal rather than a free string: an unrecognised `?session=` must not be able to put words
   // on the demo's first screen, and `catch` keeps a hand-typed one from throwing at the visitor
   // instead of simply not applying.
-  session: z.literal('expired').optional().catch(undefined),
+  session: z.literal('invalidated').optional().catch(undefined),
 });
 
 export const Route = createFileRoute('/')({
@@ -68,11 +68,11 @@ function PersonaSelectorPage(): ReactElement {
           document the toast lives in. Reproduced 1 visit in 12 — the explanation lost to the
           redirect it exists to explain. `role="status"` and not `alert`: this is the consequence of
           something that already happened, and the visitor is not being interrupted. */}
-      {session === 'expired' && (
+      {session === 'invalidated' && (
         <Alert variant="destructive">
           <TriangleAlertIcon />
           <AlertTitle>{LABELS.persona.sessionInvalidatedTitle}</AlertTitle>
-          <AlertDescription>{LABELS.shell.sessionInvalidatedToast}</AlertDescription>
+          <AlertDescription>{LABELS.shell.sessionInvalidated}</AlertDescription>
         </Alert>
       )}
 

@@ -617,7 +617,7 @@ export const LABELS = {
     notFoundAction: 'Revenir à l’accueil',
     unexpectedErrorBody:
       'Une erreur inattendue a interrompu l’affichage de cette page. Revenez à l’accueil et recommencez.',
-    sessionInvalidatedToast: 'Votre persona n’est plus reconnue. Choisissez-en une à nouveau.',
+    sessionInvalidated: 'Votre persona n’est plus reconnue. Choisissez-en une à nouveau.',
   },
 
   footer: {

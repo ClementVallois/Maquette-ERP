@@ -12,7 +12,7 @@ import { clearPersona } from './api';
  * the document — and a toast with it. A message that explains a redirect cannot live on the page
  * the redirect is discarding; it has to be handed to the destination.
  */
-export const SESSION_INVALIDATED_SEARCH = '?session=expired';
+export const SESSION_INVALIDATED_SEARCH = '?session=invalidated';
 
 /**
  * frontend-plan.md task 4.4's two session-cookie global states, wired once for the whole app

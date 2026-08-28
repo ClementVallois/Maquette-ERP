@@ -218,7 +218,7 @@ test.describe('guards', () => {
     // against the served build. Nothing about the wait was wrong; it was waiting for something the
     // next line of production code was racing to delete. Carrying the reason in the URL makes the
     // same claim deterministic, because the message now lives on the page that survives.
-    await page.waitForURL('/?session=expired');
+    await page.waitForURL('/?session=invalidated');
     await expect(page.getByRole('heading', { name: 'Choisir un persona' })).toBeVisible();
     await expect(
       page.getByText('Votre persona n’est plus reconnue', { exact: false }),
