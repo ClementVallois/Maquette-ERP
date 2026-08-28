@@ -3165,3 +3165,30 @@ The option table and the paragraph recording Clement's choice above say `?sessio
 value was never implemented: ADR-0074, `SESSION_INVALIDATED_SEARCH`, the route search schema and
 both proofs consistently use `?session=invalidated`. The record is corrected here, append-only,
 rather than by rewriting the text that captured the option as it was discussed.
+
+### Correction, 28/08/2026 (fourth) — the final rules audit ran
+
+The `rules-auditor` pass that the Phase 10 checkpoint records as not run has now audited
+`main...feat/web`, including every BUILD-RULES section and every commit message in the range. Three
+actionable findings were fixed and committed separately:
+
+1. The checkpoint still named `?session=expired` although ADR-0074 and both proofs use
+   `?session=invalidated` (`ea49ab5`).
+2. Comments changed with the session-guard fix repeated ADR-0074's reasoning instead of stating
+   only non-obvious mechanics (`6604230`).
+3. `docs/frontend-plan.md` declared itself an exception to the English-only documentation rule,
+   although BUILD-RULES permits only `README.md` to remain French (`7854d74`).
+
+The final evidence is green: `pnpm run check` (596 unit tests in 50 files; 301 modules and 1,091
+dependencies cruised with no boundary violation), `pnpm run test:int` (188 tests in 16 files), and
+the full served-build Playwright suite (73 passed, 26 intentionally skipped). The run changed only
+`tests/visual/review/8.3-issuance-dialog-success.png`; it was restored as known capture jitter and
+was not recommitted.
+
+One history-only finding remains visible rather than silently called fixed: 14 existing commits in
+`main..feat/web` use scopes outside the current closed enum. One is `17b9128`, the separately handled
+change to `.claude/agents/rules-auditor.md`; the other 13 use the earlier `repo`, `db`, `timesheet`,
+`seed`, `billing`, `platform` or `boundaries` scopes. No additive commit can change an existing
+message, while this pass was expressly forbidden to rewrite history. There is no co-author trailer
+in the range. The working tree and every new audit-fix commit comply; Clement must either accept the
+historical messages as grandfathered or explicitly authorize a history rewrite before merge.
