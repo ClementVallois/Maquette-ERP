@@ -3310,3 +3310,43 @@ closed. They are, in order:
    they close on the same event, this branch's pull request to `main`.
 2. **The vulnerability-management procedure has never been exercised** — the first point of
    section 2 above, with no phase named, because nothing schedules a vulnerability.
+
+### Neither reviewer ran, and what was re-measured instead — 31/08/2026
+
+**The `rules-auditor` and the `cold-reader` did not run before this merge.** `CLAUDE.md` names both
+— the first "before every merge to `main` and at every phase checkpoint", the second before merging
+documentation changes — and neither was dispatched, on an explicit session instruction not to run
+an audit agent for this phase. Recorded rather than silently skipped, on the precedent this file
+already set twice: the Phase 4 checkpoint (which was later corrected by a retroactive pass) and the
+front-end Phase 10 checkpoint. What the two agents do is not replaced by what follows: nothing below
+reads the diff blind against `docs/BUILD-RULES.md`, and nothing below walks the repository without a
+brief. Both passes stay **owed** for this phase.
+
+**What did run, three days after the checkpoint above was written, is a re-measurement of every
+number this branch publishes** — not a re-reading of them. The checkpoint of 28/08/2026 is a
+single-day record, and a claim measured once on one machine state is the kind of claim `0f98613`
+spent a whole commit correcting. In order:
+
+- `pnpm run check` green — 596 unit tests in 50 files, coverage 99.41 / 97.12 / 99.52 / 99.49 — and
+  `pnpm run test:int` green, 188 tests in 16 files, against the real database.
+- **A genuinely cold `pnpm run setup`.** `docker compose down -v` first, which the runs of
+  28/08/2026 did not do: their migrate step printed `No pending migrations.`, so the composite had
+  never been watched applying a schema to an empty volume. From nothing, it applies **11
+  migrations** and seeds. This is what the CI job does on every run, and it had not been reproduced.
+- **The rewritten app-role step, executed rather than read.** `0f98613` replaced a hard-coded
+  `postgres://erp_app:…` literal with `. ./.env` + `psql "$DATABASE_URL"`, and the one way that
+  rewrite could silently gut the step is if `DATABASE_URL` named the schema owner: the assertion
+  would then pass as `erp_migration` and prove nothing about least privilege, which is the whole
+  reason the step exists. It does not. `DATABASE_URL` is `erp_app` in both `.env.example` and the
+  generated `.env`, `SELECT current_user` answers `erp_app`, and the volume assertion passes on all
+  nine tables.
+- **The seed's two-pass fingerprint diff**, re-run by hand: identical.
+- **`pnpm exec stryker run` re-run on 31/08/2026**, reproducing the published score exactly —
+  **72.80 %** overall (`billing` 67.75 %, `timesheet` 79.07 %), `errors.ts` at 17.14 % and 12.50 %,
+  `Final mutation score of 72.80 is greater than or equal to break threshold 70`. The number in
+  ADR-0027 and in the README is reproducible, on a second date, from a clean run.
+- `renovate-config-validator` re-run against `renovate.json5`: valid.
+
+The half of row 44 that only the platform can close — both jobs actually running on a
+GitHub-hosted runner — is untouched by any of this, and stays open until this branch's pull request
+runs them.
