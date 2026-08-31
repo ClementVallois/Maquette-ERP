@@ -202,6 +202,60 @@ test.describe('item 2 — no skeleton flash between choosing a persona and landi
     );
     expect(skeletonFlashed?.seen).toBe(false);
   });
+
+  /**
+   * The sibling risk `invalidateQueries()` alone would have reintroduced: none of this SPA's query
+   * keys carry a persona/role/office component (`['dashboard', period]`, `['cra', 'list']`), and
+   * `invalidateQueries()`'s default `refetchType: 'active'` only refetches queries a component is
+   * currently subscribed to — an **inactive** cache entry (the consultant dashboard, left behind
+   * when this test navigates away from it) is marked stale but keeps its data. Left alone, the
+   * manager's `/tableau-de-bord` would remount that same query key, find `isPending: false`, and
+   * paint the *previous* persona's cards before the background refetch replaced them — worse than
+   * a skeleton, in an app whose whole point is authorization by role and scope. The fix
+   * (`invalidateOnPersonaChange` in `features/session/hooks.ts`) also calls
+   * `removeQueries({ type: 'inactive' })`, so a remount has nothing stale to paint.
+   */
+  test('the destination never paints the previous persona’s dashboard before its own', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'consultant-paris');
+    // Alice's own card, "Statut du mois" — `LABELS.dashboard.consultant.monthStatus` — which the
+    // manager's dashboard (`ManagerCards`) never renders.
+    await expect(page.getByText('Statut du mois')).toBeVisible();
+
+    // Widens the window in which stale cached data, if any survived, would be visible before the
+    // real fetch replaces it — same purpose as the `personas` delay in the sibling test above.
+    await page.route('**/api/v1/dashboard*', async (route) => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 300);
+      });
+      await route.continue();
+    });
+
+    await page.locator('[data-slot="dropdown-menu-trigger"]').click();
+    await page.getByRole('menuitem', { name: 'Changer de persona' }).click();
+    await page.waitForURL('/');
+
+    await page.evaluate(() => {
+      const flag = { seen: false };
+      const observer = new MutationObserver(() => {
+        if (document.body.textContent.includes('Statut du mois')) flag.seen = true;
+      });
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+      Reflect.set(window, '__stalePersonaFlash', flag);
+    });
+
+    await page.locator('[data-persona-key="manager-paris"] button').click();
+    await page.waitForURL('/tableau-de-bord');
+    // Bruno's own card, `LABELS.dashboard.manager.pending` — proves the right data landed, not
+    // only that the wrong data never did.
+    await expect(page.getByText('CRA en attente de décision')).toBeVisible();
+
+    const staleFlashed = await page.evaluate(
+      () => Reflect.get(window, '__stalePersonaFlash') as { seen: boolean } | undefined,
+    );
+    expect(staleFlashed?.seen).toBe(false);
+  });
 });
 
 test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matrix edit/save/submit', () => {

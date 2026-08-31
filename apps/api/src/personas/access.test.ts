@@ -253,7 +253,10 @@ describe('the session routes', () => {
       'manager-lyon',
       'billing-paris',
     ]);
-    expect(body.notice).toContain('n’a pas d’authentification');
+    expect(body.notice).toBe(
+      'Cette maquette n’a pas d’authentification : on choisit une identité, et tout le monde ' +
+        'peut choisir n’importe laquelle.',
+    );
   });
 
   it('sets a signed cookie when a persona is selected', async () => {
