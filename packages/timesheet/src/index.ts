@@ -42,7 +42,7 @@ export {
 } from './domain/reference.ts';
 export { type CraFlag } from './domain/submission-checks.ts';
 export {
-  PUBLIC_HOLIDAYS_2026,
+  PUBLIC_HOLIDAYS,
   type WorkingCalendar,
   workingCalendar,
 } from './domain/working-calendar.ts';

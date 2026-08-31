@@ -17,7 +17,7 @@ import { savepointTransactionally } from '../testing/transaction.ts';
  * "never in a list", extended here to an aggregate view of the same protected asset).
  *
  * June 2026 has **22** workable days by the real calendar (verified directly against
- * `workingCalendar()` — `PUBLIC_HOLIDAYS_2026` carries no June date, and 2026-06-01 is an ordinary
+ * `workingCalendar()` — `PUBLIC_HOLIDAYS` carries no June 2026 date, and 2026-06-01 is an ordinary
  * Monday, not a holiday), which is the number this file's `remainingWorkableDays` assertion is
  * built from — not the 21 a couple of sibling fixtures use for their own, unrelated reasons.
  */

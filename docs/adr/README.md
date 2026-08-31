@@ -103,6 +103,7 @@ retouched, so what was decided stays visible next to what replaced it.
 | [0075](./0075-the-vulnerability-management-procedure-and-where-it-lives.md)                  | The vulnerability-management procedure, and where it lives                         | accepted   |
 | [0076](./0076-a-role-gets-one-colour-everywhere-it-appears.md)                               | A role gets one colour, everywhere it appears                                      | accepted   |
 | [0077](./0077-a-new-route-lists-a-managers-office-roster.md)                                 | A new route lists a manager's office roster, for the consultant filter's options   | accepted   |
+| [0078](./0078-the-holiday-table-extends-to-2016-2027.md)                                     | The holiday table extends to 2016–2027                                             | accepted   |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
@@ -287,6 +288,12 @@ independent of `/api/v1/cras`' own paginated page, on the same precedent ADR-007
 "a manager needs a scoped read the existing routes don't offer" — a new, manager-only route reading
 `public.consultants` directly, rather than deriving the filter's menu from a page that will not
 hold a whole office once item 6 grows a roster past it.
+
+0078 opens Wave 2 of the same round (`docs/open-questions.md`'s "Wave 2 plan" section, written
+before this ADR): ADR-0004's own threshold — "the day the mockup spans a second calendar year" —
+is met by item 6's historical seed data, so the holiday table extends from 2026 alone to
+2016–2027, written out the same way the original eleven dates were rather than replaced by a
+computed Easter algorithm, for the same "verifiable by reading it" reason ADR-0004 gave.
 
 ## Identified, not yet decided
 
