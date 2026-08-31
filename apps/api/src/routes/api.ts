@@ -47,12 +47,29 @@ const CONFLICT = 409;
  * The cap is here **and** in the repository. Not duplication of a rule: the repository's
  * `Math.min` silently narrows, which is right for a caller that asked for too much by accident;
  * the route refuses, which is right for a caller probing for a "show all". Together they mean
- * there is no page size that returns more than fifty rows, however it is reached.
+ * there is no page size that returns more than fifty rows, however it is reached — for every
+ * list that uses this schema as written. `GET /api/v1/cras` is the one exception
+ * (`CRA_LIST_MAX_PAGE_SIZE` below, ADR-0081): it overrides `limit` at a higher, still-fixed cap,
+ * measured against a real worst case rather than raised on this shared constant, which would have
+ * raised `/api/v1/invoices`'s own cap too, unmeasured.
  */
 const Pagination = z.object({
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
   offset: z.coerce.number().int().min(0).default(0),
 });
+
+/**
+ * `GET /api/v1/cras`'s own cap (ADR-0081, item 6/step 3, QA round 1) — deliberately **not**
+ * `MAX_PAGE_SIZE` above, which `/api/v1/invoices` and every other list in this file also share:
+ * raising the shared constant would have raised theirs too, unmeasured. Item 6's own roster
+ * expansion measured a real worst case — Paris, 65 Cras in one office once the dense months and
+ * the sparse 2016 history exist (`docs/adr/0080-…`) — and this cap clears it with headroom for
+ * organic growth rather than merely matching it. `MAX_PAGE_SIZE` is still the hard ceiling
+ * BUILD-RULES asks for ("no 'show all'"): 200 is a fixed number, not `Infinity`, and a caller who
+ * asks for more still gets refused by `Pagination`'s own `.max()` shape, reproduced here at a
+ * different value.
+ */
+const CRA_LIST_MAX_PAGE_SIZE = 200;
 
 const PeriodQuery = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u) });
 
@@ -86,6 +103,9 @@ const CommaSeparatedStatuses = z
  * rosters filter server-side rather than over a page truncated by `limit`/`offset` first.
  */
 const CraListParams = Pagination.extend({
+  // `limit` overrides the base schema's field, at `CRA_LIST_MAX_PAGE_SIZE` rather than
+  // `MAX_PAGE_SIZE` — this route's own cap, ADR-0081.
+  limit: z.coerce.number().int().min(1).max(CRA_LIST_MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
   // No `period`: unlike `/api/v1/pre-facturier`, this route has never taken one — every period
   // the actor may see, always — and item 7 does not ask for one either (the CRA list already
   // shows every period at once, with its own `period` column).

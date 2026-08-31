@@ -5,10 +5,16 @@ import { expect, test, type Page } from '@playwright/test';
  * Phase 6's axe gate ("Audit axe sur la grille : zéro violation critique/sérieuse", the exit Gate
  * of `docs/frontend-plan.md` Phase 6.5) plus the list screen it sits beside — both reachable
  * without depending on `journeys.spec.ts` having run first, so this spec stands on its own on the
- * `desktop`/`mobile-shell` projects. `2026-07` audits the **editable** grid (no seed data exists
- * for it — task 7.6 later reuses the same period for the pré-facturier's own empty state, and a
- * read-only GET here never writes anything that would collide with it); `2026-06` audits the
- * **read-only, validated** grid, the seed's real month.
+ * `desktop`/`mobile-shell` projects, in whatever order `playwright test` (no `--project` filter,
+ * CI's own invocation) happens to run them in. `2026-12` audits the **editable** grid — not
+ * `2026-07` (item 6, QA round 1, densified it for every active consultant including Alice) and
+ * not `2026-08` either (Alice's own one withheld dense month, but `journeys.spec.ts`'s J1 fills
+ * and submits it interactively, so it is only blank if that spec has not run yet — exactly the
+ * ordering dependency this file's own header rules out). `2026-12` is outside `DENSE_PERIODS`,
+ * outside `HISTORICAL_VETERANS`'s span, and outside every period any spec in this repository ever
+ * writes to (`journeys.spec.ts`'s task 7.6 reads it, read-only, for the pré-facturier's own empty
+ * state) — genuinely blank regardless of run order. `2026-06` audits the **read-only, validated**
+ * grid, the seed's real month.
  *
  * Run against a live API and a seeded database — `playwright.config.ts`'s `webServer` now starts
  * both and resets the database first.
@@ -69,7 +75,7 @@ test.describe('accessibility — Mon CRA', () => {
 
   test('the editable, empty grid has no critical/serious violation', async ({ page }) => {
     await choosePersona(page, 'consultant-paris');
-    await page.goto('/cra/2026-07');
+    await page.goto('/cra/2026-12');
     await page.locator('select').first().waitFor({ state: 'visible' });
 
     await assertAccessible(page);
@@ -135,16 +141,21 @@ test.describe('accessibility — Pré-facturier', () => {
 /**
  * Phase 8's own axe gate (task 8's exit criterion: "axe on list + detail + dashboard"). Every
  * screen below is read against seed rows no spec in this repository mutates: `billing-paris`'s own
- * "Banque Nationale de Test" invoice (draft, present on any fresh seed regardless of whether
+ * "Banque Nationale de Test" invoices (draft, present on any fresh seed regardless of whether
  * `journeys.spec.ts` has already run) for the list and detail, and each persona's own `?period=`-
  * free dashboard, which always answers for the wall-clock month (`lib/period.ts`) — read-only, so
- * two invocations never disagree on which period that is.
+ * two invocations never disagree on which period that is. `.first()`: item 6 (QA round 1) staffs
+ * several new roster consultants on the same client, so more than one row can carry this exact
+ * name — this only needs "the list has loaded", not "there is exactly one".
  */
 test.describe('accessibility — Factures', () => {
   test('the invoice list has no critical/serious violation', async ({ page }) => {
     await choosePersona(page, 'billing-paris');
     await page.goto('/factures');
-    await page.getByText('Banque Nationale de Test', { exact: true }).waitFor({ state: 'visible' });
+    await page
+      .getByText('Banque Nationale de Test', { exact: true })
+      .first()
+      .waitFor({ state: 'visible' });
 
     await assertAccessible(page);
     await page.screenshot({
@@ -157,7 +168,10 @@ test.describe('accessibility — Factures', () => {
   test('an invoice detail has no critical/serious violation', async ({ page }) => {
     await choosePersona(page, 'billing-paris');
     await page.goto('/factures');
-    await page.getByText('Banque Nationale de Test', { exact: true }).waitFor({ state: 'visible' });
+    await page
+      .getByText('Banque Nationale de Test', { exact: true })
+      .first()
+      .waitFor({ state: 'visible' });
     await page.getByRole('link', { name: 'Ouvrir la facture' }).first().click();
     await page.getByText('Émetteur').waitFor({ state: 'visible' });
 
@@ -184,7 +198,10 @@ test.describe('accessibility — Tableau de bord (task 8.4, three roles)', () =>
       test.skip(testInfo.project.name !== 'desktop', 'one capture per role is enough here');
 
       await choosePersona(page, role.key);
-      await page.getByText(role.anchor).waitFor({ state: 'visible' });
+      // `.first()`: item 6 (QA round 1) can put the billing dashboard's draft-invoice count at 2
+      // or more on a fresh seed, and `labels.ts`'s `draftSentenceMany` then contains this
+      // anchor's own text as a case-insensitive substring — see `shell.spec.ts`'s identical fix.
+      await page.getByText(role.anchor).first().waitFor({ state: 'visible' });
 
       await assertAccessible(page);
       await page.screenshot({

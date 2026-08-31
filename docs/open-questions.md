@@ -3513,3 +3513,107 @@ already merged) picks up at step 4, in the order this section already gives — 
 
 Branch pushed at this point with items 1, 2, 3, 4, 5, 7, 8 (Wave 1) and item 6 steps 1–2 (Wave 2)
 complete and green; item 6 steps 3–4 open, as recorded here.
+
+## Wave 2 outcome — item 6 steps 3–4 shipped, `fix/qa-round-1`, 31/08/2026 (session 2)
+
+Picks up exactly where the previous session's "Outcome, 31/08/2026" note left off: step 4 (seed
+volume) had not run at all, and step 3 (the `limit=50` truncation) was analysed but not fixed.
+Both are done now. This section states what shipped; it does not revise the plan above it.
+
+**Step 1 (roster expansion) and step 2 (dense months) shipped together**, appended to
+`scripts/lib/seed-data.ts` after `originalConsultants` (`ids.next()` stays positional, per the
+brief's own trap warning): 39 new consultants, one new manager (Karim, Bordeaux), none added to
+`personas` (stays exactly four). Bruno and Emma each clear 10 direct reports by a wide margin (20
+each). Four veterans (Julien, Camille, Théo, and Marine — who departs 2022-12-31, ADR-0079) join
+in 2016. Every active consultant gets a dense Cra for June, July and August 2026, except Alice's
+own August — withheld on purpose (`DENSE_PERIOD_EXCLUSIONS`) because `journeys.spec.ts`'s J1 and
+"item 3" interactively create, fill, submit and validate her August/September Cra, and a
+pre-filled August would make "Ce mois n'a pas encore été commencé" false on a fresh database.
+
+**Step 3 of the plan's own order (measure) ran before any historical row was written**: `time
+pnpm run seed` on the dense months alone measured well inside the 60s budget. No cut was needed,
+so none is recorded — the contingency in this section's own earlier paragraph does not trigger.
+
+**Step 4 (sparse history to 2016) shipped**: three veterans and the departed consultant each get
+one Cra every 24 months, driven through the domain in date order. `mAuditDora`, `mSocReunion` and
+`mGrcGuyane` — the three missions carrying this history — grow an earlier `startDate` and a
+historical `missionTjm` window so a 2016 Cra resolves a real, different rate rather than declining
+`noAgreedRate` (ADR-0080). Historical invoices are issued as Henri (absent from every
+`validated_by`) through the real issuance path (`PgNumberingCounter` + `Invoice.issue`): several
+left draft, several issued, one (Julien's 2022-06) cancelled by a credit note — the resulting gap
+in `invoice_number` is the credit note itself, never persisted since ADR-0057 dropped that table
+(ADR-0080 again).
+
+Final measured shape: **48 consultants, 147 Cras** (146 validated + Claire's own June, still
+submitted-not-validated as the brief requires), **65 invoices** (53 draft, 11 issued, 1 cancelled
+by credit note) across 4 offices. Per-office Cra counts: **Paris 65, Lyon 62, Bordeaux 17, Rennes
+3** — the first two clear the _old_ 50-row cap, which is what step 3 (below) is sized against.
+Per-office invoice counts: Paris 28, Lyon 23, Bordeaux 11, Rennes 3 — all comfortably under 50, by
+deliberate design (most new consultants staffed on `Intercontrat`, ADR-0080's own consequence
+section), so `/api/v1/invoices` (untouched, still capped at `MAX_PAGE_SIZE = 50`) does not
+reproduce the defect step 3 exists to close. `pnpm run seed:fingerprint` reproducible across two
+fresh `db:reset && seed` passes (hashes compared by hand — the script has no output file to
+commit).
+
+**Step 3 (the `limit=50` truncation) shipped: ADR-0081.** `GET /api/v1/cras` gets its own cap,
+`CRA_LIST_MAX_PAGE_SIZE = 200`, overriding `limit` in `CraListParams` on top of the shared
+`Pagination` schema — not a raise of the shared `MAX_PAGE_SIZE`, which `/api/v1/invoices` still
+uses unmeasured. `packages/timesheet/src/infrastructure/pg-cra-repository.ts`'s own `MAX_PAGE_SIZE`
+moved to 200 too (the repository-side belt to the route's braces — raising only the route would
+have shipped a cap the repository's own `Math.min` quietly narrowed straight back), and
+`apps/web/src/features/cra/api.ts`'s `DEFAULT_LIST_LIMIT` moved to 200 so the one request this
+screen makes actually asks for a realistic worst case. Owed tests: `pg-cra-repository.int.test.ts`
+now proves 250 seeded rows still cap at 200 (was: 60 rows capped at 50), and a new test proves 65
+rows — the exact measured Paris worst case — are NOT truncated; `api.int.test.ts`'s own
+`pagination` block gained the same shape at the route level (a manager with 65 real Cras, inserted
+via fixture, sees every one of them through `GET /api/v1/cras`, unfiltered).
+
+**The e2e suite needed real rework, not just a re-run** — the seed's new volume broke assumptions
+several existing specs had baked in, found by running the full Playwright suite (`journeys`,
+`desktop`, `mobile-shell` projects) and fixing what broke, one failure at a time:
+
+- Two tests relied on Paris having **zero** Cras for period `2026-07` (`journeys.spec.ts` task
+  7.6's own designed empty pré-facturier state, and its `axe.spec.ts` sibling) — true before this
+  session, false after, since Paris now has dense July data for everyone. Both moved to `2026-12`,
+  a period outside `DENSE_PERIODS` and outside `HISTORICAL_VETERANS`'s span, which stays genuinely
+  empty regardless of `playwright test`'s run order (CI runs every project in one invocation, no
+  `--project` filter — the ordering constraint `axe.spec.ts`'s own header already named).
+- `axe.spec.ts`'s "editable, empty grid" test used `2026-07` for **Alice specifically** — also
+  moved to `2026-12` rather than `2026-08`: `2026-08` is Alice's one withheld dense month, but
+  `journeys.spec.ts`'s J1 fills it interactively, so it is only blank if that spec has not run yet
+  in the same invocation — exactly the ordering dependency this file's own header rules out.
+- Several `getByText(...)`/`getByRole(...)` calls without `{ exact: true }` or `.first()` started
+  matching more than one element once Claire, Alice and the new roster carried more than one Cra
+  or more than one invoice to the same client (`item 1`, `item 7`, `J4` in `journeys.spec.ts`;
+  the "Factures" and dashboard-billing checks in `axe.spec.ts`; `routing.spec.ts`'s own factures
+  list check). Fixed with `.first()` where "at least one" was always the actual intent, and with a
+  rewritten flow in item 7's own test (its two-filter narrowing no longer trivially empties Claire
+  out with 'Validé' now that she carries a validated July and August alongside her submitted June
+  — 'Refusé' replaces it as the genuinely-empty pill, since nothing is refused yet at that point in
+  the file).
+- `J4`'s own invoice-issuance test assumed "J2 leaves exactly one draft invoice" for Claire's
+  Réunion client — now three (June, from J2; July and August, already drafted at seed time) — the
+  row lookup added a period filter (`hasText: 'juin 2026'`) alongside the client-name one.
+- One genuine **pre-existing, unrelated defect** found while fixing the above and corrected as a
+  drive-by (BUILD-RULES: "a green build that leaves the repo asserting something false is a
+  failure"): `routing.spec.ts` asserted `getByRole('tab', { name: 'Brouillon' })` on the invoice
+  status filter, which is `role="group"` with `aria-pressed` toggle buttons
+  (`toggle-pill-group.tsx`'s own comment on why), not tabs — stale since item 8 (QA round 1)
+  replaced the tab pattern with individually-clickable pills, in a file `journeys.spec.ts`'s own
+  item 8 test never touches. Fixed to `getByRole('button', ...)`.
+
+All three e2e projects (`journeys`, `desktop`, `mobile-shell`) green on a full run. Every review
+screenshot under `apps/web/tests/visual/review/` that changed content (more consultants, more
+rows, the relocated empty-state period) was refreshed and is committed alongside the code, per the
+precedent commit `85c0283` set for item 7.
+
+`pnpm run check` (601 unit tests) and `pnpm run test:int` (202 integration tests, +2 from the
+`limit=50` regression tests) green.
+
+**CLAUDE.md** § "Dataset shape" updated with the new roster enumeration. **docs/todo.md** (this
+session's own untracked working note) updated in place, not committed. Two new ADRs:
+**ADR-0080** (seed volume reuses missions for history, and the one deliberate credit-note gap) and
+**ADR-0081** (the CRA-list route's own higher page cap).
+
+Item 6 is complete: all four steps of the Wave 2 plan have shipped, and the branch's full scope
+(items 1–8) is green.

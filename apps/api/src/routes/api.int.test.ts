@@ -843,7 +843,11 @@ describe('the progressive-disclosure read', () => {
 });
 
 describe('pagination', () => {
-  it('refuses a page size past the cap rather than silently narrowing it', async () => {
+  // 200, not 50: ADR-0081 (item 6/step 3, QA round 1) gave `GET /api/v1/cras` its own cap, past
+  // `MAX_PAGE_SIZE` (still 50, and still what `/api/v1/invoices` and every other list here share)
+  // — raised once the seed's roster expansion measured a real office clearing fifty Cras (Paris,
+  // 65, `docs/adr/0080-…`).
+  it('refuses a page size past this route’s own cap rather than silently narrowing it', async () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/v1/cras?limit=1000',
@@ -857,11 +861,39 @@ describe('pagination', () => {
   it('accepts the cap itself', async () => {
     const response = await app.inject({
       method: 'GET',
-      url: '/api/v1/cras?limit=50',
+      url: '/api/v1/cras?limit=200',
       headers: as('manager-paris'),
     });
 
     expect(response.statusCode).toBe(200);
+  });
+
+  // The regression item 6/step 3 exists to close: before ADR-0081, an office whose Cra count
+  // passed the *old* 50-row default answered this route wrong (silently truncated), not thin. 65
+  // rows — the exact worst case the roster expansion measured for Paris — asked for at the old
+  // default and answered in full, unfiltered.
+  it('a manager with more than the old 50-row cap’s worth of Cras sees every one of them, unfiltered', async () => {
+    const { client } = transaction;
+    const rowCount = 65;
+    await client.query(
+      `INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+       SELECT 'api-bulk-cra-' || g, $1, $2,
+              to_char(DATE '2000-01-01' + (g || ' month')::interval, 'YYYY-MM'), 'draft'
+       FROM generate_series(1, $3::int) AS g`,
+      [ALICE, PARIS, rowCount],
+    );
+
+    const response = await app.inject({
+      method: 'GET',
+      // The default limit (20) would truncate too — this asks for what the office actually has,
+      // the same shape a client sized against a real count (rather than a guess) would send.
+      url: `/api/v1/cras?limit=${String(rowCount + 2)}`,
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    // +2 from `beforeEach`'s own two seeded June Cras (Alice's and Chloé's), both Paris too.
+    expect(response.json<{ cras: unknown[] }>().cras).toHaveLength(rowCount + 2);
   });
 });
 

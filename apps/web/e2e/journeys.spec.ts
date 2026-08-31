@@ -151,7 +151,10 @@ test.describe('item 1 — switching persona drops stale data without a reload', 
     // Claire Dubois can only appear here if the office-wide query actually ran: Alice's own
     // cached list (the previous persona's `GET /api/v1/cras`) never contains Claire's name — a
     // stale cache would leave this screen showing only Alice's own months.
-    await expect(page.getByText('Claire Dubois')).toBeVisible();
+    // `.first()`: item 6 (QA round 1) gives Claire a dense June/July/August, so her name is on
+    // more than one row from the very first fresh seed — this check only needs "she is listed at
+    // all", the same reasoning item 7's own check below gives for Alice.
+    await expect(page.getByText('Claire Dubois').first()).toBeVisible();
   });
 });
 
@@ -661,11 +664,12 @@ test.describe('item 7 — consultant and status filters on the manager’s CRA l
     await choosePersona(page, 'manager-paris');
     await page.goto('/cra');
 
-    // `.first()`: Alice carries more than one row by this point in the file (item 3, run earlier,
-    // left her a validated September on top of the seed's June and J1's refused August) — this
-    // check only needs "she is listed at all", not "exactly once".
+    // `.first()`: item 6 (QA round 1) gives both Alice and Claire a dense June/July (Alice's
+    // August stays withheld, `DENSE_PERIOD_EXCLUSIONS`) — Alice also carries more than one row by
+    // this later point in the file (item 3, run earlier, left her a validated September on top of
+    // that) — this check only needs "she/she is listed at all", not "exactly once".
     await expect(page.getByText('Alice Martin').first()).toBeVisible();
-    await expect(page.getByText('Claire Dubois')).toBeVisible();
+    await expect(page.getByText('Claire Dubois').first()).toBeVisible();
 
     // Consultant filter: search narrows the option list, a checkbox selects — Alice drops out,
     // Claire stays.
@@ -676,27 +680,35 @@ test.describe('item 7 — consultant and status filters on the manager’s CRA l
     await page.locator('[data-slot="popover-content"]').getByText('Claire Dubois').click();
     await page.keyboard.press('Escape');
 
-    await expect(page.getByText('Claire Dubois')).toBeVisible();
+    // Three rows, not one: item 6 gives Claire a dense June (submitted), July and August (both
+    // validated), and the consultant filter alone — no status filter yet — narrows to *her*, not
+    // to one of her months.
+    await expect(page.getByText('Claire Dubois').first()).toBeVisible();
     await expect(page.getByText('Alice Martin')).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Ouvrir' })).toHaveCount(1);
+    await expect(page.getByRole('link', { name: 'Ouvrir' })).toHaveCount(3);
 
     // The URL carries the filter — a reload must show exactly this, not a blank slate.
     await page.reload();
-    await expect(page.getByText('Claire Dubois')).toBeVisible();
+    await expect(page.getByText('Claire Dubois').first()).toBeVisible();
     await expect(page.getByText('Alice Martin')).toHaveCount(0);
 
-    // Status pill, ANDed with the consultant filter already active: Claire's June is 'submitted',
-    // so 'Validé' (validated) narrows her away too — an empty result, not a blank table.
-    await page.getByRole('button', { name: 'Validé', exact: true }).click();
+    // Status pill, ANDed with the consultant filter already active. 'Refusé' rather than 'Validé'
+    // (this test's own shape before item 6): Claire now carries a validated July and August on
+    // top of her submitted June, so 'Validé' alone no longer empties her out — nothing in this
+    // dataset is refused yet at this point in the file (J3, later, is the first to refuse
+    // anything), which is what makes 'Refusé' the genuinely empty pill instead.
+    await page.getByRole('button', { name: 'Refusé', exact: true }).click();
     await page
       .getByText('Aucun CRA ne correspond à ces filtres', { exact: false })
       .waitFor({ state: 'visible' });
 
-    // Switching to 'Soumis' (submitted) brings her back — proves the status pill is read live,
-    // not only that "some filter" suppresses the row.
-    await page.getByRole('button', { name: 'Validé', exact: true }).click();
+    // Switching to 'Soumis' (submitted) brings her back to exactly one row — her June, the only
+    // submitted Cra in the whole office at this point — proving the status pill is read live, not
+    // only that "some filter" suppresses every row.
+    await page.getByRole('button', { name: 'Refusé', exact: true }).click();
     await page.getByRole('button', { name: 'Soumis', exact: true }).click();
     await expect(page.getByText('Claire Dubois')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Ouvrir' })).toHaveCount(1);
 
     // "Effacer les filtres" (inside the still-open-from-the-status-click combobox is closed by
     // now — reopen it) clears the consultant side only; the status pill is its own control and
@@ -851,14 +863,21 @@ test.describe('J4 — billing-paris (Henri): issues the draft J2 created, with a
     page,
   }) => {
     // Runs after J2 in this file's declared order (`test.describe.configure({ mode: 'serial' })`
-    // at the top orders every describe block, not only what is inside one) — J2 leaves exactly
-    // one draft invoice behind, Claire's Réunion one, still unissued (its own dialog closed
-    // without an issuance, and the marge visit afterwards is a read). That is the Cra this test
-    // consumes.
+    // at the top orders every describe block, not only what is inside one) — J2 leaves Claire's
+    // June Réunion invoice draft and unissued (its own dialog closed without an issuance, and the
+    // marge visit afterwards is a read). That is the invoice this test consumes.
+    //
+    // Filtered on the period too, not only the client: item 6 (QA round 1) gives Claire a dense
+    // July and August as well, both already validated at seed time and each drafting its own
+    // Réunion invoice — three draft rows share this client's name by the time this test runs, and
+    // "juin 2026" is what picks out the one J2 actually decided.
     await choosePersona(page, 'billing-paris');
     await page.goto('/factures');
 
-    const reunionRow = page.getByRole('row').filter({ hasText: 'Réunion Cyber Services' });
+    const reunionRow = page
+      .getByRole('row')
+      .filter({ hasText: 'Réunion Cyber Services' })
+      .filter({ hasText: 'juin 2026' });
     await reunionRow.waitFor({ state: 'visible' });
     await reunionRow.getByRole('link', { name: 'Ouvrir la facture' }).click();
     await page.waitForURL(/\/factures\/.+/u);

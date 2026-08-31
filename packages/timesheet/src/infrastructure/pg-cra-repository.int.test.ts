@@ -341,23 +341,44 @@ describe('PgCraRepository', () => {
     expect(await repo().list({ actor: parisManager, limit: 10, offset: 0 })).toHaveLength(2);
   });
 
-  it('caps pagination at MAX_PAGE_SIZE, however large the caller asks', async () => {
+  it('caps pagination at MAX_PAGE_SIZE (200), however large the caller asks', async () => {
     // Seeded past the cap on purpose. Asking for 1000 against an empty table also returns "no
-    // more than 50" and proves nothing — the cap has to be the reason the answer is short.
+    // more than the cap" and proves nothing — the cap has to be the reason the answer is short.
+    // 250 rows, not 60: ADR-0081 (item 6/step 3, QA round 1) raised this repository's own cap
+    // from 50 to 200 once the seed's roster expansion measured a real office clearing 50 Cras
+    // (Paris, 65) — a fixture of 60 would now return in full and prove nothing about the cap
+    // that actually governs this route today.
     await seedOffices();
     await tx.client.query(`
       INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
       SELECT 'cra-' || g, 'consultant-1', 'office-paris',
-             to_char(DATE '2020-01-01' + (g || ' month')::interval, 'YYYY-MM'), 'draft'
-      FROM generate_series(1, 60) AS g
+             to_char(DATE '2000-01-01' + (g || ' month')::interval, 'YYYY-MM'), 'draft'
+      FROM generate_series(1, 250) AS g
     `);
 
     const capped = await repo().list({ actor: parisManager, limit: 1000, offset: 0 });
-    expect(capped).toHaveLength(50);
+    expect(capped).toHaveLength(200);
 
-    // And a caller under the cap still gets what it asked for, so the fix is not "always 50".
+    // And a caller under the cap still gets what it asked for, so the fix is not "always 200".
     const asked = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
     expect(asked).toHaveLength(10);
+  });
+
+  it('a manager with more than the old 50-row cap’s worth of Cras sees every one of them, unfiltered (ADR-0081)', async () => {
+    // The regression item 6/step 3 (QA round 1) exists to close: before ADR-0081, an office past
+    // fifty Cras answered `GET /api/v1/cras` wrong (silently truncated) rather than thin. 65 rows
+    // — the exact worst case the roster expansion measured for Paris — asked for at the old
+    // default of 50 and answered in full.
+    await seedOffices();
+    await tx.client.query(`
+      INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+      SELECT 'cra-' || g, 'consultant-1', 'office-paris',
+             to_char(DATE '2000-01-01' + (g || ' month')::interval, 'YYYY-MM'), 'draft'
+      FROM generate_series(1, 65) AS g
+    `);
+
+    const overOldCap = await repo().list({ actor: parisManager, limit: 65, offset: 0 });
+    expect(overOldCap).toHaveLength(65);
   });
 
   it('round-trips a refusal, with who refused it and why', async () => {

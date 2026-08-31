@@ -275,7 +275,12 @@ test.describe('screenshots — the shell per persona (rule 0bis.10)', () => {
 
       await choosePersona(page, persona.key);
       await expect(sidebarNav(page).locator('a').first()).toBeVisible();
-      await page.getByText(persona.anchor).waitFor({ state: 'visible' });
+      // `.first()`: item 6 (QA round 1) means the billing dashboard's draft-invoice count can be
+      // 2 or more on a fresh seed now, and `labels.ts`'s `draftSentenceMany` ("{count} factures
+      // en brouillon, prêtes à émettre.") then contains this anchor's own text as a
+      // case-insensitive substring — a second, unrelated match `getByText` would otherwise trip
+      // over. The StatCard label this anchor names is the first match either way.
+      await page.getByText(persona.anchor).first().waitFor({ state: 'visible' });
 
       await page.screenshot({
         animations: 'disabled',

@@ -17,7 +17,16 @@ import type { RecordedDayType } from '../domain/day-type.ts';
 import type { ConsultantId, CraId, MissionId, OfficeId } from '../domain/ids.ts';
 import type { CraFlag } from '../domain/submission-checks.ts';
 
-const MAX_PAGE_SIZE = 50;
+/**
+ * 200, not 50 (ADR-0081, item 6/step 3 QA round 1) — this repository's own cap, raised past the
+ * realistic worst case item 6's roster expansion actually measured (Paris, 65 Cras in one
+ * office). Raised **here**, not only in `apps/api/src/routes/api.ts`'s `CraListParams`: a route
+ * cap the repository's own `Math.min` still narrows behind is not a fix, it is a cap that looks
+ * raised and silently isn't. `PgInvoiceRepository`'s own `MAX_PAGE_SIZE` is untouched — a
+ * different file, a different constant, deliberately not shared, so this change cannot loosen the
+ * invoice list too.
+ */
+const MAX_PAGE_SIZE = 200;
 
 interface PgClient {
   query<T>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;

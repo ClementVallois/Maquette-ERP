@@ -18,7 +18,14 @@ import type {
  * caller, same pattern as `features/session/api.ts`.
  */
 
-const DEFAULT_LIST_LIMIT = 50;
+/**
+ * 200, not 50 — moves with `apps/api/src/routes/api.ts`'s `CRA_LIST_MAX_PAGE_SIZE` (ADR-0081,
+ * item 6/step 3 QA round 1): the manager's CRA list has no pagination control in this UI, so
+ * whatever this constant asks for is the whole page a manager ever sees, and it has to clear the
+ * route's own cap or a manager past the old 50-row default would see a page silently short of
+ * their office's real count again, one layer up.
+ */
+const DEFAULT_LIST_LIMIT = 200;
 
 export interface CraListFilters {
   readonly consultantIds?: readonly string[];

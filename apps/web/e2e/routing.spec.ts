@@ -107,9 +107,18 @@ test.describe('the /facture prefix does not capture the SPA’s plural routes', 
     await expect(page.locator(SPA_ROOT)).toHaveCount(1);
     await expect(page.locator(SSR_MAIN)).toHaveCount(0);
 
-    // And it is the invoice **list**, not merely some SPA screen.
-    await page.getByText('Banque Nationale de Test', { exact: true }).waitFor({ state: 'visible' });
-    await expect(page.getByRole('tab', { name: 'Brouillon' })).toBeVisible();
+    // And it is the invoice **list**, not merely some SPA screen. `.first()`: item 6 (QA round 1)
+    // staffs several new roster consultants on the same client, so more than one row can carry
+    // this exact name — this only needs "the list has loaded".
+    await page
+      .getByText('Banque Nationale de Test', { exact: true })
+      .first()
+      .waitFor({ state: 'visible' });
+    // `role="group"` with `aria-pressed` toggle buttons, not `role="tab"`/`radiogroup`
+    // (`toggle-pill-group.tsx`'s own comment on why) — found stale while fixing the assertion
+    // above for item 6 (QA round 1): this line still expected the tab pattern item 8 (QA round 1)
+    // replaced.
+    await expect(page.getByRole('button', { name: 'Brouillon' })).toBeVisible();
   });
 
   test('a full navigation to /factures/:id lands on the SPA invoice detail', async ({
