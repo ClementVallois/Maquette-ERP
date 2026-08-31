@@ -148,6 +148,11 @@ describe('the module boundary rule', () => {
     );
   });
 
+  // The one case that cruises the whole repository rather than a fixture: ~2.5 s on an idle
+  // machine, against Vitest's 5 s default. That margin disappears under any parallel load — the
+  // pre-push hook's own three jobs, or a `stryker run` — and the test then fails on the clock
+  // rather than on a violation, which reads as a boundary break that is not one. The explicit
+  // timeout removes the false red; it changes nothing about what is asserted below.
   it('accepts the code that is actually shipped', () => {
     const { summary } = cruise(SHIPPED, '.dependency-cruiser.cjs');
 
@@ -155,5 +160,5 @@ describe('the module boundary rule', () => {
     // green run would otherwise prove nothing. This is the failure this suite exists to catch.
     expect(summary.totalCruised).toBeGreaterThan(0);
     expect(summary.violations).toStrictEqual([]);
-  });
+  }, 30_000);
 });

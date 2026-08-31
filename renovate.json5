@@ -1,0 +1,58 @@
+{
+  // Reasoning lives in ADR-0075, not here (BUILD-RULES.md: reasoning belongs in an ADR).
+  //
+  // The GitHub App is NOT installed on this repository (verified 28/08/2026 — no webhooks, no
+  // bot PRs, and the repository is private). This file is a committed, ready configuration, not
+  // evidence that Renovate is running; ADR-0040's precedent applies (a claimed gate that is not
+  // actually live is a defect, not a detail) and the README says so in the same place it links
+  // here.
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: ['config:recommended'],
+
+  // Fixed cadence: once a week, off the hour like nightly.yml's cron, for the same reason —
+  // avoiding the top-of-the-hour pile-up on GitHub's shared infrastructure.
+  schedule: ['before 6am on monday'],
+  timezone: 'Europe/Paris',
+
+  // Grouped: one PR per run for the routine case, not one PR per dependency. Majors are excluded
+  // from the group on purpose — a major bump is the one class of update this repository's
+  // 7-day-quarantine-and-justify discipline (BUILD-RULES.md, "Do not add a dependency") most
+  // wants reviewed on its own, not folded into a batch.
+  packageRules: [
+    {
+      groupName: 'weekly dependency updates (minor and patch)',
+      matchUpdateTypes: ['minor', 'patch'],
+    },
+    {
+      groupName: 'weekly GitHub Actions updates',
+      matchManagers: ['github-actions'],
+      matchUpdateTypes: ['minor', 'patch', 'pin', 'pinDigest'],
+    },
+    // Node and pnpm are excluded from automation: both are the toolchain the rest of this
+    // configuration runs on (`package.json`'s `engines` and `packageManager` fields, this
+    // workflow's own `NODE_VERSION`), and a bump here is a decision about what CI itself runs on,
+    // not a routine dependency update. Bumped by hand, deliberately, same as any other structural
+    // decision in this repository.
+    {
+      matchDepTypes: ['packageManager', 'engines'],
+      enabled: false,
+    },
+    {
+      matchPackageNames: ['node', 'pnpm'],
+      enabled: false,
+    },
+  ],
+
+  // Vulnerability alerts: allowed at any time, ungated by the weekly cadence above — the whole
+  // point of a fixed cadence is that a security fix must not have to wait for it.
+  vulnerabilityAlerts: {
+    enabled: true,
+    schedule: ['at any time'],
+    labels: ['security'],
+  },
+  osvVulnerabilityAlerts: true,
+
+  labels: ['dependencies'],
+  dependencyDashboard: true,
+  prConcurrentLimit: 5,
+}

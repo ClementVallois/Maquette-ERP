@@ -1,0 +1,55 @@
+name: Nightly
+
+# What deliberately does not run on every PR (ADR-0027): a long pipeline gets bypassed, so the
+# short one stays short and this one carries the slow, high-signal proof instead. `schedule:`
+# alone would leave this workflow untriggerable until it lands on the default branch — GitHub
+# does not run a cron trigger off any other ref — so `workflow_dispatch` is here from the start,
+# for a manual run on this branch and for whoever needs to re-run a failed nightly by hand.
+on:
+  schedule:
+    # 03:17 UTC, daily. Off the hour on purpose — the top of the hour is when every scheduled
+    # workflow on GitHub's shared runners fires, and a job queued behind that pile-up can start
+    # minutes late with no error, which reads as "it didn't run" the next morning.
+    - cron: '17 3 * * *'
+  workflow_dispatch: {}
+
+permissions: {}
+
+env:
+  NODE_VERSION: '24.13.1'
+
+jobs:
+  mutation:
+    name: Mutation testing (domain only)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # `packages/*/src/domain/**` only (ADR-0027): the coverage threshold in `vitest.config.ts`
+      # already says *how much* of the domain a test touches, and mutation testing is the direct
+      # answer to the question coverage cannot ask — *whether* the assertion that touched it would
+      # actually catch a wrong answer. e2e and a volumetry mode are never added here or anywhere:
+      # neither is in scope for this mockup (README, "Ce que je ne construis pas").
+      #
+      # `stryker.config.json` breaks the job below the domain's own first measured score — see the
+      # ADR for what that score was and why it is not lowered to make this pass.
+      - name: Stryker mutation testing on the domain
+        run: pnpm exec stryker run
+
+      - name: Upload the mutation HTML report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mutation-report
+          path: reports/mutation/
+          retention-days: 14
