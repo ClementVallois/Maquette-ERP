@@ -931,6 +931,63 @@ test.describe('J4 — billing-paris (Henri): issues the draft J2 created, with a
   });
 });
 
+/**
+ * Item 8 (QA round 1): the invoice status filter reads as one bar, not obviously several
+ * individually-clickable pills. Run after J4 rather than before: J4 leaves at least one real
+ * 'issued' invoice behind (the Réunion one, `SEC-2026-000001`), which is what makes "click Émises,
+ * see only issued rows" a meaningful assertion rather than one that would pass on an empty table
+ * regardless of the fix.
+ */
+test.describe('item 8 — the invoice status filter reads as individually-clickable pills', () => {
+  test('each pill narrows exclusively, carries a count, and the choice survives a reload', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'billing-paris');
+    await page.goto('/factures');
+
+    // `role="button"`/`aria-pressed`, not `role="radio"`: `TogglePillGroup` uses one accessible
+    // pattern in both selection modes (see its own comment on why) — a real radio group obliges
+    // arrow-key roving-tabindex navigation this component does not implement.
+    const allPill = page.getByRole('button', { name: /Toutes/u });
+    const issuedPill = page.getByRole('button', { name: /Émises/u });
+    await expect(allPill).toHaveAttribute('aria-pressed', 'true');
+    await expect(issuedPill).toHaveAttribute('aria-pressed', 'false');
+
+    // The count on "Émises" is read before clicking it, then compared against the table's own
+    // row count after — the same number by two different routes is what proves the count is
+    // real, not decorative.
+    const issuedLabel = (await issuedPill.textContent()) ?? '';
+    const issuedCount = /\((\d+)\)/u.exec(issuedLabel)?.[1];
+    if (issuedCount === undefined) {
+      throw new FixtureAssumptionError('Expected the "Émises" pill to carry a count.');
+    }
+
+    await issuedPill.click();
+    await expect(issuedPill).toHaveAttribute('aria-pressed', 'true');
+    await expect(allPill).toHaveAttribute('aria-pressed', 'false');
+    await page.waitForURL(/status=issued/u);
+
+    const rows = page.getByRole('table').locator('tbody tr');
+    await expect(rows).toHaveCount(Number.parseInt(issuedCount, 10));
+    // Every visible status badge reads "Émise" — the exclusivity itself, not only the count.
+    await expect(page.getByText('Émise', { exact: true })).toHaveCount(
+      Number.parseInt(issuedCount, 10),
+    );
+    await expect(page.getByText('Brouillon', { exact: true })).toHaveCount(0);
+
+    // The filter is in the URL, not only in memory.
+    await page.reload();
+    await expect(issuedPill).toHaveAttribute('aria-pressed', 'true');
+    await expect(rows).toHaveCount(Number.parseInt(issuedCount, 10));
+
+    await page.screenshot({
+      animations: 'disabled',
+      path: 'tests/visual/review/item8-factures-status-pills.png',
+      fullPage: false,
+    });
+  });
+});
+
 test.describe('J3 — manager-paris (Bruno): refuses the month Alice submitted in J1, with a reason', () => {
   test('the manager refuses through the pré-facturier dialog, and Alice sees the reason on her own grid', async ({
     page,
