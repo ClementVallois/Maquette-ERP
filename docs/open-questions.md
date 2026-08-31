@@ -3366,3 +3366,22 @@ anything about. A verification pass scoped to a phase's own assertions cannot se
 something the phase never mentions — which is one of the two things dispatching a `rules-auditor`
 against the whole diff exists to catch, and it was not dispatched. Both fixes and both document
 corrections are in the row of 28/08/2026 on the vulnerability procedure, updated above.
+
+### A gate that was failing on the clock — 31/08/2026
+
+Found while pushing the fixes above, and unrelated to them.
+`tests/boundary-rule.test.ts`'s one whole-repository case — `accepts the code that is actually
+shipped`, the cruise that reads every shipped file rather than a fixture — takes **~2.5 s** against
+Vitest's **5 s** default. Twice on this branch it did not: 5163 ms and 5986 ms, both timeouts, once
+alongside a `stryker run` and once inside the pre-push hook, which runs typecheck, boundaries and
+the unit suite in parallel with one another.
+
+**Not caused by this phase.** `main` measures the same ~2.6 s with a smaller dependency tree,
+checked in a worktree rather than assumed. Surfaced by this phase, because it is what puts a
+four-worker mutation run on the same machine as a `git push`.
+
+**Fix now**, which is what happened (`d9bc646`): an explicit 30 s timeout on that one case, with the
+mechanical reason in a comment. Nothing about what is asserted moves — `totalCruised > 0` and zero
+violations both stand. What moves is that a red there now means a boundary was crossed, which is the
+only thing this repository's central gate is allowed to mean. A flaky gate is on its way to being a
+re-run gate, and a re-run gate is a disabled one.
