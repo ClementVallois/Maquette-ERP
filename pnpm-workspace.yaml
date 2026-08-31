@@ -16,3 +16,11 @@ allowBuilds:
   esbuild: true # vitest bundler
   lefthook: true # downloads its own binary
   unrs-resolver: true # native binding of the ESLint TypeScript resolver
+
+# `typed-rest-client@2.3.1` (pulled in by @stryker-mutator/core) depends on `qs` at an exact
+# `6.15.1`, so no `pnpm update` can reach it — GHSA-q8mj-m7cp-5q26 is fixed in 6.15.2. The key is
+# version-qualified deliberately: it stops matching, and this entry retires itself, the day
+# upstream moves off 6.15.1. Not read from package.json in pnpm 11 — `pnpm.overrides` there is
+# ignored with a warning. Procedure: docs/vulnerability-management.md.
+overrides:
+  'qs@6.15.1': '6.15.2'
