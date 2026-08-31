@@ -607,6 +607,10 @@ async function seed(): Promise<void> {
         consultantId: consultant.id,
         officeId: consultant.officeId,
         period,
+        // No departed consultant carries a CRA for this period yet (this loop is 2026-06 only,
+        // the dense month every active consultant gets) — real per-consultant departure dates
+        // reach `Cra.open` where the seed opens *historical* CRAs, once those exist.
+        consultantDeparture: null,
       });
 
       // Find the consultant's assignments for this period

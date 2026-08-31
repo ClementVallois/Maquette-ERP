@@ -16,6 +16,22 @@ export class UnknownCalendarYearError extends BusinessError {
   }
 }
 
+/**
+ * A CRA was opened for a period that starts after the consultant's own departure (ADR-0079). The
+ * value is fine — the period is real — and it is the consultant's state as of that date that
+ * refuses it, the same reasoning `MissingHabilitationError` gives for its own 409.
+ */
+export class CraAfterDepartureError extends BusinessError {
+  readonly problemType = '/problems/cra-after-departure';
+
+  constructor(period: string, departure: string) {
+    super(`${period} starts after the consultant's own departure (${departure})`, {
+      period,
+      departure,
+    });
+  }
+}
+
 /** A worked day has to say which mission it was worked on: that is what becomes an invoice line. */
 export class MissionRequiredError extends BusinessError {
   readonly problemType = '/problems/mission-required';

@@ -104,6 +104,10 @@ _Avoid_: DailyRate, Rate, Price
 A person who records a `Cra` and may be staffed on a `Mission`.
 _Avoid_: Employee, User, Resource
 
+**Departure**:
+The nullable date a `Consultant` left the firm (`public.consultants.departure_date`, ADR-0079). `NULL` means still with the firm — the column's own default, so an existing row needs no backfill. Translates without loss, so it is English like `Office` and `Practice`, not kept French like `Intercontrat` or `Habilitation`. A departure erases nothing: it removes the consultant from a manager's _current_ roster and the pré-facturier's pending list, while every `Cra` and `Invoice` already on their name stays readable. The one invariant it carries is in the domain, not only in this column: a `Cra` cannot be opened for a period that starts after the departure (`Cra.open`, `CraAfterDepartureError`).
+_Avoid_: Active flag, Termination, Offboarding, Deletion
+
 **Practice** (🇬🇧 translated from _pôle_):
 An area of expertise the firm sells: audit, SOC, GRC, IAM, offensive security. Translates without loss.
 _Avoid_: Pole, Department, Team, BusinessUnit

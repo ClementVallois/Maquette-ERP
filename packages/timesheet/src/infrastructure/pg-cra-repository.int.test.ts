@@ -88,6 +88,7 @@ describe('PgCraRepository', () => {
       consultantId: 'consultant-1',
       officeId: PARIS,
       period: period(2026, 6),
+      consultantDeparture: null,
     });
   }
 

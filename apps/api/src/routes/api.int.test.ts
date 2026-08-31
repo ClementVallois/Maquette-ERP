@@ -31,6 +31,10 @@ const BRUNO = 'api-bruno';
 const EMMA = 'api-emma';
 const HENRI = 'api-henri';
 const CHLOE = 'api-chloe';
+// A consultant who has left the firm (ADR-0079) — present in `public.consultants`, absent from the
+// office roster item 7's picker builds, but never touched otherwise: this file's fixtures do not
+// depend on them existing, so most tests never reference this id at all.
+const DEPARTED = 'api-departed';
 const GRADE = 'api-grade';
 const MISSION = 'api-mission';
 const CLIENT = 'api-client';
@@ -154,6 +158,12 @@ beforeEach(async () => {
             ($4, 'Henri', 'Laurent', 'api-h@t', $5, 'api-practice', 'director'),
             ($7, 'Chloé', 'Dubois', 'api-c@t', $5, 'api-practice', 'consultant')`,
     [ALICE, BRUNO, EMMA, HENRI, PARIS, LYON, CHLOE],
+  );
+  await client.query(
+    `INSERT INTO public.consultants
+       (id, first_name, last_name, email, office_id, practice_id, role, departure_date)
+     VALUES ($1, 'Denis', 'Sorel', 'api-d@t', $2, 'api-practice', 'consultant', '2026-01-31')`,
+    [DEPARTED, PARIS],
   );
   // The grade is created here and not borrowed from `public.grades` with a `SELECT … LIMIT 1`.
   // The integration job migrates and does **not** seed, so that table is empty in CI: the INSERT
@@ -341,6 +351,20 @@ describe('GET /api/v1/consultants (item 7, QA round 1)', () => {
     // Bruno (the manager asking) is a row in `public.consultants` too — never listed among the
     // people *this* filter can pick, which is the point of `role = 'consultant'` in the query.
     expect(consultants.map((consultant) => consultant.id)).not.toContain(BRUNO);
+  });
+
+  it('drops a departed consultant from the office roster (ADR-0079)', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/consultants',
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    const { consultants } = response.json<{ consultants: { id: string; displayName: string }[] }>();
+    // DEPARTED is the same office, the same role, and would otherwise sort into this list — the
+    // one thing that keeps them out is `departure_date IS NULL` in `consultantsOfOffice`.
+    expect(consultants.map((consultant) => consultant.id)).not.toContain(DEPARTED);
   });
 
   it('never crosses the office boundary, even when the other office has nobody to hide', async () => {

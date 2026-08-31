@@ -15,6 +15,7 @@ export {
   type RecordedDayType,
 } from './domain/day-type.ts';
 export {
+  CraAfterDepartureError,
   CraTransitionError,
   DayOutsidePeriodError,
   DayOverbookedError,

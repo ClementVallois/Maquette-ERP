@@ -138,6 +138,10 @@ export async function recordMonth(
         consultantId: command.actor.consultantId,
         officeId: command.actor.officeId,
         period: command.period,
+        // Never a departed consultant here (ADR-0079): a departure erases nobody's persona, but
+        // `personas` (`apps/api/src/personas/catalogue.ts`) never selects one, and this route
+        // opens a CRA only for `command.actor` themselves — never on behalf of a third party.
+        consultantDeparture: null,
       });
 
     // Replace rather than merge. The form posts the whole month, so a day the consultant emptied

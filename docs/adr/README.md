@@ -104,6 +104,7 @@ retouched, so what was decided stays visible next to what replaced it.
 | [0076](./0076-a-role-gets-one-colour-everywhere-it-appears.md)                               | A role gets one colour, everywhere it appears                                      | accepted   |
 | [0077](./0077-a-new-route-lists-a-managers-office-roster.md)                                 | A new route lists a manager's office roster, for the consultant filter's options   | accepted   |
 | [0078](./0078-the-holiday-table-extends-to-2016-2027.md)                                     | The holiday table extends to 2016–2027                                             | accepted   |
+| [0079](./0079-departure-is-a-nullable-date-with-a-domain-invariant.md)                       | Departure is a nullable date on the consultant, with a domain invariant            | accepted   |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
@@ -294,6 +295,13 @@ before this ADR): ADR-0004's own threshold — "the day the mockup spans a secon
 is met by item 6's historical seed data, so the holiday table extends from 2026 alone to
 2016–2027, written out the same way the original eleven dates were rather than replaced by a
 computed Easter algorithm, for the same "verifiable by reading it" reason ADR-0004 gave.
+
+0079 continues Wave 2: a departed consultant is a nullable `departure_date`, not a boolean flag and
+not a deleted row — the invariant it exists to support ("a Cra cannot be opened for a period
+starting after departure") needs a date to compare against, and a delete would either cascade into
+invoiced history or be blocked by the foreign keys that reference `public.consultants.id`. The
+check lives in `Cra.open` itself, and only there — `reconstitute` has no opinion on a row it did
+not create, which is what keeps a departed consultant's historical CRAs readable.
 
 ## Identified, not yet decided
 

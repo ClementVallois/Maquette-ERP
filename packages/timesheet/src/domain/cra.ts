@@ -14,6 +14,7 @@ import { type CraLine, craLine } from './cra-line.ts';
 import type { CraStatus } from './cra-status.ts';
 import { type RecordedDayType, isBillable } from './day-type.ts';
 import {
+  CraAfterDepartureError,
   CraTransitionError,
   DayOutsidePeriodError,
   DayOverbookedError,
@@ -76,7 +77,17 @@ export class Cra {
     consultantId: ConsultantId;
     officeId: OfficeId;
     period: Period;
+    /**
+     * The consultant's own departure date, `null` for someone still with the firm (ADR-0079).
+     * Optional, not defaulted to `null` implicitly: every caller that has a consultant to hand
+     * has this value one query away (`public.consultants.departure_date`), and an omitted
+     * argument reading as "no departure" would let a caller silently skip the check by forgetting
+     * to pass it, rather than by deciding to.
+     */
+    consultantDeparture: IsoDate | null;
   }): Cra {
+    assertNotAfterDeparture(input.period, input.consultantDeparture);
+
     return new Cra(input.id, input.consultantId, input.officeId, input.period);
   }
 
@@ -323,6 +334,22 @@ export class Cra {
     if (this.#status === 'validated') {
       throw new ValidatedCraIsImmutableError(this.#id, attempted);
     }
+  }
+}
+
+/**
+ * ADR-0079: a CRA cannot exist for a period that starts after the consultant left. Checked at
+ * `open` only, never at `reconstitute` — a departure erases nothing, so a CRA legitimately opened
+ * before someone left stays loadable for as long as its own row exists, and this guard has no
+ * opinion on a row it did not create.
+ */
+function assertNotAfterDeparture(target: Period, departure: IsoDate | null): void {
+  if (departure === null) return;
+
+  // The first day of the period — no calendar knowledge needed, every month has a "01".
+  const periodStart = `${periodToIso(target)}-01`;
+  if (periodStart > departure) {
+    throw new CraAfterDepartureError(periodToIso(target), departure);
   }
 }
 
