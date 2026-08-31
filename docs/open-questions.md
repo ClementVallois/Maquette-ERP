@@ -3403,3 +3403,81 @@ infrastructure**, which is exactly what the row asked and no more. It does not s
 fired at its own hour — the first 03:17 UTC will come — and it does not need to: a cron GitHub
 accepts on a default branch is the platform's guarantee, and the reason this row existed was that a
 workflow on a non-default branch has no such guarantee at all.
+
+## Wave 2 plan — item 6, `fix/qa-round-1`, 31/08/2026
+
+Written before touching any code, per the batch brief's own hard stop: item 6 is a schema
+migration + a domain invariant + a calendar extension + several ADRs, larger than each of the
+seven items already shipped on this branch (Wave 1, commits `8105fb8`..`85c0283`). This is that
+plan, kept short.
+
+### Order, and why
+
+1. **Calendar first (arbitration A).** Nothing that writes a `Cra` for a pre-2026 or 2027 period
+   can exist until `workingCalendar()` knows those years. `PUBLIC_HOLIDAYS_2026` becomes a
+   2016–2027 table, pasted verbatim from
+   `/tmp/claude-1000/-home-cva-dev-Learning-synetis-maquette/fa516c54-c141-4691-9b23-62dbedcb9e72/scratchpad/holidays.txt`
+   — its 2026 block already checked byte-identical to the current table (same eleven dates) before
+   writing this plan, which is the validation ADR-0004's own rule asks for. New ADR (next free
+   number, ADR-0078): ADR-0004's threshold ("the day the mockup spans a second year") is met
+   today. Every call site of the old export name gets grepped and moved, including
+   `apps/api/src/routes/api.ts`'s `workingCalendar().years` route and its contract test.
+
+2. **Departure next (arbitration B).** The invariant it adds — a CRA cannot exist for a period
+   starting after the consultant left — constrains what the seed is allowed to write in step 3,
+   so it has to exist before the seed grows. Migration `012-…` (nullable `DATE` on
+   `public.consultants`), `CONTEXT.md` term in the same commit, a typed error next to the other
+   `Cra` guards, a negative test. New ADR (ADR-0079; rejected option: a boolean `active` flag, or
+   deleting the row; threshold: the day a departure has to be reversible, or a re-hire needs to
+   keep one identity). Reader behaviour: a departed consultant drops out of a manager's current
+   roster and the pré-facturier's pending list, but stays readable on their own historical CRAs
+   and invoices. This lands on `consultantsOfOffice` (ADR-0077, item 7's own new route) — the
+   picker's options must exclude a departed consultant while `GET /api/v1/cras` still returns
+   their old rows; that is a test, not a comment.
+
+3. **The `limit=50` truncation on `GET /api/v1/cras`, fixed here, not deferred.** Checked, not
+   assumed: `apps/api/src/routes/api.ts`'s `Pagination` schema caps `limit` at `MAX_PAGE_SIZE = 50`
+   (default `DEFAULT_PAGE_SIZE = 20`), and `apps/web/src/features/cra/api.ts`'s `fetchCraList`
+   already requests the max, 50, with no pagination control in the UI to go further. Item 6's own
+   floor — at least 10 consultants per manager, three dense months each (06/07/08 2026) — already
+   reaches 30+ rows before a single historical row is added; a manager with 10+ consultants and
+   any sparse history plausibly clears 50. A filter (item 7) applied over a silently truncated
+   page would answer wrong, not just look thin. Fixed as part of step 4 below, once the actual
+   per-office row count is known from the seed data being written — either the CRA-list route's
+   own cap rises past the realistic worst case (documented in that commit, not a blanket
+   `MAX_PAGE_SIZE` change that would also loosen `/api/v1/invoices`), or the manager's own request
+   asks for exactly the office's count. Whichever is chosen gets a test: a manager with more than
+   the _old_ 50-row cap's worth of CRAs still sees every one of them, unfiltered.
+
+4. **Seed volume last, measured as it grows (arbitrations C/D).** Read `scripts/lib/seed-data.ts`
+   and `scripts/seed.ts` fully first (731 + 889 lines). Add the three dense 2026 months
+   (June/July/August) for every active consultant first, run `time pnpm run seed`, and only then
+   widen backward into sparse 2016–2025 history for a narrow subset of veterans — never the
+   reverse, so a budget overrun is caught while it is still cheap to cut. Two traps named in the
+   brief, restated here so they are not lost mid-implementation: `CRA_PERIOD` and at least three
+   hard-coded `'2026-06-01'`/`'2026-06-30'` string literals must all be grepped before the loop
+   shape changes, or July/August will silently write June rows; and Claire's June 2026 must stay
+   `submitted`, not `validated` — the loop that submits-and-validates new months uniformly cannot
+   be allowed to touch her row. Every seed invariant in the brief's own checklist (positional
+   `ids.next()`, exactly four selectable personas, Henri absent from every `validated_by`,
+   `VARIED_MONTH`'s five days intact, Intercontrat/PASSI/Forfait/territoriality still working)
+   gets checked explicitly before the commit, not assumed from "the tests still pass". Historical
+   invoices are issued through the domain, in date order, so the gapless per-fiscal-year numbering
+   is exercised rather than bypassed. `pnpm run seed:fingerprint` re-run and committed; `CLAUDE.md`
+   § "Dataset shape" updated in the same commit if the enumeration changes.
+
+### Contingency, stated in advance
+
+If `time pnpm run seed` blows the 60-second budget once the dense months exist (before any
+history is added), the span is cut, not optimised — the brief's own instruction. The cut, if it
+happens, gets recorded here as a new dated row (not silently shrunk in a commit message) naming
+which years or which consultants' history were dropped, and a named phase for revisiting it. No
+such row exists yet because the seed has not been touched — this section is the plan, not the
+outcome; the outcome is what will be added below it, or a plain statement that the budget held.
+
+### What this plan deliberately does not re-decide
+
+Arbitrations A–D above are copied from the batch brief because `CLAUDE.md`'s own rule is that
+Clement owns the decisions and the agent writes the code — they are stated here as the plan being
+followed, not as a fresh choice being made. Nothing in this section reopens the "already taken"
+label the brief put on them.
