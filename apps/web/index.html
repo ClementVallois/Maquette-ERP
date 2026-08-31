@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ERP — Maquette</title>
+    <!-- Item 5, QA round 1: a path under `src/`, not `public/` — Vite content-hashes this into
+         `dist/assets/`, which `apps/api/src/web/spa.ts` already serves; a file dropped in
+         `public/` would land at `dist/favicon.svg` and 404 in production (ADR-0063). CSP's
+         `img-src 'self'` (`apps/api/src/web/reply.ts`) is why this is a same-origin file and not
+         a `data:` URI. -->
+    <link rel="icon" type="image/svg+xml" href="/src/assets/favicon.svg" />
   </head>
   <body>
     <div id="root"></div>

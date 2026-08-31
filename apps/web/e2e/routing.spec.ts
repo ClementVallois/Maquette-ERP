@@ -35,6 +35,11 @@ import { expect, test, type Page } from '@playwright/test';
  * and "the seed is not what this spec assumes" is a precondition failure, not a routing result. */
 class SeedPreconditionError extends Error {}
 
+/** Same reasoning as `SeedPreconditionError` above, for a precondition about the built markup
+ * rather than the seed — index.html not declaring a favicon at all, which item 5's own fix means
+ * to make permanently untrue. */
+class MarkupAssumptionError extends Error {}
+
 /**
  * What tells the two documents apart, at the document level rather than by anything they render.
  *
@@ -158,5 +163,27 @@ test.describe('the /facture prefix does not capture the SPA’s plural routes', 
     expect(response?.status()).toBe(200);
     await expect(page.locator(SSR_MAIN)).toHaveCount(1);
     await expect(page.locator(SPA_ROOT)).toHaveCount(0);
+  });
+});
+
+/**
+ * Item 5, QA round 1: `index.html` declared no favicon. The fix is a path under `src/`, not
+ * `public/` (a `public/` file would land at `dist/favicon.svg`, past the `/assets/*` route
+ * `apps/api/src/web/spa.ts` actually serves, and 404 in the topology `E2E_SERVED_BUILD=1` drives —
+ * see that route's own header). Checked in both topologies for the same reason `routing.spec.ts`'s
+ * other tests are: Vite's dev server resolves the reference one way, Fastify's `/assets/*` the
+ * other, and this is the one file that spans both.
+ */
+test.describe('item 5 — the favicon actually resolves', () => {
+  test('the declared <link rel="icon"> answers 200 with an SVG content type', async ({ page }) => {
+    await page.goto('/');
+
+    const href = await page.locator('link[rel="icon"]').getAttribute('href');
+    if (href === null) throw new MarkupAssumptionError('index.html always declares a favicon.');
+
+    const response = await page.request.get(href);
+
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('image/svg+xml');
   });
 });
