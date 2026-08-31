@@ -241,6 +241,105 @@ describe('PgCraRepository', () => {
     expect(await repo().list({ actor: parisManager, limit: 10, offset: 0 })).toHaveLength(2);
   });
 
+  it('narrows to the given consultants, and to every consultant the actor may see when not', async () => {
+    // Item 7 (QA round 1): "for these three consultants, every CRA not yet validated" needs the
+    // consultant dimension server-side.
+    await seedOffices();
+    await repo().save(makeCra());
+    await tx.client.query(`
+      INSERT INTO public.consultants (id, first_name, last_name, email, office_id, practice_id, role)
+      VALUES ('consultant-2', 'Chloé', 'Petit', 'chloe@test.com', 'office-paris', 'practice-audit', 'consultant');
+    `);
+    await tx.client.query(`
+      INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+      VALUES ('cra-002', 'consultant-2', 'office-paris', '2026-06', 'draft');
+    `);
+
+    const onlyAlice = await repo().list({
+      actor: parisManager,
+      limit: 10,
+      offset: 0,
+      consultantIds: ['consultant-1'],
+    });
+    expect(onlyAlice.map((row) => row.id)).toStrictEqual(['cra-001']);
+
+    const both = await repo().list({
+      actor: parisManager,
+      limit: 10,
+      offset: 0,
+      consultantIds: ['consultant-1', 'consultant-2'],
+    });
+    expect(both.map((row) => row.id).sort()).toStrictEqual(['cra-001', 'cra-002']);
+
+    expect(await repo().list({ actor: parisManager, limit: 10, offset: 0 })).toHaveLength(2);
+  });
+
+  it('the consultant filter narrows within the actor’s own scope, and never widens it', async () => {
+    // The office boundary (`c.office_id = $1`) is applied before `consultantIds` in the SQL —
+    // this is what proves it, rather than assuming the WHERE clause order the source reads.
+    // Asking as the *wrong* office's manager for a consultant id that is real, but not in that
+    // office, must still answer empty, not that consultant's row.
+    await seedOffices();
+    await repo().save(makeCra());
+
+    const lyonManagerAskingForAParisConsultant = await repo().list({
+      actor: lyonManager,
+      limit: 10,
+      offset: 0,
+      consultantIds: ['consultant-1'],
+    });
+    expect(lyonManagerAskingForAParisConsultant).toStrictEqual([]);
+
+    // Same shape, for a consultant actor: asking for a colleague's id narrows to nothing, not to
+    // the colleague's own row — `scope === 'own'` already pins `consultant_id = $2`, and
+    // `consultantIds` only ANDs onto that, never replaces it.
+    const aliceAskingForSomeoneElse = await repo().list({
+      actor: alice,
+      limit: 10,
+      offset: 0,
+      consultantIds: ['someone-else'],
+    });
+    expect(aliceAskingForSomeoneElse).toStrictEqual([]);
+  });
+
+  it('narrows to the given statuses, and to every status the actor may see when not', async () => {
+    await seedOffices();
+    await repo().save(makeCra()); // 'draft' (Cra.open's own default)
+    await tx.client.query(`
+      INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+      VALUES ('cra-submitted', 'consultant-1', 'office-paris', '2026-07', 'submitted');
+    `);
+
+    const onlySubmitted = await repo().list({
+      actor: parisManager,
+      limit: 10,
+      offset: 0,
+      statuses: ['submitted'],
+    });
+    expect(onlySubmitted.map((row) => row.id)).toStrictEqual(['cra-submitted']);
+
+    const draftOrRefused = await repo().list({
+      actor: parisManager,
+      limit: 10,
+      offset: 0,
+      statuses: ['draft', 'refused'],
+    });
+    expect(draftOrRefused.map((row) => row.id)).toStrictEqual(['cra-001']);
+
+    // Non-exclusive across dimensions, the brief's own example: these consultants AND this
+    // status, combined.
+    const combined = await repo().list({
+      actor: parisManager,
+      limit: 10,
+      offset: 0,
+      consultantIds: ['consultant-1'],
+      statuses: ['submitted'],
+    });
+    expect(combined.map((row) => row.id)).toStrictEqual(['cra-submitted']);
+
+    expect(await repo().list({ actor: parisManager, limit: 10, offset: 0 })).toHaveLength(2);
+  });
+
   it('caps pagination at MAX_PAGE_SIZE, however large the caller asks', async () => {
     // Seeded past the cap on purpose. Asking for 1000 against an empty table also returns "no
     // more than 50" and proves nothing — the cap has to be the reason the answer is short.

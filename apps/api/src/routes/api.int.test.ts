@@ -265,6 +265,66 @@ describe('GET /api/v1/cras — consultantName (ADR-0071)', () => {
   });
 });
 
+describe('GET /api/v1/cras — consultantIds/statuses (item 7, QA round 1)', () => {
+  it('narrows to the given consultants, comma-separated', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/v1/cras?consultantIds=${ALICE}`,
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    const { cras } = response.json<{ cras: { consultantId: string }[] }>();
+    expect(cras.map((cra) => cra.consultantId)).toStrictEqual([ALICE]);
+  });
+
+  it('narrows to the given statuses, comma-separated — both filters are ANDed, each an OR within itself', async () => {
+    // Everything the fixture seeds is 'submitted' — 'draft' answers empty, and both statuses
+    // together answer everything, which is what proves the list is filtered by the value and not
+    // just by "a statuses param was present at all".
+    const draftOnly = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?statuses=draft',
+      headers: as('manager-paris'),
+    });
+    expect(draftOnly.statusCode).toBe(200);
+    expect(draftOnly.json<{ cras: unknown[] }>().cras).toStrictEqual([]);
+
+    const submittedOrDraft = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?statuses=submitted,draft',
+      headers: as('manager-paris'),
+    });
+    expect(submittedOrDraft.statusCode).toBe(200);
+    const { cras } = submittedOrDraft.json<{ cras: { consultantId: string }[] }>();
+    expect(cras.map((cra) => cra.consultantId).sort()).toStrictEqual([ALICE, CHLOE].sort());
+  });
+
+  it('refuses an unknown status rather than silently ignoring it', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?statuses=bogus',
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('a consultant id outside the actor’s own scope narrows to nothing, never to that id’s office', async () => {
+    // manager-lyon may see nothing this fixture seeds (both Cras are Paris) — asking it for a
+    // real, but out-of-office, consultant id must still answer empty, not Alice's row: the
+    // office boundary runs first and consultantIds only narrows further, never around it.
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/v1/cras?consultantIds=${ALICE}`,
+      headers: as('manager-lyon'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ cras: unknown[] }>().cras).toStrictEqual([]);
+  });
+});
+
 describe('ADR-0003, both beats', () => {
   it('beat one: the out-of-scope Cra is absent from the list, and nothing says why', async () => {
     const response = await app.inject({

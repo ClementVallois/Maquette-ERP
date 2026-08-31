@@ -1,6 +1,6 @@
 import { API_PROBLEM_TYPES } from '@erp/contracts';
 import { daysOf, isoDateInFirmTimeZone, periodFromIso, QUARTER_DAYS_PER_DAY } from '@erp/platform';
-import { workingCalendar } from '@erp/timesheet';
+import { CRA_STATUSES, workingCalendar } from '@erp/timesheet';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -55,6 +55,43 @@ const Pagination = z.object({
 });
 
 const PeriodQuery = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u) });
+
+/**
+ * A single query-string value, comma-separated, rather than a repeated key
+ * (`?consultantIds=a&consultantIds=b`) — Fastify's default querystring parser only produces an
+ * array from a repeated key, and a *single* selection would otherwise arrive as a bare string,
+ * needing a second branch here to tell "one" from "many" apart. Comma-separated needs none: an
+ * absent param stays `undefined` ("every value", the domain's own `CraListQuery` reading), and
+ * empty segments are dropped so a trailing comma or `?consultantIds=` cannot smuggle in `''` as
+ * an id. Two concrete schemas rather than one generic helper: Zod v4's `.pipe()` cannot carry a
+ * type parameter through cleanly (`input<Item>` does not narrow to `string` for an unconstrained
+ * `Item`), and two short schemas cost less than fighting that for two call sites.
+ */
+const CommaSeparatedIds = z
+  .string()
+  .optional()
+  .transform((value) => value?.split(',').filter((entry) => entry.length > 0))
+  .pipe(z.array(z.string().min(1).max(64)).optional());
+
+const CommaSeparatedStatuses = z
+  .string()
+  .optional()
+  .transform((value) => value?.split(',').filter((entry) => entry.length > 0))
+  .pipe(z.array(z.enum(CRA_STATUSES)).optional());
+
+/**
+ * Item 7 (QA round 1): "for these three consultants, every CRA not yet validated" — both
+ * dimensions, non-exclusive within themselves (an id/status list is an OR) and ANDed with each
+ * other, pushed to the domain's `CraListQuery` (`packages/timesheet`) so item 6's larger office
+ * rosters filter server-side rather than over a page truncated by `limit`/`offset` first.
+ */
+const CraListParams = Pagination.extend({
+  // No `period`: unlike `/api/v1/pre-facturier`, this route has never taken one — every period
+  // the actor may see, always — and item 7 does not ask for one either (the CRA list already
+  // shows every period at once, with its own `period` column).
+  consultantIds: CommaSeparatedIds,
+  statuses: CommaSeparatedStatuses,
+});
 
 const IdParam = z.object({ id: z.string().min(1).max(64) });
 const ConsultantParams = z.object({ consultantId: z.string().min(1).max(64) });
@@ -210,18 +247,26 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
     '/api/v1/cras',
     { config: { access: forRoles('consultant', 'manager', 'billing') } },
     async (request, reply) => {
-      const query = parseInput(Pagination, request.query);
+      const query = parseInput(CraListParams, request.query);
       if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
 
       const actor = requireActor(request);
 
       // Filtered, not refused: a consultant sees their own months, a manager the office's. The
       // empty state is ADR-0003's first beat and it is what this route can answer.
+      // `consultantIds`/`statuses` (item 7, QA round 1) narrow within that same filtering — never
+      // widen it, the repository's own contract (`CraListQuery`'s header, `packages/timesheet`).
       return dependencies.transactionally(async (unit) => {
         const cras = await unit.cras.list({
           actor,
           limit: query.value.limit,
           offset: query.value.offset,
+          // `exactOptionalPropertyTypes` refuses an explicit `undefined` — omitted, not passed,
+          // when the query carried no filter on that dimension.
+          ...(query.value.consultantIds === undefined
+            ? {}
+            : { consultantIds: query.value.consultantIds }),
+          ...(query.value.statuses === undefined ? {} : { statuses: query.value.statuses }),
         });
 
         // `consultantName`, presentation rather than a rule — the same source and the same

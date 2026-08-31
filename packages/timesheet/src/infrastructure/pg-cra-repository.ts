@@ -84,6 +84,10 @@ export class PgCraRepository implements CraRepository {
     const { rows } = await this.#client.query<CraListRow>(
       // LEFT JOIN, and the `COALESCE` with it: a month opened and never filled is precisely the
       // row the pré-facturier exists to show, and an inner join would drop it.
+      //
+      // `c.office_id = $1` (and, for a consultant, `$2`) runs first and unconditionally — `$6`
+      // (consultantIds) and `$7` (statuses) are ANDed onto it, never substituted for it, so
+      // neither can widen what the actor may see, only narrow it further (item 7, QA round 1).
       `SELECT c.id, c.consultant_id, c.office_id, c.period, c.status,
               COALESCE(SUM(l.quarter_days), 0)::int AS recorded_quarter_days
        FROM timesheet.cras c
@@ -91,6 +95,8 @@ export class PgCraRepository implements CraRepository {
        WHERE c.office_id = $1
          AND ($2::text IS NULL OR c.consultant_id = $2)
          AND ($5::text IS NULL OR c.period = $5)
+         AND ($6::text[] IS NULL OR c.consultant_id = ANY($6))
+         AND ($7::text[] IS NULL OR c.status = ANY($7))
        GROUP BY c.id, c.consultant_id, c.office_id, c.period, c.status
        ORDER BY c.period DESC, c.consultant_id
        LIMIT $3 OFFSET $4`,
@@ -100,6 +106,10 @@ export class PgCraRepository implements CraRepository {
         limit,
         query.offset,
         query.period ?? null,
+        query.consultantIds !== undefined && query.consultantIds.length > 0
+          ? query.consultantIds
+          : null,
+        query.statuses !== undefined && query.statuses.length > 0 ? query.statuses : null,
       ],
     );
 

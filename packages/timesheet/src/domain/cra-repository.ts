@@ -1,5 +1,6 @@
 import type { Actor, Period } from '@erp/platform';
 
+import type { CraStatus } from './cra-status.ts';
 import type { Cra } from './cra.ts';
 import type { ConsultantId, CraId, OfficeId } from './ids.ts';
 
@@ -27,6 +28,17 @@ export interface CraListQuery {
    * page of Cras across all months would otherwise see the month itself truncated.
    */
   readonly period?: string;
+  /**
+   * Item 7 (QA round 1): "for these three consultants, every CRA not yet validated" — both this
+   * field and `statuses` below narrow *within* whatever `actor` may already see; neither can
+   * widen it. The office boundary (and, for a consultant, the own-id boundary) is applied first
+   * in the SQL, so a consultant id or a status outside the actor's scope answers an empty result,
+   * never another office's row — `list` is filtered, not refused, and that holds here too.
+   * `undefined`/an absent array means "every consultant/status the actor may see", matching
+   * `period`'s own "one period, or every one".
+   */
+  readonly consultantIds?: readonly ConsultantId[];
+  readonly statuses?: readonly CraStatus[];
 }
 
 export interface CraRepository {
