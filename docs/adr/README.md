@@ -273,6 +273,13 @@ configuration that is committed but not installed is stated as such rather than 
 live, on ADR-0040's own precedent — this repository has already shipped one claim of a gate that
 was never real, and did not want to ship a second.
 
+0076 opens the QA round 1 sequence (`docs/todo.md`, worked as `fix/qa-round-1`): item 4 asked for a
+distinct colour per role badge, which reverses `docs/direction-visuelle.md` §4.5's "neutral
+everywhere but the selector" — a decision the SPA had implemented but the no-JS shell
+(`apps/api/src/web/style.css`'s `roleTag`) never did, using the identical three hex values under
+different names. Rather than inventing a third scheme, the SPA is brought in line with what the
+no-JS shell already did.
+
 ## Identified, not yet decided
 
 Numbers are reserved so that what is **known and unsettled** is visible rather than implied.

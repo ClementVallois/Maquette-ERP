@@ -3,6 +3,7 @@ import { ChevronDownIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { toast } from 'sonner';
 
+import { RoleBadge } from '@/components/role-badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -55,13 +56,13 @@ export function PersonaBlock({ persona }: { readonly persona: PersonaSummary }):
           <Avatar size="sm">
             <AvatarFallback>{initialsOf(persona.displayName)}</AvatarFallback>
           </Avatar>
-          <span className="flex flex-col leading-tight">
+          <span className="flex flex-col items-start gap-0.5 leading-tight">
             <span className="text-sm font-medium text-foreground">{persona.displayName}</span>
-            {/* Thin spaces around the middle dot, the separator `apps/api/src/web/problem-page.ts`
-                already uses (`' · '`) — direction-visuelle.md §6's ASCII sketch writes
-                `manager·Paris` to fit a monospace box, not as a typographic instruction. */}
-            <span className="text-[0.75rem] text-muted-foreground">
-              {LABELS.roles[persona.role]} · {persona.office}
+            {/* Item 4, QA round 1: the role reads as a coloured badge (ADR-0076) rather than
+                plain text — the middle dot direction-visuelle.md §6's ASCII sketch describes
+                (`manager·Paris`) stays between the badge and the office name. */}
+            <span className="flex items-center gap-1 text-[0.75rem] text-muted-foreground">
+              <RoleBadge role={persona.role} /> · {persona.office}
             </span>
           </span>
           <ChevronDownIcon aria-hidden="true" className="size-4 text-muted-foreground" />
@@ -69,9 +70,9 @@ export function PersonaBlock({ persona }: { readonly persona: PersonaSummary }):
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>{LABELS.persona.current}</DropdownMenuLabel>
-        <div className="px-1.5 pb-1.5 text-sm text-muted-foreground">
-          <p>
-            {LABELS.persona.role} : {LABELS.roles[persona.role]}
+        <div className="flex flex-col gap-1 px-1.5 pb-1.5 text-sm text-muted-foreground">
+          <p className="flex items-center gap-1.5">
+            {LABELS.persona.role} : <RoleBadge role={persona.role} />
           </p>
           <p>
             {LABELS.persona.office} : {persona.office}

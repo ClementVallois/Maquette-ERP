@@ -181,9 +181,20 @@
   --absence-dot: #6b5b95;
   --absence-text: #55447c;
 
-  /* §4.5 Roles: the selector's role badge takes the primary tint (`--primary` on `--accent`,
-     already declared above). Everywhere else roles are neutral-outlined using existing tokens
-     (`--muted-foreground`, transparent fill, `--border`) — no new hex needed for that reading. */
+  /* §4.5 Roles (ADR-0076, superseding the neutral-everywhere-but-the-selector reading this
+     comment used to describe): one colour per role, everywhere a role renders. No new hex —
+     aliased onto three of the existing status tones, the same three `apps/api/src/web/style.css`'s
+     `roleTag` already used before this file caught up to it (`--accent`/`--held`/`--settled`
+     there are the identical hex triplets to blue/amber/green here). Reusing rather than
+     inventing keeps the palette from growing a role-only hue nobody else needs, and the
+     collision the tone names might suggest (`manager` reads amber, `late` also reads amber) does
+     not actually happen on screen: a role badge and a status badge never share a view. */
+  --role-consultant-text: var(--tone-blue-text);
+  --role-consultant-fill: var(--tone-blue-fill);
+  --role-manager-text: var(--tone-amber-text);
+  --role-manager-fill: var(--tone-amber-fill);
+  --role-billing-text: var(--tone-green-text);
+  --role-billing-fill: var(--tone-green-fill);
 
   /* §8 Motion — both `ease-out`. Applied via Tailwind's numeric duration utilities
      (`duration-120`, `duration-180`) rather than a custom theme key so no bespoke utility name has
@@ -295,6 +306,13 @@
   --color-absence-fill: var(--absence-fill);
   --color-absence-dot: var(--absence-dot);
   --color-absence-text: var(--absence-text);
+
+  --color-role-consultant-text: var(--role-consultant-text);
+  --color-role-consultant-fill: var(--role-consultant-fill);
+  --color-role-manager-text: var(--role-manager-text);
+  --color-role-manager-fill: var(--role-manager-fill);
+  --color-role-billing-text: var(--role-billing-text);
+  --color-role-billing-fill: var(--role-billing-fill);
 
   /* Literal, not `var(--shadow-card)`: the raw value lives here and only here — a `:root`
      re-declaration under the same name would self-reference once Tailwind merges the two blocks,
