@@ -284,6 +284,24 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
     },
   );
 
+  /**
+   * Item 7 (QA round 1): the consultant filter's own option list, independent of `/api/v1/cras`'
+   * page — a manager's office can hold more Cra rows than one page (item 6 grows a roster past
+   * fifty), so deriving "who can I filter by" from whichever page happens to be loaded would make
+   * the picker's own options depend on which filter is already applied. Manager only, matching
+   * the one caller (`features/cra/components/cra-list-screen.tsx`'s `CraListFilters`, manager-only
+   * itself): billing sees `/api/v1/cras` too, but that screen renders neither a consultant column
+   * nor an "Ouvrir" action for that role, so this filter has nothing on screen for billing to
+   * narrow down yet — granting the read anyway would be capability nothing exercises.
+   */
+  app.get('/api/v1/consultants', { config: { access: forRoles('manager') } }, async (request) => {
+    const actor = requireActor(request);
+
+    return dependencies.transactionally(async (unit) => ({
+      consultants: await new PgReferenceReader(unit.client).consultantsOfOffice(actor.officeId),
+    }));
+  });
+
   app.get(
     '/api/v1/cras/:id',
     { config: { access: forRoles('consultant', 'manager', 'billing') } },

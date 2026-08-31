@@ -157,6 +157,19 @@ export const LABELS = {
     emptyList: 'Aucun CRA sur cette période.',
     emptyListHint:
       'Ce n’est pas un refus : la liste est bien la vôtre, elle ne contient simplement rien pour ce mois.',
+    /** Item 7 (QA round 1) — the manager-only consultant/status filter on `/cra`. A consultant
+     * persona never sees this (they have one CRA), so these strings render for a manager or
+     * billing persona only. */
+    filters: {
+      consultantLabel: 'Consultants',
+      consultantPlaceholder: 'Rechercher un consultant…',
+      consultantNoMatch: 'Aucun consultant ne correspond à cette recherche.',
+      consultantNoneSelected: 'Tous les consultants',
+      statusLabel: 'Statut',
+      clear: 'Effacer les filtres',
+      emptyTitle: 'Aucun CRA ne correspond à ces filtres.',
+      emptyBody: 'Essayez de retirer un consultant ou un statut du filtre.',
+    },
     /** task 6.1: the two-row list needed no filter; this replaces it with the control item 2
      * actually asked for — opening a month that has no `Cra` row yet. */
     openAnotherMonth: 'Ouvrir un autre mois',

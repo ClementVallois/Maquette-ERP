@@ -101,6 +101,8 @@ retouched, so what was decided stays visible next to what replaced it.
 | [0073](./0073-the-dashboard-reads-an-optional-period-override.md)                            | The dashboard reads an optional `?period=` override, defaulting to the wall clock  | accepted   |
 | [0074](./0074-the-session-guard-hands-its-reason-to-the-destination.md)                      | The session guard hands its reason to the destination, not to the page it destroys | accepted   |
 | [0075](./0075-the-vulnerability-management-procedure-and-where-it-lives.md)                  | The vulnerability-management procedure, and where it lives                         | accepted   |
+| [0076](./0076-a-role-gets-one-colour-everywhere-it-appears.md)                               | A role gets one colour, everywhere it appears                                      | accepted   |
+| [0077](./0077-a-new-route-lists-a-managers-office-roster.md)                                 | A new route lists a manager's office roster, for the consultant filter's options   | accepted   |
 
 0008–0011 were written on 17/08 out of numeric order relative to 0005–0007. Those three numbers were
 **reserved** earlier the same day, and a reservation is honoured rather than reshuffled — renumbering
@@ -279,6 +281,12 @@ everywhere but the selector" — a decision the SPA had implemented but the no-J
 (`apps/api/src/web/style.css`'s `roleTag`) never did, using the identical three hex values under
 different names. Rather than inventing a third scheme, the SPA is brought in line with what the
 no-JS shell already did.
+
+0077 continues the same round: item 7's consultant filter needs a searchable option list
+independent of `/api/v1/cras`' own paginated page, on the same precedent ADR-0071 already set for
+"a manager needs a scoped read the existing routes don't offer" — a new, manager-only route reading
+`public.consultants` directly, rather than deriving the filter's menu from a page that will not
+hold a whole office once item 6 grows a roster past it.
 
 ## Identified, not yet decided
 

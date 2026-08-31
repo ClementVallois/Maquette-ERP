@@ -34,7 +34,7 @@ export const Route = createFileRoute('/_shell/pre-facturier')({
   beforeLoad: async ({ context, search }) => {
     if (search.period !== undefined) return;
 
-    const list = await context.queryClient.ensureQueryData(craListQueryOptions);
+    const list = await context.queryClient.ensureQueryData(craListQueryOptions());
     const mostRecent = [...new Set(list.cras.map((cra) => cra.period))].sort((left, right) =>
       right.localeCompare(left),
     )[0];

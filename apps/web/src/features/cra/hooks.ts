@@ -4,7 +4,9 @@ import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 import { unwrap } from '@/lib/api-client';
 
 import {
+  type CraListFilters,
   fetchCalendar,
+  fetchConsultantRoster,
   fetchCraGrid,
   fetchCraList,
   fetchManagerCraGrid,
@@ -14,6 +16,7 @@ import {
 } from './api';
 import type {
   CalendarResponse,
+  ConsultantRosterResponse,
   CraGridResponse,
   CraListResponse,
   ManagerCraGridResponse,
@@ -25,6 +28,22 @@ import type {
 
 const CRA_LIST_QUERY_KEY = ['cra', 'list'] as const;
 const CALENDAR_QUERY_KEY = ['cra', 'calendar'] as const;
+const CONSULTANT_ROSTER_QUERY_KEY = ['cra', 'consultant-roster'] as const;
+
+/**
+ * Item 7 (QA round 1): sorted, so `['a','b']` and `['b','a']` cache under the same entry rather
+ * than one per order the filter happened to be built in — the two only ever differ by which
+ * values are present, never by an order this SPA itself assigns meaning to.
+ */
+function craListQueryKey(
+  filters: CraListFilters,
+): readonly [...typeof CRA_LIST_QUERY_KEY, readonly string[], readonly string[]] {
+  return [
+    ...CRA_LIST_QUERY_KEY,
+    [...(filters.consultantIds ?? [])].sort(),
+    [...(filters.statuses ?? [])].sort(),
+  ];
+}
 
 // Rebuilt here rather than imported: `features/pre-facturier/hooks.ts` keeps its own
 // `preFacturierQueryKey` private for exactly this reason — see that file's comment. The two agree
@@ -51,13 +70,32 @@ function managerCraGridQueryKey(
 // (possibly many) manager-grid queries is active without either caller having to say which.
 const MANAGER_GRID_QUERY_KEY_PREFIX = ['cra', 'manager-grid'] as const;
 
-export const craListQueryOptions = queryOptions({
-  queryKey: CRA_LIST_QUERY_KEY,
-  queryFn: async () => unwrap(await fetchCraList()),
-});
+/**
+ * `filters` defaults to none, unlike `craGridQueryOptions`/`managerCraGridQueryKey` below, which
+ * always take their parameter: `routes/_shell/pre-facturier.tsx`'s `beforeLoad` calls this with no
+ * argument to read the office's own unfiltered list (computing the default period), and item 7's
+ * filter controls (QA round 1) call it with one.
+ */
+export function craListQueryOptions(filters: CraListFilters = {}) {
+  return queryOptions({
+    queryKey: craListQueryKey(filters),
+    queryFn: async () => unwrap(await fetchCraList(filters)),
+  });
+}
 
-export function useCraList(): UseQueryResult<CraListResponse> {
-  return useQuery(craListQueryOptions);
+export function useCraList(filters: CraListFilters = {}): UseQueryResult<CraListResponse> {
+  return useQuery(craListQueryOptions(filters));
+}
+
+/** Item 7 (QA round 1) — the consultant filter's own roster, independent of whichever page of
+ * `/api/v1/cras` happens to be loaded (that route's own header explains why). Static within a
+ * session in practice (the office roster does not change while a persona is picked), so this
+ * stays on the global `staleTime` rather than a bespoke one, same reasoning `useCalendar` gives. */
+export function useConsultantRoster(): UseQueryResult<ConsultantRosterResponse> {
+  return useQuery({
+    queryKey: CONSULTANT_ROSTER_QUERY_KEY,
+    queryFn: async () => unwrap(await fetchConsultantRoster()),
+  });
 }
 
 export function craGridQueryOptions(period: string) {

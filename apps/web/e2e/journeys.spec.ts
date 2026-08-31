@@ -648,6 +648,75 @@ test.describe('task 6.1 — the month list', () => {
 });
 
 /**
+ * Item 7 (QA round 1): the manager's own `/cra` filters, non-exclusive on both dimensions and
+ * ANDed with each other — the brief's own example, "for these three consultants, every CRA not
+ * yet validated". Read-only throughout (no validate/refuse/save here): this test runs before J2
+ * below decides anything, and must leave Claire's June exactly as it found it — "submitted",
+ * still the one pending row J2 depends on.
+ */
+test.describe('item 7 — consultant and status filters on the manager’s CRA list', () => {
+  test('both filters narrow, together, and the state survives a reload via the URL', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'manager-paris');
+    await page.goto('/cra');
+
+    // `.first()`: Alice carries more than one row by this point in the file (item 3, run earlier,
+    // left her a validated September on top of the seed's June and J1's refused August) — this
+    // check only needs "she is listed at all", not "exactly once".
+    await expect(page.getByText('Alice Martin').first()).toBeVisible();
+    await expect(page.getByText('Claire Dubois')).toBeVisible();
+
+    // Consultant filter: search narrows the option list, a checkbox selects — Alice drops out,
+    // Claire stays.
+    await page.getByRole('button', { name: 'Consultants' }).click();
+    await page.getByPlaceholder('Rechercher un consultant…').fill('Claire');
+    // Scoped to the popover, not `role="listbox"`: the option list is a checkbox group (a plain
+    // `<ul>`, no ARIA role), not a listbox — see `multi-select-combobox.tsx`'s own comment on why.
+    await page.locator('[data-slot="popover-content"]').getByText('Claire Dubois').click();
+    await page.keyboard.press('Escape');
+
+    await expect(page.getByText('Claire Dubois')).toBeVisible();
+    await expect(page.getByText('Alice Martin')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Ouvrir' })).toHaveCount(1);
+
+    // The URL carries the filter — a reload must show exactly this, not a blank slate.
+    await page.reload();
+    await expect(page.getByText('Claire Dubois')).toBeVisible();
+    await expect(page.getByText('Alice Martin')).toHaveCount(0);
+
+    // Status pill, ANDed with the consultant filter already active: Claire's June is 'submitted',
+    // so 'Validé' (validated) narrows her away too — an empty result, not a blank table.
+    await page.getByRole('button', { name: 'Validé', exact: true }).click();
+    await page
+      .getByText('Aucun CRA ne correspond à ces filtres', { exact: false })
+      .waitFor({ state: 'visible' });
+
+    // Switching to 'Soumis' (submitted) brings her back — proves the status pill is read live,
+    // not only that "some filter" suppresses the row.
+    await page.getByRole('button', { name: 'Validé', exact: true }).click();
+    await page.getByRole('button', { name: 'Soumis', exact: true }).click();
+    await expect(page.getByText('Claire Dubois')).toBeVisible();
+
+    // "Effacer les filtres" (inside the still-open-from-the-status-click combobox is closed by
+    // now — reopen it) clears the consultant side only; the status pill is its own control and
+    // stays pressed.
+    await page.getByRole('button', { name: 'Consultants' }).click();
+    await page.getByRole('button', { name: 'Effacer les filtres' }).click();
+    await page.keyboard.press('Escape');
+
+    await expect(page.getByText('Alice Martin')).toHaveCount(0); // Alice's June is validated
+    await expect(page.getByText('Claire Dubois')).toBeVisible();
+
+    await page.screenshot({
+      animations: 'disabled',
+      path: 'tests/visual/review/item7-cra-list-filters.png',
+      fullPage: false,
+    });
+  });
+});
+
+/**
  * Phase 7's own journeys (Annexe B, "Phase" column = 7). Placed after every Phase 6 test rather
  * than interleaved: `test.describe.configure({ mode: 'serial' })` at the top of this file orders
  * every describe block in the file, not only the ones inside a given block, so appending here is

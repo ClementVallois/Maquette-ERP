@@ -8,7 +8,9 @@ import { DataTable } from '@/components/data-table/data-table';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
+import { MultiSelectCombobox } from '@/components/multi-select-combobox';
 import { StatusBadge, type StatusBadgeVariant } from '@/components/status-badge';
+import { TogglePillGroup } from '@/components/toggle-pill-group';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -25,8 +27,10 @@ import { LABELS } from '@/lib/labels';
 import { currentPeriod } from '@/lib/period';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
-import { useCalendar, useCraList } from '../hooks';
+import { useCalendar, useConsultantRoster, useCraList } from '../hooks';
 import type { CraListItem, CraStatus } from '../types';
+
+const CRA_STATUS_ORDER: readonly CraStatus[] = ['draft', 'submitted', 'validated', 'refused'];
 
 const STATUS_VARIANT: Record<CraStatus, StatusBadgeVariant> = {
   draft: 'cra-draft',
@@ -142,6 +146,10 @@ function columnsFor(role: Role): ColumnDef<CraListItem>[] {
 
 interface CraListScreenProps {
   readonly role: Role;
+  /** Item 7 (QA round 1). Always `[]` for a consultant persona — the route never renders the
+   * filter controls for one, and `useCraList` reads exactly what it is given either way. */
+  readonly consultantIds: readonly string[];
+  readonly statuses: readonly CraStatus[];
 }
 
 /**
@@ -150,8 +158,10 @@ interface CraListScreenProps {
  * Annexe A). "Ouvrir" now works for both: a consultant reaches their own editable grid, a manager
  * reaches ADR-0071's read-only view of the row's own consultant and period.
  */
-export function CraListScreen({ role }: CraListScreenProps): ReactElement {
-  const query = useCraList();
+export function CraListScreen({ role, consultantIds, statuses }: CraListScreenProps): ReactElement {
+  const filters = { consultantIds, statuses };
+  const query = useCraList(filters);
+  const filtersActive = consultantIds.length > 0 || statuses.length > 0;
 
   if (query.isPending) return <ListSkeleton />;
 
@@ -188,6 +198,13 @@ export function CraListScreen({ role }: CraListScreenProps): ReactElement {
         <OpenAnotherMonth alreadyListed={new Set(rows.map((row) => row.period))} />
       )}
 
+      {/* Manager only: a consultant persona has one Cra and never sees this — the brief's own
+          words. Billing is deliberately excluded too — `columnsFor` above renders neither a
+          "Consultant" column nor an "Ouvrir" action for that role (a pre-existing gap, not one
+          item 7 introduces), so a filter naming consultants nothing on screen identifies would
+          be worse than no filter at all. */}
+      {role === 'manager' && <CraListFilters consultantIds={consultantIds} statuses={statuses} />}
+
       <DataTable
         columns={columnsFor(role)}
         data={rows}
@@ -195,9 +212,9 @@ export function CraListScreen({ role }: CraListScreenProps): ReactElement {
         emptyState={
           <EmptyState
             icon={CalendarIcon}
-            title={LABELS.cra.emptyList}
-            body={LABELS.cra.emptyListHint}
-            {...(!hasAnyCra && role === 'consultant'
+            title={filtersActive ? LABELS.cra.filters.emptyTitle : LABELS.cra.emptyList}
+            body={filtersActive ? LABELS.cra.filters.emptyBody : LABELS.cra.emptyListHint}
+            {...(!hasAnyCra && !filtersActive && role === 'consultant'
               ? {
                   action: {
                     label: LABELS.cra.show,
@@ -208,6 +225,70 @@ export function CraListScreen({ role }: CraListScreenProps): ReactElement {
               : {})}
           />
         }
+      />
+    </div>
+  );
+}
+
+/**
+ * Item 7 (QA round 1): both dimensions non-exclusive (multi-select) and ANDed with each other —
+ * "for these three consultants, every CRA not yet validated". Filter state lives in the URL
+ * (`routes/_shell/cra.index.tsx`'s `validateSearch`), so this component only ever reads its
+ * current value from props and writes a new one via `navigate`; it holds no state of its own.
+ */
+function CraListFilters({
+  consultantIds,
+  statuses,
+}: {
+  readonly consultantIds: readonly string[];
+  readonly statuses: readonly CraStatus[];
+}): ReactElement {
+  const navigate = useNavigate();
+  const roster = useConsultantRoster();
+
+  // `undefined`, not `[]`, once a filter clears back to empty — the search schema treats both the
+  // same way ("no filter"), and this is what keeps a cleared filter's URL as plain `/cra` again
+  // rather than permanently carrying `?consultantIds=%5B%5D`.
+  function setConsultantIds(next: readonly string[]): void {
+    void navigate({
+      to: '/cra',
+      search: (prev) => ({ ...prev, consultantIds: next.length === 0 ? undefined : [...next] }),
+    });
+  }
+
+  function setStatuses(next: readonly string[]): void {
+    void navigate({
+      to: '/cra',
+      search: (prev) => ({
+        ...prev,
+        statuses: next.length === 0 ? undefined : (next as CraStatus[]),
+      }),
+    });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <MultiSelectCombobox
+        label={LABELS.cra.filters.consultantLabel}
+        placeholder={LABELS.cra.filters.consultantPlaceholder}
+        noMatchLabel={LABELS.cra.filters.consultantNoMatch}
+        noneSelectedLabel={LABELS.cra.filters.consultantNoneSelected}
+        clearLabel={LABELS.cra.filters.clear}
+        options={(roster.data?.consultants ?? []).map((consultant) => ({
+          value: consultant.id,
+          label: consultant.displayName,
+        }))}
+        selected={consultantIds}
+        onChange={setConsultantIds}
+      />
+      <TogglePillGroup
+        label={LABELS.cra.filters.statusLabel}
+        options={CRA_STATUS_ORDER.map((status) => ({
+          value: status,
+          label: LABELS.cra.statuses[status],
+        }))}
+        selected={statuses}
+        onChange={setStatuses}
       />
     </div>
   );

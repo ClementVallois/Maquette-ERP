@@ -77,6 +77,33 @@ test.describe('accessibility — Mon CRA', () => {
 });
 
 /**
+ * Item 7 (QA round 1)'s own filters, on the manager's month list — every other "Mon CRA" test
+ * above uses `consultant-paris`, which never renders `CraListFilters`, so a manager's `/cra` had
+ * no axe coverage at all before this block. The popover's option list only exists in the DOM while
+ * open (`Popover`'s own behaviour), so a violation confined to it — the `role="listbox"` without
+ * `role="option"` children this filter shipped with, before it was corrected — would not be caught
+ * by auditing the closed page alone; both states are asserted here for that reason.
+ */
+test.describe('accessibility — Mon CRA (manager, item 7 filters)', () => {
+  test('the filter controls, closed, have no critical/serious violation', async ({ page }) => {
+    await choosePersona(page, 'manager-paris');
+    await page.goto('/cra');
+    await page.getByRole('button', { name: 'Consultants' }).waitFor({ state: 'visible' });
+
+    await assertAccessible(page);
+  });
+
+  test('the consultant picker, open, has no critical/serious violation', async ({ page }) => {
+    await choosePersona(page, 'manager-paris');
+    await page.goto('/cra');
+    await page.getByRole('button', { name: 'Consultants' }).click();
+    await page.getByPlaceholder('Rechercher un consultant…').waitFor({ state: 'visible' });
+
+    await assertAccessible(page);
+  });
+});
+
+/**
  * Phase 7's own axe gate ("Audit axe sur le pré-facturier", task 7's exit criterion). Both states
  * below are read-only GETs against the seed, robust to whether `journeys.spec.ts` has already run
  * in this invocation — `2026-06` always has at least Alice's June row, `2026-07` is a period no

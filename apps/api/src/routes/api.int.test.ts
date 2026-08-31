@@ -325,6 +325,56 @@ describe('GET /api/v1/cras — consultantIds/statuses (item 7, QA round 1)', () 
   });
 });
 
+describe('GET /api/v1/consultants (item 7, QA round 1)', () => {
+  it("answers the manager's own office roster, consultants only", async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/consultants',
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    const { consultants } = response.json<{ consultants: { id: string; displayName: string }[] }>();
+    expect(consultants.map((consultant) => consultant.id).sort()).toStrictEqual(
+      [ALICE, CHLOE].sort(),
+    );
+    // Bruno (the manager asking) is a row in `public.consultants` too — never listed among the
+    // people *this* filter can pick, which is the point of `role = 'consultant'` in the query.
+    expect(consultants.map((consultant) => consultant.id)).not.toContain(BRUNO);
+  });
+
+  it('never crosses the office boundary, even when the other office has nobody to hide', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/consultants',
+      headers: as('manager-lyon'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ consultants: unknown[] }>().consultants).toStrictEqual([]);
+  });
+
+  it('refuses a consultant persona — this filter is manager-only', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/consultants',
+      headers: as('consultant-paris'),
+    });
+
+    expect(response.statusCode).toBe(403);
+  });
+
+  it('refuses a billing persona too: no screen renders this filter for that role yet', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/consultants',
+      headers: as('billing-paris'),
+    });
+
+    expect(response.statusCode).toBe(403);
+  });
+});
+
 describe('ADR-0003, both beats', () => {
   it('beat one: the out-of-scope Cra is absent from the list, and nothing says why', async () => {
     const response = await app.inject({
