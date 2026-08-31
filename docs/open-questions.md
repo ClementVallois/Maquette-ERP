@@ -3481,3 +3481,35 @@ Arbitrations A–D above are copied from the batch brief because `CLAUDE.md`'s o
 Clement owns the decisions and the agent writes the code — they are stated here as the plan being
 followed, not as a fresh choice being made. Nothing in this section reopens the "already taken"
 label the brief put on them.
+
+### Outcome, 31/08/2026 — steps 1–3 shipped, step 4 (seed volume) did not run
+
+Session time ran out before step 4. What is true as of `fix/qa-round-1`'s tip:
+
+- **Step 1 (calendar) shipped** — ADR-0078, `PUBLIC_HOLIDAYS` now covers 2016–2027, every call
+  site moved, `pnpm vitest run --project unit` green.
+- **Step 2 (departure) shipped** — ADR-0079, migration `012-consultant-departure.sql`,
+  `Cra.open`'s new `consultantDeparture` guard with `CraAfterDepartureError`, `CONTEXT.md`
+  updated, `consultantsOfOffice` narrowed, negative tests in both `cra.test.ts` and
+  `api.int.test.ts`. `pnpm run check` green at this point (601 unit tests, 200 integration tests).
+- **Step 3 (the `limit=50` truncation)** — analysed in the plan above, **not fixed**. No seed
+  volume exists yet to size the real fix against, so there is nothing to measure the new cap
+  against without guessing. Still a real, live-once-step-4-lands defect: `GET /api/v1/cras`
+  answers correctly today only because no office has more than a handful of rows.
+- **Step 4 (seed volume, arbitrations C and D) did not run at all.** `scripts/lib/seed-data.ts`
+  and `scripts/seed.ts` are untouched since before this plan was written: no extra consultants, no
+  July/August 2026 CRAs, no historical span back to 2016, no additional managers, no invoice
+  history beyond what already existed. `pnpm run seed:fingerprint` was not re-run because nothing
+  changed to fingerprint. `CLAUDE.md` § "Dataset shape" was not touched, because the enumeration
+  it states did not change.
+
+This is a genuine gap, not a disguised cut: the brief's own arbitrations (10+ consultants per
+manager, dense 2026-06/07/08, sparse history to 2016, three invoice statuses issued through the
+domain in date order) are recorded above and remain the plan — nothing here revises them. **Named
+phase and date**: the next session on `fix/qa-round-1` (or its successor branch, if this one has
+already merged) picks up at step 4, in the order this section already gives — dense months first,
+`time pnpm run seed` measured before any historical row is added, only then widened backward. Step
+3's fix rides with it, sized against whatever step 4 actually produces rather than guessed at now.
+
+Branch pushed at this point with items 1, 2, 3, 4, 5, 7, 8 (Wave 1) and item 6 steps 1–2 (Wave 2)
+complete and green; item 6 steps 3–4 open, as recorded here.
