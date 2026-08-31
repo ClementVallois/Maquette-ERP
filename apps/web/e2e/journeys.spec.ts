@@ -618,7 +618,10 @@ test.describe('task 6.5 — a role this route cannot serve', () => {
 
     await page.getByText('Accès refusé', { exact: true }).waitFor({ state: 'visible' });
     await expect(page.getByText('/problems/insufficient-role')).toBeVisible();
-    await expect(page.getByText('Manager', { exact: true })).toBeVisible();
+    // Scoped to `DeniedState`'s own `<dl>`, not the whole page: since item 4 (QA round 1) gave
+    // every role a coloured `RoleBadge`, the topbar's own identity block (`PersonaBlock`) reads
+    // "Manager" too, and an unscoped `getByText` now matches both.
+    await expect(page.locator('dl').getByText('Manager', { exact: true })).toBeVisible();
 
     await page.screenshot({
       animations: 'disabled',
@@ -930,7 +933,9 @@ test.describe('J6 — billing-paris (Henri): the margin URL refuses him, by role
 
     await page.getByText('Accès refusé', { exact: true }).waitFor({ state: 'visible' });
     await expect(page.getByText('/problems/insufficient-role')).toBeVisible();
-    await expect(page.getByText('Facturation', { exact: true })).toBeVisible();
+    // Scoped to `DeniedState`'s own `<dl>` — same reason `task 6.5`'s sibling assertion above
+    // gives: item 4 (QA round 1) put a coloured `RoleBadge` in the topbar too.
+    await expect(page.locator('dl').getByText('Facturation', { exact: true })).toBeVisible();
 
     await page.screenshot({
       animations: 'disabled',
