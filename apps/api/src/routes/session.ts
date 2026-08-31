@@ -41,10 +41,12 @@ export function registerSessionRoutes(
 
       return {
         // Said in the payload and not only in the README: a client that only ever reads this
-        // route still learns that none of this is authentication.
+        // route still learns that none of this is authentication. French: this is the only
+        // copy of the notice rendered to a visitor (item 1, QA round 1) — the selector used to
+        // also show a French paragraph of its own, which duplicated this idea and was dropped.
         notice:
-          'These are demonstration personas, not accounts. Anyone may select any of them; ' +
-          'there is no authentication in this mockup.',
+          'Cette maquette n’a pas d’authentification : on choisit une identité, et tout le ' +
+          'monde peut choisir n’importe laquelle.',
         personas: personas.map(view),
       };
     },

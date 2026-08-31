@@ -55,7 +55,6 @@ function PersonaSelectorPage(): ReactElement {
           {LABELS.appName}
         </p>
         <h1 className="text-page-title">{LABELS.persona.heading}</h1>
-        <p className="text-sm text-muted-foreground">{LABELS.persona.lead}</p>
       </header>
 
       {/* Alert spreads props after its default role, so this explicit status role wins. ADR-0074. */}

@@ -43,9 +43,6 @@ export const LABELS = {
   persona: {
     sessionInvalidatedTitle: 'Session interrompue',
     heading: 'Choisir un persona',
-    lead: 'Cette maquette n’a pas d’authentification : on choisit une identité, et tout le monde peut choisir n’importe laquelle.',
-    warning:
-      'Ce n’est pas une connexion. Aucun mot de passe n’est demandé, aucune identité n’est vérifiée, et le sélecteur remplace un fournisseur d’identité pour rendre les règles d’autorisation démontrables en trois clics.',
     choose: 'Prendre ce rôle',
     current: 'Persona en cours',
     change: 'Changer de persona',

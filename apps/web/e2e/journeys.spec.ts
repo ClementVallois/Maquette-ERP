@@ -127,7 +127,7 @@ test.describe('demo checklist — the opening beat: the selector, notice visible
   test('the API’s own not-authentication notice renders on the first screen', async ({ page }) => {
     await page.goto('/');
     await page
-      .getByText('These are demonstration personas, not accounts', { exact: false })
+      .getByText('n’a pas d’authentification', { exact: false })
       .waitFor({ state: 'visible' });
   });
 });

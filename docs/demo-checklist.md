@@ -29,8 +29,9 @@ clicks through by hand, in the same order.
 ## 1 — The selector
 
 Land on `/`. The notice above the persona grid is the API's own words
-(`GET /api/v1/personas`'s `notice` field), not a paraphrase — "these are demonstration personas,
-not accounts … no authentication in this mockup." Say it out loud; do not soften it into "login."
+(`GET /api/v1/personas`'s `notice` field), not a paraphrase — in French, "Cette maquette n'a pas
+d'authentification : on choisit une identité, et tout le monde peut choisir n'importe laquelle."
+Say it out loud; do not soften it into "login."
 
 - **Proof**: `journeys.spec.ts`, describe `demo checklist — the opening beat: the selector, notice
 visible`.

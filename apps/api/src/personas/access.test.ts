@@ -253,7 +253,7 @@ describe('the session routes', () => {
       'manager-lyon',
       'billing-paris',
     ]);
-    expect(body.notice).toContain('no authentication');
+    expect(body.notice).toContain('n’a pas d’authentification');
   });
 
   it('sets a signed cookie when a persona is selected', async () => {
