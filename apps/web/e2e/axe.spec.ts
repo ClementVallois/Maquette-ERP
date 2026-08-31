@@ -106,8 +106,9 @@ test.describe('accessibility — Mon CRA (manager, item 7 filters)', () => {
 /**
  * Phase 7's own axe gate ("Audit axe sur le pré-facturier", task 7's exit criterion). Both states
  * below are read-only GETs against the seed, robust to whether `journeys.spec.ts` has already run
- * in this invocation — `2026-06` always has at least Alice's June row, `2026-07` is a period no
- * spec in this repository ever writes to.
+ * in this invocation — `2026-06` always has at least Alice's June row. `2026-12` (not `2026-07`
+ * since item 6, QA round 1: the seed's dense months now cover 2026-06/07/08 for every office) is
+ * a period no spec in this repository, and no seed period, ever writes to.
  */
 test.describe('accessibility — Pré-facturier', () => {
   test('a period with data has no critical/serious violation', async ({ page }) => {
@@ -118,11 +119,11 @@ test.describe('accessibility — Pré-facturier', () => {
     await assertAccessible(page);
   });
 
-  test('a period with nothing in it (2026-07, task 7.6’s empty state) has no critical/serious violation', async ({
+  test('a period with nothing in it (2026-12, task 7.6’s empty state) has no critical/serious violation', async ({
     page,
   }) => {
     await choosePersona(page, 'manager-paris');
-    await page.goto('/pre-facturier?period=2026-07');
+    await page.goto('/pre-facturier?period=2026-12');
     await page
       .getByText('Aucun CRA sur ce mois dans cette implantation.')
       .waitFor({ state: 'visible' });

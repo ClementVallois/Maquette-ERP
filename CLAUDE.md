@@ -62,6 +62,17 @@ The seed data must look like the reality of a consulting firm:
 - Time-and-materials **and** fixed-price missions (only T&M is invoiced by this mockup)
 - One consultant in **bench** (intercontrat)
 - One **certification-based habilitation** that constrains an assignment (e.g., PASSI-qualified auditor required on a qualified mission)
+- **48 consultants** in total (item 6, QA round 1): the 9 original named individuals plus a
+  roster-expansion cohort — none of it selectable in the persona picker, which stays at
+  **exactly four** entries (ADR-0023). **3 managers** (Bruno, Emma, and a new one, Karim, in
+  Bordeaux), each with 10+ direct reports for the two selectable ones (Bruno and Emma). **4
+  veterans** carry sparse historical CRAs back to 2016 on missions extended to cover that span,
+  and **one of them (Marine) has left the firm** (`departure_date`, ADR-0079) — her old CRAs and
+  invoices stay readable, and she is absent from every current roster read. Every active
+  consultant has a dense Cra for June, July and August 2026 (Alice's own August is the one
+  deliberate exception, reserved for `apps/web/e2e/journeys.spec.ts`'s interactive
+  create/submit/validate journey). Invoice history runs from 2016 in draft, issued and
+  cancelled-by-credit-note statuses, issued through the domain in date order.
 
 ## Schedule constraint
 

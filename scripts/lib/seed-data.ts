@@ -79,7 +79,7 @@ export const legalEntityData = {
 // ── Consultants ─────────────────────────────────────────────────────────────
 // Roles: consultant, manager, director
 
-export const consultants = [
+const originalConsultants = [
   // Paris — audit practice
   {
     id: ids.next(),
@@ -170,7 +170,214 @@ export const consultants = [
   },
 ] as const;
 
-const [alice, bruno, claire, david, emma, francois, gabrielle, henri, ines] = consultants;
+const [alice, bruno, claire, david, emma, francois, gabrielle, henri, ines] = originalConsultants;
+
+// ── Roster expansion (item 6, QA round 1) ───────────────────────────────────
+//
+// Wave 2 plan step 4 (`docs/open-questions.md`): each manager needs 10+ consultants, dense
+// 2026-06/07/08 for every active one, sparse history to 2016 for a subset of veterans, at least
+// one departure, and more managers — all NOT selectable (`personas` stays exactly four entries,
+// ADR-0023). Every name below is synthetic (ADR-0022: no real name, no real rate), built by a
+// small deterministic generator — a fixed pool indexed by counter, never `Math.random()` — so
+// `pnpm run seed:fingerprint` stays reproducible.
+//
+// `ids.next()` is positional (the trap named in the brief): this block sits textually **after**
+// `originalConsultants` and **before** `consultantGrades`/`gradeTjmDefaults`/etc., so every id it
+// mints lands after the original nine and before any downstream array's own ids — nothing already
+// bound (`alice`, `bruno`, …) shifts, and nothing after this block renumbers.
+
+/** Strips diacritics for an ASCII-safe `@secureco.test` local part -- `Théo` -> `theo`. */
+function asciiSlug(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/gu, '')
+    .toLowerCase();
+}
+
+function emailOf(firstName: string, lastName: string): string {
+  return `${asciiSlug(firstName)}.${asciiSlug(lastName)}@secureco.test`;
+}
+
+/** Thrown only if a pool this file itself sizes turns out too small -- a defensive check
+ * `noUncheckedIndexedAccess` requires the code to make, never expected to actually fire. */
+class RosterPoolExhaustedError extends Error {}
+
+function cyclic<T>(pool: readonly T[], index: number): T {
+  const value = pool[index % pool.length];
+  if (value === undefined) {
+    throw new RosterPoolExhaustedError(`empty roster pool at index ${String(index)}`);
+  }
+  return value;
+}
+
+interface RosterConsultant {
+  readonly id: string;
+  readonly firstName: string;
+  readonly lastName: string;
+  readonly email: string;
+  readonly officeId: string;
+  readonly practiceId: string;
+  readonly role: 'consultant' | 'manager';
+  readonly departureDate: string | null;
+}
+
+// The four veterans/departure and the new manager, named individually rather than pulled from a
+// pool: each carries its own office/practice/role/departure, so a shared generator would need as
+// much per-entry configuration as writing them out plainly does.
+
+/** Paris veteran, active -- historical Cra on `mAuditDora`, still on staff through 2026. */
+const julien: RosterConsultant = {
+  id: ids.next(),
+  firstName: 'Julien',
+  lastName: 'Fabre',
+  email: emailOf('Julien', 'Fabre'),
+  officeId: paris.id,
+  practiceId: audit.id,
+  role: 'consultant',
+  departureDate: null,
+};
+/** Paris veteran who **left** -- the departure ADR-0079's invariant asks the seed to exercise. */
+const marine: RosterConsultant = {
+  id: ids.next(),
+  firstName: 'Marine',
+  lastName: 'Girard',
+  email: emailOf('Marine', 'Girard'),
+  officeId: paris.id,
+  practiceId: audit.id,
+  role: 'consultant',
+  departureDate: '2022-12-31',
+};
+/** Lyon veteran, active -- historical Cra on `mSocReunion`. */
+const camille: RosterConsultant = {
+  id: ids.next(),
+  firstName: 'Camille',
+  lastName: 'Roche',
+  email: emailOf('Camille', 'Roche'),
+  officeId: lyon.id,
+  practiceId: soc.id,
+  role: 'consultant',
+  departureDate: null,
+};
+/** Bordeaux veteran, active -- historical Cra on `mGrcGuyane`. */
+const theo: RosterConsultant = {
+  id: ids.next(),
+  firstName: 'Théo',
+  lastName: 'Dubreuil',
+  email: emailOf('Théo', 'Dubreuil'),
+  officeId: bordeaux.id,
+  practiceId: grc.id,
+  role: 'consultant',
+  departureDate: null,
+};
+/** A second, non-selectable manager -- Bordeaux gets its own local management line, the way Paris
+ * (Bruno) and Lyon (Emma) already do. Reports to Henri, same as Bruno/Emma. */
+const karim: RosterConsultant = {
+  id: ids.next(),
+  firstName: 'Karim',
+  lastName: 'Faure',
+  email: emailOf('Karim', 'Faure'),
+  officeId: bordeaux.id,
+  practiceId: offensive.id,
+  role: 'manager',
+  departureDate: null,
+};
+
+/** 34 names, one per filler consultant, never reused -- `(firstName, lastName)` is unique by
+ * construction rather than by checking. */
+const FILLER_NAME_POOL: readonly { readonly firstName: string; readonly lastName: string }[] = [
+  { firstName: 'Léa', lastName: 'Chevalier' },
+  { firstName: 'Antoine', lastName: 'Perrin' },
+  { firstName: 'Sophie', lastName: 'Gauthier' },
+  { firstName: 'Nicolas', lastName: 'Aubert' },
+  { firstName: 'Chloé', lastName: 'Fontaine' },
+  { firstName: 'Maxime', lastName: 'Rousseau' },
+  { firstName: 'Élise', lastName: 'Blanchard' },
+  { firstName: 'Romain', lastName: 'Guérin' },
+  { firstName: 'Pauline', lastName: 'Boyer' },
+  { firstName: 'Hugo', lastName: 'Renard' },
+  { firstName: 'Manon', lastName: 'Fournier' },
+  { firstName: 'Simon', lastName: 'Lambert' },
+  { firstName: 'Aurélie', lastName: 'Barbier' },
+  { firstName: 'Thibault', lastName: 'Rolland' },
+  { firstName: 'Charlotte', lastName: 'Masson' },
+  { firstName: 'Lucas', lastName: 'Michel' },
+  { firstName: 'Margaux', lastName: 'Colin' },
+  { firstName: 'Adrien', lastName: 'Vidal' },
+  { firstName: 'Céline', lastName: 'Caron' },
+  { firstName: 'Baptiste', lastName: 'Meunier' },
+  { firstName: 'Laurie', lastName: 'Lacroix' },
+  { firstName: 'Victor', lastName: 'Roy' },
+  { firstName: 'Anaïs', lastName: 'Noël' },
+  { firstName: 'Florian', lastName: 'Meyer' },
+  { firstName: 'Justine', lastName: 'Simoneau' },
+  { firstName: 'Mehdi', lastName: 'Denis' },
+  { firstName: 'Océane', lastName: 'Marchand' },
+  { firstName: 'Bastien', lastName: 'Lemoine' },
+  { firstName: 'Delphine', lastName: 'Dumas' },
+  { firstName: 'Yanis', lastName: 'Legrand' },
+  { firstName: 'Alexia', lastName: 'Brun' },
+  { firstName: 'Kevin', lastName: 'Picard' },
+  { firstName: 'Solène', lastName: 'Charpentier' },
+  { firstName: 'Damien', lastName: 'Riviere' },
+] as const;
+
+const rosterPractices = [audit, soc, grc, iam, offensive] as const;
+
+/** Regie fillers exist to give managers more than a bench roster; the rest sit on the internal
+ * `Intercontrat` mission (ADR-0046) -- realistic for a firm that is not staffed at 100%, and it
+ * bounds how many draft invoices the dense months produce (each Regie validation drafts one). */
+const PARIS_REGIE_FILLER_COUNT = 4;
+const LYON_REGIE_FILLER_COUNT = 4;
+const BORDEAUX_REGIE_FILLER_COUNT = 1;
+
+/** Paris fillers, reporting to Bruno -- brings his roster to 3 + 16 = 19. */
+const PARIS_FILLER_COUNT = 16;
+/** Lyon fillers, reporting to Emma -- brings her roster to 3 + 16 = 19. */
+const LYON_FILLER_COUNT = 16;
+/** Bordeaux fillers, reporting to Karim -- depth for the new line, not a floor to clear (only the
+ * two selectable managers, Bruno and Emma, owe the "10 consultants" floor). */
+const BORDEAUX_FILLER_COUNT = 2;
+
+function fillerRoster(
+  count: number,
+  poolStart: number,
+  officeId: string,
+): readonly RosterConsultant[] {
+  return FILLER_NAME_POOL.slice(poolStart, poolStart + count).map((name, i) => ({
+    id: ids.next(),
+    firstName: name.firstName,
+    lastName: name.lastName,
+    email: emailOf(name.firstName, name.lastName),
+    officeId,
+    practiceId: cyclic(rosterPractices, poolStart + i).id,
+    role: 'consultant' as const,
+    departureDate: null,
+  }));
+}
+
+const parisFillers = fillerRoster(PARIS_FILLER_COUNT, 0, paris.id);
+const lyonFillers = fillerRoster(LYON_FILLER_COUNT, PARIS_FILLER_COUNT, lyon.id);
+const bordeauxFillers = fillerRoster(
+  BORDEAUX_FILLER_COUNT,
+  PARIS_FILLER_COUNT + LYON_FILLER_COUNT,
+  bordeaux.id,
+);
+
+const rosterConsultants: readonly RosterConsultant[] = [
+  julien,
+  marine,
+  camille,
+  theo,
+  karim,
+  ...parisFillers,
+  ...lyonFillers,
+  ...bordeauxFillers,
+];
+
+export const consultants = [
+  ...originalConsultants.map((c) => ({ ...c, departureDate: null as string | null })),
+  ...rosterConsultants,
+] as const;
 
 // ── Consultant grades (with Cjm — the sensitive value) ──────────────────────
 // Cjm = cost per day, in integer cents. A whole number of euros, like Tjm.
@@ -248,6 +455,27 @@ export const consultantGrades = [
     toDate: null,
     cjmCents: 19000,
   }, // 190 €/j
+  // Roster expansion (item 6, QA round 1): one grade per new consultant, cycling
+  // Junior/Confirmé/Senior (Karim, the new manager, gets the Manager grade). `fromDate` matches
+  // each roster member's own join date — 2016 for the four veterans/departure, 2024 for Karim,
+  // 2025 for every dense-only filler (a year of margin before the earliest 2026 CRA).
+  ...rosterConsultants.map((c, index) => {
+    const isVeteran = index < 4; // julien, marine, camille, theo
+    const isManager = c.role === 'manager'; // karim
+    const grade = isManager
+      ? gradeManager
+      : cyclic([gradeJunior, gradeConfirme, gradeSenior] as const, index);
+    const fromDate = isVeteran || isManager ? '2016-01-01' : '2025-01-01';
+    const cjmBase = isManager ? 39000 : cyclic([21000, 26000, 31000] as const, index);
+    return {
+      id: ids.next(),
+      consultantId: c.id,
+      gradeId: grade.id,
+      fromDate,
+      toDate: null,
+      cjmCents: cjmBase + (index % 5) * 500,
+    };
+  }),
 ] as const;
 
 // ── Grade Tjm defaults (the starting-point Tjm per grade) ───────────────────
@@ -384,12 +612,20 @@ const [clientMetro, clientReunion, clientGuyane, clientEu] = clients;
 
 export const missions = [
   // Regie missions — these produce invoices
+  //
+  // `startDate` on these three (Audit DORA, SOC Réunion, GRC Guyane) was `2026-01-05`/`2026-03-
+  // 01`/`2026-02-01` until item 6 (QA round 1): pushed back to 2016 so the roster's veteran
+  // consultants (`julien`, `camille`, `theo` below) can carry a sparse **historical** Cra on the
+  // same mission id — one mission's whole lifetime rather than a second, parallel "legacy"
+  // mission per veteran. `missionTjm` below grows a matching historical rate window per mission;
+  // the *existing* 2026 entry is untouched, so Alice/Claire/David's own 2026 invoices resolve
+  // exactly the Tjm they always did.
   {
     id: ids.next(),
     clientId: clientMetro.id,
     name: 'Audit DORA — Banque Nationale',
     billingModel: 'Regie' as const,
-    startDate: '2026-01-05',
+    startDate: '2016-01-01',
     endDate: null,
   },
   {
@@ -397,7 +633,7 @@ export const missions = [
     clientId: clientReunion.id,
     name: 'SOC Réunion Cyber',
     billingModel: 'Regie' as const,
-    startDate: '2026-03-01',
+    startDate: '2016-01-01',
     endDate: null,
   },
   {
@@ -405,7 +641,7 @@ export const missions = [
     clientId: clientGuyane.id,
     name: 'GRC Guyane Sécurité',
     billingModel: 'Regie' as const,
-    startDate: '2026-02-01',
+    startDate: '2016-01-01',
     endDate: null,
   },
   {
@@ -425,14 +661,17 @@ export const missions = [
     startDate: '2026-05-01',
     endDate: null,
   },
-  // Forfait mission — present in the dataset, never invoiced (ADR-0037)
+  // Forfait mission — present in the dataset, never invoiced (ADR-0037). `endDate` was
+  // `2026-06-30` until item 6 (QA round 1): pushed to `null` (ongoing) so Gabrielle — Forfait,
+  // "present but not invoiced" is her whole point in this dataset — stays actively assigned
+  // through July and August rather than falling out of every consultant's dense months.
   {
     id: ids.next(),
     clientId: clientMetro.id,
     name: 'Pentest Forfait — Banque Nationale',
     billingModel: 'Forfait' as const,
     startDate: '2026-01-15',
-    endDate: '2026-06-30',
+    endDate: null,
   },
   // Internal mission for Intercontrat (settled 18/08 — Forfait, not billable)
   {
@@ -500,6 +739,33 @@ export const missionTjm = [
     toDate: null,
     tjmCents: 95000,
   }, // 950 €/j
+  // Roster expansion (item 6, QA round 1): a historical rate window on each of the three
+  // missions pushed back to 2016 above, ending the day before that mission's existing 2026 entry
+  // starts — non-overlapping, so Alice/Claire/David's own 2026 invoices resolve exactly the Tjm
+  // they always did. One flat rate for the whole 2016–2025 span: `Tjm` is dated (BUILD-RULES), and
+  // one window already exercises that a historical invoice resolves *its own period's* rate
+  // rather than today's — a second rate change inside the span would prove the same thing twice.
+  {
+    id: ids.next(),
+    missionId: mAuditDora.id,
+    fromDate: '2016-01-01',
+    toDate: '2026-01-04',
+    tjmCents: 72000,
+  }, // 720 €/j
+  {
+    id: ids.next(),
+    missionId: mSocReunion.id,
+    fromDate: '2016-01-01',
+    toDate: '2026-02-28',
+    tjmCents: 63000,
+  }, // 630 €/j
+  {
+    id: ids.next(),
+    missionId: mGrcGuyane.id,
+    fromDate: '2016-01-01',
+    toDate: '2026-01-31',
+    tjmCents: 68000,
+  }, // 680 €/j
 ] as const;
 
 // ── Assignments ─────────────────────────────────────────────────────────────
@@ -544,13 +810,14 @@ export const assignments = [
     fromDate: '2026-04-01',
     toDate: null,
   },
-  // Gabrielle → Pentest Forfait (Forfait — present, not invoiced)
+  // Gabrielle → Pentest Forfait (Forfait — present, not invoiced). `toDate` was `2026-06-30`
+  // until item 6 (QA round 1) — now open-ended, matching the mission's own new `endDate: null`.
   {
     id: ids.next(),
     consultantId: gabrielle.id,
     missionId: mPentestForfait.id,
     fromDate: '2026-01-15',
-    toDate: '2026-06-30',
+    toDate: null,
   },
   // Inès → Intercontrat (internal Forfait mission)
   {
@@ -560,6 +827,66 @@ export const assignments = [
     fromDate: '2026-01-01',
     toDate: null,
   },
+  // Roster expansion (item 6, QA round 1): one continuous assignment per new consultant, from
+  // their own join date (2016 for the veterans/departure, 2025 for dense-only fillers) through
+  // `null` — or the departure date for Marine, closed the same way ADR-0079 asks every open row
+  // to close. Julien/Camille/Théo sit on the same historically-extended mission a veteran of
+  // their office would realistically have carried for a decade (`mAuditDora`/`mSocReunion`/
+  // `mGrcGuyane`, all pushed back to 2016 above); Karim, the new manager, carries none.
+  {
+    id: ids.next(),
+    consultantId: julien.id,
+    missionId: mAuditDora.id,
+    fromDate: '2016-01-01',
+    toDate: null,
+  },
+  {
+    id: ids.next(),
+    consultantId: marine.id,
+    missionId: mAuditDora.id,
+    fromDate: '2016-01-01',
+    toDate: '2022-12-31',
+  },
+  {
+    id: ids.next(),
+    consultantId: camille.id,
+    missionId: mSocReunion.id,
+    fromDate: '2016-01-01',
+    toDate: null,
+  },
+  {
+    id: ids.next(),
+    consultantId: theo.id,
+    missionId: mGrcGuyane.id,
+    fromDate: '2016-01-01',
+    toDate: null,
+  },
+  ...parisFillers.map((c, index) => ({
+    id: ids.next(),
+    consultantId: c.id,
+    missionId: index < PARIS_REGIE_FILLER_COUNT ? mAuditDora.id : mIntercontrat.id,
+    fromDate: '2025-01-01',
+    toDate: null,
+  })),
+  ...lyonFillers.map((c, index) => ({
+    id: ids.next(),
+    consultantId: c.id,
+    missionId:
+      index < LYON_REGIE_FILLER_COUNT
+        ? index % 2 === 0
+          ? mGrcGuyane.id
+          : mIamEurosecure.id
+        : mIntercontrat.id,
+    fromDate: '2025-01-01',
+    toDate: null,
+  })),
+  ...bordeauxFillers.map((c, index) => ({
+    id: ids.next(),
+    consultantId: c.id,
+    missionId: index < BORDEAUX_REGIE_FILLER_COUNT ? mSocReunion.id : mIntercontrat.id,
+    fromDate: '2025-01-01',
+    toDate: null,
+  })),
 ] as const;
 
 // ── Manager attachments ─────────────────────────────────────────────────────
@@ -623,6 +950,68 @@ export const managerAttachments = [
     fromDate: '2023-06-01',
     toDate: null,
   },
+  // Roster expansion (item 6, QA round 1): Karim is Bordeaux's own new manager, reporting to
+  // Henri like Bruno/Emma — dated from 2016 (not 2024) so he can already be Théo's manager on
+  // Théo's earliest historical Cra below.
+  {
+    id: ids.next(),
+    consultantId: karim.id,
+    managerId: henri.id,
+    fromDate: '2016-01-01',
+    toDate: null,
+  },
+  // The four named veterans/departure, one row each, spanning their whole tenure — closed at
+  // Marine's departure, open-ended for the three still on staff.
+  {
+    id: ids.next(),
+    consultantId: julien.id,
+    managerId: bruno.id,
+    fromDate: '2016-01-01',
+    toDate: null,
+  },
+  {
+    id: ids.next(),
+    consultantId: marine.id,
+    managerId: bruno.id,
+    fromDate: '2016-01-01',
+    toDate: '2022-12-31',
+  },
+  {
+    id: ids.next(),
+    consultantId: camille.id,
+    managerId: emma.id,
+    fromDate: '2016-01-01',
+    toDate: null,
+  },
+  {
+    id: ids.next(),
+    consultantId: theo.id,
+    managerId: karim.id,
+    fromDate: '2016-01-01',
+    toDate: null,
+  },
+  // Every dense-only filler, one row each, reporting to their office's manager since 2025.
+  ...parisFillers.map((c) => ({
+    id: ids.next(),
+    consultantId: c.id,
+    managerId: bruno.id,
+    fromDate: '2025-01-01',
+    toDate: null,
+  })),
+  ...lyonFillers.map((c) => ({
+    id: ids.next(),
+    consultantId: c.id,
+    managerId: emma.id,
+    fromDate: '2025-01-01',
+    toDate: null,
+  })),
+  ...bordeauxFillers.map((c) => ({
+    id: ids.next(),
+    consultantId: c.id,
+    managerId: karim.id,
+    fromDate: '2025-01-01',
+    toDate: null,
+  })),
 ] as const;
 
 /**
@@ -635,6 +1024,14 @@ export const managerAttachments = [
  * VAT rate.
  */
 export const SUBMITTED_NOT_VALIDATED_EMAIL = 'claire.dubois@secureco.test';
+
+/**
+ * Who the seed's historical invoices are issued as (item 6, QA round 1). Henri, and only Henri:
+ * he is the one consultant guaranteed absent from every `validated_by` in this dataset (the same
+ * property `personas` already relies on for `billing-paris`), so issuing as anyone else risks
+ * `ValidatorCannotIssueError` the moment a historical veteran's manager and issuer collide.
+ */
+export const ISSUER_EMAIL = henri.email;
 
 /**
  * The month that is **not** uniform.
@@ -721,11 +1118,69 @@ export const personas = [
 ] as const;
 
 // ── CRA period ──────────────────────────────────────────────────────────────
-// June 2026: a month where the working calendar is valid and the Intercontrat scenario works.
+// June 2026: the original month, where `VARIED_MONTH` and `SUBMITTED_NOT_VALIDATED_EMAIL` live.
 
 export const CRA_PERIOD = '2026-06';
 
+/**
+ * Item 6 (QA round 1): dense CRAs for every active consultant across three consecutive months,
+ * not just the original June — the mockup is reviewed in September 2026, so June/July/August
+ * should all read as already closed out.
+ */
+export const DENSE_PERIODS = ['2026-06', '2026-07', '2026-08'] as const;
+
+/**
+ * Periods `DENSE_PERIODS` would otherwise cover for a given consultant, withheld on purpose.
+ * Keyed by email, the same idiom `SUBMITTED_NOT_VALIDATED_EMAIL`/`VARIED_MONTH.email` already use.
+ *
+ * Alice's August (and, by construction, everything after it) has to stay genuinely unopened:
+ * `apps/web/e2e/journeys.spec.ts`'s J1 and "item 3" describe blocks interactively create,
+ * fill, submit and validate her August/September Cra as part of the demonstrated journey — a
+ * seed that pre-fills August would make "Ce mois n'a pas encore été commencé" false on a fresh
+ * database. July is not withheld: nothing in that suite asserts Alice's July is empty, only that
+ * clicking "Mois suivant" twice from June reaches August (`journeys.spec.ts:386-388`), which holds
+ * whether or not July already has a Cra.
+ */
+export const DENSE_PERIOD_EXCLUSIONS: ReadonlyMap<string, readonly string[]> = new Map([
+  [alice.email, ['2026-08']],
+]);
+
+/** One historical Cra-period list per veteran/departed consultant (item 6's own "sparse back to
+ * 2016" and "at least one departure"), keyed by email like the exclusions above. Every 24 months
+ * from 2016 — sparse, not monthly, per the plan's own contingency ("cut the span, do not
+ * optimise" if the seed's 60s budget does not hold); Marine's list stops at 2022, the last one
+ * before her `2022-12-31` departure. */
+export interface HistoricalVeteran {
+  readonly email: string;
+  readonly periods: readonly string[];
+}
+
+const VETERAN_PERIODS = ['2016-06', '2018-06', '2020-06', '2022-06', '2024-06'] as const;
+
+export const HISTORICAL_VETERANS: readonly HistoricalVeteran[] = [
+  { email: julien.email, periods: VETERAN_PERIODS },
+  // marine.departureDate is '2022-12-31' — filtered rather than repeated, so the two can never
+  // drift apart.
+  {
+    email: marine.email,
+    periods: VETERAN_PERIODS.filter((p) => p <= (marine.departureDate ?? '')),
+  },
+  { email: camille.email, periods: VETERAN_PERIODS },
+  { email: theo.email, periods: VETERAN_PERIODS },
+];
+
 // A fixed clock instant for submit/validate timestamps: deterministic across runs.
 export const SEED_CLOCK_INSTANT = new Date('2026-07-05T10:00:00.000Z');
+
+/** The clock a historical period's submit/validate is stamped with: the 5th of the month after
+ * the period closes, same offset `SEED_CLOCK_INSTANT` uses for June 2026 (period closes 30/06,
+ * clock reads 05/07) — kept a function rather than a second frozen constant so every historical
+ * period gets its own plausible timestamp instead of all sharing one. */
+export function clockInstantAfter(period: string): Date {
+  const [year, month] = period.split('-').map(Number) as [number, number];
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+  return new Date(Date.UTC(nextYear, nextMonth - 1, 5, 10, 0, 0));
+}
 
 export { ids, SEED_TIMESTAMP_MS };

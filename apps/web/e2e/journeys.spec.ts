@@ -1072,9 +1072,14 @@ test.describe('J6 — billing-paris (Henri): the margin URL refuses him, by role
 });
 
 test.describe('task 7.6 — a period with nothing in it', () => {
-  test('2026-07 renders a designed empty pré-facturier, not a blank page', async ({ page }) => {
+  // 2026-07 until item 6 (QA round 1): the seed's own dense months now cover 2026-06/07/08 for
+  // every office (`scripts/lib/seed-data.ts`'s `DENSE_PERIODS`), so Paris genuinely has Cras on
+  // 2026-07 today. 2026-12 is outside both `DENSE_PERIODS` and the sparse 2016-2024 historical
+  // span `HISTORICAL_VETERANS` writes — no spec in this repository, and no seed period, ever
+  // touches it, which is what this test's own point (a period with nothing in it) needs.
+  test('2026-12 renders a designed empty pré-facturier, not a blank page', async ({ page }) => {
     await choosePersona(page, 'manager-paris');
-    await page.goto('/pre-facturier?period=2026-07');
+    await page.goto('/pre-facturier?period=2026-12');
 
     // Not the "office has never had a Cra at all" branch (`data.period === null`) — this office
     // has plenty of Cras, just none on this specific period, so the ordinary response comes back

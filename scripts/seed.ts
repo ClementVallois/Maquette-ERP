@@ -15,16 +15,21 @@ import {
   billingReference,
   client as clientFactory,
   commercialMission,
+  type CreditNoteReason,
+  creditNote,
   draftInvoicesFrom,
   type DraftInvoicesDependencies,
   legalEntity as legalEntityFactory,
   legalMentions,
   paymentTerms,
   PgInvoiceRepository,
+  PgNumberingCounter,
   RECOVERY_INDEMNITY_CENTS,
 } from '@erp/billing';
 import {
   type Clock,
+  isoDateInFirmTimeZone,
+  lastDayOf,
   periodFromIso,
   ROLES,
   TechnicalFailure,
@@ -48,14 +53,19 @@ import {
 import {
   assignments,
   clients,
+  clockInstantAfter,
   consultantGrades,
   consultantHabilitations,
   consultants,
   CRA_PERIOD,
+  DENSE_PERIOD_EXCLUSIONS,
+  DENSE_PERIODS,
   gradeTjmDefaults,
   grades,
   habilitations,
+  HISTORICAL_VETERANS,
   internalClient,
+  ISSUER_EMAIL,
   legalEntityData,
   managerAttachments,
   missionHabilitations,
@@ -64,7 +74,6 @@ import {
   offices,
   personas,
   practices,
-  SEED_CLOCK_INSTANT,
   SEED_TIMESTAMP_MS,
   SUBMITTED_NOT_VALIDATED_EMAIL,
   VARIED_MONTH,
@@ -100,6 +109,8 @@ const HabilitationSchema = z.object({
   name: z.string(),
 });
 
+const IsoDateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
 const ConsultantSchema = z.object({
   id: z.string(),
   firstName: z.string(),
@@ -108,6 +119,9 @@ const ConsultantSchema = z.object({
   officeId: z.string(),
   practiceId: z.string(),
   role: z.enum(['consultant', 'manager', 'director']),
+  // ADR-0079: nullable, defaulting to null (still with the firm) so the original nine — and every
+  // roster-expansion consultant who never left — need no explicit field.
+  departureDate: IsoDateString.nullable().optional(),
 });
 
 const ClientSchema = z.object({
@@ -184,8 +198,6 @@ const WholeEuroCents = z
   .int()
   .positive()
   .refine((cents) => cents % 100 === 0, 'a daily rate is a whole number of euros');
-
-const IsoDateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 const AddressSchema = z.object({
   line1: z.string(),
@@ -400,9 +412,18 @@ async function seed(): Promise<void> {
 
     for (const c of validatedConsultants) {
       await client.query(
-        `INSERT INTO public.consultants (id, first_name, last_name, email, office_id, practice_id, role)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [c.id, c.firstName, c.lastName, c.email, c.officeId, c.practiceId, c.role],
+        `INSERT INTO public.consultants (id, first_name, last_name, email, office_id, practice_id, role, departure_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          c.id,
+          c.firstName,
+          c.lastName,
+          c.email,
+          c.officeId,
+          c.practiceId,
+          c.role,
+          c.departureDate ?? null,
+        ],
       );
     }
     console.log(`Seeded ${String(validatedConsultants.length)} consultants.`);
@@ -521,9 +542,7 @@ async function seed(): Promise<void> {
     // submission check passes. Then invoices are drafted through the billing
     // domain, proving the dataset is reachable through the invariants.
 
-    const clock: Clock = { now: () => SEED_CLOCK_INSTANT };
     const calendar = workingCalendar();
-    const period = periodFromIso(CRA_PERIOD);
 
     // Build timesheet reference
     const tsRef: TimesheetReference = timesheetReference({
@@ -559,27 +578,28 @@ async function seed(): Promise<void> {
       })),
     );
 
-    // Determine which consultants should have CRAs for June 2026.
-    // Every consultant (not managers or directors unless they also consult) gets a CRA.
-    // For the seed, every consultant + manager + director gets a CRA.
-    const consultantsWithCras = validatedConsultants.filter((c) => {
-      // Find this consultant's assignments for June 2026
-      const hasAssignment = validatedAssignments.some(
-        (a) =>
-          a.consultantId === c.id &&
-          a.fromDate <= '2026-06-30' &&
-          (a.toDate === null || a.toDate >= '2026-06-01'),
-      );
-      // A consultant needs a CRA if they are assigned to at least one mission
-      // and they have a manager attachment
-      const hasManager = validatedManagerAttachments.some(
-        (ma) =>
-          ma.consultantId === c.id &&
-          ma.fromDate <= '2026-06-30' &&
-          (ma.toDate === null || ma.toDate >= '2026-06-01'),
-      );
-      return hasAssignment && hasManager;
-    });
+    // A consultant needs a CRA for a period if they have an active assignment AND an active
+    // manager attachment overlapping it — unchanged from the original single-month rule, now
+    // parameterised so it can be asked of any of `DENSE_PERIODS` and of every historical period.
+    function consultantsWithCrasFor(periodIso: string): typeof validatedConsultants {
+      const periodStart = `${periodIso}-01`;
+      const periodEnd = lastDayOf(periodFromIso(periodIso));
+      return validatedConsultants.filter((c) => {
+        const hasAssignment = validatedAssignments.some(
+          (a) =>
+            a.consultantId === c.id &&
+            a.fromDate <= periodEnd &&
+            (a.toDate === null || a.toDate >= periodStart),
+        );
+        const hasManager = validatedManagerAttachments.some(
+          (ma) =>
+            ma.consultantId === c.id &&
+            ma.fromDate <= periodEnd &&
+            (ma.toDate === null || ma.toDate >= periodStart),
+        );
+        return hasAssignment && hasManager;
+      });
+    }
 
     // One sequence for every id the write side mints — aggregate ids here, child-row ids inside
     // the repositories, event ids inside the journal. Offset past the reference data's counter so
@@ -592,14 +612,30 @@ async function seed(): Promise<void> {
     const cras = new PgCraRepository(client, nextWriteId);
     const invoices = new PgInvoiceRepository(client, nextWriteId);
     const events = new PgEventStore(client, nextWriteId);
-    const workableDays = calendar.workableDaysOf(period);
 
     const seededCras: {
       officeId: string;
       payload: TimesheetValidatedPayload;
+      /** Set only for a historical Cra whose invoice gets more than "draft" (item 6, QA round
+       * 1) — undefined leaves the invoice as `draftInvoicesFrom` always left it, the seed's
+       * original and still-default behaviour for every 2026 dense-month Cra. */
+      historicalOutcome?: 'issued' | 'issuedThenCancelled';
     }[] = [];
 
-    for (const consultant of consultantsWithCras) {
+    /**
+     * Opens, fills, submits and — unless withheld — validates one consultant's Cra for one
+     * period, through the domain exactly as the original single-month loop did. Shared by the
+     * dense-months loop and the historical-widening loop below: the only thing that varies
+     * between a 2026 dense month and a 2016 historical one is which period is asked for and
+     * whether `VARIED_MONTH`'s split/absence/flagged-Saturday shape applies — and that shape is
+     * keyed to Alice's June specifically, so `varied` is false everywhere else by construction.
+     */
+    async function openSubmitValidate(
+      consultant: (typeof validatedConsultants)[number],
+      periodIso: string,
+    ): Promise<void> {
+      const period = periodFromIso(periodIso);
+      const workableDays = calendar.workableDaysOf(period);
       const craId = nextWriteId();
 
       const cra = Cra.open({
@@ -607,27 +643,22 @@ async function seed(): Promise<void> {
         consultantId: consultant.id,
         officeId: consultant.officeId,
         period,
-        // No departed consultant carries a CRA for this period yet (this loop is 2026-06 only,
-        // the dense month every active consultant gets) — real per-consultant departure dates
-        // reach `Cra.open` where the seed opens *historical* CRAs, once those exist.
-        consultantDeparture: null,
+        // ADR-0079: a Cra opened for a period starting after the consultant's own departure is
+        // refused by the domain — every consultant's own `departureDate` reaches this call so
+        // that guard is genuinely exercised, not merely available.
+        consultantDeparture: consultant.departureDate ?? null,
       });
 
-      // Find the consultant's assignments for this period
       const activeAssignments = validatedAssignments.filter(
         (a) =>
           a.consultantId === consultant.id &&
-          a.fromDate <= '2026-06-30' &&
-          (a.toDate === null || a.toDate >= '2026-06-01'),
+          a.fromDate <= lastDayOf(period) &&
+          (a.toDate === null || a.toDate >= `${periodIso}-01`),
       );
 
-      // Record every workable day as worked on the first active assignment — except for the one
-      // consultant whose month is deliberately varied (VARIED_MONTH), so that a split day, an
-      // absence and a flagged Saturday exist in the data the screens render rather than only in
-      // the model that permits them.
       const primaryAssignment = activeAssignments[0];
       const secondAssignment = activeAssignments[1];
-      const varied = consultant.email === VARIED_MONTH.email;
+      const varied = periodIso === CRA_PERIOD && consultant.email === VARIED_MONTH.email;
 
       if (primaryAssignment !== undefined) {
         for (const day of workableDays) {
@@ -712,20 +743,29 @@ async function seed(): Promise<void> {
         }
       }
 
-      cra.submit({ clock, calendar, reference: tsRef });
+      cra.submit({
+        clock: { now: () => clockInstantAfter(periodIso) },
+        calendar,
+        reference: tsRef,
+      });
 
       const manager = mgmtHierarchy.managerOf(consultant.id, period);
       if (manager === null) {
-        throw new SeedDataError(
-          `No manager found for consultant ${consultant.id} in ${CRA_PERIOD}`,
-        );
+        throw new SeedDataError(`No manager found for consultant ${consultant.id} in ${periodIso}`);
       }
 
       // One Cra stops at `submitted`, on purpose: a dataset where every month is already
       // validated leaves the chain describable and not performable. This is the one the demo
       // validates, and it is why an invoice appears while somebody is watching.
-      if (consultant.email !== SUBMITTED_NOT_VALIDATED_EMAIL) {
-        const payload = cra.validate({ by: manager, clock, hierarchy: mgmtHierarchy });
+      const withheldFromValidation =
+        periodIso === CRA_PERIOD && consultant.email === SUBMITTED_NOT_VALIDATED_EMAIL;
+      if (!withheldFromValidation) {
+        const validationClock: Clock = { now: () => clockInstantAfter(periodIso) };
+        const payload = cra.validate({
+          by: manager,
+          clock: validationClock,
+          hierarchy: mgmtHierarchy,
+        });
 
         seededCras.push({ officeId: consultant.officeId, payload });
       }
@@ -733,7 +773,70 @@ async function seed(): Promise<void> {
       await cras.save(cra);
     }
 
-    console.log(`Seeded ${String(seededCras.length)} validated CRAs for ${CRA_PERIOD}.`);
+    // ── Dense 2026 months (item 6, QA round 1) ─────────────────────────────
+    //
+    // Every active consultant gets June, July and August 2026 — except a per-consultant,
+    // per-period withhold list (`DENSE_PERIOD_EXCLUSIONS`): Alice's August has to stay genuinely
+    // unopened for `apps/web/e2e/journeys.spec.ts`'s own interactive create/submit/validate
+    // journey, which would be false on a fresh database otherwise.
+    for (const periodIso of DENSE_PERIODS) {
+      let denseCount = 0;
+      for (const consultant of consultantsWithCrasFor(periodIso)) {
+        const withheld =
+          DENSE_PERIOD_EXCLUSIONS.get(consultant.email)?.includes(periodIso) ?? false;
+        if (withheld) continue;
+        await openSubmitValidate(consultant, periodIso);
+        denseCount++;
+      }
+      console.log(`Seeded ${String(denseCount)} Cras for ${periodIso}.`);
+    }
+
+    // ── Sparse historical widening, 2016 onward (item 6, QA round 1) ───────
+    //
+    // A handful of veterans (`HISTORICAL_VETERANS`), one Cra every 24 months rather than every
+    // month — sparse, per the plan's own instruction, and cheap enough that the 60s seed budget
+    // measured after the dense months above holds with room for it. Processed in date order
+    // across every veteran (not veteran by veteran) so the gapless per-fiscal-year invoice
+    // numbering below is genuinely exercised rather than trivially satisfied one series at a time.
+    const historicalEntries = HISTORICAL_VETERANS.flatMap((veteran, veteranIndex) =>
+      veteran.periods.map((periodIso, periodIndex) => ({
+        veteran,
+        veteranIndex,
+        periodIso,
+        periodIndex,
+      })),
+    ).sort((a, b) => (a.periodIso < b.periodIso ? -1 : a.periodIso > b.periodIso ? 1 : 0));
+
+    let historicalCount = 0;
+    for (const { veteran, veteranIndex, periodIso, periodIndex } of historicalEntries) {
+      const consultant = validatedConsultants.find((c) => c.email === veteran.email);
+      if (consultant === undefined) {
+        throw new SeedDataError(`Historical veteran ${veteran.email} is not a seeded consultant`);
+      }
+      const before = seededCras.length;
+      await openSubmitValidate(consultant, periodIso);
+      // `openSubmitValidate` pushed at most one entry (it never pushes one for a withheld
+      // validation, which no historical period triggers — `DENSE_PERIOD_EXCLUSIONS` only ever
+      // withholds a `DENSE_PERIODS` entry).
+      if (seededCras.length > before) {
+        const pushed = seededCras[seededCras.length - 1];
+        if (pushed !== undefined) {
+          // Julien's 2022-06 (veteranIndex 0, periodIndex 3) is the one credit note this seed
+          // writes — `docs/adr/0080-…` names it as the deliberate, sole exception to "several
+          // different statuses" being carried by draft/issued alone. Every other even period
+          // index is issued; every odd one is left as a draft backlog.
+          if (veteranIndex === 0 && periodIndex === 3) {
+            pushed.historicalOutcome = 'issuedThenCancelled';
+          } else if (periodIndex % 2 === 0) {
+            pushed.historicalOutcome = 'issued';
+          }
+        }
+      }
+      historicalCount++;
+    }
+    console.log(`Seeded ${String(historicalCount)} historical Cras from 2016.`);
+
+    console.log(`Seeded ${String(seededCras.length)} validated CRAs in total.`);
 
     // ── Draft invoices through the billing domain ─────────────────────────
 
@@ -822,13 +925,23 @@ async function seed(): Promise<void> {
 
     let totalInvoices = 0;
     let totalDeclined = 0;
+    let totalIssued = 0;
+    let totalCancelled = 0;
 
-    for (const { officeId, payload } of seededCras) {
+    // Item 6 (QA round 1): who issues a historical invoice. Henri only (see `ISSUER_EMAIL`'s own
+    // comment) — resolved once here rather than per iteration.
+    const issuer = validatedConsultants.find((c) => c.email === ISSUER_EMAIL);
+    if (issuer === undefined) {
+      throw new SeedDataError(`Issuer ${ISSUER_EMAIL} is not a seeded consultant`);
+    }
+    const numberingCounter = new PgNumberingCounter(client);
+
+    for (const { officeId, payload, historicalOutcome } of seededCras) {
       // Build the domain event
       const event: TimesheetValidated = {
         type: TIMESHEET_VALIDATED,
         version: TIMESHEET_VALIDATED_VERSION,
-        occurredAt: SEED_CLOCK_INSTANT,
+        occurredAt: clockInstantAfter(payload.period),
         correlationId: nextWriteId(),
         causationId: null,
         payload,
@@ -851,6 +964,41 @@ async function seed(): Promise<void> {
       for (const invoice of result.invoices) {
         await invoices.saveDraft(invoice, payload.craId);
         totalInvoices++;
+
+        // Historical invoices only (item 6, QA round 1): draft is the default every dense-2026
+        // invoice keeps (Alice's and Claire's own included, both load-bearing for
+        // `apps/web/e2e/*.spec.ts` staying draft-and-present) — `historicalOutcome` opts a
+        // specific historical Cra's invoice into `issued`, or `issued` then immediately
+        // cancelled by a credit note, **through the domain**, in the same date order the Cras
+        // themselves were opened in, so the gapless per-`(entity, fiscalYear)` numbering
+        // (ADR-0007) is genuinely exercised rather than hand-assigned.
+        if (historicalOutcome !== undefined) {
+          const issueDate = isoDateInFirmTimeZone(clockInstantAfter(payload.period));
+          const fiscalYear = Number.parseInt(issueDate.slice(0, 4), 10);
+          const sequence = await numberingCounter.nextSequence(seller.id, fiscalYear);
+          invoice.issue({ by: issuer.id, sequence, issueDate });
+          totalIssued++;
+
+          if (historicalOutcome === 'issuedThenCancelled') {
+            const reason: CreditNoteReason = 'entryError';
+            const cancelSequence = await numberingCounter.nextSequence(seller.id, fiscalYear);
+            // `creditNote()` mutates `invoice` to `cancelledByCreditNote` as its last step; the
+            // note itself is never persisted (migration 010, ADR-0057 dropped its table) — the
+            // gap it leaves in `invoice_number` *is* the credit note, the only trace of a
+            // never-materialised document this mockup does not build (README's own "Ce que je ne
+            // construis pas").
+            creditNote({
+              id: nextWriteId(),
+              invoice,
+              reason,
+              sequence: cancelSequence,
+              issueDate,
+            });
+            totalCancelled++;
+          }
+
+          await invoices.save(invoice);
+        }
       }
 
       // The days the validation carried that produced no line, with the reason (ADR-0037). The
@@ -874,7 +1022,10 @@ async function seed(): Promise<void> {
 
     await client.query('COMMIT');
 
-    console.log(`Seeded ${String(totalInvoices)} draft invoices.`);
+    console.log(`Seeded ${String(totalInvoices)} invoices in total.`);
+    console.log(
+      `  of which ${String(totalIssued)} issued, ${String(totalCancelled)} cancelled by a credit note.`,
+    );
     if (totalDeclined > 0) {
       console.log(`${String(totalDeclined)} mission(s) declined (Forfait or unrecognised).`);
     }
