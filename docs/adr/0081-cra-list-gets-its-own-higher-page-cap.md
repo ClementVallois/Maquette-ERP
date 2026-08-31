@@ -48,6 +48,17 @@ by `/factures`; item 6's own invoice volume was kept deliberately under fifty pe
 specifically so this ADR would not have to widen that cap too on the same commit (ADR-0080's own
 consequence section).
 
+BUILD-RULES gives the pagination cap two reasons, not one: there is no "show all", **and** the
+control sits on collection-in-volume because the asset it protects is the aggregate. This ADR only
+relaxes the first for this one route, because the second does not apply to what it returns.
+`CraListItem` (`packages/timesheet/src/domain/cra-repository.ts`) carries `id`, `consultantId`,
+`officeId`, `period`, `status` and `recordedQuarterDays` — a quantity, not a rate. No `Cjm`, `Tjm`
+or margin rides on this projection; that comment is the repository's own, older than this ADR
+(BUILD-RULES § Authorization again). `/api/v1/invoices`, by contrast, carries a total on every row
+— which is exactly why it keeps `MAX_PAGE_SIZE` unmeasured and untouched above rather than getting
+the same treatment: raising its cap would raise the volume of a projection the rule is actually
+about.
+
 ## Rejected option
 
 **Raise `MAX_PAGE_SIZE` itself, globally.** Rejected: `/api/v1/invoices` shares the same constant,
