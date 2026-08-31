@@ -155,6 +155,55 @@ test.describe('item 1 — switching persona drops stale data without a reload', 
   });
 });
 
+/**
+ * QA round 1, item 2: clicking a persona used to briefly re-render the selector's own loading
+ * skeleton before the destination screen appeared, because `useSelectPersona`'s `onSuccess` called
+ * `queryClient.clear()` — wiping the still-mounted personas/session queries back to `isPending` for
+ * the frame before `navigate()` took over. The fix (`features/session/hooks.ts`) switched to an
+ * unfiltered `invalidateQueries()`, which marks every query stale without deleting the data an
+ * observer already has, so nothing still on screen drops to its skeleton.
+ *
+ * A `MutationObserver` registered before the click is what makes this deterministic rather than a
+ * race: it cannot miss a synchronous flash the way a single post-click `expect(...).not.toBeVisible()`
+ * could, and it does not depend on how fast localhost happens to respond. `page.route` on the
+ * personas endpoint adds a delay on top, purely so a human reading a failing run sees an obvious
+ * repro rather than a one-frame blip.
+ */
+test.describe('item 2 — no skeleton flash between choosing a persona and landing on its home', () => {
+  test('the selector never falls back to its own loading skeleton once a persona is chosen', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page.locator('[data-persona-key="consultant-paris"] button').waitFor({
+      state: 'visible',
+    });
+
+    await page.route('**/api/v1/personas', async (route) => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 300);
+      });
+      await route.continue();
+    });
+
+    await page.evaluate(() => {
+      const flag = { seen: false };
+      const observer = new MutationObserver(() => {
+        if (document.querySelector('ul[aria-hidden="true"]') !== null) flag.seen = true;
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+      Reflect.set(window, '__skeletonFlash', flag);
+    });
+
+    await page.locator('[data-persona-key="consultant-paris"] button').click();
+    await page.waitForURL('/tableau-de-bord');
+
+    const skeletonFlashed = await page.evaluate(
+      () => Reflect.get(window, '__skeletonFlash') as { seen: boolean } | undefined,
+    );
+    expect(skeletonFlashed?.seen).toBe(false);
+  });
+});
+
 test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matrix edit/save/submit', () => {
   test('the validated June matrix shows exactly what the seed says it does', async ({ page }) => {
     await choosePersona(page, 'consultant-paris');

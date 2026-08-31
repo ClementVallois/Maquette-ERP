@@ -42,14 +42,18 @@ export function useSelectPersona(): UseMutationResult<SelectPersonaResponse, Err
 
   return useMutation({
     mutationFn: async (key: string) => unwrap(await selectPersona(key)),
-    // `clear()`, not `invalidateQueries({ queryKey: SESSION_QUERY_KEY })`: every query in this SPA
-    // is scoped by the persona cookie (`lib/query-client.ts`'s `staleTime: 30_000` otherwise keeps
-    // serving the *previous* persona's cached CRA list, dashboard and grid for up to thirty
-    // seconds). Invalidating one key per feature would need this file to grow in lockstep with
-    // every feature added under `features/`; dropping the whole cache is the one fix that cannot
-    // fall out of step with the feature list.
+    // `invalidateQueries()` with no filter, not `clear()`: every query in this SPA is scoped by
+    // the persona cookie (`lib/query-client.ts`'s `staleTime: 30_000` otherwise keeps serving the
+    // *previous* persona's cached CRA list, dashboard and grid for up to thirty seconds), so
+    // everything has to be marked stale on a switch — an unfiltered call reaches the whole cache
+    // without this file growing one entry per feature, same as `clear()` did. The difference is
+    // that invalidation keeps each query's last-known data in place and only marks it stale, so an
+    // observer still mounted at the moment this resolves (the persona grid itself, for the one
+    // frame before `navigate()` lands) keeps rendering what it already has instead of dropping to
+    // `isPending` and flashing its skeleton — `clear()` removed the data outright, which is what
+    // caused that flash (QA round 1, item 2).
     onSuccess: () => {
-      queryClient.clear();
+      void queryClient.invalidateQueries();
     },
   });
 }
@@ -62,7 +66,7 @@ export function useClearPersona(): UseMutationResult<SessionResponse, Error, voi
     // Same reasoning as `useSelectPersona` above — the identity acting changed (to none), so every
     // persona-scoped query cached under the old one is stale in a sense `staleTime` does not cover.
     onSuccess: () => {
-      queryClient.clear();
+      void queryClient.invalidateQueries();
     },
   });
 }
