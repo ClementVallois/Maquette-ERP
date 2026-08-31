@@ -3617,3 +3617,14 @@ session's own untracked working note) updated in place, not committed. Two new A
 
 Item 6 is complete: all four steps of the Wave 2 plan have shipped, and the branch's full scope
 (items 1–8) is green.
+
+**Double checkpoint, this section's own second question ("what breaks in three months").**
+`/api/v1/invoices` was deliberately kept out of this session's fix — its own worst case (Paris, 28) was never measured against `MAX_PAGE_SIZE = 50`, and ADR-0081 says so out loud rather than
+raising it unmeasured. That is a real, named gap, not a silent one: the day the seed's invoice
+volume grows again — more Regie fillers, a longer historical span, or a second credit note per
+veteran — Paris or Lyon's own count can cross 50 before anyone notices, reproducing exactly the
+defect this session closed for Cras, one route over. **Named phase**: the next session that touches
+`scripts/lib/seed-data.ts`'s invoice-producing assignments (item 6's own natural continuation, no
+number assigned yet) re-measures `/api/v1/invoices`'s per-office count the same way this one
+measured Cras, before adding more Regie-staffed consultants — and gives it ADR-0081's own treatment
+(a route-specific cap, not a raise of the shared constant) if it is needed.
