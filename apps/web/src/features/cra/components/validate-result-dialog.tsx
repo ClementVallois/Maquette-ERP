@@ -9,13 +9,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import type { DeclinedDay, ValidationResponse } from '@/features/cra/types';
+import type { InvoiceListItem } from '@/features/factures/types';
 import { frenchDays, frenchEuros } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 
-import type { PreFacturierCraRow, PreFacturierInvoiceRow } from '../types';
+import type { DeclinedDay, ValidationResponse } from '../types';
 
-const INVOICE_STATUS_VARIANT: Record<PreFacturierInvoiceRow['status'], StatusBadgeVariant> = {
+const INVOICE_STATUS_VARIANT: Record<InvoiceListItem['status'], StatusBadgeVariant> = {
   draft: 'invoice-draft',
   issued: 'invoice-issued',
   cancelledByCreditNote: 'invoice-cancelled',
@@ -29,16 +29,22 @@ const DECLINE_REASON_VARIANT: Record<DeclinedDay['reason'], StatusBadgeVariant> 
 };
 
 interface ValidateResultDialogProps {
-  readonly cra: PreFacturierCraRow;
+  // Deliberately narrow rather than a full pré-facturier row: this dialog only ever reads the
+  // consultant's name for its title. The CRA detail screen (item 3, QA round 1) has a Cra but not
+  // a pré-facturier row, and does not need to fabricate the rest to open this dialog.
+  readonly cra: { readonly consultantName: string };
   readonly result: ValidationResponse;
   readonly onClose: () => void;
 }
 
 /**
- * Task 7.2's result dialog. Purely presentational — `pre-facturier-screen.tsx` already ran the
- * mutation and is the one that decided which toast to show (success vs. `replayed`); this
- * component only ever renders a result it was handed, success or replay alike, which is what
- * "résultat d'origine affiché" means on a replay.
+ * Task 7.2's result dialog. Purely presentational — the caller already ran the mutation and is the
+ * one that decided which toast to show (success vs. `replayed`); this component only ever renders
+ * a result it was handed, success or replay alike, which is what "résultat d'origine affiché" means
+ * on a replay.
+ *
+ * Lives under `features/cra/`, not `features/pre-facturier/` where it was first written — same
+ * reasoning as this file's sibling `refuse-dialog.tsx`, whose header explains the direction.
  */
 export function ValidateResultDialog({
   cra,

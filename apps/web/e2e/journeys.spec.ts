@@ -258,6 +258,78 @@ test.describe('item 2 — no skeleton flash between choosing a persona and landi
   });
 });
 
+/**
+ * QA round 1, item 3: a manager used to have to leave the pré-facturier through the CRA menu
+ * (`cra-list-screen.tsx`'s own link, covered separately by "items 4/5" below) to open a row and
+ * decide it. `pre-facturier-screen.tsx`'s `craColumns` now offers "Ouvrir" on every manager row,
+ * and `manager-cra-grid-screen.tsx` now offers Valider/Refuser on a decidable one, reusing the same
+ * dialogs the pré-facturier table itself uses (moved to `features/cra/components/` so `features/cra`
+ * does not import from `features/pre-facturier` — see `refuse-dialog.tsx`'s header).
+ *
+ * 2026-09 rather than the seed's own June or J1's own August: both are claimed by other tests in
+ * this file by the time it finishes, and this test needs a Cra nothing else decides first. Filled
+ * the fast way (one day, then "Remplir les jours ouvrés vides") — the fill mechanism itself is
+ * `J1`'s own test's job, not this one's.
+ */
+test.describe('item 3 — a manager opens and decides a CRA from the pré-facturier', () => {
+  test('the pré-facturier’s “Ouvrir” link reaches the CRA, and validating from there lands back on the pré-facturier', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    const period = '2026-09';
+
+    await choosePersona(page, 'consultant-paris');
+    await page.goto('/cra/2026-06');
+    await page.getByRole('link', { name: 'Mois suivant' }).click();
+    await page.waitForURL('/cra/2026-07');
+    await page.getByRole('link', { name: 'Mois suivant' }).click();
+    await page.waitForURL('/cra/2026-08');
+    await page.getByRole('link', { name: 'Mois suivant' }).click();
+    await page.waitForURL(`/cra/${period}`);
+
+    await page.getByRole('combobox', { name: 'Ajouter une activité' }).click();
+    await page.getByRole('option', { name: DORA }).click();
+    await expect(page.getByRole('rowheader', { name: DORA })).toBeVisible();
+
+    const doraRow = page
+      .getByRole('row')
+      .filter({ has: page.getByRole('rowheader', { name: DORA }) });
+    await doraRow.locator('select').first().selectOption({ label: '1' });
+    await page.getByRole('button', { name: `Remplir les jours ouvrés vides — ${DORA}` }).click();
+
+    await page.getByRole('button', { name: 'Enregistrer' }).click();
+    await page.getByText('Enregistré', { exact: true }).waitFor({ state: 'visible' });
+    await page.getByRole('button', { name: 'Soumettre au manager' }).click();
+    await page.getByText('Soumis', { exact: true }).waitFor({ state: 'visible' });
+
+    await switchPersonaViaUi(page, 'manager-paris');
+    await page.goto(`/pre-facturier?period=${period}`);
+    await page.getByRole('heading', { name: 'Les CRA du mois' }).waitFor({ state: 'visible' });
+
+    const aliceRow = page.getByRole('row').filter({ hasText: 'Alice Martin' });
+    await aliceRow.getByRole('link', { name: 'Ouvrir' }).click();
+    await page.waitForURL(new RegExp(`/cra/${period}/.+`));
+
+    await page
+      .getByText('Vous consultez le CRA de Alice Martin', { exact: false })
+      .waitFor({ state: 'visible' });
+    const validateButton = page.getByRole('button', { name: 'Valider' });
+    await expect(validateButton).toBeVisible();
+    await validateButton.click();
+
+    const validateDialog = page.getByRole('dialog');
+    await validateDialog.getByText('Validation du CRA de Alice Martin').waitFor({
+      state: 'visible',
+    });
+    await validateDialog.getByRole('button', { name: 'Fermer' }).last().click();
+
+    // "Land back somewhere sensible after validating" — the brief's own words.
+    await page.waitForURL(new RegExp(`/pre-facturier\\?period=${period}`));
+    await expect(aliceRow.getByRole('button', { name: 'Valider' })).toHaveCount(0);
+    await expect(aliceRow.getByRole('link', { name: 'Ouvrir' })).toBeVisible();
+  });
+});
+
 test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matrix edit/save/submit', () => {
   test('the validated June matrix shows exactly what the seed says it does', async ({ page }) => {
     await choosePersona(page, 'consultant-paris');

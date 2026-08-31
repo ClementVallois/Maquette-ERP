@@ -3,7 +3,15 @@ import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
 import { unwrap } from '@/lib/api-client';
 
-import { fetchCalendar, fetchCraGrid, fetchCraList, fetchManagerCraGrid, saveMonth } from './api';
+import {
+  fetchCalendar,
+  fetchCraGrid,
+  fetchCraList,
+  fetchManagerCraGrid,
+  postRefusal,
+  postValidation,
+  saveMonth,
+} from './api';
 import type {
   CalendarResponse,
   CraGridResponse,
@@ -11,10 +19,19 @@ import type {
   ManagerCraGridResponse,
   MonthEntriesRequest,
   MonthEntriesResponse,
+  RefusalResponse,
+  ValidationResponse,
 } from './types';
 
 const CRA_LIST_QUERY_KEY = ['cra', 'list'] as const;
 const CALENDAR_QUERY_KEY = ['cra', 'calendar'] as const;
+
+// Rebuilt here rather than imported: `features/pre-facturier/hooks.ts` keeps its own
+// `preFacturierQueryKey` private for exactly this reason — see that file's comment. The two agree
+// on the shape `['pre-facturier', period]` by convention; change one, change both.
+function preFacturierQueryKey(period: string): readonly [string, string] {
+  return ['pre-facturier', period] as const;
+}
 
 function craGridQueryKey(period: string): readonly [string, string, string] {
   return ['cra', 'grid', period] as const;
@@ -26,6 +43,13 @@ function managerCraGridQueryKey(
 ): readonly [string, string, string, string] {
   return ['cra', 'manager-grid', consultantId, period] as const;
 }
+
+// Unparameterised on purpose: both mutations below can be triggered from the pré-facturier table
+// (which knows no `consultantId` worth keying on beyond the row that just changed) or from the CRA
+// detail screen (`features/cra/components/manager-cra-grid-screen.tsx`, item 3 of QA round 1,
+// which does). Matching the whole `['cra', 'manager-grid']` prefix reaches whichever one of
+// (possibly many) manager-grid queries is active without either caller having to say which.
+const MANAGER_GRID_QUERY_KEY_PREFIX = ['cra', 'manager-grid'] as const;
 
 export const craListQueryOptions = queryOptions({
   queryKey: CRA_LIST_QUERY_KEY,
@@ -92,6 +116,51 @@ export function useSaveMonth(
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: craGridQueryKey(period) }),
         queryClient.invalidateQueries({ queryKey: CRA_LIST_QUERY_KEY }),
+      ]);
+    },
+  });
+}
+
+/**
+ * Task 7.2. `postValidation` drafts an invoice this feature does not itself list — the two
+ * callers each own the query that has to change: the pré-facturier table (whose row's status and
+ * decidability just changed, and whose invoices table just gained a row), and, since item 3 (QA
+ * round 1), the CRA detail screen a manager can now validate from directly. Invalidating all three
+ * queries rather than tracking which caller needs which is the same reasoning
+ * `features/session/hooks.ts`'s `invalidateOnPersonaChange` uses: cheaper than either caller
+ * having to remember the other's cache key, and correct regardless of which one triggered it.
+ */
+export function useValidateCra(
+  period: string,
+): UseMutationResult<ValidationResponse, Error, string> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (craId: string) => unwrap(await postValidation(craId)),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: preFacturierQueryKey(period) }),
+        queryClient.invalidateQueries({ queryKey: CRA_LIST_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: MANAGER_GRID_QUERY_KEY_PREFIX }),
+      ]);
+    },
+  });
+}
+
+/** Task 7.3. Same invalidation reasoning as `useValidateCra` above. */
+export function useRefuseCra(
+  period: string,
+): UseMutationResult<RefusalResponse, Error, { readonly craId: string; readonly reason: string }> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ craId, reason }: { craId: string; reason: string }) =>
+      unwrap(await postRefusal(craId, reason)),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: preFacturierQueryKey(period) }),
+        queryClient.invalidateQueries({ queryKey: CRA_LIST_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: MANAGER_GRID_QUERY_KEY_PREFIX }),
       ]);
     },
   });
