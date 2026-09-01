@@ -254,8 +254,8 @@ describe('the session routes', () => {
       'billing-paris',
     ]);
     expect(body.notice).toBe(
-      'Cette maquette n’a pas d’authentification : on choisit une identité, et tout le monde ' +
-        'peut choisir n’importe laquelle.',
+      'These are demonstration personas, not accounts. Anyone may select any of them; ' +
+        'there is no authentication in this mockup.',
     );
   });
 

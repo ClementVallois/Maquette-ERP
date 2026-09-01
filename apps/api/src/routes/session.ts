@@ -41,12 +41,12 @@ export function registerSessionRoutes(
 
       return {
         // Said in the payload and not only in the README: a client that only ever reads this
-        // route still learns that none of this is authentication. French: this is the only
-        // copy of the notice rendered to a visitor (item 1, QA round 1) — the selector used to
-        // also show a French paragraph of its own, which duplicated this idea and was dropped.
+        // route still learns that none of this is authentication. English, like every other
+        // string under `/api/v1` (ADR-0026, and ADR-0060's own rejected option): the French
+        // sentence a visitor reads is `LABELS.persona.notice`, on the screen that renders it.
         notice:
-          'Cette maquette n’a pas d’authentification : on choisit une identité, et tout le ' +
-          'monde peut choisir n’importe laquelle.',
+          'These are demonstration personas, not accounts. Anyone may select any of them; ' +
+          'there is no authentication in this mockup.',
         personas: personas.map(view),
       };
     },

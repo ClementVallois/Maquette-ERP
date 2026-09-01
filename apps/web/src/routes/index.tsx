@@ -66,12 +66,9 @@ function PersonaSelectorPage(): ReactElement {
         </Alert>
       )}
 
-      {/* This contract requires the API's notice verbatim, not a local label. */}
-      {personas.data !== undefined && (
-        <div className="rounded-xl border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
-          {personas.data.notice}
-        </div>
-      )}
+      <div className="rounded-xl border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
+        {LABELS.persona.notice}
+      </div>
 
       {personas.isPending && <PersonaGridSkeleton />}
 

@@ -54,6 +54,11 @@ export const LABELS = {
     emptyTitle: 'Aucun persona disponible',
     emptyBody: 'Cette instance ne propose aucun persona pour le moment.',
     selectError: 'Le persona n’a pas pu être choisi. Réessayez.',
+    /** The one place a visitor is told this is not authentication (item 1, QA round 1). The API
+     * says the same thing in English on `GET /api/v1/personas`, for a client that never renders
+     * a screen; French display copy lives here, per ADR-0026. */
+    notice:
+      'Cette maquette n’a pas d’authentification : on choisit une identité, et tout le monde peut choisir n’importe laquelle.',
   },
 
   roles: {
