@@ -108,6 +108,14 @@ _Avoid_: Employee, User, Resource
 The nullable date a `Consultant` left the firm (`public.consultants.departure_date`, ADR-0079). `NULL` means still with the firm — the column's own default, so an existing row needs no backfill. Translates without loss, so it is English like `Office` and `Practice`, not kept French like `Intercontrat` or `Habilitation`. A departure erases nothing: it removes the consultant from a manager's _current_ roster and the pré-facturier's pending list, while every `Cra` and `Invoice` already on their name stays readable. The one invariant it carries is in the domain, not only in this column: a `Cra` cannot be opened for a period that starts after the departure (`Cra.open`, `CraAfterDepartureError`).
 _Avoid_: Active flag, Termination, Offboarding, Deletion
 
+**Roster**:
+The set of `Consultant`s a `Manager` may read: their own `Office`'s consultants, excluding the manager asking and anyone whose `Departure` has passed (`GET /api/v1/consultants`, ADR-0077). It is a read, never a stored list — the membership is derived from `office_id` and `departure_date` every time, so there is nothing to keep in step. It names an office's people, not a project's: who is staffed on a `Mission` is an `Assignment`.
+_Avoid_: Team, Headcount, Directory, Staff list
+
+**Veteran**:
+A `Consultant` seeded with a sparse `Cra` history reaching back to 2016, as opposed to one holding only the dense recent months (`HISTORICAL_VETERANS`, `scripts/lib/seed-data.ts`). A fixture term, not a business one: the firm grants a veteran nothing, and no rule anywhere reads it. It exists so the dataset can exercise a decade of periods, an extended `Mission` and a `Departure` without inventing a second client base (ADR-0080).
+_Avoid_: Senior (a `Grade`), Historical consultant, Legacy consultant
+
 **Practice** (🇬🇧 translated from _pôle_):
 An area of expertise the firm sells: audit, SOC, GRC, IAM, offensive security. Translates without loss.
 _Avoid_: Pole, Department, Team, BusinessUnit
