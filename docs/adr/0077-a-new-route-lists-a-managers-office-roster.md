@@ -40,10 +40,17 @@ actor, not from the request").
   (`columnsFor`'s own comment), so granting the read to either role would be a capability nothing
   exercises. Widening it is a one-line `forRoles` change if that changes; adding it ahead of a real
   caller is the anticipatory permission BUILD-RULES rules out.
-- **No pagination, no filter of its own.** A roster is bounded by an office's headcount, not by
-  the CRA table's row count — this mockup's dataset tops out at a handful of consultants per
-  office even after item 6. If a real office roster ever needed pagination, that is a
-  reconsideration on its own (see below), not a reason to add unused query parameters today.
+- **No pagination, no filter of its own — and this is a departure from BUILD-RULES**, which says
+  pagination is hard-capped including through the API and that there is no "show all". Naming it
+  rather than leaving it implied: the rule has two reasons, an unbounded read and an aggregate
+  reachable through a list, and this route answers neither. A roster is bounded by an office's
+  headcount, not by the CRA table's row count — twenty rows for the largest office even after
+  item 6 — and the payload is `{ id, displayName }`, with no Tjm, Cjm or margin the cap could be
+  protecting. The aggregate half of the rule therefore holds unchanged here; the bound half is
+  carried by the domain (an office roster) instead of by a `LIMIT`. If a real office roster ever
+  needed pagination, that is a reconsideration on its own (see below), not a reason to add unused
+  query parameters today. ADR-0081, on this same round, relaxes the other half of the same rule
+  for `GET /api/v1/cras` and names it the same way.
 - **`consultantsOfOffice`** is a new, small method on the existing `PgReferenceReader` — one query
   against `public.consultants`, the same reader `/api/v1/pre-facturier` and the manager's own CRA
   list already use for `consultantNames()`. No new persistence class; this reuses the reader that

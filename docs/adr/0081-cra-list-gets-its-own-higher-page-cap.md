@@ -86,5 +86,5 @@ existing "cap is here and in the repository" belt-and-braces shape is preserved 
 different number for this one route.
 
 **A future office past 200 Cras reintroduces the exact defect this ADR closes**, silently, unless
-someone remembers to check. `docs/todo.md`/`docs/open-questions.md` name the threshold above so
+someone remembers to check. `docs/qa-rounds.md`/`docs/open-questions.md` name the threshold above so
 the next person sizing the seed further has somewhere to look before they hit it blind.
