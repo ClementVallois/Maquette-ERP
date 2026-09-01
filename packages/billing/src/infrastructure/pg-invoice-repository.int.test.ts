@@ -304,6 +304,29 @@ describe('PgInvoiceRepository', () => {
     expect(found!.totals.totalIncludingVatCents).toBe(1_638_000);
   });
 
+  it('saves and retrieves a cancelledByCreditNote invoice — totals stay readable', async () => {
+    // The regression this test exists for: #upsertInvoice gated totals on status === 'issued',
+    // so a cancelledByCreditNote invoice — which keeps its totals per
+    // assertInvoiceStateIsCoherent — was written with null ones and could never be read back.
+    await seedReferenceData();
+
+    const invoice = makeDraftInvoice();
+    invoice.issue({ by: 'claire', sequence: 43, issueDate: '2026-04-02' });
+    await repo().save(invoice);
+
+    invoice.cancelByCreditNote();
+    await repo().save(invoice);
+
+    const found = await repo().findById('invoice-1', parisManager);
+
+    expect(found).not.toBeNull();
+    expect(found!.status).toBe('cancelledByCreditNote');
+    expect(found!.number).toBe('TST-2026-000043');
+    expect(found!.totals.totalExcludingVatCents).toBe(1_365_000);
+    expect(found!.totals.vatTotalCents).toBe(273_000);
+    expect(found!.totals.totalIncludingVatCents).toBe(1_638_000);
+  });
+
   it('saveDraft records the source CRA id', async () => {
     await seedReferenceData();
 

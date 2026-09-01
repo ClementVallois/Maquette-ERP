@@ -396,7 +396,10 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         mentions: invoice.mentions,
         lines: invoice.lines,
         vatBreakdown: invoice.vatBreakdown,
-        totals: invoice.status === 'issued' ? invoice.totals : null,
+        // Mirrors assertInvoiceStateIsCoherent (billing/domain/invoice.ts): draft is the only
+        // status with no totals — issued, cancelledByCreditNote and any other non-draft status
+        // carry them.
+        totals: invoice.status === 'draft' ? null : invoice.totals,
       };
     },
   );
