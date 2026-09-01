@@ -88,3 +88,22 @@ month has to reach them through pré-facturier's own month picker, which is `doc
 row dated 31/08/2026 for a related, already-open reason (that picker's own page cap can omit an
 old period for a large office). This ADR makes the dashboard's own count honest; it does not build
 a cross-period queue screen, and does not claim to.
+
+## Addendum, 01/09/2026 — a departed consultant's own row, checked rather than assumed
+
+The double-checkpoint following this commit asked directly: can `pendingDecisions`/`lateCras` now
+surface a departed consultant's Cra, where the single-period read never used to reach far enough
+back to? Checked against `pg-cra-repository.ts`'s `list()` (no `departure_date` clause) and against
+ADR-0079, rather than assumed: **no code change is needed, and none is added.** ADR-0079's own
+invariant is at `Cra.open`, not at any read — a Cra cannot be _created_ for a period starting after
+the consultant's departure, for any status, so no period entirely after a departure can ever hold a
+`submitted`/`draft`/`refused` row, whether one period is read or every one. The one row this cannot
+prevent is a Cra opened _before_ departure, for a period that had already started, left
+non-validated at the moment the person left (departure closes `manager_attachments` and
+`assignments`, not open Cras — ADR-0079's own "Consequences"). A single-period read already showed
+that exact row whenever a manager happened to browse that one period; this ADR's only change is
+that it no longer requires browsing that specific period to see it. That is the fix working as
+intended, not a leak: a departed consultant's last month still needs a manager's decision to close
+out cleanly, and hiding it because the person left would be the mockup asserting the invoice chain
+can quietly skip a step ADR-0079 itself says must stay intact. `consultantsOfOffice` (the roster a
+manager _picks new work from_) is unaffected either way — this ADR touches no read that route owns.
