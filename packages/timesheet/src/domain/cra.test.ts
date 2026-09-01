@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { Cra } from './cra.ts';
 import {
+  CraAfterDepartureError,
   CraTransitionError,
   DayOutsidePeriodError,
   DayOverbookedError,
@@ -157,6 +158,39 @@ describe('a Cra', () => {
 
     expect(cra.quarterDaysOn('2026-03-02')).toBe(0);
     expect(cra.lines).toHaveLength(1);
+  });
+});
+
+describe('Cra.open and a consultant departure (ADR-0079)', () => {
+  it('opens normally for a consultant still with the firm (departure null)', () => {
+    expect(() => emptyCra('cra-1', null)).not.toThrow();
+  });
+
+  it('opens normally for a period that ends before the departure', () => {
+    // MARCH is 2026-03; a departure the following month does not touch it.
+    expect(() => emptyCra('cra-1', '2026-04-01')).not.toThrow();
+  });
+
+  it('opens normally the day the departure IS the first day of the period', () => {
+    // "Starts after" is strict: a consultant who left on 1 March still had a March to record.
+    expect(() => emptyCra('cra-1', '2026-03-01')).not.toThrow();
+  });
+
+  it('refuses a period that starts after the departure', () => {
+    // Left mid-February; March starts after that.
+    expect(() => emptyCra('cra-1', '2026-02-15')).toThrow(CraAfterDepartureError);
+  });
+
+  it('names the period and the departure it conflicts with', () => {
+    try {
+      emptyCra('cra-1', '2026-02-15');
+      expect.unreachable('the guard should have refused the period');
+    } catch (error) {
+      expect((error as CraAfterDepartureError).details).toStrictEqual({
+        period: '2026-03',
+        departure: '2026-02-15',
+      });
+    }
   });
 });
 

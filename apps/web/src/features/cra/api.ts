@@ -2,6 +2,7 @@ import { apiFetch, type ApiResult } from '@/lib/api-client';
 
 import type {
   CalendarResponse,
+  ConsultantRosterResponse,
   CraGridResponse,
   CraListResponse,
   ManagerCraGridResponse,
@@ -17,10 +18,50 @@ import type {
  * caller, same pattern as `features/session/api.ts`.
  */
 
-const DEFAULT_LIST_LIMIT = 50;
+/**
+ * 200, not 50 — moves with `apps/api/src/routes/api.ts`'s `CRA_LIST_MAX_PAGE_SIZE` (ADR-0081,
+ * item 6/step 3 QA round 1): the manager's CRA list has no pagination control in this UI, so
+ * whatever this constant asks for is the whole page a manager ever sees, and it has to clear the
+ * route's own cap or a manager past the old 50-row default would see a page silently short of
+ * their office's real count again, one layer up.
+ */
+const DEFAULT_LIST_LIMIT = 200;
 
-export function fetchCraList(): Promise<ApiResult<CraListResponse>> {
-  return apiFetch<CraListResponse>(`/api/v1/cras?limit=${String(DEFAULT_LIST_LIMIT)}`);
+export interface CraListFilters {
+  readonly consultantIds?: readonly string[];
+  readonly statuses?: readonly string[];
+  /** Item 4 (QA round 2): independent of each other and of `consultantIds`/`statuses` above —
+   * matches `apps/api/src/routes/api.ts`'s own `year`/`month` query params. */
+  readonly year?: number;
+  readonly month?: number;
+}
+
+/** Comma-separated, matching `apps/api/src/routes/api.ts`'s own `CommaSeparatedIds`/
+ * `CommaSeparatedStatuses` — an empty/absent list adds no query param at all rather than one
+ * whose value is the empty string, so "no filter" and "filtered to nothing" stay distinguishable
+ * on the wire. */
+export function fetchCraList(filters: CraListFilters = {}): Promise<ApiResult<CraListResponse>> {
+  const params = new URLSearchParams({ limit: String(DEFAULT_LIST_LIMIT) });
+  if (filters.consultantIds !== undefined && filters.consultantIds.length > 0) {
+    params.set('consultantIds', filters.consultantIds.join(','));
+  }
+  if (filters.statuses !== undefined && filters.statuses.length > 0) {
+    params.set('statuses', filters.statuses.join(','));
+  }
+  if (filters.year !== undefined) {
+    params.set('year', String(filters.year));
+  }
+  if (filters.month !== undefined) {
+    params.set('month', String(filters.month));
+  }
+
+  return apiFetch<CraListResponse>(`/api/v1/cras?${params.toString()}`);
+}
+
+/** Item 7 (QA round 1) — the consultant filter's own option list (`features/cra/hooks.ts`'s
+ * `useConsultantRoster` explains why it is a separate read from the list itself). */
+export function fetchConsultantRoster(): Promise<ApiResult<ConsultantRosterResponse>> {
+  return apiFetch<ConsultantRosterResponse>('/api/v1/consultants');
 }
 
 export function fetchCraGrid(period: string): Promise<ApiResult<CraGridResponse>> {

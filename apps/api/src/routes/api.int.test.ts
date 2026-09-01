@@ -31,6 +31,10 @@ const BRUNO = 'api-bruno';
 const EMMA = 'api-emma';
 const HENRI = 'api-henri';
 const CHLOE = 'api-chloe';
+// A consultant who has left the firm (ADR-0079) — present in `public.consultants`, absent from the
+// office roster item 7's picker builds, but never touched otherwise: this file's fixtures do not
+// depend on them existing, so most tests never reference this id at all.
+const DEPARTED = 'api-departed';
 const GRADE = 'api-grade';
 const MISSION = 'api-mission';
 const CLIENT = 'api-client';
@@ -155,6 +159,12 @@ beforeEach(async () => {
             ($7, 'Chloé', 'Dubois', 'api-c@t', $5, 'api-practice', 'consultant')`,
     [ALICE, BRUNO, EMMA, HENRI, PARIS, LYON, CHLOE],
   );
+  await client.query(
+    `INSERT INTO public.consultants
+       (id, first_name, last_name, email, office_id, practice_id, role, departure_date)
+     VALUES ($1, 'Denis', 'Sorel', 'api-d@t', $2, 'api-practice', 'consultant', '2026-01-31')`,
+    [DEPARTED, PARIS],
+  );
   // The grade is created here and not borrowed from `public.grades` with a `SELECT … LIMIT 1`.
   // The integration job migrates and does **not** seed, so that table is empty in CI: the INSERT
   // matched no row, Alice had no `Cjm`, and the economics route answered 500 — while the same test
@@ -262,6 +272,205 @@ describe('GET /api/v1/cras — consultantName (ADR-0071)', () => {
     expect(cras).toContainEqual(
       expect.objectContaining({ consultantId: CHLOE, consultantName: 'Chloé Dubois' }),
     );
+  });
+});
+
+describe('GET /api/v1/cras — consultantIds/statuses (item 7, QA round 1)', () => {
+  it('narrows to the given consultants, comma-separated', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/v1/cras?consultantIds=${ALICE}`,
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    const { cras } = response.json<{ cras: { consultantId: string }[] }>();
+    expect(cras.map((cra) => cra.consultantId)).toStrictEqual([ALICE]);
+  });
+
+  it('narrows to the given statuses, comma-separated — both filters are ANDed, each an OR within itself', async () => {
+    // Everything the fixture seeds is 'submitted' — 'draft' answers empty, and both statuses
+    // together answer everything, which is what proves the list is filtered by the value and not
+    // just by "a statuses param was present at all".
+    const draftOnly = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?statuses=draft',
+      headers: as('manager-paris'),
+    });
+    expect(draftOnly.statusCode).toBe(200);
+    expect(draftOnly.json<{ cras: unknown[] }>().cras).toStrictEqual([]);
+
+    const submittedOrDraft = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?statuses=submitted,draft',
+      headers: as('manager-paris'),
+    });
+    expect(submittedOrDraft.statusCode).toBe(200);
+    const { cras } = submittedOrDraft.json<{ cras: { consultantId: string }[] }>();
+    expect(cras.map((cra) => cra.consultantId).sort()).toStrictEqual([ALICE, CHLOE].sort());
+  });
+
+  it('refuses an unknown status rather than silently ignoring it', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?statuses=bogus',
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('a consultant id outside the actor’s own scope narrows to nothing, never to that id’s office', async () => {
+    // manager-lyon may see nothing this fixture seeds (both Cras are Paris) — asking it for a
+    // real, but out-of-office, consultant id must still answer empty, not Alice's row: the
+    // office boundary runs first and consultantIds only narrows further, never around it.
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/v1/cras?consultantIds=${ALICE}`,
+      headers: as('manager-lyon'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ cras: unknown[] }>().cras).toStrictEqual([]);
+  });
+});
+
+describe('GET /api/v1/cras — year/month (item 4, QA round 2)', () => {
+  // Both fixture rows (`CRA`, `CRA_TWO`) sit at '2026-06' — the same "one real value proves the
+  // positive case, a nearby wrong one proves the filter actually reads the value" shape the
+  // statuses tests above use.
+  it('narrows to the given year, independent of month', async () => {
+    const matching = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?year=2026',
+      headers: as('manager-paris'),
+    });
+    expect(matching.statusCode).toBe(200);
+    expect(
+      matching.json<{ cras: { consultantId: string }[] }>().cras.map((cra) => cra.consultantId),
+    ).toStrictEqual(expect.arrayContaining([ALICE, CHLOE]));
+
+    const wrongYear = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?year=2025',
+      headers: as('manager-paris'),
+    });
+    expect(wrongYear.statusCode).toBe(200);
+    expect(wrongYear.json<{ cras: unknown[] }>().cras).toStrictEqual([]);
+  });
+
+  it('narrows to the given month, independent of year', async () => {
+    const matching = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?month=6',
+      headers: as('manager-paris'),
+    });
+    expect(matching.statusCode).toBe(200);
+    expect(
+      matching.json<{ cras: { consultantId: string }[] }>().cras.map((cra) => cra.consultantId),
+    ).toStrictEqual(expect.arrayContaining([ALICE, CHLOE]));
+
+    const wrongMonth = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?month=7',
+      headers: as('manager-paris'),
+    });
+    expect(wrongMonth.statusCode).toBe(200);
+    expect(wrongMonth.json<{ cras: unknown[] }>().cras).toStrictEqual([]);
+  });
+
+  it('ANDs year and month together, same as any other two filters', async () => {
+    const both = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?year=2026&month=6',
+      headers: as('manager-paris'),
+    });
+    expect(both.statusCode).toBe(200);
+    expect(
+      both.json<{ cras: { consultantId: string }[] }>().cras.map((cra) => cra.consultantId),
+    ).toStrictEqual(expect.arrayContaining([ALICE, CHLOE]));
+
+    const rightYearWrongMonth = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?year=2026&month=7',
+      headers: as('manager-paris'),
+    });
+    expect(rightYearWrongMonth.statusCode).toBe(200);
+    expect(rightYearWrongMonth.json<{ cras: unknown[] }>().cras).toStrictEqual([]);
+  });
+
+  it('refuses a month outside 1-12 rather than silently ignoring it', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?month=13',
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+});
+
+describe('GET /api/v1/consultants (item 7, QA round 1)', () => {
+  it("answers the manager's own office roster, consultants only", async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/consultants',
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    const { consultants } = response.json<{ consultants: { id: string; displayName: string }[] }>();
+    expect(consultants.map((consultant) => consultant.id).sort()).toStrictEqual(
+      [ALICE, CHLOE].sort(),
+    );
+    // Bruno (the manager asking) is a row in `public.consultants` too — never listed among the
+    // people *this* filter can pick, which is the point of `role = 'consultant'` in the query.
+    expect(consultants.map((consultant) => consultant.id)).not.toContain(BRUNO);
+  });
+
+  it('drops a departed consultant from the office roster (ADR-0079)', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/consultants',
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    const { consultants } = response.json<{ consultants: { id: string; displayName: string }[] }>();
+    // DEPARTED is the same office, the same role, and would otherwise sort into this list — the
+    // one thing that keeps them out is `departure_date IS NULL` in `consultantsOfOffice`.
+    expect(consultants.map((consultant) => consultant.id)).not.toContain(DEPARTED);
+  });
+
+  it('never crosses the office boundary, even when the other office has nobody to hide', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/consultants',
+      headers: as('manager-lyon'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ consultants: unknown[] }>().consultants).toStrictEqual([]);
+  });
+
+  it('refuses a consultant persona — this filter is manager-only', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/consultants',
+      headers: as('consultant-paris'),
+    });
+
+    expect(response.statusCode).toBe(403);
+  });
+
+  it('refuses a billing persona too: no screen renders this filter for that role yet', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/consultants',
+      headers: as('billing-paris'),
+    });
+
+    expect(response.statusCode).toBe(403);
   });
 });
 
@@ -709,7 +918,11 @@ describe('the progressive-disclosure read', () => {
 });
 
 describe('pagination', () => {
-  it('refuses a page size past the cap rather than silently narrowing it', async () => {
+  // 200, not 50: ADR-0081 (item 6/step 3, QA round 1) gave `GET /api/v1/cras` its own cap, past
+  // `MAX_PAGE_SIZE` (still 50, and still what `/api/v1/invoices` and every other list here share)
+  // — raised once the seed's roster expansion measured a real office clearing fifty Cras (Paris,
+  // 65, `docs/adr/0080-…`).
+  it('refuses a page size past this route’s own cap rather than silently narrowing it', async () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/v1/cras?limit=1000',
@@ -723,11 +936,39 @@ describe('pagination', () => {
   it('accepts the cap itself', async () => {
     const response = await app.inject({
       method: 'GET',
-      url: '/api/v1/cras?limit=50',
+      url: '/api/v1/cras?limit=200',
       headers: as('manager-paris'),
     });
 
     expect(response.statusCode).toBe(200);
+  });
+
+  // The regression item 6/step 3 exists to close: before ADR-0081, an office whose Cra count
+  // passed the *old* 50-row default answered this route wrong (silently truncated), not thin. 65
+  // rows — the exact worst case the roster expansion measured for Paris — asked for at the old
+  // default and answered in full, unfiltered.
+  it('a manager with more than the old 50-row cap’s worth of Cras sees every one of them, unfiltered', async () => {
+    const { client } = transaction;
+    const rowCount = 65;
+    await client.query(
+      `INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+       SELECT 'api-bulk-cra-' || g, $1, $2,
+              to_char(DATE '2000-01-01' + (g || ' month')::interval, 'YYYY-MM'), 'draft'
+       FROM generate_series(1, $3::int) AS g`,
+      [ALICE, PARIS, rowCount],
+    );
+
+    const response = await app.inject({
+      method: 'GET',
+      // The default limit (20) would truncate too — this asks for what the office actually has,
+      // the same shape a client sized against a real count (rather than a guess) would send.
+      url: `/api/v1/cras?limit=${String(rowCount + 2)}`,
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    // +2 from `beforeEach`'s own two seeded June Cras (Alice's and Chloé's), both Paris too.
+    expect(response.json<{ cras: unknown[] }>().cras).toHaveLength(rowCount + 2);
   });
 });
 

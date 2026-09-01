@@ -306,7 +306,8 @@ each refusal has a **negative test**.
 ### 1.2 — `DayType` and `WorkingCalendar`
 
 `DayType`: worked, absence, public holiday, weekend. `WorkingCalendar` decides what is workable in
-France (`Europe/Paris`, weekends, the fixed 2026 holiday table of ADR-0004). It is not a utility: it
+France (`Europe/Paris`, weekends, the written holiday table of ADR-0004 — 2026 when this was
+written, 2016–2027 since ADR-0078). It is not a utility: it
 decides what may be billed. Time comes from the injected `Clock`.
 
 ### 1.3 — The `Cra` aggregate and its lifecycle

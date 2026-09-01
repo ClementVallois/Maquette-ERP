@@ -17,7 +17,16 @@ import type { RecordedDayType } from '../domain/day-type.ts';
 import type { ConsultantId, CraId, MissionId, OfficeId } from '../domain/ids.ts';
 import type { CraFlag } from '../domain/submission-checks.ts';
 
-const MAX_PAGE_SIZE = 50;
+/**
+ * 200, not 50 (ADR-0081, item 6/step 3 QA round 1) — this repository's own cap, raised past the
+ * realistic worst case item 6's roster expansion actually measured (Paris, 65 Cras in one
+ * office). Raised **here**, not only in `apps/api/src/routes/api.ts`'s `CraListParams`: a route
+ * cap the repository's own `Math.min` still narrows behind is not a fix, it is a cap that looks
+ * raised and silently isn't. `PgInvoiceRepository`'s own `MAX_PAGE_SIZE` is untouched — a
+ * different file, a different constant, deliberately not shared, so this change cannot loosen the
+ * invoice list too.
+ */
+const MAX_PAGE_SIZE = 200;
 
 interface PgClient {
   query<T>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
@@ -84,6 +93,10 @@ export class PgCraRepository implements CraRepository {
     const { rows } = await this.#client.query<CraListRow>(
       // LEFT JOIN, and the `COALESCE` with it: a month opened and never filled is precisely the
       // row the pré-facturier exists to show, and an inner join would drop it.
+      //
+      // `c.office_id = $1` (and, for a consultant, `$2`) runs first and unconditionally — `$6`
+      // (consultantIds) and `$7` (statuses) are ANDed onto it, never substituted for it, so
+      // neither can widen what the actor may see, only narrow it further (item 7, QA round 1).
       `SELECT c.id, c.consultant_id, c.office_id, c.period, c.status,
               COALESCE(SUM(l.quarter_days), 0)::int AS recorded_quarter_days
        FROM timesheet.cras c
@@ -91,6 +104,10 @@ export class PgCraRepository implements CraRepository {
        WHERE c.office_id = $1
          AND ($2::text IS NULL OR c.consultant_id = $2)
          AND ($5::text IS NULL OR c.period = $5)
+         AND ($6::text[] IS NULL OR c.consultant_id = ANY($6))
+         AND ($7::text[] IS NULL OR c.status = ANY($7))
+         AND ($8::text IS NULL OR left(c.period, 4) = $8)
+         AND ($9::text IS NULL OR right(c.period, 2) = $9)
        GROUP BY c.id, c.consultant_id, c.office_id, c.period, c.status
        ORDER BY c.period DESC, c.consultant_id
        LIMIT $3 OFFSET $4`,
@@ -100,6 +117,16 @@ export class PgCraRepository implements CraRepository {
         limit,
         query.offset,
         query.period ?? null,
+        query.consultantIds !== undefined && query.consultantIds.length > 0
+          ? query.consultantIds
+          : null,
+        query.statuses !== undefined && query.statuses.length > 0 ? query.statuses : null,
+        // `period` is `YYYY-MM` text (migration 002's own comment) — `left`/`right` on that
+        // string is what item 4 (QA round 2)'s year-alone/month-alone filtering needs, cheaper
+        // than a real date type this column was never given. Zero-padded to two digits: `period`
+        // itself always is, and an unpadded '6' would never match `right(c.period, 2)`'s '06'.
+        query.year === undefined ? null : String(query.year),
+        query.month === undefined ? null : String(query.month).padStart(2, '0'),
       ],
     );
 

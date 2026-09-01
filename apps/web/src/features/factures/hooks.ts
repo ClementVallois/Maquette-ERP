@@ -44,8 +44,7 @@ interface IssueVariables {
 /**
  * Task 8.3. Issuing changes the invoiced document (its own detail read) **and** the list's status
  * badge/number/TTC for that row — both queries are invalidated rather than patched by hand, same
- * reasoning `pre-facturier/hooks.ts`'s `useValidateCra` already gives for its own two affected
- * reads.
+ * reasoning `features/cra/hooks.ts`'s `useValidateCra` already gives for its own affected reads.
  */
 export function useIssueInvoice(): UseMutationResult<IssuanceResponse, Error, IssueVariables> {
   const queryClient = useQueryClient();

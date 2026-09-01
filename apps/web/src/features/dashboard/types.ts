@@ -8,10 +8,13 @@
  * three personas, `?period=2026-06`, seed reset) rather than guessed (rule 0bis.8):
  *
  * - consultant: `myMonthStatus` (`CraStatus | null` — `null` only when no Cra exists yet for the
- *   period), `recordedQuarterDays`, `remainingWorkableDays`.
- * - manager: `pendingDecisions` (submitted Cras awaiting a decision), `billableCents` (the same
- *   aggregate `/pre-facturier` shows in full — this route reads the identical composition,
- *   ADR-0053/ADR-0065, so the two screens cannot disagree), `lateCras`.
+ *   period), `recordedQuarterDays`, `remainingWorkableDays`, `refusedPeriods` (ADR-0082: every
+ *   period currently `refused`, not only `period` above).
+ * - manager: `pendingDecisions` (submitted Cras awaiting a decision, across every period —
+ *   ADR-0082), `billableCents` (the requested period's own total — the same aggregate
+ *   `/pre-facturier` shows in full for that period, ADR-0053/ADR-0065, so the two screens cannot
+ *   disagree on it), `lateCras` (closed-period, non-`validated` Cras, across every period —
+ *   ADR-0082 again).
  * - billing: `draftInvoices`, `issuedInvoices`, `totalTtcIssuedCents` — the one branch the Phase 3
  *   placeholder already had right.
  *
@@ -41,6 +44,13 @@ export interface ConsultantDashboard {
   readonly myMonthStatus: DashboardCraStatus | null;
   readonly recordedQuarterDays: number;
   readonly remainingWorkableDays: number;
+  /**
+   * ADR-0082: every period currently `refused`, not only `period` above — a refusal from a month
+   * the visitor has since moved on from still owes a correction, and stops showing anywhere on
+   * this screen the moment `period` defaults past it. Usually holds at most one entry; may hold
+   * `period` itself too (when this month's own refusal is what `myMonthStatus` already reports).
+   */
+  readonly refusedPeriods: readonly string[];
 }
 
 export interface ManagerDashboard {

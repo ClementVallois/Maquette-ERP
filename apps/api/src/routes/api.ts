@@ -1,6 +1,12 @@
 import { API_PROBLEM_TYPES } from '@erp/contracts';
-import { daysOf, isoDateInFirmTimeZone, periodFromIso, QUARTER_DAYS_PER_DAY } from '@erp/platform';
-import { workingCalendar } from '@erp/timesheet';
+import {
+  daysOf,
+  isoDateInFirmTimeZone,
+  lastDayOf,
+  periodFromIso,
+  QUARTER_DAYS_PER_DAY,
+} from '@erp/platform';
+import { CRA_STATUSES, workingCalendar } from '@erp/timesheet';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -47,14 +53,94 @@ const CONFLICT = 409;
  * The cap is here **and** in the repository. Not duplication of a rule: the repository's
  * `Math.min` silently narrows, which is right for a caller that asked for too much by accident;
  * the route refuses, which is right for a caller probing for a "show all". Together they mean
- * there is no page size that returns more than fifty rows, however it is reached.
+ * there is no page size that returns more than fifty rows, however it is reached — for every
+ * list that uses this schema as written. `GET /api/v1/cras` is the one exception
+ * (`CRA_LIST_MAX_PAGE_SIZE` below, ADR-0081): it overrides `limit` at a higher, still-fixed cap,
+ * measured against a real worst case rather than raised on this shared constant, which would have
+ * raised `/api/v1/invoices`'s own cap too, unmeasured.
  */
 const Pagination = z.object({
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+/**
+ * `GET /api/v1/cras`'s own cap (ADR-0081, item 6/step 3, QA round 1) — deliberately **not**
+ * `MAX_PAGE_SIZE` above, which `/api/v1/invoices` and every other list in this file also share:
+ * raising the shared constant would have raised theirs too, unmeasured. Item 6's own roster
+ * expansion measured a real worst case — Paris, 65 Cras in one office once the dense months and
+ * the sparse 2016 history exist (`docs/adr/0080-…`) — and this cap clears it with headroom for
+ * organic growth rather than merely matching it. `MAX_PAGE_SIZE` is still the hard ceiling
+ * BUILD-RULES asks for ("no 'show all'"): 200 is a fixed number, not `Infinity`, and a caller who
+ * asks for more still gets refused by `Pagination`'s own `.max()` shape, reproduced here at a
+ * different value.
+ */
+const CRA_LIST_MAX_PAGE_SIZE = 200;
+
+/**
+ * Every `CraStatus` but `validated` (ADR-0082): the dashboard's own definition of "actionable" —
+ * `submitted` awaits a manager's decision, `refused` awaits the consultant's correction, `draft`
+ * is what a Cra past its own period's close still not validated looks like on the way there. Kept
+ * as a literal tuple rather than `CRA_STATUSES.filter(…)` so its type stays the readonly-tuple
+ * `CraListQuery.statuses` wants, not a widened `CraStatus[]`.
+ */
+const NON_VALIDATED_CRA_STATUSES = ['draft', 'submitted', 'refused'] as const;
+
 const PeriodQuery = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u) });
+
+/**
+ * A single query-string value, comma-separated, rather than a repeated key
+ * (`?consultantIds=a&consultantIds=b`) — Fastify's default querystring parser only produces an
+ * array from a repeated key, and a *single* selection would otherwise arrive as a bare string,
+ * needing a second branch here to tell "one" from "many" apart. Comma-separated needs none: an
+ * absent param stays `undefined` ("every value", the domain's own `CraListQuery` reading), and
+ * empty segments are dropped so a trailing comma or `?consultantIds=` cannot smuggle in `''` as
+ * an id. Two concrete schemas rather than one generic helper: Zod v4's `.pipe()` cannot carry a
+ * type parameter through cleanly (`input<Item>` does not narrow to `string` for an unconstrained
+ * `Item`), and two short schemas cost less than fighting that for two call sites.
+ */
+const CommaSeparatedIds = z
+  .string()
+  .optional()
+  .transform((value) => value?.split(',').filter((entry) => entry.length > 0))
+  .pipe(z.array(z.string().min(1).max(64)).optional());
+
+const CommaSeparatedStatuses = z
+  .string()
+  .optional()
+  .transform((value) => value?.split(',').filter((entry) => entry.length > 0))
+  .pipe(z.array(z.enum(CRA_STATUSES)).optional());
+
+/**
+ * Item 4 (QA round 2): "a year and/or month filter". Two independent, optional numbers rather
+ * than a `period` string — a manager picks a year and a month from two separate dropdowns, not
+ * types a `YYYY-MM`, and either one alone has to narrow on its own (every March, any year; every
+ * period in 2024, any month). `CraListQuery.year`/`.month` (`packages/timesheet`) carry the same
+ * shape through to the repository, which matches each against `period`'s own text directly (that
+ * column is `YYYY-MM` text, not a real date type — migration 002's own comment).
+ */
+const YearQuery = z.coerce.number().int().min(2000).max(2100).optional();
+const MonthQuery = z.coerce.number().int().min(1).max(12).optional();
+
+/**
+ * Item 7 (QA round 1): "for these three consultants, every CRA not yet validated" — both
+ * dimensions, non-exclusive within themselves (an id/status list is an OR) and ANDed with each
+ * other, pushed to the domain's `CraListQuery` (`packages/timesheet`) so item 6's larger office
+ * rosters filter server-side rather than over a page truncated by `limit`/`offset` first.
+ */
+const CraListParams = Pagination.extend({
+  // `limit` overrides the base schema's field, at `CRA_LIST_MAX_PAGE_SIZE` rather than
+  // `MAX_PAGE_SIZE` — this route's own cap, ADR-0081.
+  limit: z.coerce.number().int().min(1).max(CRA_LIST_MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
+  // No exact `period`: unlike `/api/v1/pre-facturier`, this route has never taken one, and item 7
+  // did not ask for one either (the CRA list already shows every period at once, with its own
+  // `period` column) — `year`/`month` below (item 4, QA round 2) narrow *within* that same
+  // always-every-period list, they do not add a single-period mode back.
+  consultantIds: CommaSeparatedIds,
+  statuses: CommaSeparatedStatuses,
+  year: YearQuery,
+  month: MonthQuery,
+});
 
 const IdParam = z.object({ id: z.string().min(1).max(64) });
 const ConsultantParams = z.object({ consultantId: z.string().min(1).max(64) });
@@ -210,18 +296,28 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
     '/api/v1/cras',
     { config: { access: forRoles('consultant', 'manager', 'billing') } },
     async (request, reply) => {
-      const query = parseInput(Pagination, request.query);
+      const query = parseInput(CraListParams, request.query);
       if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
 
       const actor = requireActor(request);
 
       // Filtered, not refused: a consultant sees their own months, a manager the office's. The
       // empty state is ADR-0003's first beat and it is what this route can answer.
+      // `consultantIds`/`statuses` (item 7, QA round 1) narrow within that same filtering — never
+      // widen it, the repository's own contract (`CraListQuery`'s header, `packages/timesheet`).
       return dependencies.transactionally(async (unit) => {
         const cras = await unit.cras.list({
           actor,
           limit: query.value.limit,
           offset: query.value.offset,
+          // `exactOptionalPropertyTypes` refuses an explicit `undefined` — omitted, not passed,
+          // when the query carried no filter on that dimension.
+          ...(query.value.consultantIds === undefined
+            ? {}
+            : { consultantIds: query.value.consultantIds }),
+          ...(query.value.statuses === undefined ? {} : { statuses: query.value.statuses }),
+          ...(query.value.year === undefined ? {} : { year: query.value.year }),
+          ...(query.value.month === undefined ? {} : { month: query.value.month }),
         });
 
         // `consultantName`, presentation rather than a rule — the same source and the same
@@ -238,6 +334,24 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       });
     },
   );
+
+  /**
+   * Item 7 (QA round 1): the consultant filter's own option list, independent of `/api/v1/cras`'
+   * page — a manager's office can hold more Cra rows than one page (item 6 grows a roster past
+   * fifty), so deriving "who can I filter by" from whichever page happens to be loaded would make
+   * the picker's own options depend on which filter is already applied. Manager only, matching
+   * the one caller (`features/cra/components/cra-list-screen.tsx`'s `CraListFilters`, manager-only
+   * itself): billing sees `/api/v1/cras` too, but that screen renders neither a consultant column
+   * nor an "Ouvrir" action for that role, so this filter has nothing on screen for billing to
+   * narrow down yet — granting the read anyway would be capability nothing exercises.
+   */
+  app.get('/api/v1/consultants', { config: { access: forRoles('manager') } }, async (request) => {
+    const actor = requireActor(request);
+
+    return dependencies.transactionally(async (unit) => ({
+      consultants: await new PgReferenceReader(unit.client).consultantsOfOffice(actor.officeId),
+    }));
+  });
 
   app.get(
     '/api/v1/cras/:id',
@@ -313,7 +427,10 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         mentions: invoice.mentions,
         lines: invoice.lines,
         vatBreakdown: invoice.vatBreakdown,
-        totals: invoice.status === 'issued' ? invoice.totals : null,
+        // Mirrors assertInvoiceStateIsCoherent (billing/domain/invoice.ts): draft is the only
+        // status with no totals — issued, cancelledByCreditNote and any other non-draft status
+        // carry them.
+        totals: invoice.status === 'draft' ? null : invoice.totals,
       };
     },
   );
@@ -481,9 +598,17 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           (day) => calendar.nonWorkableReason(day) === null,
         );
 
-        const cra = await dependencies.transactionally((unit) =>
-          unit.cras.findByConsultantAndPeriod(actor.consultantId, period, actor),
-        );
+        const { cra, refused } = await dependencies.transactionally(async (unit) => ({
+          cra: await unit.cras.findByConsultantAndPeriod(actor.consultantId, period, actor),
+          // ADR-0082: a refusal stays visible past the period it happened in, so a consultant who
+          // has moved on to the next month still sees that last month's correction is still owed.
+          refused: await unit.cras.list({
+            actor,
+            statuses: ['refused'],
+            limit: CRA_LIST_MAX_PAGE_SIZE,
+            offset: 0,
+          }),
+        }));
 
         const recordedByDay = new Map<string, number>();
         for (const line of cra?.lines ?? []) {
@@ -500,32 +625,42 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           remainingWorkableDays: workableDays.filter(
             (day) => (recordedByDay.get(day) ?? 0) < QUARTER_DAYS_PER_DAY,
           ).length,
+          refusedPeriods: refused.map((row) => row.period),
         };
       }
 
       if (actor.role === 'manager') {
         const today = isoDateInFirmTimeZone(dependencies.clock.now());
-        // The same composition `GET /api/v1/pre-facturier` answers from (ADR-0053, ADR-0065): the
-        // dashboard's three manager figures are read off it rather than recomputed, so they cannot
-        // disagree with the screen that already shows them in full. That also means this branch
-        // inherits ADR-0053's own fifty-row cap on the office's Cras for the period — its
-        // reconsideration threshold ("reopen when the office page exceeds the cap") is the one that
-        // governs here too, not a second one for the dashboard.
-        const composition = await dependencies.transactionally((unit) =>
-          preFacturierComposition(unit, { actor, requestedPeriod: query.value.period, today }),
-        );
+        // `billableCents` still reads off `preFacturierComposition` for the requested period
+        // specifically (ADR-0053, ADR-0065) — a month's own billable total, not an actionable
+        // state. `pendingDecisions`/`lateCras` no longer come from it (ADR-0082): a Cra awaiting a
+        // decision or already late does not stop being either just because the requested period
+        // changed, so both are read across every period the manager may see instead.
+        const { composition, actionable } = await dependencies.transactionally(async (unit) => ({
+          composition: await preFacturierComposition(unit, {
+            actor,
+            requestedPeriod: query.value.period,
+            today,
+          }),
+          actionable: await unit.cras.list({
+            actor,
+            statuses: NON_VALIDATED_CRA_STATUSES,
+            limit: CRA_LIST_MAX_PAGE_SIZE,
+            offset: 0,
+          }),
+        }));
 
         return {
           period: query.value.period,
           role: 'manager' as const,
-          pendingDecisions: composition.cras.filter((row) => row.status === 'submitted').length,
+          pendingDecisions: actionable.filter((row) => row.status === 'submitted').length,
           billableCents: composition.billable.reduce(
             (total, row) => total + row.totalExcludingVatCents,
             0,
           ),
-          lateCras: composition.cras.filter(
-            (row) => composition.periodClosed && row.status !== 'validated',
-          ).length,
+          // ADR-0054: a closed period's Cra that never reached `validated`. `actionable` already
+          // excludes `validated`, so only the closed-period test is left to apply.
+          lateCras: actionable.filter((row) => lastDayOf(periodFromIso(row.period)) < today).length,
         };
       }
 

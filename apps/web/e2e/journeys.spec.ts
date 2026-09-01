@@ -7,7 +7,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  * `playwright.config.ts`'s `journeys` project (`fullyParallel: false`, `workers: 1`) is what stops
  * a second worker from picking one of these up out of turn. Order matters below: the persona-cache
  * test runs first (nothing it needs depends on anything another test writes), then J1 (which
- * creates `2026-08`'s Cra as a side effect — later tests that need a still-blank future month pick
+ * creates `2026-09`'s Cra as a side effect — later tests that need a still-blank future month pick
  * whatever the "Ouvrir un autre mois" control offers rather than assuming a specific one), then the
  * manager-facing reads (ADR-0071), which are read-only and safe anywhere after the seed exists.
  *
@@ -27,7 +27,7 @@ class FixtureAssumptionError extends Error {}
 
 const DORA = 'Audit DORA — Banque Nationale';
 const PASSI = 'Audit PASSI — Banque Nationale';
-const EDIT_PERIOD = '2026-08';
+const EDIT_PERIOD = '2026-09';
 
 const API_ORIGIN = 'http://127.0.0.1:3000';
 
@@ -127,7 +127,7 @@ test.describe('demo checklist — the opening beat: the selector, notice visible
   test('the API’s own not-authentication notice renders on the first screen', async ({ page }) => {
     await page.goto('/');
     await page
-      .getByText('These are demonstration personas, not accounts', { exact: false })
+      .getByText('n’a pas d’authentification', { exact: false })
       .waitFor({ state: 'visible' });
   });
 });
@@ -151,7 +151,247 @@ test.describe('item 1 — switching persona drops stale data without a reload', 
     // Claire Dubois can only appear here if the office-wide query actually ran: Alice's own
     // cached list (the previous persona's `GET /api/v1/cras`) never contains Claire's name — a
     // stale cache would leave this screen showing only Alice's own months.
-    await expect(page.getByText('Claire Dubois')).toBeVisible();
+    // `.first()`: item 6 (QA round 1) gives Claire a dense June/July/August, so her name is on
+    // more than one row from the very first fresh seed — this check only needs "she is listed at
+    // all", the same reasoning item 7's own check below gives for Alice.
+    await expect(page.getByText('Claire Dubois').first()).toBeVisible();
+  });
+});
+
+/**
+ * QA round 1, item 2: clicking a persona used to briefly re-render the selector's own loading
+ * skeleton before the destination screen appeared, because `useSelectPersona`'s `onSuccess` called
+ * `queryClient.clear()` — wiping the still-mounted personas/session queries back to `isPending` for
+ * the frame before `navigate()` took over. The fix (`features/session/hooks.ts`) switched to an
+ * unfiltered `invalidateQueries()`, which marks every query stale without deleting the data an
+ * observer already has, so nothing still on screen drops to its skeleton.
+ *
+ * A `MutationObserver` registered before the click is what makes this deterministic rather than a
+ * race: it cannot miss a synchronous flash the way a single post-click `expect(...).not.toBeVisible()`
+ * could, and it does not depend on how fast localhost happens to respond. `page.route` on the
+ * personas endpoint adds a delay on top, purely so a human reading a failing run sees an obvious
+ * repro rather than a one-frame blip.
+ */
+test.describe('item 2 — no skeleton flash between choosing a persona and landing on its home', () => {
+  test('the selector never falls back to its own loading skeleton once a persona is chosen', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page.locator('[data-persona-key="consultant-paris"] button').waitFor({
+      state: 'visible',
+    });
+
+    await page.route('**/api/v1/personas', async (route) => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 300);
+      });
+      await route.continue();
+    });
+
+    await page.evaluate(() => {
+      const flag = { seen: false };
+      const observer = new MutationObserver(() => {
+        if (document.querySelector('ul[aria-hidden="true"]') !== null) flag.seen = true;
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+      Reflect.set(window, '__skeletonFlash', flag);
+    });
+
+    await page.locator('[data-persona-key="consultant-paris"] button').click();
+    await page.waitForURL('/tableau-de-bord');
+
+    const skeletonFlashed = await page.evaluate(
+      () => Reflect.get(window, '__skeletonFlash') as { seen: boolean } | undefined,
+    );
+    expect(skeletonFlashed?.seen).toBe(false);
+  });
+
+  /**
+   * The sibling risk `invalidateQueries()` alone would have reintroduced: none of this SPA's query
+   * keys carry a persona/role/office component (`['dashboard', period]`, `['cra', 'list']`), and
+   * `invalidateQueries()`'s default `refetchType: 'active'` only refetches queries a component is
+   * currently subscribed to — an **inactive** cache entry (the consultant dashboard, left behind
+   * when this test navigates away from it) is marked stale but keeps its data. Left alone, the
+   * manager's `/tableau-de-bord` would remount that same query key, find `isPending: false`, and
+   * paint the *previous* persona's cards before the background refetch replaced them — worse than
+   * a skeleton, in an app whose whole point is authorization by role and scope. The fix
+   * (`invalidateOnPersonaChange` in `features/session/hooks.ts`) also calls
+   * `removeQueries({ type: 'inactive' })`, so a remount has nothing stale to paint.
+   */
+  test('the destination never paints the previous persona’s dashboard before its own', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'consultant-paris');
+    // Alice's own card, "Statut du mois" — `LABELS.dashboard.consultant.monthStatus` — which the
+    // manager's dashboard (`ManagerCards`) never renders.
+    await expect(page.getByText('Statut du mois')).toBeVisible();
+
+    // Widens the window in which stale cached data, if any survived, would be visible before the
+    // real fetch replaces it — same purpose as the `personas` delay in the sibling test above.
+    await page.route('**/api/v1/dashboard*', async (route) => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 300);
+      });
+      await route.continue();
+    });
+
+    await page.locator('[data-slot="dropdown-menu-trigger"]').click();
+    await page.getByRole('menuitem', { name: 'Changer de persona' }).click();
+    await page.waitForURL('/');
+
+    await page.evaluate(() => {
+      const flag = { seen: false };
+      const observer = new MutationObserver(() => {
+        if (document.body.textContent.includes('Statut du mois')) flag.seen = true;
+      });
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+      Reflect.set(window, '__stalePersonaFlash', flag);
+    });
+
+    await page.locator('[data-persona-key="manager-paris"] button').click();
+    await page.waitForURL('/tableau-de-bord');
+    // Bruno's own card, `LABELS.dashboard.manager.pending` — proves the right data landed, not
+    // only that the wrong data never did.
+    await expect(page.getByText('CRA en attente de décision')).toBeVisible();
+
+    const staleFlashed = await page.evaluate(
+      () => Reflect.get(window, '__stalePersonaFlash') as { seen: boolean } | undefined,
+    );
+    expect(staleFlashed?.seen).toBe(false);
+  });
+});
+
+/**
+ * Item 9 (QA round 2): "Changer de persona" used to produce skeleton → blank white screen →
+ * skeleton → real content. Root cause, confirmed live rather than assumed (`page.on('request')`
+ * with `resourceType() === 'document'`, plus `load`/`framenavigated`): `useClearPersona`'s
+ * `onSuccess` (`features/session/hooks.ts`) ran an unfiltered `invalidateQueries()` *before*
+ * `PersonaBlock.handleChange`'s own `navigate({ to: '/' })` had unmounted the page the user was
+ * still on — `useMutation`'s hook-level `onSuccess` always runs before a call-level one. Whatever
+ * persona-scoped query that page still had active (a manager's dashboard, say) refetched
+ * immediately, against a cookie the mutation had just deleted — a refetch guaranteed to fail.
+ * `session-guard.ts`'s global cache-error subscription reacted to that failure with
+ * `window.location.assign('/')`: a genuine hard reload landing on top of the client-side
+ * navigation already in flight, producing the second skeleton (a fresh mount after the reload)
+ * with a blank frame while the browser tore down and reloaded the document in between.
+ *
+ * Fixed by passing `refetchType: 'none'` to that same `invalidateQueries()` call, for
+ * `useClearPersona` only: everything still gets marked stale (item 1's cross-persona leak stays
+ * fixed), nothing refetches synchronously, so there is nothing to fail and nothing for the guard
+ * to react to. `/` never reads `useSession()` anyway — only the public `usePersonas()` — so no
+ * data this mutation cares about is lost by not refetching it immediately.
+ *
+ * A hard reload is what a `resourceType() === 'document'` request or a second `load` event proves
+ * — a `MutationObserver`-based DOM check (the sibling tests above) cannot tell "the SPA re-rendered
+ * twice" apart from "the whole document reloaded once", and this bug is specifically the second
+ * one.
+ */
+test.describe('item 9 — “Changer de persona” never hard-reloads the page', () => {
+  test('no second document request and no second load event follow the client-side navigation to /', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'manager-paris');
+    // Bruno's own dashboard card — a persona-scoped query, active on this exact screen, which is
+    // the one whose doomed refetch used to trigger the hard reload.
+    await expect(page.getByText('CRA en attente de décision')).toBeVisible();
+
+    const documentRequests: string[] = [];
+    let loadEventCount = 0;
+    page.on('request', (request) => {
+      if (request.resourceType() === 'document') documentRequests.push(request.url());
+    });
+    page.on('load', () => {
+      loadEventCount += 1;
+    });
+
+    await page.locator('[data-slot="dropdown-menu-trigger"]').click();
+    await page.getByRole('menuitem', { name: 'Changer de persona' }).click();
+    await page.waitForURL('/');
+
+    // The persona selector's own real content, not its skeleton — proves the navigation actually
+    // finished settling, not just that the URL changed, before the two counts below are read.
+    await expect(page.locator('[data-persona-key]').first()).toBeVisible();
+    // A brief grace window: a hard reload's own `load` event, if this regressed, fires shortly
+    // after the URL already reads `/` (confirmed live: tens of milliseconds, not a race this
+    // margin could hide).
+    await page.waitForTimeout(500);
+
+    expect(documentRequests).toHaveLength(0);
+    expect(loadEventCount).toBe(0);
+  });
+});
+
+/**
+ * QA round 1, item 3: a manager used to have to leave the pré-facturier through the CRA menu
+ * (`cra-list-screen.tsx`'s own link, covered separately by "items 4/5" below) to open a row and
+ * decide it. `pre-facturier-screen.tsx`'s `craColumns` now offers "Ouvrir" on every manager row,
+ * and `manager-cra-grid-screen.tsx` now offers Valider/Refuser on a decidable one, reusing the same
+ * dialogs the pré-facturier table itself uses (moved to `features/cra/components/` so `features/cra`
+ * does not import from `features/pre-facturier` — see `refuse-dialog.tsx`'s header).
+ *
+ * 2026-10 rather than the seed's own June or J1's own September: both are claimed by other tests
+ * in this file by the time it finishes, and this test needs a Cra nothing else decides first.
+ * Filled the fast way (one day, then "Remplir les jours ouvrés vides") — the fill mechanism itself
+ * is `J1`'s own test's job, not this one's.
+ */
+test.describe('item 3 — a manager opens and decides a CRA from the pré-facturier', () => {
+  test('the pré-facturier’s “Ouvrir” link reaches the CRA, and validating from there lands back on the pré-facturier', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    const period = '2026-10';
+
+    await choosePersona(page, 'consultant-paris');
+    await page.goto('/cra/2026-06');
+    await page.getByRole('link', { name: 'Mois suivant' }).click();
+    await page.waitForURL('/cra/2026-07');
+    await page.getByRole('link', { name: 'Mois suivant' }).click();
+    await page.waitForURL('/cra/2026-08');
+    await page.getByRole('link', { name: 'Mois suivant' }).click();
+    await page.waitForURL('/cra/2026-09');
+    await page.getByRole('link', { name: 'Mois suivant' }).click();
+    await page.waitForURL(`/cra/${period}`);
+
+    await page.getByRole('combobox', { name: 'Ajouter une activité' }).click();
+    await page.getByRole('option', { name: DORA }).click();
+    await expect(page.getByRole('rowheader', { name: DORA })).toBeVisible();
+
+    const doraRow = page
+      .getByRole('row')
+      .filter({ has: page.getByRole('rowheader', { name: DORA }) });
+    await doraRow.locator('select').first().selectOption({ label: '1' });
+    await page.getByRole('button', { name: `Remplir les jours ouvrés vides — ${DORA}` }).click();
+
+    await page.getByRole('button', { name: 'Enregistrer' }).click();
+    await page.getByText('Enregistré', { exact: true }).waitFor({ state: 'visible' });
+    await page.getByRole('button', { name: 'Soumettre au manager' }).click();
+    await page.getByText('Soumis', { exact: true }).waitFor({ state: 'visible' });
+
+    await switchPersonaViaUi(page, 'manager-paris');
+    await page.goto(`/pre-facturier?period=${period}`);
+    await page.getByRole('heading', { name: 'Les CRA du mois' }).waitFor({ state: 'visible' });
+
+    const aliceRow = page.getByRole('row').filter({ hasText: 'Alice Martin' });
+    await aliceRow.getByRole('link', { name: 'Ouvrir' }).click();
+    await page.waitForURL(new RegExp(`/cra/${period}/.+`));
+
+    await page
+      .getByText('Vous consultez le CRA de Alice Martin', { exact: false })
+      .waitFor({ state: 'visible' });
+    const validateButton = page.getByRole('button', { name: 'Valider' });
+    await expect(validateButton).toBeVisible();
+    await validateButton.click();
+
+    const validateDialog = page.getByRole('dialog');
+    await validateDialog.getByText('Validation du CRA de Alice Martin').waitFor({
+      state: 'visible',
+    });
+    await validateDialog.getByRole('button', { name: 'Fermer' }).last().click();
+
+    // "Land back somewhere sensible after validating" — the brief's own words.
+    await page.waitForURL(new RegExp(`/pre-facturier\\?period=${period}`));
+    await expect(aliceRow.getByRole('button', { name: 'Valider' })).toHaveCount(0);
+    await expect(aliceRow.getByRole('link', { name: 'Ouvrir' })).toBeVisible();
   });
 });
 
@@ -206,9 +446,11 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     await choosePersona(page, 'consultant-paris');
     await page.goto('/cra/2026-06');
 
-    // The gesture, not a `goto`: two clicks of "Mois suivant" (task 6.3's own navigation tool).
+    // The gesture, not a `goto`: three clicks of "Mois suivant" (task 6.3's own navigation tool).
     await page.getByRole('link', { name: 'Mois suivant' }).click();
     await page.waitForURL('/cra/2026-07');
+    await page.getByRole('link', { name: 'Mois suivant' }).click();
+    await page.waitForURL('/cra/2026-08');
     await page.getByRole('link', { name: 'Mois suivant' }).click();
     await page.waitForURL(`/cra/${EDIT_PERIOD}`);
 
@@ -236,11 +478,11 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     // A prefix match, not an exact one: a day total out of range appends the reason to its own
     // accessible name (`TOTAL_TONES[…].sentence`, `cra-matrix-table.tsx`) so a screen reader hears
     // *why* the figure is flagged, and ¼ of a day makes this very cell incomplete two steps below.
-    const mondayDayTotal = page.locator('[aria-label^="Total du jour — 03/08/2026"]');
+    const firstDayTotal = page.locator('[aria-label^="Total du jour — 03/09/2026"]');
 
     // Keyboard-focus evidence (task 6.2).
-    const monday = cell(page, DORA, '03/08/2026');
-    await monday.focus();
+    const firstDay = cell(page, DORA, '03/09/2026');
+    await firstDay.focus();
     await page.screenshot({
       animations: 'disabled',
       path: 'tests/visual/review/6.2-cra-grid-keyboard-focus.png',
@@ -251,23 +493,23 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     // otherwise cycles its own option on every arrow key (Left/Right no less than Up/Down),
     // changing the cell being left, or the one about to be entered. Both cells are still blank
     // here, so a value changing either way would show up as `'1'` (a full day), not `'0'`.
-    const tuesday = cell(page, DORA, '04/08/2026');
+    const secondDay = cell(page, DORA, '04/09/2026');
     await page.keyboard.press('ArrowRight');
-    await expect(tuesday).toBeFocused();
-    await expect(monday).toHaveValue('0');
-    await expect(tuesday).toHaveValue('0');
+    await expect(secondDay).toBeFocused();
+    await expect(firstDay).toHaveValue('0');
+    await expect(secondDay).toHaveValue('0');
     await page.keyboard.press('ArrowLeft');
-    await expect(monday).toBeFocused();
-    await expect(monday).toHaveValue('0');
-    await expect(tuesday).toHaveValue('0');
+    await expect(firstDay).toBeFocused();
+    await expect(firstDay).toHaveValue('0');
+    await expect(secondDay).toHaveValue('0');
 
     // A quarter-day, and the day total reflects it immediately (task 6.2's own contract) — read
     // off the row's own month total, which sums the same local state the cell just changed.
     // `frenchDays(1)` (`lib/format.ts`), not the cell's own `¼` glyph — the two are different
     // display conventions for the same quantity.
-    await monday.selectOption({ label: '¼' });
+    await firstDay.selectOption({ label: '¼' });
     await expect(doraMonthTotal).toHaveText(/0,25\s*j/u);
-    await expect(mondayDayTotal).toHaveText(/0,25\s*j/u);
+    await expect(firstDayTotal).toHaveText(/0,25\s*j/u);
     await page.screenshot({
       animations: 'disabled',
       path: 'tests/visual/review/6.2-cra-grid-draft.png',
@@ -276,8 +518,8 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
 
     // Complete that one day (topping the quarter up to a full day), then let the row tool fill
     // every other workable day — "remplir les jours ouvrés vides" never touches a day that
-    // already carries anything, which 03/08 now does.
-    await monday.selectOption({ label: '1' });
+    // already carries anything, which 03/09 now does.
+    await firstDay.selectOption({ label: '1' });
     await page.getByRole('button', { name: `Remplir les jours ouvrés vides — ${DORA}` }).click();
 
     await page.getByRole('button', { name: 'Enregistrer' }).click();
@@ -286,7 +528,7 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     // Reopen: a full page reload, not the SPA's own cache — proof the write reached the server.
     await page.reload();
     await page.getByRole('rowheader', { name: DORA }).waitFor({ state: 'visible' });
-    await expect(cell(page, DORA, '03/08/2026')).toHaveValue('4');
+    await expect(cell(page, DORA, '03/09/2026')).toHaveValue('4');
 
     const reread = await fetchGrid(page, EDIT_PERIOD);
     expect(reread.status).toBe('draft');
@@ -318,7 +560,7 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     const craId = before.craId;
 
     await switchPersonaViaApi(page, 'manager-paris');
-    const reason = 'Le 03/08 doit être reventilé sur un seul projet — motif de démonstration e2e.';
+    const reason = 'Le 03/09 doit être reventilé sur un seul projet — motif de démonstration e2e.';
     const refusal = await page.request.post(`${API_ORIGIN}/pre-facturier/refus/${craId}`, {
       form: { reason, periode: EDIT_PERIOD },
       headers: { origin: browserOrigin() },
@@ -443,7 +685,10 @@ test.describe('task 6.5 — a role this route cannot serve', () => {
 
     await page.getByText('Accès refusé', { exact: true }).waitFor({ state: 'visible' });
     await expect(page.getByText('/problems/insufficient-role')).toBeVisible();
-    await expect(page.getByText('Manager', { exact: true })).toBeVisible();
+    // Scoped to `DeniedState`'s own `<dl>`, not the whole page: since item 4 (QA round 1) gave
+    // every role a coloured `RoleBadge`, the topbar's own identity block (`PersonaBlock`) reads
+    // "Manager" too, and an unscoped `getByText` now matches both.
+    await expect(page.locator('dl').getByText('Manager', { exact: true })).toBeVisible();
 
     await page.screenshot({
       animations: 'disabled',
@@ -470,10 +715,263 @@ test.describe('task 6.1 — the month list', () => {
 });
 
 /**
+ * Items 3 + 11 (QA round 2), one commit, same component: the consultant selector used to close
+ * the moment a checkbox was ticked (item 3) and, before that, showed a checkbox, a redundant
+ * check icon and a redundant badge list for the same fact (item 11). Item 3's real cause: ticking
+ * a box navigates (`CraListFilters.setConsultantIds`), which used to flip `useCraList`'s
+ * `isPending` back to `true` and swap the whole screen for `<ListSkeleton />` — unmounting the
+ * popover along with everything else, resetting its own local `open` state. Fixed with
+ * `placeholderData: keepPreviousData` on `craListQueryOptions` (`features/cra/hooks.ts`), not by
+ * touching `MultiSelectCombobox`/`Popover`/`Checkbox` at all — none of those were ever at fault.
+ */
+test.describe('items 3 + 11 — the consultant selector stays open, and shows only checkboxes', () => {
+  test('checking two boxes in a row keeps the popover open, with no extra icon or badge', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'manager-paris');
+    await page.goto('/cra');
+
+    await page.getByRole('button', { name: 'Consultants' }).click();
+    const content = page.locator('[data-slot="popover-content"]');
+    await expect(content).toBeVisible();
+
+    const rows = content.locator('ul li');
+    const aliceRow = rows.filter({ hasText: 'Alice Martin' });
+    const claireRow = rows.filter({ hasText: 'Claire Dubois' });
+
+    // The checkbox itself, not its label text — the exact click item 3's own bug needed and the
+    // previous round's own filter test (below) never exercised.
+    await aliceRow.locator('[data-slot="checkbox"]').click();
+    await expect(content).toBeVisible();
+    await claireRow.locator('[data-slot="checkbox"]').click();
+    await expect(content).toBeVisible();
+
+    // Item 11: one `svg` per checked row (the checkbox's own indicator), not two — the redundant
+    // `CheckIcon` this item removed would have made this two.
+    await expect(aliceRow.locator('svg')).toHaveCount(1);
+    await expect(claireRow.locator('svg')).toHaveCount(1);
+
+    // Item 11: the popover renders each selected name once — inside its own row — not a second
+    // time in a badge list above the search field.
+    await expect(content.getByText('Alice Martin')).toHaveCount(1);
+    await expect(content.getByText('Claire Dubois')).toHaveCount(1);
+
+    // The trigger's own `aria-label` stays the fixed "Consultants" (that is its accessible name);
+    // the count lives in its visible text only.
+    await expect(page.getByRole('button', { name: 'Consultants', exact: true })).toContainText(
+      'Consultants (2)',
+    );
+  });
+
+  /**
+   * The race `toggleDiff`/`applyDiff` (ADR-0083) guards against: two `onChange` calls firing in
+   * the same task, before React has had a chance to re-render `CraListFilters` with the first
+   * one's result — so both compute their "next selection" from the same, now-stale
+   * `consultantIds` prop. Without the diff machinery, the second `navigate()`'s `search` callback
+   * set `consultantIds` to whatever `next` its own stale `selected` prop computed, silently
+   * dropping the first click's id.
+   *
+   * Two ordinary, separately-awaited `page.click()` calls do **not** reproduce this — each one's
+   * own actionability wait is enough of a task boundary for React to flush the first navigation's
+   * render before the second click's handler runs (checked empirically: that version of this test
+   * passed identically with `toggleDiff`/`applyDiff` deleted). Only dispatching both native
+   * `click` events from a single `page.evaluate` — genuinely the same task, not just
+   * "no `await expect` between them" — reproduces the drop: verified to fail (one id, not two)
+   * against a build with the diff machinery removed, and to pass against this one.
+   */
+  test('two same-tick clicks both land in the URL, not just the last one', async ({ page }) => {
+    await choosePersona(page, 'manager-paris');
+    await page.goto('/cra');
+
+    await page.getByRole('button', { name: 'Consultants' }).click();
+    const content = page.locator('[data-slot="popover-content"]');
+    await expect(content).toBeVisible();
+    await expect(content.getByText('Alice Martin')).toBeVisible();
+    await expect(content.getByText('Claire Dubois')).toBeVisible();
+
+    await page.evaluate(() => {
+      const rows = Array.from(document.querySelectorAll('[data-slot="popover-content"] ul li'));
+      const findCheckbox = (name: string) =>
+        rows.find((row) => row.textContent.includes(name))?.querySelector('[data-slot="checkbox"]');
+
+      findCheckbox('Alice Martin')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true }),
+      );
+      findCheckbox('Claire Dubois')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true }),
+      );
+    });
+
+    await expect(page.getByRole('button', { name: 'Consultants', exact: true })).toContainText(
+      'Consultants (2)',
+    );
+    const url = new URL(page.url());
+    const consultantIds = JSON.parse(url.searchParams.get('consultantIds') ?? '[]') as string[];
+    expect(consultantIds).toHaveLength(2);
+  });
+});
+
+/**
+ * Item 7 (QA round 1): the manager's own `/cra` filters, non-exclusive on both dimensions and
+ * ANDed with each other — the brief's own example, "for these three consultants, every CRA not
+ * yet validated". Read-only throughout (no validate/refuse/save here): this test runs before J2
+ * below decides anything, and must leave Claire's June exactly as it found it — "submitted",
+ * still the one pending row J2 depends on.
+ */
+test.describe('item 7 — consultant and status filters on the manager’s CRA list', () => {
+  test('both filters narrow, together, and the state survives a reload via the URL', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'manager-paris');
+    await page.goto('/cra');
+
+    // `.first()`: item 6 (QA round 1) gives both Alice and Claire a dense June/July/August (item 2,
+    // QA round 2, ends August's own exclusion for Alice) — Alice also carries more than one row by
+    // this later point in the file (item 3, run earlier, left her a validated October on top of
+    // that) — this check only needs "she/she is listed at all", not "exactly once".
+    await expect(page.getByText('Alice Martin').first()).toBeVisible();
+    await expect(page.getByText('Claire Dubois').first()).toBeVisible();
+
+    // Consultant filter: search narrows the option list, a checkbox selects — Alice drops out,
+    // Claire stays.
+    await page.getByRole('button', { name: 'Consultants' }).click();
+    await page.getByPlaceholder('Rechercher un consultant…').fill('Claire');
+    // Scoped to the popover, not `role="listbox"`: the option list is a checkbox group (a plain
+    // `<ul>`, no ARIA role), not a listbox — see `multi-select-combobox.tsx`'s own comment on why.
+    await page.locator('[data-slot="popover-content"]').getByText('Claire Dubois').click();
+    await page.keyboard.press('Escape');
+
+    // Three rows, not one: item 6 gives Claire a dense June (submitted), July and August (both
+    // validated), and the consultant filter alone — no status filter yet — narrows to *her*, not
+    // to one of her months.
+    await expect(page.getByText('Claire Dubois').first()).toBeVisible();
+    await expect(page.getByText('Alice Martin')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Ouvrir' })).toHaveCount(3);
+
+    // The URL carries the filter — a reload must show exactly this, not a blank slate.
+    await page.reload();
+    await expect(page.getByText('Claire Dubois').first()).toBeVisible();
+    await expect(page.getByText('Alice Martin')).toHaveCount(0);
+
+    // Status pill, ANDed with the consultant filter already active. 'Refusé' rather than 'Validé'
+    // (this test's own shape before item 6): Claire now carries a validated July and August on
+    // top of her submitted June, so 'Validé' alone no longer empties her out — nothing in this
+    // dataset is refused yet at this point in the file (J3, later, is the first to refuse
+    // anything), which is what makes 'Refusé' the genuinely empty pill instead.
+    await page.getByRole('button', { name: 'Refusé', exact: true }).click();
+    await page
+      .getByText('Aucun CRA ne correspond à ces filtres', { exact: false })
+      .waitFor({ state: 'visible' });
+
+    // Switching to 'Soumis' (submitted) brings her back to exactly one row — her June, the only
+    // submitted Cra in the whole office at this point — proving the status pill is read live, not
+    // only that "some filter" suppresses every row.
+    //
+    // The `aria-pressed="false"` wait between the untoggle and the next click is a synchronisation
+    // point this test always depended on, made explicit rather than left implicit: before item 3
+    // (QA round 2)'s `keepPreviousData` fix, every filter change forced a skeleton swap that
+    // incidentally serialised rapid clicks; without it, untoggling 'Refusé' and clicking 'Soumis'
+    // back to back (nothing awaited between them) races the second click's `activate()` against
+    // the first navigation's own re-render, under load reliably enough to flip this from "passes"
+    // to "fails" depending on machine load (found running the full `journeys` project, never in
+    // isolation) — a load-dependent test gap, not an app bug: found instrumenting the actual
+    // `navigate()`/`search` calls, which always resolved in the intended order once observed.
+    // `aria-pressed` is rendered from the URL-derived `statuses` prop, so it flipping to `false`
+    // is proof the first navigation has actually committed and re-rendered.
+    await page.getByRole('button', { name: 'Refusé', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Refusé', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    await page.getByRole('button', { name: 'Soumis', exact: true }).click();
+    // `.first()`: Claire's own row count depends on which status narrows her down, and at this
+    // exact point that is "her one submitted Cra" — but `getByText` alone would still be a strict
+    // mode violation if the previous status transition were mid-flight, same reasoning lines
+    // 772/787/793 already use for the same name earlier in this test.
+    await expect(page.getByText('Claire Dubois').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Ouvrir' })).toHaveCount(1);
+
+    // "Effacer les filtres" (inside the still-open-from-the-status-click combobox is closed by
+    // now — reopen it) clears the consultant side only; the status pill is its own control and
+    // stays pressed.
+    await page.getByRole('button', { name: 'Consultants' }).click();
+    await page.getByRole('button', { name: 'Effacer les filtres' }).click();
+    await page.keyboard.press('Escape');
+
+    await expect(page.getByText('Alice Martin')).toHaveCount(0); // Alice's June is validated
+    await expect(page.getByText('Claire Dubois')).toBeVisible();
+
+    await page.screenshot({
+      animations: 'disabled',
+      path: 'tests/visual/review/item7-cra-list-filters.png',
+      fullPage: false,
+    });
+  });
+});
+
+/**
+ * Item 4 (QA round 2): a year and/or month filter, independent of each other and of the two
+ * item-7 filters above. Julien Fabre and Marine Girard (item 6, QA round 1's veteran roster) are
+ * the fixture this test leans on: both carry a single Cra at exactly 2016-06, and Marine departed
+ * the firm (ADR-0079) — her old Cra staying visible here, unfiltered by that departure, is
+ * incidental proof of the same "old data stays readable" rule item 6's own tests cover elsewhere,
+ * not this test's own point.
+ */
+test.describe('item 4 — a year and/or month filter on the manager’s CRA list', () => {
+  test('year and month each narrow on their own, and AND together, surviving a reload', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'manager-paris');
+    await page.goto('/cra');
+
+    // Year alone: exactly the two 2016 veterans, nothing from the dense 2026 months.
+    await page.getByRole('combobox', { name: 'Année' }).click();
+    await page.getByRole('option', { name: '2016', exact: true }).click();
+    await expect(page.getByText('Julien Fabre')).toBeVisible();
+    await expect(page.getByText('Marine Girard')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Ouvrir' })).toHaveCount(2);
+
+    // The URL carries it — a reload must show exactly this, not a blank slate (same guarantee
+    // item 7's own test proves for consultantIds/statuses).
+    await page.reload();
+    await expect(page.getByRole('link', { name: 'Ouvrir' })).toHaveCount(2);
+
+    // A year with nothing in it for this office (the veterans' history is sparse, every second
+    // year — item 6's own seed) proves the filter reads the value, not just "a year was picked".
+    await page.getByRole('combobox', { name: 'Année' }).click();
+    await page.getByRole('option', { name: '2017', exact: true }).click();
+    await page
+      .getByText('Aucun CRA ne correspond à ces filtres', { exact: false })
+      .waitFor({ state: 'visible' });
+
+    // Month, independent of year: June across every year this office has one, not only 2016 —
+    // strictly more than the two 2016-06 rows alone, proving the two dimensions are separate
+    // filters rather than the same one under another name.
+    await page.getByRole('combobox', { name: 'Année' }).click();
+    await page.getByRole('option', { name: 'Toutes les années', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Mois' }).click();
+    await page.getByRole('option', { name: 'juin', exact: true }).click();
+    const juneCount = await page.getByRole('link', { name: 'Ouvrir' }).count();
+    expect(juneCount).toBeGreaterThan(2);
+
+    // Both together, ANDed: back down to exactly the two 2016-06 veterans.
+    await page.getByRole('combobox', { name: 'Année' }).click();
+    await page.getByRole('option', { name: '2016', exact: true }).click();
+    await expect(page.getByRole('link', { name: 'Ouvrir' })).toHaveCount(2);
+    await expect(page.getByText('Julien Fabre')).toBeVisible();
+    await expect(page.getByText('Marine Girard')).toBeVisible();
+
+    const url = new URL(page.url());
+    expect(url.searchParams.get('year')).toBe('2016');
+    expect(url.searchParams.get('month')).toBe('6');
+  });
+});
+
+/**
  * Phase 7's own journeys (Annexe B, "Phase" column = 7). Placed after every Phase 6 test rather
  * than interleaved: `test.describe.configure({ mode: 'serial' })` at the top of this file orders
  * every describe block in the file, not only the ones inside a given block, so appending here is
- * what actually runs these last — after J1 has left `2026-08` in the state J3 below needs.
+ * what actually runs these last — after J1 has left `2026-09` in the state J3 below needs.
  *
  * J5 is not repeated as its own block: "items 4/5" above (`a manager of another office is
  * refused, out-of-scope, on the same deep link`) already deep-links `manager-lyon` into a Paris
@@ -522,7 +1020,7 @@ test.describe('J2 — manager-paris (Bruno): validates Claire’s submitted June
     });
 
     // Explicit period: Bruno's own `/pre-facturier` (no `period`) defaults to the office's most
-    // recent Cra period, which J1 (run earlier in this file) may have pushed to `2026-08` by now
+    // recent Cra period, which J1 (run earlier in this file) may have pushed to `2026-09` by now
     // — this journey is about the seed's June data specifically, so it never relies on that
     // default.
     await page.goto('/pre-facturier?period=2026-06');
@@ -604,14 +1102,21 @@ test.describe('J4 — billing-paris (Henri): issues the draft J2 created, with a
     page,
   }) => {
     // Runs after J2 in this file's declared order (`test.describe.configure({ mode: 'serial' })`
-    // at the top orders every describe block, not only what is inside one) — J2 leaves exactly
-    // one draft invoice behind, Claire's Réunion one, still unissued (its own dialog closed
-    // without an issuance, and the marge visit afterwards is a read). That is the Cra this test
-    // consumes.
+    // at the top orders every describe block, not only what is inside one) — J2 leaves Claire's
+    // June Réunion invoice draft and unissued (its own dialog closed without an issuance, and the
+    // marge visit afterwards is a read). That is the invoice this test consumes.
+    //
+    // Filtered on the period too, not only the client: item 6 (QA round 1) gives Claire a dense
+    // July and August as well, both already validated at seed time and each drafting its own
+    // Réunion invoice — three draft rows share this client's name by the time this test runs, and
+    // "juin 2026" is what picks out the one J2 actually decided.
     await choosePersona(page, 'billing-paris');
     await page.goto('/factures');
 
-    const reunionRow = page.getByRole('row').filter({ hasText: 'Réunion Cyber Services' });
+    const reunionRow = page
+      .getByRole('row')
+      .filter({ hasText: 'Réunion Cyber Services' })
+      .filter({ hasText: 'juin 2026' });
     await reunionRow.waitFor({ state: 'visible' });
     await reunionRow.getByRole('link', { name: 'Ouvrir la facture' }).click();
     await page.waitForURL(/\/factures\/.+/u);
@@ -684,6 +1189,63 @@ test.describe('J4 — billing-paris (Henri): issues the draft J2 created, with a
   });
 });
 
+/**
+ * Item 8 (QA round 1): the invoice status filter reads as one bar, not obviously several
+ * individually-clickable pills. Run after J4 rather than before: J4 leaves at least one real
+ * 'issued' invoice behind (the Réunion one, `SEC-2026-000001`), which is what makes "click Émises,
+ * see only issued rows" a meaningful assertion rather than one that would pass on an empty table
+ * regardless of the fix.
+ */
+test.describe('item 8 — the invoice status filter reads as individually-clickable pills', () => {
+  test('each pill narrows exclusively, carries a count, and the choice survives a reload', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'billing-paris');
+    await page.goto('/factures');
+
+    // `role="button"`/`aria-pressed`, not `role="radio"`: `TogglePillGroup` uses one accessible
+    // pattern in both selection modes (see its own comment on why) — a real radio group obliges
+    // arrow-key roving-tabindex navigation this component does not implement.
+    const allPill = page.getByRole('button', { name: /Toutes/u });
+    const issuedPill = page.getByRole('button', { name: /Émises/u });
+    await expect(allPill).toHaveAttribute('aria-pressed', 'true');
+    await expect(issuedPill).toHaveAttribute('aria-pressed', 'false');
+
+    // The count on "Émises" is read before clicking it, then compared against the table's own
+    // row count after — the same number by two different routes is what proves the count is
+    // real, not decorative.
+    const issuedLabel = (await issuedPill.textContent()) ?? '';
+    const issuedCount = /\((\d+)\)/u.exec(issuedLabel)?.[1];
+    if (issuedCount === undefined) {
+      throw new FixtureAssumptionError('Expected the "Émises" pill to carry a count.');
+    }
+
+    await issuedPill.click();
+    await expect(issuedPill).toHaveAttribute('aria-pressed', 'true');
+    await expect(allPill).toHaveAttribute('aria-pressed', 'false');
+    await page.waitForURL(/status=issued/u);
+
+    const rows = page.getByRole('table').locator('tbody tr');
+    await expect(rows).toHaveCount(Number.parseInt(issuedCount, 10));
+    // Every visible status badge reads "Émise" — the exclusivity itself, not only the count.
+    await expect(page.getByText('Émise', { exact: true })).toHaveCount(
+      Number.parseInt(issuedCount, 10),
+    );
+    await expect(page.getByText('Brouillon', { exact: true })).toHaveCount(0);
+
+    // The filter is in the URL, not only in memory.
+    await page.reload();
+    await expect(issuedPill).toHaveAttribute('aria-pressed', 'true');
+    await expect(rows).toHaveCount(Number.parseInt(issuedCount, 10));
+
+    await page.screenshot({
+      animations: 'disabled',
+      path: 'tests/visual/review/item8-factures-status-pills.png',
+      fullPage: false,
+    });
+  });
+});
+
 test.describe('J3 — manager-paris (Bruno): refuses the month Alice submitted in J1, with a reason', () => {
   test('the manager refuses through the pré-facturier dialog, and Alice sees the reason on her own grid', async ({
     page,
@@ -692,7 +1254,7 @@ test.describe('J3 — manager-paris (Bruno): refuses the month Alice submitted i
     // route (`docs/open-questions.md`, row dated 25/08/2026 — the JSON route Phase 7 adds had
     // nothing to be driven against until this phase). Annexe B's J3 wants "the month Alice
     // submitted in J1" refused through the SPA's own dialog; that submission was already spent
-    // proving the SSR path, so this resubmits the exact same August matrix — nothing is retyped,
+    // proving the SSR path, so this resubmits the exact same September matrix — nothing is retyped,
     // the grid the refusal left behind (still carrying every line J1 filled) is simply handed
     // back to the manager — before refusing it again, this time through the dialog Phase 7 built.
     await choosePersona(page, 'consultant-paris');
@@ -712,7 +1274,7 @@ test.describe('J3 — manager-paris (Bruno): refuses the month Alice submitted i
 
     const refuseDialog = page.getByRole('dialog');
     await refuseDialog.getByText('Refuser le CRA de Alice Martin').waitFor({ state: 'visible' });
-    const reason = 'Le 03/08 doit être reventilé sur un seul projet — motif de démonstration J3.';
+    const reason = 'Le 03/09 doit être reventilé sur un seul projet — motif de démonstration J3.';
     await refuseDialog.getByLabel('Motif du refus').fill(reason);
     await page.screenshot({
       animations: 'disabled',
@@ -730,6 +1292,27 @@ test.describe('J3 — manager-paris (Bruno): refuses the month Alice submitted i
       .getByText('Ce CRA a été refusé par le manager', { exact: false })
       .waitFor({ state: 'visible' });
     await expect(page.getByText(reason)).toBeVisible();
+  });
+});
+
+/**
+ * Item 5 (QA round 2), ADR-0082: J3 above leaves Alice's September `refused` — this test asks the
+ * dashboard for a *different* period (June, already `validated`) and checks the refusal from the
+ * other month still surfaces there, instead of disappearing the moment `period` moves past it.
+ */
+test.describe('item 5 — the consultant dashboard names a refusal from another period', () => {
+  test('a refusal from another month stays visible, and its own link opens that month', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'consultant-paris');
+    await page.goto('/tableau-de-bord?period=2026-06');
+
+    await page
+      .getByText('Le CRA de septembre 2026 a été refusé', { exact: false })
+      .waitFor({ state: 'visible' });
+
+    await page.getByRole('link', { name: 'Ouvrir ce CRA' }).click();
+    await page.waitForURL(`/cra/${EDIT_PERIOD}`);
   });
 });
 
@@ -755,7 +1338,9 @@ test.describe('J6 — billing-paris (Henri): the margin URL refuses him, by role
 
     await page.getByText('Accès refusé', { exact: true }).waitFor({ state: 'visible' });
     await expect(page.getByText('/problems/insufficient-role')).toBeVisible();
-    await expect(page.getByText('Facturation', { exact: true })).toBeVisible();
+    // Scoped to `DeniedState`'s own `<dl>` — same reason `task 6.5`'s sibling assertion above
+    // gives: item 4 (QA round 1) put a coloured `RoleBadge` in the topbar too.
+    await expect(page.locator('dl').getByText('Facturation', { exact: true })).toBeVisible();
 
     await page.screenshot({
       animations: 'disabled',
@@ -766,9 +1351,14 @@ test.describe('J6 — billing-paris (Henri): the margin URL refuses him, by role
 });
 
 test.describe('task 7.6 — a period with nothing in it', () => {
-  test('2026-07 renders a designed empty pré-facturier, not a blank page', async ({ page }) => {
+  // 2026-07 until item 6 (QA round 1): the seed's own dense months now cover 2026-06/07/08 for
+  // every office (`scripts/lib/seed-data.ts`'s `DENSE_PERIODS`), so Paris genuinely has Cras on
+  // 2026-07 today. 2026-12 is outside both `DENSE_PERIODS` and the sparse 2016-2024 historical
+  // span `HISTORICAL_VETERANS` writes — no spec in this repository, and no seed period, ever
+  // touches it, which is what this test's own point (a period with nothing in it) needs.
+  test('2026-12 renders a designed empty pré-facturier, not a blank page', async ({ page }) => {
     await choosePersona(page, 'manager-paris');
-    await page.goto('/pre-facturier?period=2026-07');
+    await page.goto('/pre-facturier?period=2026-12');
 
     // Not the "office has never had a Cra at all" branch (`data.period === null`) — this office
     // has plenty of Cras, just none on this specific period, so the ordinary response comes back

@@ -88,6 +88,7 @@ describe('PgCraRepository', () => {
       consultantId: 'consultant-1',
       officeId: PARIS,
       period: period(2026, 6),
+      consultantDeparture: null,
     });
   }
 
@@ -241,23 +242,198 @@ describe('PgCraRepository', () => {
     expect(await repo().list({ actor: parisManager, limit: 10, offset: 0 })).toHaveLength(2);
   });
 
-  it('caps pagination at MAX_PAGE_SIZE, however large the caller asks', async () => {
+  it('narrows to the given consultants, and to every consultant the actor may see when not', async () => {
+    // Item 7 (QA round 1): "for these three consultants, every CRA not yet validated" needs the
+    // consultant dimension server-side.
+    await seedOffices();
+    await repo().save(makeCra());
+    await tx.client.query(`
+      INSERT INTO public.consultants (id, first_name, last_name, email, office_id, practice_id, role)
+      VALUES ('consultant-2', 'Chloé', 'Petit', 'chloe@test.com', 'office-paris', 'practice-audit', 'consultant');
+    `);
+    await tx.client.query(`
+      INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+      VALUES ('cra-002', 'consultant-2', 'office-paris', '2026-06', 'draft');
+    `);
+
+    const onlyAlice = await repo().list({
+      actor: parisManager,
+      limit: 10,
+      offset: 0,
+      consultantIds: ['consultant-1'],
+    });
+    expect(onlyAlice.map((row) => row.id)).toStrictEqual(['cra-001']);
+
+    const both = await repo().list({
+      actor: parisManager,
+      limit: 10,
+      offset: 0,
+      consultantIds: ['consultant-1', 'consultant-2'],
+    });
+    expect(both.map((row) => row.id).sort()).toStrictEqual(['cra-001', 'cra-002']);
+
+    expect(await repo().list({ actor: parisManager, limit: 10, offset: 0 })).toHaveLength(2);
+  });
+
+  it('the consultant filter narrows within the actor’s own scope, and never widens it', async () => {
+    // The office boundary (`c.office_id = $1`) is applied before `consultantIds` in the SQL —
+    // this is what proves it, rather than assuming the WHERE clause order the source reads.
+    // Asking as the *wrong* office's manager for a consultant id that is real, but not in that
+    // office, must still answer empty, not that consultant's row.
+    await seedOffices();
+    await repo().save(makeCra());
+
+    const lyonManagerAskingForAParisConsultant = await repo().list({
+      actor: lyonManager,
+      limit: 10,
+      offset: 0,
+      consultantIds: ['consultant-1'],
+    });
+    expect(lyonManagerAskingForAParisConsultant).toStrictEqual([]);
+
+    // Same shape, for a consultant actor: asking for a colleague's id narrows to nothing, not to
+    // the colleague's own row — `scope === 'own'` already pins `consultant_id = $2`, and
+    // `consultantIds` only ANDs onto that, never replaces it.
+    const aliceAskingForSomeoneElse = await repo().list({
+      actor: alice,
+      limit: 10,
+      offset: 0,
+      consultantIds: ['someone-else'],
+    });
+    expect(aliceAskingForSomeoneElse).toStrictEqual([]);
+  });
+
+  it('narrows to the given statuses, and to every status the actor may see when not', async () => {
+    await seedOffices();
+    await repo().save(makeCra()); // 'draft' (Cra.open's own default)
+    await tx.client.query(`
+      INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+      VALUES ('cra-submitted', 'consultant-1', 'office-paris', '2026-07', 'submitted');
+    `);
+
+    const onlySubmitted = await repo().list({
+      actor: parisManager,
+      limit: 10,
+      offset: 0,
+      statuses: ['submitted'],
+    });
+    expect(onlySubmitted.map((row) => row.id)).toStrictEqual(['cra-submitted']);
+
+    const draftOrRefused = await repo().list({
+      actor: parisManager,
+      limit: 10,
+      offset: 0,
+      statuses: ['draft', 'refused'],
+    });
+    expect(draftOrRefused.map((row) => row.id)).toStrictEqual(['cra-001']);
+
+    // Non-exclusive across dimensions, the brief's own example: these consultants AND this
+    // status, combined.
+    const combined = await repo().list({
+      actor: parisManager,
+      limit: 10,
+      offset: 0,
+      consultantIds: ['consultant-1'],
+      statuses: ['submitted'],
+    });
+    expect(combined.map((row) => row.id)).toStrictEqual(['cra-submitted']);
+
+    expect(await repo().list({ actor: parisManager, limit: 10, offset: 0 })).toHaveLength(2);
+  });
+
+  it('narrows by year, by month, and by both — the single-digit month padded', async () => {
+    // Item 4 (QA round 2). The trap this covers is in the SQL, not in the API: `period` is
+    // `YYYY-MM` text (migration 002), so the filter is `left(period, 4)` and `right(period, 2)`,
+    // and an unpadded '6' would never match '06'. `api.int.test.ts` exercises the same filters
+    // end to end; this is the layer that does the padding.
+    await seedOffices();
+    await repo().save(makeCra()); // 2026-06
+    await tx.client.query(`
+      INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+      VALUES ('cra-2016-06', 'consultant-1', 'office-paris', '2016-06', 'validated');
+      INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+      VALUES ('cra-2026-11', 'consultant-1', 'office-paris', '2026-11', 'draft');
+    `);
+
+    const of2016 = await repo().list({ actor: parisManager, limit: 10, offset: 0, year: 2016 });
+    expect(of2016.map((row) => row.id)).toStrictEqual(['cra-2016-06']);
+
+    // Month alone crosses years: June 2016 and June 2026 both answer, and November does not.
+    const everyJune = await repo().list({ actor: parisManager, limit: 10, offset: 0, month: 6 });
+    expect(everyJune.map((row) => row.id).sort()).toStrictEqual(['cra-001', 'cra-2016-06']);
+
+    const june2026 = await repo().list({
+      actor: parisManager,
+      limit: 10,
+      offset: 0,
+      year: 2026,
+      month: 6,
+    });
+    expect(june2026.map((row) => row.id)).toStrictEqual(['cra-001']);
+
+    // A double-digit month is the other half of the padding: `right(period, 2)` reads '11'.
+    const november = await repo().list({ actor: parisManager, limit: 10, offset: 0, month: 11 });
+    expect(november.map((row) => row.id)).toStrictEqual(['cra-2026-11']);
+
+    expect(await repo().list({ actor: parisManager, limit: 10, offset: 0 })).toHaveLength(3);
+  });
+
+  it('the year and month filters narrow within the actor’s own scope, and never widen it', async () => {
+    // Same negative as `consultantIds` above: the office boundary is applied before these two in
+    // the SQL, so a Lyon manager asking for a year that only Paris holds gets nothing rather than
+    // the Paris row.
+    await seedOffices();
+    await repo().save(makeCra());
+
+    expect(
+      await repo().list({ actor: lyonManager, limit: 10, offset: 0, year: 2026, month: 6 }),
+    ).toStrictEqual([]);
+
+    // And a year nobody holds is empty rather than unfiltered — the filter is not silently
+    // dropped when it matches no row.
+    expect(
+      await repo().list({ actor: parisManager, limit: 10, offset: 0, year: 2024 }),
+    ).toStrictEqual([]);
+  });
+
+  it('caps pagination at MAX_PAGE_SIZE (200), however large the caller asks', async () => {
     // Seeded past the cap on purpose. Asking for 1000 against an empty table also returns "no
-    // more than 50" and proves nothing — the cap has to be the reason the answer is short.
+    // more than the cap" and proves nothing — the cap has to be the reason the answer is short.
+    // 250 rows, not 60: ADR-0081 (item 6/step 3, QA round 1) raised this repository's own cap
+    // from 50 to 200 once the seed's roster expansion measured a real office clearing 50 Cras
+    // (Paris, 65) — a fixture of 60 would now return in full and prove nothing about the cap
+    // that actually governs this route today.
     await seedOffices();
     await tx.client.query(`
       INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
       SELECT 'cra-' || g, 'consultant-1', 'office-paris',
-             to_char(DATE '2020-01-01' + (g || ' month')::interval, 'YYYY-MM'), 'draft'
-      FROM generate_series(1, 60) AS g
+             to_char(DATE '2000-01-01' + (g || ' month')::interval, 'YYYY-MM'), 'draft'
+      FROM generate_series(1, 250) AS g
     `);
 
     const capped = await repo().list({ actor: parisManager, limit: 1000, offset: 0 });
-    expect(capped).toHaveLength(50);
+    expect(capped).toHaveLength(200);
 
-    // And a caller under the cap still gets what it asked for, so the fix is not "always 50".
+    // And a caller under the cap still gets what it asked for, so the fix is not "always 200".
     const asked = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
     expect(asked).toHaveLength(10);
+  });
+
+  it('a manager with more than the old 50-row cap’s worth of Cras sees every one of them, unfiltered (ADR-0081)', async () => {
+    // The regression item 6/step 3 (QA round 1) exists to close: before ADR-0081, an office past
+    // fifty Cras answered `GET /api/v1/cras` wrong (silently truncated) rather than thin. 65 rows
+    // — the exact worst case the roster expansion measured for Paris — asked for at the old
+    // default of 50 and answered in full.
+    await seedOffices();
+    await tx.client.query(`
+      INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+      SELECT 'cra-' || g, 'consultant-1', 'office-paris',
+             to_char(DATE '2000-01-01' + (g || ' month')::interval, 'YYYY-MM'), 'draft'
+      FROM generate_series(1, 65) AS g
+    `);
+
+    const overOldCap = await repo().list({ actor: parisManager, limit: 65, offset: 0 });
+    expect(overOldCap).toHaveLength(65);
   });
 
   it('round-trips a refusal, with who refused it and why', async () => {

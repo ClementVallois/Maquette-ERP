@@ -253,7 +253,10 @@ describe('the session routes', () => {
       'manager-lyon',
       'billing-paris',
     ]);
-    expect(body.notice).toContain('no authentication');
+    expect(body.notice).toBe(
+      'These are demonstration personas, not accounts. Anyone may select any of them; ' +
+        'there is no authentication in this mockup.',
+    );
   });
 
   it('sets a signed cookie when a persona is selected', async () => {

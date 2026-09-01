@@ -162,7 +162,7 @@ interface InvoiceDetailScreenProps {
 
 /**
  * `/factures/$id` (task 8.2). Blocs vendeur/client, faits, table des lignes, récapitulatif TVA
- * par taux, totaux **uniquement si `issued`** (`data.totals` is `null` otherwise, on the wire —
+ * par taux, totaux **sauf pour un `draft`** (`data.totals` is `null` only then, on the wire —
  * never computed here). Lien « Version imprimable » vers la SSR `/facture/:id`. Task 8.3's
  * issuance button/dialog is `billing`-only, `IssuanceDialog`.
  */

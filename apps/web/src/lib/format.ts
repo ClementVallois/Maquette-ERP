@@ -69,6 +69,14 @@ export function frenchMonth(period: string): string {
   return `${MONTHS[month - 1] ?? ''} ${year}`;
 }
 
+/** `6` → `juin` — the month name alone, no year: item 4 (QA round 2)'s month filter names a
+ * calendar month independent of any particular year, so `frenchMonth` (which always needs a
+ * `YYYY-MM` and always prints both) is the wrong shape for it. `1`-indexed, matching every other
+ * month number on the wire (`@erp/platform`'s `Period`, this file's own `frenchMonth` above). */
+export function frenchMonthName(month: number): string {
+  return MONTHS[month - 1] ?? '';
+}
+
 // Sakamoto's algorithm, ported from `packages/platform/src/iso-date.ts` `dayOfWeek` — see the file
 // header for why it is ported rather than imported. `MONTH_OFFSET` holds the offset of each month
 // inside the year; January and February are treated as months of the previous year (the leap-day

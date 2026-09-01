@@ -8,7 +8,9 @@ import { DataTable } from '@/components/data-table/data-table';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
+import { MultiSelectCombobox } from '@/components/multi-select-combobox';
 import { StatusBadge, type StatusBadgeVariant } from '@/components/status-badge';
+import { TogglePillGroup } from '@/components/toggle-pill-group';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -20,13 +22,15 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
-import { frenchDays, frenchMonth } from '@/lib/format';
+import { frenchDays, frenchMonth, frenchMonthName } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { currentPeriod } from '@/lib/period';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
-import { useCalendar, useCraList } from '../hooks';
+import { useCalendar, useConsultantRoster, useCraList } from '../hooks';
 import type { CraListItem, CraStatus } from '../types';
+
+const CRA_STATUS_ORDER: readonly CraStatus[] = ['draft', 'submitted', 'validated', 'refused'];
 
 const STATUS_VARIANT: Record<CraStatus, StatusBadgeVariant> = {
   draft: 'cra-draft',
@@ -34,6 +38,14 @@ const STATUS_VARIANT: Record<CraStatus, StatusBadgeVariant> = {
   validated: 'cra-validated',
   refused: 'cra-refused',
 };
+
+/** Item 4 (QA round 2): the "clear this filter" sentinel both `Select`s below need — Radix's
+ * `SelectItem` refuses an empty string as a `value`. Shared between the year and month pickers on
+ * purpose (each `Select`'s own item list is a separate Radix instance, so the one string cannot
+ * collide with itself): never sent to the API or read from the URL, `CraListFilters.setYear`/
+ * `setMonth` translate a click on either back to `undefined` before it ever reaches `navigate()`. */
+const FILTER_ALL = 'all';
+const MONTH_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 /**
  * Item 2's own bound: "offer the months the calendar actually covers … derive that bound from the
@@ -142,6 +154,13 @@ function columnsFor(role: Role): ColumnDef<CraListItem>[] {
 
 interface CraListScreenProps {
   readonly role: Role;
+  /** Item 7 (QA round 1). Always `[]` for a consultant persona — the route never renders the
+   * filter controls for one, and `useCraList` reads exactly what it is given either way. */
+  readonly consultantIds: readonly string[];
+  readonly statuses: readonly CraStatus[];
+  /** Item 4 (QA round 2), same "always present, manager-only controls" shape as the two above. */
+  readonly year: number | undefined;
+  readonly month: number | undefined;
 }
 
 /**
@@ -150,8 +169,25 @@ interface CraListScreenProps {
  * Annexe A). "Ouvrir" now works for both: a consultant reaches their own editable grid, a manager
  * reaches ADR-0071's read-only view of the row's own consultant and period.
  */
-export function CraListScreen({ role }: CraListScreenProps): ReactElement {
-  const query = useCraList();
+export function CraListScreen({
+  role,
+  consultantIds,
+  statuses,
+  year,
+  month,
+}: CraListScreenProps): ReactElement {
+  // `exactOptionalPropertyTypes` refuses an explicit `year: undefined`/`month: undefined` — the
+  // spread omits the key entirely when there is no value, matching `CraListFilters`'s own
+  // `year?: number` (present-and-a-number, or simply absent, never present-and-`undefined`).
+  const filters = {
+    consultantIds,
+    statuses,
+    ...(year === undefined ? {} : { year }),
+    ...(month === undefined ? {} : { month }),
+  };
+  const query = useCraList(filters);
+  const filtersActive =
+    consultantIds.length > 0 || statuses.length > 0 || year !== undefined || month !== undefined;
 
   if (query.isPending) return <ListSkeleton />;
 
@@ -188,6 +224,20 @@ export function CraListScreen({ role }: CraListScreenProps): ReactElement {
         <OpenAnotherMonth alreadyListed={new Set(rows.map((row) => row.period))} />
       )}
 
+      {/* Manager only: a consultant persona has one Cra and never sees this — the brief's own
+          words. Billing is deliberately excluded too — `columnsFor` above renders neither a
+          "Consultant" column nor an "Ouvrir" action for that role (a pre-existing gap, not one
+          item 7 introduces), so a filter naming consultants nothing on screen identifies would
+          be worse than no filter at all. */}
+      {role === 'manager' && (
+        <CraListFilters
+          consultantIds={consultantIds}
+          statuses={statuses}
+          year={year}
+          month={month}
+        />
+      )}
+
       <DataTable
         columns={columnsFor(role)}
         data={rows}
@@ -195,9 +245,9 @@ export function CraListScreen({ role }: CraListScreenProps): ReactElement {
         emptyState={
           <EmptyState
             icon={CalendarIcon}
-            title={LABELS.cra.emptyList}
-            body={LABELS.cra.emptyListHint}
-            {...(!hasAnyCra && role === 'consultant'
+            title={filtersActive ? LABELS.cra.filters.emptyTitle : LABELS.cra.emptyList}
+            body={filtersActive ? LABELS.cra.filters.emptyBody : LABELS.cra.emptyListHint}
+            {...(!hasAnyCra && !filtersActive && role === 'consultant'
               ? {
                   action: {
                     label: LABELS.cra.show,
@@ -209,6 +259,183 @@ export function CraListScreen({ role }: CraListScreenProps): ReactElement {
           />
         }
       />
+    </div>
+  );
+}
+
+/**
+ * Item 7 (QA round 1): both dimensions non-exclusive (multi-select) and ANDed with each other —
+ * "for these three consultants, every CRA not yet validated". Filter state lives in the URL
+ * (`routes/_shell/cra.index.tsx`'s `validateSearch`), so this component only ever reads its
+ * current value from props and writes a new one via `navigate`; it holds no state of its own.
+ */
+function CraListFilters({
+  consultantIds,
+  statuses,
+  year,
+  month,
+}: {
+  readonly consultantIds: readonly string[];
+  readonly statuses: readonly CraStatus[];
+  readonly year: number | undefined;
+  readonly month: number | undefined;
+}): ReactElement {
+  const navigate = useNavigate();
+  const roster = useConsultantRoster();
+  const calendar = useCalendar();
+
+  // `undefined`, not `[]`, once a filter clears back to empty — the search schema treats both the
+  // same way ("no filter"), and this is what keeps a cleared filter's URL as plain `/cra` again
+  // rather than permanently carrying `?consultantIds=%5B%5D`.
+  //
+  // `next` is computed by `MultiSelectCombobox`/`TogglePillGroup` from the `selected` **prop**
+  // this component handed them — always exactly one value away from that same prop (their own
+  // `toggle`/`activate` never changes more than one at a time; "Effacer les filtres" is the one
+  // exception, an explicit `onChange([])` with no single value to name). That prop can itself lag
+  // the router's own state by one render when two toggles fire in quick succession (found chasing
+  // item 3/11's own fix, ADR-0083: two `navigate()` calls in flight let the second commit before
+  // the first, so the first's toggle silently disappears). `toggleDiff` names the one value that
+  // changed by diffing `next` against `current` — the prop `next` was actually computed from, the
+  // only baseline the diff is guaranteed to be exactly one value from — and `applyDiff` replays
+  // that same single change against `search`'s own `prev`, which the router keeps current
+  // regardless of React's render timing, so a stale `next` replays the right diff late rather than
+  // losing it or applying a different one.
+  //
+  // `next.length === 0` is ambiguous on its own: `toggle` unticking the *last* remaining box
+  // (`current.length === 1`) and "Effacer les filtres" (`onChange([])`, reachable from any
+  // `current`) both land here, and only one of them means "wipe everything". `toggle` never
+  // removes more than one value at a time, so `current.length > 1` going to `next.length === 0`
+  // is reachable only through the explicit clear — that is the one case treated as `clear`.
+  // `current.length <= 1` is read as "remove the one value that was there" instead: against a
+  // *stale* `current` (the exact case this machinery exists for), that stale value may no longer
+  // be the router's only entry, and `clear` would wipe out whatever raced in ahead of it.
+  type ToggleDiff =
+    { readonly kind: 'add' | 'remove'; readonly value: string } | { readonly kind: 'clear' };
+
+  function toggleDiff(current: readonly string[], next: readonly string[]): ToggleDiff {
+    if (next.length === 0) {
+      const [onlyValue] = current;
+      return current.length <= 1 && onlyValue !== undefined
+        ? { kind: 'remove', value: onlyValue }
+        : { kind: 'clear' };
+    }
+    const added = next.find((value) => !current.includes(value));
+    if (added !== undefined) return { kind: 'add', value: added };
+    const removed = current.find((value) => !next.includes(value));
+    return removed !== undefined ? { kind: 'remove', value: removed } : { kind: 'clear' };
+  }
+
+  function applyDiff(current: readonly string[], diff: ToggleDiff): readonly string[] {
+    switch (diff.kind) {
+      case 'add':
+        return current.includes(diff.value) ? current : [...current, diff.value];
+      case 'remove':
+        return current.filter((value) => value !== diff.value);
+      case 'clear':
+        return [];
+    }
+  }
+
+  function setConsultantIds(next: readonly string[]): void {
+    const diff = toggleDiff(consultantIds, next);
+    void navigate({
+      to: '/cra',
+      search: (prev) => {
+        const updated = applyDiff(prev.consultantIds ?? [], diff);
+        return { ...prev, consultantIds: updated.length === 0 ? undefined : [...updated] };
+      },
+    });
+  }
+
+  function setStatuses(next: readonly string[]): void {
+    const diff = toggleDiff(statuses, next);
+    void navigate({
+      to: '/cra',
+      search: (prev) => {
+        const updated = applyDiff(prev.statuses ?? [], diff);
+        return { ...prev, statuses: updated.length === 0 ? undefined : (updated as CraStatus[]) };
+      },
+    });
+  }
+
+  // Item 4 (QA round 2). A single `Select`, not `MultiSelectCombobox`/`TogglePillGroup`: each
+  // change fully replaces the one value it owns, so there is no multi-value diff to race —
+  // `toggleDiff`/`applyDiff` above exist for exactly the ambiguity a single-value control never
+  // has. `FILTER_ALL` is a sentinel: Radix's `SelectItem` refuses an empty string value, and this
+  // is the "clear this one filter" option both of these `Select`s need one of.
+  function setYear(next: string): void {
+    const parsed = next === FILTER_ALL ? undefined : Number.parseInt(next, 10);
+    void navigate({
+      to: '/cra',
+      search: (prev) => ({ ...prev, year: parsed }),
+    });
+  }
+
+  function setMonth(next: string): void {
+    const parsed = next === FILTER_ALL ? undefined : Number.parseInt(next, 10);
+    void navigate({
+      to: '/cra',
+      search: (prev) => ({ ...prev, month: parsed }),
+    });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <MultiSelectCombobox
+        label={LABELS.cra.filters.consultantLabel}
+        placeholder={LABELS.cra.filters.consultantPlaceholder}
+        noMatchLabel={LABELS.cra.filters.consultantNoMatch}
+        noneSelectedLabel={LABELS.cra.filters.consultantNoneSelected}
+        clearLabel={LABELS.cra.filters.clear}
+        options={(roster.data?.consultants ?? []).map((consultant) => ({
+          value: consultant.id,
+          label: consultant.displayName,
+        }))}
+        selected={consultantIds}
+        onChange={setConsultantIds}
+      />
+      <TogglePillGroup
+        label={LABELS.cra.filters.statusLabel}
+        options={CRA_STATUS_ORDER.map((status) => ({
+          value: status,
+          label: LABELS.cra.statuses[status],
+        }))}
+        selected={statuses}
+        onChange={setStatuses}
+      />
+      <Select value={year === undefined ? FILTER_ALL : String(year)} onValueChange={setYear}>
+        <SelectTrigger aria-label={LABELS.cra.filters.yearLabel} className="w-36">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={FILTER_ALL}>{LABELS.cra.filters.yearAll}</SelectItem>
+          {/* Ascending order across the whole calendar (`useCalendar`, ADR-0004/ADR-0078), not
+              only the years this office's own Cras happen to cover: the same "known working
+              calendar" list `OpenAnotherMonth` already reads from, so a year with nothing to show
+              is still pickable (and answers the filtered-empty state) rather than silently
+              impossible to select at all. */}
+          {[...(calendar.data?.years ?? [])]
+            .sort((a, b) => a - b)
+            .map((calendarYear) => (
+              <SelectItem key={calendarYear} value={String(calendarYear)}>
+                {calendarYear}
+              </SelectItem>
+            ))}
+        </SelectContent>
+      </Select>
+      <Select value={month === undefined ? FILTER_ALL : String(month)} onValueChange={setMonth}>
+        <SelectTrigger aria-label={LABELS.cra.filters.monthLabel} className="w-40">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={FILTER_ALL}>{LABELS.cra.filters.monthAll}</SelectItem>
+          {MONTH_NUMBERS.map((monthNumber) => (
+            <SelectItem key={monthNumber} value={String(monthNumber)}>
+              {frenchMonthName(monthNumber)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

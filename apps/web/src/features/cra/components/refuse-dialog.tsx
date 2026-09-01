@@ -18,14 +18,24 @@ import { LABELS } from '@/lib/labels';
 import { sentenceFor } from '@/lib/problems';
 
 import { useRefuseCra } from '../hooks';
-import type { PreFacturierCraRow } from '../types';
 
 const REASON_MAX_LENGTH = 500;
 
 interface RefuseDialogProps {
   readonly period: string;
-  readonly cra: PreFacturierCraRow;
+  // Deliberately narrow rather than a full pré-facturier row: this dialog only ever reads these
+  // two fields (the title, and the id it posts against), so either caller — the pré-facturier
+  // table's own row, or the CRA detail screen (item 3, QA round 1), which only has a Cra, not a
+  // pré-facturier row — can hand it exactly what it has.
+  readonly cra: { readonly craId: string; readonly consultantName: string };
   readonly onClose: () => void;
+  /**
+   * Called once, right before `onClose`, only on a successful refusal — never on cancel. Optional:
+   * the pré-facturier table has nowhere more sensible to go than staying put, so it leaves this
+   * unset; the CRA detail screen (item 3, QA round 1) uses it to route the manager back to the
+   * pré-facturier once there is nothing left to decide on this row.
+   */
+  readonly onRefused?: () => void;
 }
 
 /**
@@ -34,8 +44,17 @@ interface RefuseDialogProps {
  * mirrors so the submit button does not invite a request the domain will reject anyway). Unlike
  * validation, this is a genuine two-step dialog: nothing is sent until the manager confirms a
  * reason.
+ *
+ * Lives under `features/cra/`, not `features/pre-facturier/` where it was first written: the
+ * mutation it drives (`useRefuseCra`) is a Cra action wired against `features/cra/api.ts`, and
+ * `features/pre-facturier` already imports from `features/cra` for its own row/status types — the
+ * one direction this SPA's features use between each other (mirrored exactly by
+ * `features/factures/types.ts`'s own header, which explains why `InvoiceListItem` lives there and
+ * not in `features/cra`). The CRA detail screen (item 3, QA round 1) needed this same dialog from
+ * inside `features/cra`; moving it here keeps that one direction rather than adding the reverse
+ * arrow a caller under `features/cra` importing from `features/pre-facturier` would have opened.
  */
-export function RefuseDialog({ period, cra, onClose }: RefuseDialogProps): ReactElement {
+export function RefuseDialog({ period, cra, onClose, onRefused }: RefuseDialogProps): ReactElement {
   const [reason, setReason] = useState('');
   const refuseMutation = useRefuseCra(period);
   const trimmed = reason.trim();
@@ -47,6 +66,7 @@ export function RefuseDialog({ period, cra, onClose }: RefuseDialogProps): React
     try {
       await refuseMutation.mutateAsync({ craId: cra.craId, reason });
       toast.success(LABELS.preFacturier.refuseSuccessToast);
+      onRefused?.();
       onClose();
     } catch {
       // The refusal renders inline below, from `refuseMutation.error` — nothing else to do here.

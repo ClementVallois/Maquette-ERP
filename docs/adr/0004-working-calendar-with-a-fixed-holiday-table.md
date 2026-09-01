@@ -1,7 +1,10 @@
-# ADR-0004 — The working calendar is a domain component with a fixed 2026 holiday table
+# ADR-0004 — The working calendar is a domain component with a written holiday table
 
 - **Date**: 2026-08-17
-- **Status**: accepted
+- **Status**: accepted — its table extended from 2026 alone to 2016–2027 by
+  [ADR-0078](./0078-the-holiday-table-extends-to-2016-2027.md) (31/08/2026), on this ADR's own
+  reconsideration threshold. The decision below is unchanged; only the span of the table moved,
+  and the title said "fixed 2026" until that happened.
 
 ## Context
 

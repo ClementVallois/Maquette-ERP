@@ -1,9 +1,9 @@
 import { BusinessError, TechnicalFailure } from '@erp/platform';
 
 /**
- * The working calendar was asked about a year it does not hold. ADR-0004 keeps a written table
- * for 2026 alone and requires this to be loud: a silent answer would treat an unknown public
- * holiday as an ordinary working day, and bill it.
+ * The working calendar was asked about a year it does not hold. ADR-0004 keeps a written table —
+ * 2016–2027 since ADR-0078 extended it — and requires this to be loud: a silent answer would
+ * treat an unknown public holiday as an ordinary working day, and bill it.
  */
 export class UnknownCalendarYearError extends BusinessError {
   readonly problemType = '/problems/unknown-calendar-year';
@@ -12,6 +12,22 @@ export class UnknownCalendarYearError extends BusinessError {
     super(`the working calendar holds ${known.join(', ')} and was asked about ${String(year)}`, {
       year,
       known,
+    });
+  }
+}
+
+/**
+ * A CRA was opened for a period that starts after the consultant's own departure (ADR-0079). The
+ * value is fine — the period is real — and it is the consultant's state as of that date that
+ * refuses it, the same reasoning `MissingHabilitationError` gives for its own 409.
+ */
+export class CraAfterDepartureError extends BusinessError {
+  readonly problemType = '/problems/cra-after-departure';
+
+  constructor(period: string, departure: string) {
+    super(`${period} starts after the consultant's own departure (${departure})`, {
+      period,
+      departure,
     });
   }
 }

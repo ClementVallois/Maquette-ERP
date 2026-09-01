@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { ShieldAlertIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 
+import { RoleBadge } from '@/components/role-badge';
 import { Button } from '@/components/ui/button';
 import type { Role } from '@/features/session/types';
 import { LABELS } from '@/lib/labels';
@@ -35,9 +36,11 @@ export function DeniedState({ deniedBy, role }: DeniedStateProps): ReactElement 
           <dt className="text-muted-foreground">{LABELS.problem.deniedBy}</dt>
           <dd className="font-mono text-[0.8125rem] text-foreground">{deniedBy}</dd>
         </div>
-        <div className="flex justify-between gap-4">
+        <div className="flex items-center justify-between gap-4">
           <dt className="text-muted-foreground">{LABELS.persona.role}</dt>
-          <dd className="text-foreground">{LABELS.roles[role]}</dd>
+          <dd>
+            <RoleBadge role={role} />
+          </dd>
         </div>
       </dl>
       <Button asChild size="sm" className="mt-1">

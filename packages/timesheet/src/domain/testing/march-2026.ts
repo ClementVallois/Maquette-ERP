@@ -1,4 +1,4 @@
-import { type Clock, period } from '@erp/platform';
+import { type Clock, type IsoDate, period } from '@erp/platform';
 
 import { Cra } from '../cra.ts';
 import { type Hierarchy, hierarchy } from '../hierarchy.ts';
@@ -36,8 +36,16 @@ export const managers: Hierarchy = hierarchy([
   { consultantId: CONSULTANT, managerId: MANAGER, from: '2025-01-01', to: null },
 ]);
 
-export function emptyCra(id = 'cra-1'): Cra {
-  return Cra.open({ id, consultantId: CONSULTANT, officeId: OFFICE, period: MARCH });
+/** `departure`: `null` (the default) for a consultant still with the firm — ADR-0079's own test
+ * passes a real date to exercise the guard `Cra.open` runs against it. */
+export function emptyCra(id = 'cra-1', departure: IsoDate | null = null): Cra {
+  return Cra.open({
+    id,
+    consultantId: CONSULTANT,
+    officeId: OFFICE,
+    period: MARCH,
+    consultantDeparture: departure,
+  });
 }
 
 /** Every workable day of March worked on one mission: the shape a complete Cra has. */

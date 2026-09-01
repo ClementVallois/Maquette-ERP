@@ -20,7 +20,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCraList } from '@/features/cra/hooks';
+import { RefuseDialog } from '@/features/cra/components/refuse-dialog';
+import { ValidateResultDialog } from '@/features/cra/components/validate-result-dialog';
+import { useCraList, useValidateCra } from '@/features/cra/hooks';
 import type { CraStatus, ValidationResponse } from '@/features/cra/types';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
@@ -28,11 +30,8 @@ import { frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
-import { usePreFacturier, useValidateCra } from '../hooks';
+import { usePreFacturier } from '../hooks';
 import type { DeclineReason, PreFacturierCraRow, PreFacturierInvoiceRow } from '../types';
-
-import { RefuseDialog } from './refuse-dialog';
-import { ValidateResultDialog } from './validate-result-dialog';
 
 const CRA_STATUS_VARIANT: Record<CraStatus, StatusBadgeVariant> = {
   draft: 'cra-draft',
@@ -236,28 +235,44 @@ function craColumns(
     {
       id: 'actions',
       header: () => <span className="sr-only">{LABELS.action.tableActions}</span>,
-      cell: ({ row }) =>
-        row.original.decidable ? (
-          <div className="ml-auto flex w-fit gap-2">
-            <Button
-              size="sm"
-              onClick={() => {
-                onValidate(row.original);
-              }}
+      // Item 3 (QA round 1): a manager used to have to leave the pré-facturier through the CRA
+      // menu (`cra-list-screen.tsx`'s own `Link` to this same route) to look at a row before
+      // deciding on it. "Ouvrir" is offered on every manager row, decidable or not — a validated
+      // or refused Cra is still worth opening to read — while validate/refuse stay gated on
+      // `decidable`, exactly as before.
+      cell: ({ row }) => (
+        <div className="ml-auto flex w-fit items-center gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link
+              to="/cra/$period/$consultantId"
+              params={{ period, consultantId: row.original.consultantId }}
             >
-              {LABELS.preFacturier.validate}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                onRefuse(row.original);
-              }}
-            >
-              {LABELS.preFacturier.refuse}
-            </Button>
-          </div>
-        ) : null,
+              {LABELS.cra.show}
+            </Link>
+          </Button>
+          {row.original.decidable && (
+            <>
+              <Button
+                size="sm"
+                onClick={() => {
+                  onValidate(row.original);
+                }}
+              >
+                {LABELS.preFacturier.validate}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  onRefuse(row.original);
+                }}
+              >
+                {LABELS.preFacturier.refuse}
+              </Button>
+            </>
+          )}
+        </div>
+      ),
     },
   ];
 

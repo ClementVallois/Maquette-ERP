@@ -312,6 +312,7 @@ export const LABELS = {
       '/problems/missing-habilitation':
         'La mission exige une habilitation que le consultant ne détenait pas ce jour-là.',
       '/problems/cra-incomplete': 'Le mois n’est pas complet au regard du calendrier ouvré.',
+      '/problems/cra-after-departure': 'Ce mois commence après le départ du consultant (ADR-0079).',
       '/problems/self-validation-forbidden':
         'Qui saisit un CRA ne le juge pas — ni pour le valider, ni pour le refuser : c’est la première règle de séparation des tâches (ADR-0006).',
       '/problems/not-the-manager':

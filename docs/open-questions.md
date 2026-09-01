@@ -43,6 +43,8 @@ moves down to "Settled" with its answer, so the record shows it was known rather
 | 27/08/2026 | **`journeys.spec.ts`'s `EDIT_PERIOD` constant is `'2026-08'`, and the date this row is written is 27/08/2026 — the first time the capstone demo replay has ever run in the same month its own hardcoded "future, editable" period names.** J1's "month navigation reaches an empty, editable month" test clicks "Mois suivant" twice from `/cra/2026-06` to reach `EDIT_PERIOD` and expects a blank, editable grid there; every other test in the file that touches this period (the manager refusal, J3's resubmission) inherits the same constant. Nothing in this phase changed the constant or the navigation logic — found reading the file while diagnosing an unrelated, self-inflicted flake (stale `2026-08` state left over from a previous unreset run in this same session), not by reproducing a real failure. | If the grid's "blank, editable" state for a period ever comes to depend on that period being in the future relative to the wall clock (rather than only on whether a `Cra` row exists for it — which is what the domain and route code actually check today, as far as this reading went), the demo checklist's own replay breaks the first time it runs in a month after August 2026, which for `docs/demo-checklist.md`'s own stated purpose (rerunnable "at any date this mockup will ever be opened") is exactly the failure this document exists to rule out. | Not resolved here — `apps/api/src/composition/cra-grid.ts`'s own `editable` field is `cra === null \|\| cra.status === 'draft' \|\| cra.status === 'refused'` (line 149), a status check with no wall-clock term anywhere in it or in the route that serves it (`routes/api.ts`'s `/api/v1/cras/:period/grid`), so the constant is very likely safe as a **frozen date literal** rather than a **relative "two months ahead"** the way it reads at a glance; but "very likely" from a reading is not the same claim as a test that runs the file in a later month and watches it pass. No test does that today, and none is invented here to avoid manufacturing a fixture (a fake wall clock inside a real-browser Playwright run is not a small addition). Resolve **whichever phase next touches `journeys.spec.ts`'s own date constants**, none currently scheduled — or, failing that, the first real run of this suite in September 2026 or later, which either confirms the reading or reopens this row with an actual failure attached. |
 | 28/08/2026 | **Neither the `setup` job's real composite nor `nightly.yml`'s Stryker gate has ever run on GitHub's own infrastructure.** Both are verified locally only: the `setup` composite end to end (`env:init`, `env:check`, `docker compose up -d --wait`, `migrate`, `seed`), corroborated against `actions/runner-images`' documented `ubuntu-latest` software list (Docker 28.0.4, Compose 2.38.2); the mutation score by a local `pnpm exec stryker run`, not by the workflow that will run it. | A gate reported green that was never run is the exact defect this repository's history records twice — the branch-protection claim of Phase 0 (ADR-0040) and the nine-vs-ten README count this same phase fixed. Neither claim says "green"; both say "verified locally, not yet on the platform". The gap closes only on the real runner. | Resolve when this branch's pull request to `main` opens: the `setup` job's first CI run proves the first half; the first 03:17 UTC after merge — or an earlier manual `workflow_dispatch` — proves the second. No later phase is named because this one already owns both proofs; the event is "this branch merges", not a numbered phase. **First half proved on 31/08/2026**: pull request #6 ran `Cold setup (migrate + seed)` on a GitHub-hosted `ubuntu-latest` runner and it **passed** in 49 s — `docker compose up -d --wait` reaches a live runner, as corroborated but never witnessed until then. **Second half proved on 31/08/2026**, minutes after the merge and by the means this row names: `nightly.yml` was dispatched by hand on `main` (`gh workflow run nightly.yml --ref main`, run `33382053843`) and the `Mutation testing (domain only)` job **passed** on a GitHub-hosted runner, reporting `All files 72.80` — `billing` 67.75, `timesheet` 79.07 — and `Final mutation score of 72.80 is greater than or equal to break threshold 70`. The same three numbers ADR-0027 and the README publish, produced this time by the workflow rather than by a local run. **Settled 31/08/2026**: both gates have now run on the platform, and neither the `schedule:` trigger's own first firing (the next 03:17 UTC) nor anything else is still owed for this row — a cron that the platform accepts on the default branch is GitHub's guarantee, not this repository's claim. |
 | 28/08/2026 | **The vulnerability-management procedure (`docs/vulnerability-management.md`) has never been exercised**: its exception table is empty because `pnpm audit --audit-level=high` has never gone red since Phase 0, so the four-step decision it documents has no real precedent behind it. | If a real exception is ever needed, the procedure could turn out to be missing a case its author did not anticipate — the ordinary gap between a designed process and a used one. | **Half answered on 31/08/2026, three days after this row was written, on this phase's own pull request.** The `dependencies` job went red — not on `pnpm audit`, which passed, but on **osv-scanner, which has no severity floor**, over GHSA-q8mj-m7cp-5q26 (`qs` 6.15.1, CVSS 6.3, moderate) reaching the graph through **Stryker, the dependency this very phase added**. Two things came out of it. The first is that the procedure **described its own gate wrongly** — "a severity the audit tool itself already filtered for" was true of one of the job's two steps and false of the other; corrected in place, with the README's gate-table row, per the ADR-0045 rule that a description of the code is brought into line with the code. The second is that **step 2 (a fix is available: take it) is now exercised end to end**: `typed-rest-client@2.3.1` pins `qs` exactly, so the fix is a version-qualified `overrides` entry in `pnpm-workspace.yaml`, verified with the job's own digest-pinned scanner locally (`No issues found`). No severity floor was added — turning the gate green by lowering it is what the gate table refuses by name. **Still open**: step 3, the exception path, and the shape of the exception table, which stays correctly empty because a fix taken is not an exception. Same terms as before — no phase named, reopen the day an advisory arrives with no fix available. |
+| 31/08/2026 | **README's own reconsideration threshold for the pré-facturier's month picker (`Pagination du pré-facturier au-delà d'une page`) was reached by this branch's own seed, not by a hypothetical office.** `composition/pre-facturier.ts`'s `unit.cras.list({ actor, limit: MAX_MONTHS, offset: 0 })` (`MAX_MONTHS = 50`) is the query the month selector reads (`offeredPeriods`), ordered `period DESC`. Item 6 (QA round 1) gave Paris and Lyon dense June/July/August 2026 across 19 active consultants each (`select count(*) filter (where departure_date is null) from public.consultants where office_id = …`) — roughly three months' worth of rows per office before a single historical row is reached, enough alone to fill the fifty-row page before the query ever gets there. Verified against the live seed (`docker exec maquette-postgres-1 psql`): a fresh `db:reset && seed` gives Paris eight distinct periods (`2016-06`, `2018-06`, `2020-06`, `2022-06`, `2024-06`, `2026-06`, `2026-07`, `2026-08` — the dev database also carries a leftover `2026-09` row from an e2e run, `journeys.spec.ts`'s own fixture, not seed output, excluded from this count), and the top fifty rows by `period DESC` stop inside `2026-06` — the five historical veteran periods do not appear in `offeredPeriods` at all, for either office. | The picker's degradation is the one the README already names as expected in the ordinary case ("il peut donc omettre un mois ancien, jamais un mois récent") — nothing is broken in the sense of showing wrong data — but the README's own threshold for revisiting this ("une implantation dont les CRA dépassent une page") is now literally true for two of the four offices, and the prescribed fix (a dedicated query for the selector, plus visible pagination — not a higher cap) is unbuilt. This is a **discoverability** gap, not a reachability one: `preFacturierComposition` honors an explicit `requestedPeriod` regardless of `offeredPeriods` (`pre-facturier.ts`, the query is validated then passed straight through, and the composition's own comment says so — "the month asked for is offered even when this office has no Cra in it"), so `GET /api/v1/pre-facturier?period=2016-06` and the SPA's own `/pre-facturier?period=2016-06` both resolve correctly today. A manager or billing persona at Paris or Lyon who does not already know a historical period's exact value has no way to discover it from the picker; one who has it (a shared link, a support ticket, a direct read of `GET /api/v1/cras`) reaches it exactly as before. The manager dashboard's own use of this composition is unaffected: its default period is `offeredPeriods(recent)[0]`, always the most recent, and its `pendingDecisions`/`lateCras` reads are period-filtered at each office's current-month row count, well under the cap. | Not fixed here: item 6's own brief was seed volume plus `/api/v1/cras`'s own page cap (ADR-0081), a REST route with its own pagination contract — this is a different composition (`pre-facturier.ts`'s `MAX_MONTHS`, unaffected by ADR-0081) backing a screen with no visible pagination control at all, and the README's own prescribed fix is sized as a feature (dedicated selector query + visible pagination), not a constant bump. Resolve in the next phase that touches the pré-facturier screen: build the dedicated month-selector query (all distinct periods for the office, not a byproduct of a capped row page) named as the fix here and in the README's own threshold row, which now points back at this row. **Update, 01/09/2026 (item 5, QA round 2, ADR-0082): this row's own closing sentence is now stale, corrected here rather than rewritten in place — the manager dashboard's `pendingDecisions`/`lateCras` are exactly what ADR-0082 stopped period-filtering.** They no longer inherit this composition's cap silently — ADR-0082 reads them from `unit.cras.list` directly, capped at `CRA_LIST_MAX_PAGE_SIZE = 200` (ADR-0081's own number, not this row's `MAX_MONTHS = 50`), so the two figures are unaffected by the gap this row names. What ADR-0082 does **not** fix, and what this row's own subject now also blocks: the dashboard's "Ouvrir le pré-facturier" button still opens the _requested_ period specifically (default: now), so a manager whose pending item sits in an old period this row's picker cannot list has no click that reaches it — only a shared link or a direct `?period=` guess. Still resolved by the same fix this row already names (a dedicated month-selector query with visible pagination); no new phase to add. |
+| 01/09/2026 | **The README's front matter describes an application that no longer exists, and its quickstart 404s.** Four statements, all of them true before the front-end merge of 28/08/2026 and none of them since: « Où en est cette maquette » says the interactive React SPA is unwritten (it ships, and `apps/api/src/web/routes.ts` now registers two server-rendered pages, not seven); « Démarrer » gives `pnpm run setup` then `pnpm run api` and sends the reader to `http://127.0.0.1:3000/`, but never says to build the SPA, and `apps/api/src/web/spa.ts` serves the ordinary 404 when `apps/web/dist/index.html` is absent — which it is on every fresh clone, `dist/` being gitignored; « Cinq paquets » lists five where the README's own `pnpm run boundaries` prints six; and `docs/frontend-plan.md` and `docs/direction-visuelle.md` are advertised « en français comme ce README » while both are English. Found by the `cold-reader` pass of 01/09/2026, whose walk stalled on the 404 before it could read anything else. | The first instruction a stranger follows does not work, on the repository whose stated requirement is that it explains itself to a reader with no brief. A reader who gets a 404 on the URL the README calls the entry point concludes the mockup is broken; nothing on the page lets them diagnose otherwise. | **Open — Phase 9 (`docs/BUILD-PLAN.md`, the documentation review pass), before the repository link goes out.** Not fixed on `fix/qa-round-1` on purpose: the README's front matter is the narrative Clement authors, and rewriting it inside a QA-fix merge would put an unreviewed rewrite of the repo's showcase behind a batch of bug fixes. The build step in « Démarrer » is the one line of it that is a defect rather than a narrative choice, and Phase 9 takes it first. |
 ---
 
 ## Front-end Phase 1 checkpoint — `feat/web`, 24/08/2026
@@ -3403,3 +3405,284 @@ infrastructure**, which is exactly what the row asked and no more. It does not s
 fired at its own hour — the first 03:17 UTC will come — and it does not need to: a cron GitHub
 accepts on a default branch is the platform's guarantee, and the reason this row existed was that a
 workflow on a non-default branch has no such guarantee at all.
+
+## Wave 2 plan — item 6, `fix/qa-round-1`, 31/08/2026
+
+Written before touching any code, per the batch brief's own hard stop: item 6 is a schema
+migration + a domain invariant + a calendar extension + several ADRs, larger than each of the
+seven items already shipped on this branch (Wave 1, commits `8105fb8`..`85c0283`). This is that
+plan, kept short.
+
+### Order, and why
+
+1. **Calendar first (arbitration A).** Nothing that writes a `Cra` for a pre-2026 or 2027 period
+   can exist until `workingCalendar()` knows those years. `PUBLIC_HOLIDAYS_2026` becomes a
+   2016–2027 table, written out date by date — its 2026 block checked byte-identical to the current
+   table (same eleven dates) before writing this plan, which is the validation ADR-0004's own rule
+   asks for. (This paragraph originally cited the session scratchpad file the table was drafted in,
+   a path on one machine that no reader can open. Corrected 01/09/2026; the check it describes is
+   the one that was actually run, and the merge audit of the same date recomputed all 132 dates
+   independently.) New ADR (next free
+   number, ADR-0078): ADR-0004's threshold ("the day the mockup spans a second year") is met
+   today. Every call site of the old export name gets grepped and moved, including
+   `apps/api/src/routes/api.ts`'s `workingCalendar().years` route and its contract test.
+
+2. **Departure next (arbitration B).** The invariant it adds — a CRA cannot exist for a period
+   starting after the consultant left — constrains what the seed is allowed to write in step 3,
+   so it has to exist before the seed grows. Migration `012-…` (nullable `DATE` on
+   `public.consultants`), `CONTEXT.md` term in the same commit, a typed error next to the other
+   `Cra` guards, a negative test. New ADR (ADR-0079; rejected option: a boolean `active` flag, or
+   deleting the row; threshold: the day a departure has to be reversible, or a re-hire needs to
+   keep one identity). Reader behaviour: a departed consultant drops out of a manager's current
+   roster and the pré-facturier's pending list, but stays readable on their own historical CRAs
+   and invoices. This lands on `consultantsOfOffice` (ADR-0077, item 7's own new route) — the
+   picker's options must exclude a departed consultant while `GET /api/v1/cras` still returns
+   their old rows; that is a test, not a comment.
+
+3. **The `limit=50` truncation on `GET /api/v1/cras`, fixed here, not deferred.** Checked, not
+   assumed: `apps/api/src/routes/api.ts`'s `Pagination` schema caps `limit` at `MAX_PAGE_SIZE = 50`
+   (default `DEFAULT_PAGE_SIZE = 20`), and `apps/web/src/features/cra/api.ts`'s `fetchCraList`
+   already requests the max, 50, with no pagination control in the UI to go further. Item 6's own
+   floor — at least 10 consultants per manager, three dense months each (06/07/08 2026) — already
+   reaches 30+ rows before a single historical row is added; a manager with 10+ consultants and
+   any sparse history plausibly clears 50. A filter (item 7) applied over a silently truncated
+   page would answer wrong, not just look thin. Fixed as part of step 4 below, once the actual
+   per-office row count is known from the seed data being written — either the CRA-list route's
+   own cap rises past the realistic worst case (documented in that commit, not a blanket
+   `MAX_PAGE_SIZE` change that would also loosen `/api/v1/invoices`), or the manager's own request
+   asks for exactly the office's count. Whichever is chosen gets a test: a manager with more than
+   the _old_ 50-row cap's worth of CRAs still sees every one of them, unfiltered.
+
+4. **Seed volume last, measured as it grows (arbitrations C/D).** Read `scripts/lib/seed-data.ts`
+   and `scripts/seed.ts` fully first (731 + 889 lines). Add the three dense 2026 months
+   (June/July/August) for every active consultant first, run `time pnpm run seed`, and only then
+   widen backward into sparse 2016–2025 history for a narrow subset of veterans — never the
+   reverse, so a budget overrun is caught while it is still cheap to cut. Two traps named in the
+   brief, restated here so they are not lost mid-implementation: `CRA_PERIOD` and at least three
+   hard-coded `'2026-06-01'`/`'2026-06-30'` string literals must all be grepped before the loop
+   shape changes, or July/August will silently write June rows; and Claire's June 2026 must stay
+   `submitted`, not `validated` — the loop that submits-and-validates new months uniformly cannot
+   be allowed to touch her row. Every seed invariant in the brief's own checklist (positional
+   `ids.next()`, exactly four selectable personas, Henri absent from every `validated_by`,
+   `VARIED_MONTH`'s five days intact, Intercontrat/PASSI/Forfait/territoriality still working)
+   gets checked explicitly before the commit, not assumed from "the tests still pass". Historical
+   invoices are issued through the domain, in date order, so the gapless per-fiscal-year numbering
+   is exercised rather than bypassed. `pnpm run seed:fingerprint` re-run and committed; `CLAUDE.md`
+   § "Dataset shape" updated in the same commit if the enumeration changes.
+
+### Contingency, stated in advance
+
+If `time pnpm run seed` blows the 60-second budget once the dense months exist (before any
+history is added), the span is cut, not optimised — the brief's own instruction. The cut, if it
+happens, gets recorded here as a new dated row (not silently shrunk in a commit message) naming
+which years or which consultants' history were dropped, and a named phase for revisiting it. No
+such row exists yet because the seed has not been touched — this section is the plan, not the
+outcome; the outcome is what will be added below it, or a plain statement that the budget held.
+
+### What this plan deliberately does not re-decide
+
+Arbitrations A–D above are copied from the batch brief because `CLAUDE.md`'s own rule is that
+Clement owns the decisions and the agent writes the code — they are stated here as the plan being
+followed, not as a fresh choice being made. Nothing in this section reopens the "already taken"
+label the brief put on them.
+
+### Outcome, 31/08/2026 — steps 1–3 shipped, step 4 (seed volume) did not run
+
+Session time ran out before step 4. What is true as of `fix/qa-round-1`'s tip:
+
+- **Step 1 (calendar) shipped** — ADR-0078, `PUBLIC_HOLIDAYS` now covers 2016–2027, every call
+  site moved, `pnpm vitest run --project unit` green.
+- **Step 2 (departure) shipped** — ADR-0079, migration `012-consultant-departure.sql`,
+  `Cra.open`'s new `consultantDeparture` guard with `CraAfterDepartureError`, `CONTEXT.md`
+  updated, `consultantsOfOffice` narrowed, negative tests in both `cra.test.ts` and
+  `api.int.test.ts`. `pnpm run check` green at this point (601 unit tests, 200 integration tests).
+- **Step 3 (the `limit=50` truncation)** — analysed in the plan above, **not fixed**. No seed
+  volume exists yet to size the real fix against, so there is nothing to measure the new cap
+  against without guessing. Still a real, live-once-step-4-lands defect: `GET /api/v1/cras`
+  answers correctly today only because no office has more than a handful of rows.
+- **Step 4 (seed volume, arbitrations C and D) did not run at all.** `scripts/lib/seed-data.ts`
+  and `scripts/seed.ts` are untouched since before this plan was written: no extra consultants, no
+  July/August 2026 CRAs, no historical span back to 2016, no additional managers, no invoice
+  history beyond what already existed. `pnpm run seed:fingerprint` was not re-run because nothing
+  changed to fingerprint. `CLAUDE.md` § "Dataset shape" was not touched, because the enumeration
+  it states did not change.
+
+This is a genuine gap, not a disguised cut: the brief's own arbitrations (10+ consultants per
+manager, dense 2026-06/07/08, sparse history to 2016, three invoice statuses issued through the
+domain in date order) are recorded above and remain the plan — nothing here revises them. **Named
+phase and date**: the next session on `fix/qa-round-1` (or its successor branch, if this one has
+already merged) picks up at step 4, in the order this section already gives — dense months first,
+`time pnpm run seed` measured before any historical row is added, only then widened backward. Step
+3's fix rides with it, sized against whatever step 4 actually produces rather than guessed at now.
+
+Branch pushed at this point with items 1, 2, 3, 4, 5, 7, 8 (Wave 1) and item 6 steps 1–2 (Wave 2)
+complete and green; item 6 steps 3–4 open, as recorded here.
+
+## Wave 2 outcome — item 6 steps 3–4 shipped, `fix/qa-round-1`, 31/08/2026 (session 2)
+
+Picks up exactly where the previous session's "Outcome, 31/08/2026" note left off: step 4 (seed
+volume) had not run at all, and step 3 (the `limit=50` truncation) was analysed but not fixed.
+Both are done now. This section states what shipped; it does not revise the plan above it.
+
+**Step 1 (roster expansion) and step 2 (dense months) shipped together**, appended to
+`scripts/lib/seed-data.ts` after `originalConsultants` (`ids.next()` stays positional, per the
+brief's own trap warning): 39 new consultants, one new manager (Karim, Bordeaux), none added to
+`personas` (stays exactly four). Bruno and Emma each clear 10 direct reports by a wide margin (20
+each). Four veterans (Julien, Camille, Théo, and Marine — who departs 2022-12-31, ADR-0079) join
+in 2016. Every active consultant gets a dense Cra for June, July and August 2026, except Alice's
+own August — withheld on purpose (`DENSE_PERIOD_EXCLUSIONS`) because `journeys.spec.ts`'s J1 and
+"item 3" interactively create, fill, submit and validate her August/September Cra, and a
+pre-filled August would make "Ce mois n'a pas encore été commencé" false on a fresh database.
+
+**Step 3 of the plan's own order (measure) ran before any historical row was written**: `time
+pnpm run seed` on the dense months alone measured well inside the 60s budget. No cut was needed,
+so none is recorded — the contingency in this section's own earlier paragraph does not trigger.
+
+**Step 4 (sparse history to 2016) shipped**: three veterans and the departed consultant each get
+one Cra every 24 months, driven through the domain in date order. `mAuditDora`, `mSocReunion` and
+`mGrcGuyane` — the three missions carrying this history — grow an earlier `startDate` and a
+historical `missionTjm` window so a 2016 Cra resolves a real, different rate rather than declining
+`noAgreedRate` (ADR-0080). Historical invoices are issued as Henri (absent from every
+`validated_by`) through the real issuance path (`PgNumberingCounter` + `Invoice.issue`): several
+left draft, several issued, one (Julien's 2022-06) cancelled by a credit note — the resulting gap
+in `invoice_number` is the credit note itself, never persisted since ADR-0057 dropped that table
+(ADR-0080 again).
+
+Final measured shape: **48 consultants, 147 Cras** (146 validated + Claire's own June, still
+submitted-not-validated as the brief requires), **65 invoices** (53 draft, 11 issued, 1 cancelled
+by credit note) across 4 offices. Per-office Cra counts: **Paris 65, Lyon 62, Bordeaux 17, Rennes
+3** — the first two clear the _old_ 50-row cap, which is what step 3 (below) is sized against.
+Per-office invoice counts: Paris 28, Lyon 23, Bordeaux 11, Rennes 3 — all comfortably under 50, by
+deliberate design (most new consultants staffed on `Intercontrat`, ADR-0080's own consequence
+section), so `/api/v1/invoices` (untouched, still capped at `MAX_PAGE_SIZE = 50`) does not
+reproduce the defect step 3 exists to close. `pnpm run seed:fingerprint` reproducible across two
+fresh `db:reset && seed` passes (hashes compared by hand — the script has no output file to
+commit).
+
+**Step 3 (the `limit=50` truncation) shipped: ADR-0081.** `GET /api/v1/cras` gets its own cap,
+`CRA_LIST_MAX_PAGE_SIZE = 200`, overriding `limit` in `CraListParams` on top of the shared
+`Pagination` schema — not a raise of the shared `MAX_PAGE_SIZE`, which `/api/v1/invoices` still
+uses unmeasured. `packages/timesheet/src/infrastructure/pg-cra-repository.ts`'s own `MAX_PAGE_SIZE`
+moved to 200 too (the repository-side belt to the route's braces — raising only the route would
+have shipped a cap the repository's own `Math.min` quietly narrowed straight back), and
+`apps/web/src/features/cra/api.ts`'s `DEFAULT_LIST_LIMIT` moved to 200 so the one request this
+screen makes actually asks for a realistic worst case. Owed tests: `pg-cra-repository.int.test.ts`
+now proves 250 seeded rows still cap at 200 (was: 60 rows capped at 50), and a new test proves 65
+rows — the exact measured Paris worst case — are NOT truncated; `api.int.test.ts`'s own
+`pagination` block gained the same shape at the route level (a manager with 65 real Cras, inserted
+via fixture, sees every one of them through `GET /api/v1/cras`, unfiltered).
+
+**The e2e suite needed real rework, not just a re-run** — the seed's new volume broke assumptions
+several existing specs had baked in, found by running the full Playwright suite (`journeys`,
+`desktop`, `mobile-shell` projects) and fixing what broke, one failure at a time:
+
+- Two tests relied on Paris having **zero** Cras for period `2026-07` (`journeys.spec.ts` task
+  7.6's own designed empty pré-facturier state, and its `axe.spec.ts` sibling) — true before this
+  session, false after, since Paris now has dense July data for everyone. Both moved to `2026-12`,
+  a period outside `DENSE_PERIODS` and outside `HISTORICAL_VETERANS`'s span, which stays genuinely
+  empty regardless of `playwright test`'s run order (CI runs every project in one invocation, no
+  `--project` filter — the ordering constraint `axe.spec.ts`'s own header already named).
+- `axe.spec.ts`'s "editable, empty grid" test used `2026-07` for **Alice specifically** — also
+  moved to `2026-12` rather than `2026-08`: `2026-08` is Alice's one withheld dense month, but
+  `journeys.spec.ts`'s J1 fills it interactively, so it is only blank if that spec has not run yet
+  in the same invocation — exactly the ordering dependency this file's own header rules out.
+- Several `getByText(...)`/`getByRole(...)` calls without `{ exact: true }` or `.first()` started
+  matching more than one element once Claire, Alice and the new roster carried more than one Cra
+  or more than one invoice to the same client (`item 1`, `item 7`, `J4` in `journeys.spec.ts`;
+  the "Factures" and dashboard-billing checks in `axe.spec.ts`; `routing.spec.ts`'s own factures
+  list check). Fixed with `.first()` where "at least one" was always the actual intent, and with a
+  rewritten flow in item 7's own test (its two-filter narrowing no longer trivially empties Claire
+  out with 'Validé' now that she carries a validated July and August alongside her submitted June
+  — 'Refusé' replaces it as the genuinely-empty pill, since nothing is refused yet at that point in
+  the file).
+- `J4`'s own invoice-issuance test assumed "J2 leaves exactly one draft invoice" for Claire's
+  Réunion client — now three (June, from J2; July and August, already drafted at seed time) — the
+  row lookup added a period filter (`hasText: 'juin 2026'`) alongside the client-name one.
+- One genuine **pre-existing, unrelated defect** found while fixing the above and corrected as a
+  drive-by (BUILD-RULES: "a green build that leaves the repo asserting something false is a
+  failure"): `routing.spec.ts` asserted `getByRole('tab', { name: 'Brouillon' })` on the invoice
+  status filter, which is `role="group"` with `aria-pressed` toggle buttons
+  (`toggle-pill-group.tsx`'s own comment on why), not tabs — stale since item 8 (QA round 1)
+  replaced the tab pattern with individually-clickable pills, in a file `journeys.spec.ts`'s own
+  item 8 test never touches. Fixed to `getByRole('button', ...)`.
+
+All three e2e projects (`journeys`, `desktop`, `mobile-shell`) green on a full run. Every review
+screenshot under `apps/web/tests/visual/review/` that changed content (more consultants, more
+rows, the relocated empty-state period) was refreshed and is committed alongside the code, per the
+precedent commit `85c0283` set for item 7.
+
+`pnpm run check` (601 unit tests) and `pnpm run test:int` (202 integration tests, +2 from the
+`limit=50` regression tests) green.
+
+**CLAUDE.md** § "Dataset shape" updated with the new roster enumeration. **docs/todo.md** (this
+session's own untracked working note) updated in place, not committed. Two new ADRs:
+**ADR-0080** (seed volume reuses missions for history, and the one deliberate credit-note gap) and
+**ADR-0081** (the CRA-list route's own higher page cap).
+
+Item 6 is complete: all four steps of the Wave 2 plan have shipped, and the branch's full scope
+(items 1–8) is green.
+
+**Double checkpoint, this section's own second question ("what breaks in three months").**
+`/api/v1/invoices` was deliberately kept out of this session's fix — its own worst case (Paris, 28) was never measured against `MAX_PAGE_SIZE = 50`, and ADR-0081 says so out loud rather than
+raising it unmeasured. That is a real, named gap, not a silent one: the day the seed's invoice
+volume grows again — more Regie fillers, a longer historical span, or a second credit note per
+veteran — Paris or Lyon's own count can cross 50 before anyone notices, reproducing exactly the
+defect this session closed for Cras, one route over. **Named phase**: the next session that touches
+`scripts/lib/seed-data.ts`'s invoice-producing assignments (item 6's own natural continuation, no
+number assigned yet) re-measures `/api/v1/invoices`'s per-office count the same way this one
+measured Cras, before adding more Regie-staffed consultants — and gives it ADR-0081's own treatment
+(a route-specific cap, not a raise of the shared constant) if it is needed.
+
+## QA round 2 checkpoint — `fix/qa-round-1`, 01/09/2026
+
+The second read of the running application, twelve items (`docs/qa-rounds.md`). Eleven shipped, one
+commit each; this is the phase-level record CLAUDE.md's double checkpoint requires, including what
+did not run.
+
+**Which items did not run, and why.** **Item 8** — a screen letting a manager assign missions to
+consultants — was not started, by Clement's decision of 01/09/2026. It is categorically larger than
+the other eleven combined: a new route, a new write path, a new authorization surface, at least one
+ADR, and a check against both the README's "Ce que je ne construis pas" and the PASSI habilitation
+rule. Nothing was scaffolded, so the branch carries no half of it. This is the product owner's call,
+not an open question, and it gets no row above. **Item 6** (the favicon not visible in dev) ran and
+found no defect: the dev server answers `200 image/svg+xml` on the declared href, the `<link>` is in
+the HTML of every route, no stray `public/favicon.*` exists, and the existing `routing.spec.ts`
+assertion passes. Chromium headless never requests a favicon, so the tab icon itself is not
+observable from here — the two remaining explanations (a tab opened before the favicon commit, the
+browser's per-origin favicon cache) are named in the file and only Clement can check them.
+
+**Two decisions the round forced, both written as ADRs at the time**: **ADR-0082** (a Cra in an
+actionable state is counted whatever month is displayed) and **ADR-0083** (the consultant filter
+replays a same-tick toggle as a diff). The other nine items are bug fixes and UI corrections, whose
+checkpoints were resolved in place in their own commits.
+
+**Corrections to the Wave 2 outcome section above, 01/09/2026.** Two numbers in it were measured
+before item 2 restored Alice's August and are now wrong: the seed holds **148 Cras**, not 147, and
+**66 invoices**, not 65. Counted against a clean `db:reset` on 01/09/2026: 54 draft, 11 issued, 1 cancelled by credit note, spanning supply periods 2016-06 to 2026-08. `.github/workflows/ci.yml`
+asserts those two figures per table on every pull request, which is what caught them. The same
+section says Alice's August is "withheld on purpose (`DENSE_PERIOD_EXCLUSIONS`)": that constant was
+deleted by item 2 of round 2 — every active consultant now has a dense August, and the interactive
+journey moved to September, which is genuinely blank for everyone. The same section's line about
+**docs/todo.md** being "updated in place, not committed" is true of the day it was written and stays
+as written: that file is still untracked and on no clone, and what it recorded is now
+`docs/qa-rounds.md`, which is tracked.
+
+**What the two merge reviewers found, and what was done with it.** `rules-auditor` and `cold-reader`
+both ran against `d218881` before the merge. Everything they raised that this branch itself made
+false was fixed on the branch rather than deferred: the persona notice translated at the API (the
+option ADR-0060 names and rejects), an unbounded `?year=` on the client while `?month=` was bounded,
+`year`/`month` missing their repository-level tests, a bare `Error` and a dead export in the seed,
+seven comments contradicting the code under them, four ADRs missing from the index, ADR-0004 still
+described as a "fixed 2026" table, ADR-0077 departing from BUILD-RULES' pagination line without
+naming it, the front-end plan's Annexe A describing three routes as they were before this branch,
+the README's dataset section describing a nine-consultant seed, and eight ADRs citing `docs/todo.md`
+— an untracked file that exists on no clone, now replaced by the tracked `docs/qa-rounds.md`.
+
+**Named as a row rather than fixed: the README's front matter is stale from before this branch.**
+Its "Où en est cette maquette" still says the React SPA is unwritten, "Démarrer" omits the
+`pnpm --filter @erp/web build` step so `http://127.0.0.1:3000/` — the URL it calls the entry point —
+404s on a fresh clone, the architecture section lists five packages where `pnpm run boundaries`
+prints six, and two documents it advertises "en français comme ce README" are English. None of it is
+this branch's doing; all of it arrived with the front-end merge of 28/08/2026. It is Phase 9's job by
+name (`docs/BUILD-PLAN.md`, the documentation review pass), and the row above dated 01/09/2026 says
+so with that phase named.

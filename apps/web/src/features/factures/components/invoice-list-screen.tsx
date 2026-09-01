@@ -9,8 +9,8 @@ import { DeniedState } from '@/components/feedback/denied-state';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
 import { StatusBadge, type StatusBadgeVariant } from '@/components/status-badge';
+import { TogglePillGroup } from '@/components/toggle-pill-group';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
 import { frenchEuros, frenchMonth } from '@/lib/format';
@@ -115,8 +115,8 @@ interface InvoiceListScreenProps {
 
 /**
  * `/factures` (task 8.1). `GET /api/v1/invoices` answers one page of up to 50, unfiltered — the
- * status tabs are a client-side view (`docs/frontend-plan.md` §8.1's "onglets de vue comme sur les
- * maquettes"), never a second request per tab.
+ * status filter is a client-side view (`docs/frontend-plan.md` §8.1's "onglets de vue comme sur
+ * les maquettes"), never a second request per pill.
  */
 export function InvoiceListScreen({ status, role }: InvoiceListScreenProps): ReactElement {
   const query = useInvoiceList();
@@ -127,6 +127,17 @@ export function InvoiceListScreen({ status, role }: InvoiceListScreenProps): Rea
 
     return status === 'all' ? invoices : invoices.filter((invoice) => invoice.status === status);
   }, [query.data, status]);
+
+  // Item 8 (QA round 1): "a count per status if the data already carries one" — it does, this
+  // page's own already-fetched, unfiltered page (`query.data.invoices`), so every pill's count
+  // reflects the same underlying read regardless of which one is currently selected.
+  const countOf = (candidate: InvoiceStatusFilter): number => {
+    const invoices = query.data?.invoices ?? [];
+
+    return candidate === 'all'
+      ? invoices.length
+      : invoices.filter((invoice) => invoice.status === candidate).length;
+  };
 
   if (query.isPending) return <TableSkeleton />;
 
@@ -168,42 +179,37 @@ export function InvoiceListScreen({ status, role }: InvoiceListScreenProps): Rea
 
   return (
     <div className="flex flex-col gap-4">
-      <Tabs
-        value={status}
-        onValueChange={(next) => {
+      {/* Item 8 (QA round 1): a segmented pill per status, `exclusive` (item 7's own multi-select
+       * CRA-status filter is the non-exclusive sibling) — obviously individually clickable rather
+       * than one wide bar, the brief's own complaint about the previous `Tabs` rendering. */}
+      <TogglePillGroup
+        label={LABELS.preFacturier.invoiceStatus}
+        exclusive
+        options={TAB_ORDER.map((candidate) => ({
+          value: candidate,
+          label: LABELS.invoice.filters[candidate],
+          count: countOf(candidate),
+        }))}
+        selected={[status]}
+        onChange={([next]) => {
           void navigate({
             to: '/factures',
-            search: next === 'all' ? {} : { status: next as InvoiceStatus },
+            search: next === undefined || next === 'all' ? {} : { status: next as InvoiceStatus },
           });
         }}
-      >
-        <TabsList>
-          {TAB_ORDER.map((candidate) => (
-            <TabsTrigger key={candidate} value={candidate}>
-              {LABELS.invoice.filters[candidate]}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-        {/* One `TabsContent`, matching whichever tab is active: this screen uses `Tabs` as a view
-         * filter over one table, not as separate per-tab panels, so there is exactly one panel to
-         * give Radix's own `aria-controls` (set on every trigger, active or not) something real to
-         * point at — found live by axe (task 8.1): with none rendered at all, the active trigger's
-         * own `aria-controls` referenced an id nothing in the DOM carried. */}
-        <TabsContent value={status}>
-          <DataTable
-            columns={columns()}
-            data={filtered}
-            getRowId={(row) => row.id}
-            emptyState={
-              <EmptyState
-                icon={ReceiptTextIcon}
-                title={LABELS.invoice.filters[status]}
-                body={LABELS.invoice.filterEmptyBody}
-              />
-            }
+      />
+      <DataTable
+        columns={columns()}
+        data={filtered}
+        getRowId={(row) => row.id}
+        emptyState={
+          <EmptyState
+            icon={ReceiptTextIcon}
+            title={LABELS.invoice.filters[status]}
+            body={LABELS.invoice.filterEmptyBody}
           />
-        </TabsContent>
-      </Tabs>
+        }
+      />
     </div>
   );
 }

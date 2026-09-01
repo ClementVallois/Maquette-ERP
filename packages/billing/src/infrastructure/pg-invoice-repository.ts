@@ -200,7 +200,10 @@ export class PgInvoiceRepository implements InvoiceRepository {
     sourceCraIds?: readonly string[],
     issuanceIdempotencyKey?: string,
   ): Promise<void> {
-    const totals = invoice.status === 'issued' ? invoice.totals : null;
+    // Mirrors assertInvoiceStateIsCoherent (domain/invoice.ts): draft is the only status with
+    // null totals. Gating on 'issued' instead of 'not draft' left cancelledByCreditNote rows
+    // unreadable — they carry totals but were written with null ones.
+    const totals = invoice.status === 'draft' ? null : invoice.totals;
     const mentions = invoice.mentions;
 
     await this.#client.query(

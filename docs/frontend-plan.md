@@ -673,25 +673,26 @@ checkbox rather than a claimed pass.
 
 ### Timesheet
 
-| Method and path                    | Roles | Contract                                                                                                                                                             |
-| ---------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/v1/cras?limit&offset`    | c,m,b | Limit 1–50, default 20; `>50` is 400, never clamped. Out-of-scope rows are filtered. Items contain id, consultant, office, period, status and recorded quarter-days. |
-| `GET /api/v1/cras/:id`             | c,m,b | Full lines/flags/status/validator. Missing is 404; existing but out of scope is 403.                                                                                 |
-| `PUT /api/v1/cras/:period/entries` | c     | `{ submit, entries: [{ day, dayType, missionId                                                                                                                       | null, quarterDays }] }`, at most 124, whole-month replacement. |
-| `POST /api/v1/cras/:id/validation` | m     | Returns replay flag, invoices and declined quarter-days. Replay is 200, not 409.                                                                                     |
-| `POST /api/v1/cras/:id/refusal`    | m     | Reason 1–500; returns refused. Scope 403, missing 404, blank reason 422, wrong state 409.                                                                            |
-| `GET /api/v1/cras/:period/grid`    | c     | Month skeleton, missions, assignable days and CRA state.                                                                                                             |
+| Method and path                    | Roles | Contract                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/v1/cras?limit&offset`    | c,m,b | Limit 1–200, default 20; `>200` is 400, never clamped (ADR-0081 — this route alone; every other list stays at 50). Optional `consultantIds`, `statuses`, `year` and `month` filters, ANDed with each other, never widening scope. Out-of-scope rows are filtered. Items contain id, consultant, office, period, status and recorded quarter-days. |
+| `GET /api/v1/cras/:id`             | c,m,b | Full lines/flags/status/validator. Missing is 404; existing but out of scope is 403.                                                                                                                                                                                                                                                              |
+| `PUT /api/v1/cras/:period/entries` | c     | `{ submit, entries: [{ day, dayType, missionId                                                                                                                                                                                                                                                                                                    | null, quarterDays }] }`, at most 124, whole-month replacement. |
+| `POST /api/v1/cras/:id/validation` | m     | Returns replay flag, invoices and declined quarter-days. Replay is 200, not 409.                                                                                                                                                                                                                                                                  |
+| `POST /api/v1/cras/:id/refusal`    | m     | Reason 1–500; returns refused. Scope 403, missing 404, blank reason 422, wrong state 409.                                                                                                                                                                                                                                                         |
+| `GET /api/v1/cras/:period/grid`    | c     | Month skeleton, missions, assignable days and CRA state.                                                                                                                                                                                                                                                                                          |
+| `GET /api/v1/consultants`          | m     | The manager's own office roster, `{ id, displayName }` only — no Tjm, Cjm or margin. Unpaginated by ADR-0077. A consultant or billing persona gets 403.                                                                                                                                                                                           |
 
 ### Billing
 
-| Method and path                                 | Roles | Contract                                                                                                   |
-| ----------------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------- |
-| `GET /api/v1/invoices?limit&offset`             | m,b   | Items include status, period, billed party, optional number/date/TTC.                                      |
-| `GET /api/v1/invoices/:id`                      | m,b   | Frozen document, lines/origins/VAT; totals null until issued.                                              |
-| `POST /api/v1/invoices/:id/issuance`            | b     | Requires 8–200 `Idempotency-Key`; missing 400, reused elsewhere 409; returns legal number/date/TTC/replay. |
-| `GET /api/v1/consultants/:id/economics?period=` | m     | Cjm and per-mission/total integer-cent economics; every read logged; billing gets 403.                     |
-| `GET /api/v1/pre-facturier?period=`             | m,b   | Phase 5.1 composition.                                                                                     |
-| `GET /api/v1/dashboard?period=`                 | c,m,b | Phase 5.3 role aggregate.                                                                                  |
+| Method and path                                 | Roles | Contract                                                                                                             |
+| ----------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/v1/invoices?limit&offset`             | m,b   | Items include status, period, billed party, optional number/date/TTC.                                                |
+| `GET /api/v1/invoices/:id`                      | m,b   | Frozen document, lines/origins/VAT; totals null while draft, present once issued and after a credit note cancels it. |
+| `POST /api/v1/invoices/:id/issuance`            | b     | Requires 8–200 `Idempotency-Key`; missing 400, reused elsewhere 409; returns legal number/date/TTC/replay.           |
+| `GET /api/v1/consultants/:id/economics?period=` | m     | Cjm and per-mission/total integer-cent economics; every read logged; billing gets 403.                               |
+| `GET /api/v1/pre-facturier?period=`             | m,b   | Phase 5.1 composition.                                                                                               |
+| `GET /api/v1/dashboard?period=`                 | c,m,b | Phase 5.3 role aggregate.                                                                                            |
 
 Printable documents remain `GET /facture/:id` for manager/billing and `GET /releve/:id` for all
 roles, opened by the SPA in new tabs.

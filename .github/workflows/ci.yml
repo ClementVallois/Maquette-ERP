@@ -356,6 +356,11 @@ jobs:
       # the `.env` that `setup`'s own `env:init` just wrote, rather than a second copy of the same
       # credentials pasted here: a value that drifted in `.env.example` would then fail loudly here
       # instead of being masked by a hard-coded literal that still happens to match.
+      #
+      # The numbers are the seed's own volume, so any change to the dataset lands here — deliberate:
+      # a gate that accepted "more than zero" would have stayed green through item 6's roster
+      # expansion without ever reading it. Every mismatch is collected and raised once, because
+      # aborting on the first hid the eight tables behind `consultants` when that expansion landed.
       - name: The app role can read what the seed wrote
         run: |
           set -a
@@ -366,18 +371,22 @@ jobs:
             DECLARE
               expected CONSTANT text[][] := ARRAY[
                 ['public.offices','4'], ['public.practices','5'], ['public.personas','4'],
-                ['public.consultants','9'], ['public.clients','5'], ['public.missions','7'],
-                ['timesheet.cras','6'], ['billing.invoices','3'], ['public.domain_events','5']
+                ['public.consultants','48'], ['public.clients','5'], ['public.missions','7'],
+                ['timesheet.cras','148'], ['billing.invoices','66'], ['public.domain_events','147']
               ];
               found bigint;
+              mismatches text[] := ARRAY[]::text[];
             BEGIN
               FOR i IN 1 .. array_length(expected, 1) LOOP
                 EXECUTE format('SELECT count(*) FROM %s', expected[i][1]) INTO found;
                 IF found <> expected[i][2]::bigint THEN
-                  RAISE EXCEPTION 'erp_app reads % rows from %, expected %',
-                    found, expected[i][1], expected[i][2];
+                  mismatches := mismatches || format('%s reads %s rows, expected %s',
+                    expected[i][1], found, expected[i][2]);
                 END IF;
               END LOOP;
+              IF array_length(mismatches, 1) IS NOT NULL THEN
+                RAISE EXCEPTION 'erp_app: %', array_to_string(mismatches, '; ');
+              END IF;
               RAISE NOTICE 'erp_app reads every seeded table at the expected volume.';
             END
             $$;

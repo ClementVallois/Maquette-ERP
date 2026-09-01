@@ -237,6 +237,36 @@ export class PgReferenceReader {
     return new Map(rows.map((row) => [row.id, `${row.first_name} ${row.last_name}`]));
   }
 
+  /**
+   * One office's **current** roster, for item 7's (QA round 1) consultant filter — unlike
+   * `consultantNames` above, this is scoped by `office_id` at the query itself rather than left to
+   * the caller, because it is meant to be exposed on the wire as a list, not read back only to
+   * enrich rows an authorization check already scoped elsewhere. A manager reads their own office,
+   * never another's (BUILD-RULES § Authorization) — the `WHERE office_id = $1` is that rule, not a
+   * courtesy.
+   *
+   * `departure_date IS NULL` (ADR-0079): a departed consultant is not staffable, so they drop out
+   * of the picker a manager builds a *new* filter from — the same reasoning `consultantNames`
+   * above deliberately does not carry, since that map still has to label a departed consultant's
+   * own historical rows correctly.
+   */
+  async consultantsOfOffice(
+    officeId: string,
+  ): Promise<readonly { readonly id: string; readonly displayName: string }[]> {
+    const { rows } = await this.#client.query<{
+      id: string;
+      first_name: string;
+      last_name: string;
+    }>(
+      `SELECT id, first_name, last_name FROM public.consultants
+       WHERE office_id = $1 AND role = 'consultant' AND departure_date IS NULL
+       ORDER BY last_name, first_name`,
+      [officeId],
+    );
+
+    return rows.map((row) => ({ id: row.id, displayName: `${row.first_name} ${row.last_name}` }));
+  }
+
   /** Office names, for the record a printable Cra carries. Presentation, not a rule. */
   async officeNames(): Promise<ReadonlyMap<string, string>> {
     const { rows } = await this.#client.query<{ id: string; name: string }>(

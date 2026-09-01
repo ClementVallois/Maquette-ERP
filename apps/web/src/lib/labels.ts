@@ -43,9 +43,6 @@ export const LABELS = {
   persona: {
     sessionInvalidatedTitle: 'Session interrompue',
     heading: 'Choisir un persona',
-    lead: 'Cette maquette n’a pas d’authentification : on choisit une identité, et tout le monde peut choisir n’importe laquelle.',
-    warning:
-      'Ce n’est pas une connexion. Aucun mot de passe n’est demandé, aucune identité n’est vérifiée, et le sélecteur remplace un fournisseur d’identité pour rendre les règles d’autorisation démontrables en trois clics.',
     choose: 'Prendre ce rôle',
     current: 'Persona en cours',
     change: 'Changer de persona',
@@ -57,6 +54,11 @@ export const LABELS = {
     emptyTitle: 'Aucun persona disponible',
     emptyBody: 'Cette instance ne propose aucun persona pour le moment.',
     selectError: 'Le persona n’a pas pu être choisi. Réessayez.',
+    /** The one place a visitor is told this is not authentication (item 1, QA round 1). The API
+     * says the same thing in English on `GET /api/v1/personas`, for a client that never renders
+     * a screen; French display copy lives here, per ADR-0026. */
+    notice:
+      'Cette maquette n’a pas d’authentification : on choisit une identité, et tout le monde peut choisir n’importe laquelle.',
   },
 
   roles: {
@@ -87,6 +89,13 @@ export const LABELS = {
         refused: 'Votre mois a été refusé : une correction est attendue.',
       },
       open: 'Ouvrir mon CRA',
+      /**
+       * ADR-0082: `refusedPeriods` may name a period other than the one already reported by
+       * `hints.refused` above — `{month}` interpolated with `frenchMonth(period)`, one sentence
+       * per period since each opens a different Cra.
+       */
+      refusedElsewhere: 'Le CRA de {month} a été refusé : une correction est attendue.',
+      openRefused: 'Ouvrir ce CRA',
     },
     manager: {
       pending: 'CRA en attente de décision',
@@ -96,7 +105,9 @@ export const LABELS = {
        * de votre décision »), singular/plural chosen at the call site. */
       pendingSentenceOne: '1 CRA en attente de votre décision.',
       pendingSentenceMany: '{count} CRA en attente de votre décision.',
-      pendingSentenceNone: 'Aucun CRA n’attend votre décision ce mois.',
+      // ADR-0082: this counts across every period, not just the one shown — "ce mois" would be
+      // false the moment a pending Cra sits in another month.
+      pendingSentenceNone: 'Aucun CRA n’attend votre décision.',
       open: 'Ouvrir le pré-facturier',
     },
     billing: {
@@ -160,6 +171,24 @@ export const LABELS = {
     emptyList: 'Aucun CRA sur cette période.',
     emptyListHint:
       'Ce n’est pas un refus : la liste est bien la vôtre, elle ne contient simplement rien pour ce mois.',
+    /** Item 7 (QA round 1) — the manager-only consultant/status filter on `/cra`. A consultant
+     * persona never sees this (they have one CRA) and neither does a billing one, so these
+     * strings render for a manager and nobody else. */
+    filters: {
+      consultantLabel: 'Consultants',
+      consultantPlaceholder: 'Rechercher un consultant…',
+      consultantNoMatch: 'Aucun consultant ne correspond à cette recherche.',
+      consultantNoneSelected: 'Tous les consultants',
+      statusLabel: 'Statut',
+      clear: 'Effacer les filtres',
+      emptyTitle: 'Aucun CRA ne correspond à ces filtres.',
+      emptyBody: 'Essayez de retirer un consultant, un statut, une année ou un mois du filtre.',
+      /** Item 4 (QA round 2): year and month, independent of each other and of the two above. */
+      yearLabel: 'Année',
+      yearAll: 'Toutes les années',
+      monthLabel: 'Mois',
+      monthAll: 'Tous les mois',
+    },
     /** task 6.1: the two-row list needed no filter; this replaces it with the control item 2
      * actually asked for — opening a month that has no `Cra` row yet. */
     openAnotherMonth: 'Ouvrir un autre mois',
@@ -542,6 +571,7 @@ export const LABELS = {
       '/problems/missing-habilitation':
         'La mission exige une habilitation que le consultant ne détenait pas ce jour-là.',
       '/problems/cra-incomplete': 'Le mois n’est pas complet au regard du calendrier ouvré.',
+      '/problems/cra-after-departure': 'Ce mois commence après le départ du consultant (ADR-0079).',
       '/problems/self-validation-forbidden':
         'Qui saisit un CRA ne le juge pas — ni pour le valider, ni pour le refuser : c’est la première règle de séparation des tâches (ADR-0006).',
       '/problems/not-the-manager':

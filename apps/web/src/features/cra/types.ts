@@ -37,6 +37,13 @@ export interface CraListResponse {
   readonly cras: readonly CraListItem[];
 }
 
+/** `GET /api/v1/consultants` (item 7, QA round 1) — a manager's own office roster, consultants
+ * only (never the manager asking, never another office). Manager alone: ADR-0077 rejects granting
+ * it to a billing persona, and `api.int.test.ts` asserts the 403. */
+export interface ConsultantRosterResponse {
+  readonly consultants: readonly { readonly id: string; readonly displayName: string }[];
+}
+
 export type RecordedDayType = 'worked' | 'absence';
 
 export interface CraLine {

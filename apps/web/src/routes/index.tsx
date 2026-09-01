@@ -6,8 +6,8 @@ import { z } from 'zod';
 
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
+import { RoleBadge } from '@/components/role-badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePersonas, useSelectPersona } from '@/features/session/hooks';
 import type { PersonaSummary } from '@/features/session/types';
@@ -55,7 +55,6 @@ function PersonaSelectorPage(): ReactElement {
           {LABELS.appName}
         </p>
         <h1 className="text-page-title">{LABELS.persona.heading}</h1>
-        <p className="text-sm text-muted-foreground">{LABELS.persona.lead}</p>
       </header>
 
       {/* Alert spreads props after its default role, so this explicit status role wins. ADR-0074. */}
@@ -67,12 +66,9 @@ function PersonaSelectorPage(): ReactElement {
         </Alert>
       )}
 
-      {/* This contract requires the API's notice verbatim, not a local label. */}
-      {personas.data !== undefined && (
-        <div className="rounded-xl border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
-          {personas.data.notice}
-        </div>
-      )}
+      <div className="rounded-xl border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
+        {LABELS.persona.notice}
+      </div>
 
       {personas.isPending && <PersonaGridSkeleton />}
 
@@ -153,12 +149,9 @@ function PersonaCard({ persona, pending, disabled, onChoose }: PersonaCardProps)
       >
         <span className="text-card-title">{persona.displayName}</span>
         <span className="flex items-center gap-1.5">
-          {/* Primary tint, deliberately not the neutral-outlined treatment every other role
-              badge in the app uses (direction-visuelle.md §4.5: "On the selector … the role
-              badge takes the primary tint … Everywhere else it is neutral outlined"). */}
-          <Badge className="border-transparent bg-accent text-accent-foreground">
-            {LABELS.roles[persona.role]}
-          </Badge>
+          {/* Item 4, QA round 1: the same colour this role gets everywhere else in the app now
+              (ADR-0076) — the selector no longer needs a distinct "primary tint" reading. */}
+          <RoleBadge role={persona.role} />
           <span className="text-sm text-muted-foreground">{persona.office}</span>
         </span>
         <span className="text-sm text-primary">{pending ? '…' : LABELS.persona.choose}</span>

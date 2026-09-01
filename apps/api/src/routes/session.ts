@@ -41,7 +41,9 @@ export function registerSessionRoutes(
 
       return {
         // Said in the payload and not only in the README: a client that only ever reads this
-        // route still learns that none of this is authentication.
+        // route still learns that none of this is authentication. English, like every other
+        // string under `/api/v1` (ADR-0026, and ADR-0060's own rejected option): the French
+        // sentence a visitor reads is `LABELS.persona.notice`, on the screen that renders it.
         notice:
           'These are demonstration personas, not accounts. Anyone may select any of them; ' +
           'there is no authentication in this mockup.',
