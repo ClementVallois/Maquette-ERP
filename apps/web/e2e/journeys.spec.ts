@@ -262,6 +262,66 @@ test.describe('item 2 — no skeleton flash between choosing a persona and landi
 });
 
 /**
+ * Item 9 (QA round 2): "Changer de persona" used to produce skeleton → blank white screen →
+ * skeleton → real content. Root cause, confirmed live rather than assumed (`page.on('request')`
+ * with `resourceType() === 'document'`, plus `load`/`framenavigated`): `useClearPersona`'s
+ * `onSuccess` (`features/session/hooks.ts`) ran an unfiltered `invalidateQueries()` *before*
+ * `PersonaBlock.handleChange`'s own `navigate({ to: '/' })` had unmounted the page the user was
+ * still on — `useMutation`'s hook-level `onSuccess` always runs before a call-level one. Whatever
+ * persona-scoped query that page still had active (a manager's dashboard, say) refetched
+ * immediately, against a cookie the mutation had just deleted — a refetch guaranteed to fail.
+ * `session-guard.ts`'s global cache-error subscription reacted to that failure with
+ * `window.location.assign('/')`: a genuine hard reload landing on top of the client-side
+ * navigation already in flight, producing the second skeleton (a fresh mount after the reload)
+ * with a blank frame while the browser tore down and reloaded the document in between.
+ *
+ * Fixed by passing `refetchType: 'none'` to that same `invalidateQueries()` call, for
+ * `useClearPersona` only: everything still gets marked stale (item 1's cross-persona leak stays
+ * fixed), nothing refetches synchronously, so there is nothing to fail and nothing for the guard
+ * to react to. `/` never reads `useSession()` anyway — only the public `usePersonas()` — so no
+ * data this mutation cares about is lost by not refetching it immediately.
+ *
+ * A hard reload is what a `resourceType() === 'document'` request or a second `load` event proves
+ * — a `MutationObserver`-based DOM check (the sibling tests above) cannot tell "the SPA re-rendered
+ * twice" apart from "the whole document reloaded once", and this bug is specifically the second
+ * one.
+ */
+test.describe('item 9 — “Changer de persona” never hard-reloads the page', () => {
+  test('no second document request and no second load event follow the client-side navigation to /', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'manager-paris');
+    // Bruno's own dashboard card — a persona-scoped query, active on this exact screen, which is
+    // the one whose doomed refetch used to trigger the hard reload.
+    await expect(page.getByText('CRA en attente de décision')).toBeVisible();
+
+    const documentRequests: string[] = [];
+    let loadEventCount = 0;
+    page.on('request', (request) => {
+      if (request.resourceType() === 'document') documentRequests.push(request.url());
+    });
+    page.on('load', () => {
+      loadEventCount += 1;
+    });
+
+    await page.locator('[data-slot="dropdown-menu-trigger"]').click();
+    await page.getByRole('menuitem', { name: 'Changer de persona' }).click();
+    await page.waitForURL('/');
+
+    // The persona selector's own real content, not its skeleton — proves the navigation actually
+    // finished settling, not just that the URL changed, before the two counts below are read.
+    await expect(page.locator('[data-persona-key]').first()).toBeVisible();
+    // A brief grace window: a hard reload's own `load` event, if this regressed, fires shortly
+    // after the URL already reads `/` (confirmed live: tens of milliseconds, not a race this
+    // margin could hide).
+    await page.waitForTimeout(500);
+
+    expect(documentRequests).toHaveLength(0);
+    expect(loadEventCount).toBe(0);
+  });
+});
+
+/**
  * QA round 1, item 3: a manager used to have to leave the pré-facturier through the CRA menu
  * (`cra-list-screen.tsx`'s own link, covered separately by "items 4/5" below) to open a row and
  * decide it. `pre-facturier-screen.tsx`'s `craColumns` now offers "Ouvrir" on every manager row,
