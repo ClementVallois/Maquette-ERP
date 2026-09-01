@@ -30,6 +30,10 @@ const DEFAULT_LIST_LIMIT = 200;
 export interface CraListFilters {
   readonly consultantIds?: readonly string[];
   readonly statuses?: readonly string[];
+  /** Item 4 (QA round 2): independent of each other and of `consultantIds`/`statuses` above —
+   * matches `apps/api/src/routes/api.ts`'s own `year`/`month` query params. */
+  readonly year?: number;
+  readonly month?: number;
 }
 
 /** Comma-separated, matching `apps/api/src/routes/api.ts`'s own `CommaSeparatedIds`/
@@ -43,6 +47,12 @@ export function fetchCraList(filters: CraListFilters = {}): Promise<ApiResult<Cr
   }
   if (filters.statuses !== undefined && filters.statuses.length > 0) {
     params.set('statuses', filters.statuses.join(','));
+  }
+  if (filters.year !== undefined) {
+    params.set('year', String(filters.year));
+  }
+  if (filters.month !== undefined) {
+    params.set('month', String(filters.month));
   }
 
   return apiFetch<CraListResponse>(`/api/v1/cras?${params.toString()}`);

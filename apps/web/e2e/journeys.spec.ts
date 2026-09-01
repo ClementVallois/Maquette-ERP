@@ -910,6 +910,64 @@ test.describe('item 7 — consultant and status filters on the manager’s CRA l
 });
 
 /**
+ * Item 4 (QA round 2): a year and/or month filter, independent of each other and of the two
+ * item-7 filters above. Julien Fabre and Marine Girard (item 6, QA round 1's veteran roster) are
+ * the fixture this test leans on: both carry a single Cra at exactly 2016-06, and Marine departed
+ * the firm (ADR-0079) — her old Cra staying visible here, unfiltered by that departure, is
+ * incidental proof of the same "old data stays readable" rule item 6's own tests cover elsewhere,
+ * not this test's own point.
+ */
+test.describe('item 4 — a year and/or month filter on the manager’s CRA list', () => {
+  test('year and month each narrow on their own, and AND together, surviving a reload', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'manager-paris');
+    await page.goto('/cra');
+
+    // Year alone: exactly the two 2016 veterans, nothing from the dense 2026 months.
+    await page.getByRole('combobox', { name: 'Année' }).click();
+    await page.getByRole('option', { name: '2016', exact: true }).click();
+    await expect(page.getByText('Julien Fabre')).toBeVisible();
+    await expect(page.getByText('Marine Girard')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Ouvrir' })).toHaveCount(2);
+
+    // The URL carries it — a reload must show exactly this, not a blank slate (same guarantee
+    // item 7's own test proves for consultantIds/statuses).
+    await page.reload();
+    await expect(page.getByRole('link', { name: 'Ouvrir' })).toHaveCount(2);
+
+    // A year with nothing in it for this office (the veterans' history is sparse, every second
+    // year — item 6's own seed) proves the filter reads the value, not just "a year was picked".
+    await page.getByRole('combobox', { name: 'Année' }).click();
+    await page.getByRole('option', { name: '2017', exact: true }).click();
+    await page
+      .getByText('Aucun CRA ne correspond à ces filtres', { exact: false })
+      .waitFor({ state: 'visible' });
+
+    // Month, independent of year: June across every year this office has one, not only 2016 —
+    // strictly more than the two 2016-06 rows alone, proving the two dimensions are separate
+    // filters rather than the same one under another name.
+    await page.getByRole('combobox', { name: 'Année' }).click();
+    await page.getByRole('option', { name: 'Toutes les années', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Mois' }).click();
+    await page.getByRole('option', { name: 'juin', exact: true }).click();
+    const juneCount = await page.getByRole('link', { name: 'Ouvrir' }).count();
+    expect(juneCount).toBeGreaterThan(2);
+
+    // Both together, ANDed: back down to exactly the two 2016-06 veterans.
+    await page.getByRole('combobox', { name: 'Année' }).click();
+    await page.getByRole('option', { name: '2016', exact: true }).click();
+    await expect(page.getByRole('link', { name: 'Ouvrir' })).toHaveCount(2);
+    await expect(page.getByText('Julien Fabre')).toBeVisible();
+    await expect(page.getByText('Marine Girard')).toBeVisible();
+
+    const url = new URL(page.url());
+    expect(url.searchParams.get('year')).toBe('2016');
+    expect(url.searchParams.get('month')).toBe('6');
+  });
+});
+
+/**
  * Phase 7's own journeys (Annexe B, "Phase" column = 7). Placed after every Phase 6 test rather
  * than interleaved: `test.describe.configure({ mode: 'serial' })` at the top of this file orders
  * every describe block in the file, not only the ones inside a given block, so appending here is

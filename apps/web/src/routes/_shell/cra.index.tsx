@@ -26,6 +26,12 @@ const CraListSearch = z.object({
     .array(z.enum(['draft', 'submitted', 'refused', 'validated']))
     .catch([])
     .optional(),
+  // Item 4 (QA round 2): independent of each other and of the two filters above. `.catch(undefined)`
+  // rather than `.catch([])` — these are single values, not lists — so a hand-typed `?year=bogus`
+  // degrades to "no filter" the same way an unrecognised status already does, instead of a 400 the
+  // visitor cannot self-correct from a URL bar.
+  year: z.coerce.number().int().optional().catch(undefined),
+  month: z.coerce.number().int().min(1).max(12).optional().catch(undefined),
 });
 
 /**
@@ -40,7 +46,7 @@ export const Route = createFileRoute('/_shell/cra/')({
 
 function CraListRoute(): ReactElement {
   const { persona } = Route.useRouteContext();
-  const { consultantIds, statuses } = Route.useSearch();
+  const { consultantIds, statuses, year, month } = Route.useSearch();
 
   return (
     <div className="flex flex-col gap-4">
@@ -49,6 +55,8 @@ function CraListRoute(): ReactElement {
         role={persona.role}
         consultantIds={consultantIds ?? []}
         statuses={statuses ?? []}
+        year={year}
+        month={month}
       />
     </div>
   );

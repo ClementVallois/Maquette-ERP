@@ -177,7 +177,12 @@ export const LABELS = {
       statusLabel: 'Statut',
       clear: 'Effacer les filtres',
       emptyTitle: 'Aucun CRA ne correspond à ces filtres.',
-      emptyBody: 'Essayez de retirer un consultant ou un statut du filtre.',
+      emptyBody: 'Essayez de retirer un consultant, un statut, une année ou un mois du filtre.',
+      /** Item 4 (QA round 2): year and month, independent of each other and of the two above. */
+      yearLabel: 'Année',
+      yearAll: 'Toutes les années',
+      monthLabel: 'Mois',
+      monthAll: 'Tous les mois',
     },
     /** task 6.1: the two-row list needed no filter; this replaces it with the control item 2
      * actually asked for — opening a month that has no `Cra` row yet. */

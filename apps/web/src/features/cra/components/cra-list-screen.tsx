@@ -22,7 +22,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
-import { frenchDays, frenchMonth } from '@/lib/format';
+import { frenchDays, frenchMonth, frenchMonthName } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { currentPeriod } from '@/lib/period';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
@@ -38,6 +38,14 @@ const STATUS_VARIANT: Record<CraStatus, StatusBadgeVariant> = {
   validated: 'cra-validated',
   refused: 'cra-refused',
 };
+
+/** Item 4 (QA round 2): the "clear this filter" sentinel both `Select`s below need — Radix's
+ * `SelectItem` refuses an empty string as a `value`. Shared between the year and month pickers on
+ * purpose (each `Select`'s own item list is a separate Radix instance, so the one string cannot
+ * collide with itself): never sent to the API or read from the URL, `CraListFilters.setYear`/
+ * `setMonth` translate a click on either back to `undefined` before it ever reaches `navigate()`. */
+const FILTER_ALL = 'all';
+const MONTH_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 /**
  * Item 2's own bound: "offer the months the calendar actually covers … derive that bound from the
@@ -150,6 +158,9 @@ interface CraListScreenProps {
    * filter controls for one, and `useCraList` reads exactly what it is given either way. */
   readonly consultantIds: readonly string[];
   readonly statuses: readonly CraStatus[];
+  /** Item 4 (QA round 2), same "always present, manager-only controls" shape as the two above. */
+  readonly year: number | undefined;
+  readonly month: number | undefined;
 }
 
 /**
@@ -158,10 +169,25 @@ interface CraListScreenProps {
  * Annexe A). "Ouvrir" now works for both: a consultant reaches their own editable grid, a manager
  * reaches ADR-0071's read-only view of the row's own consultant and period.
  */
-export function CraListScreen({ role, consultantIds, statuses }: CraListScreenProps): ReactElement {
-  const filters = { consultantIds, statuses };
+export function CraListScreen({
+  role,
+  consultantIds,
+  statuses,
+  year,
+  month,
+}: CraListScreenProps): ReactElement {
+  // `exactOptionalPropertyTypes` refuses an explicit `year: undefined`/`month: undefined` — the
+  // spread omits the key entirely when there is no value, matching `CraListFilters`'s own
+  // `year?: number` (present-and-a-number, or simply absent, never present-and-`undefined`).
+  const filters = {
+    consultantIds,
+    statuses,
+    ...(year === undefined ? {} : { year }),
+    ...(month === undefined ? {} : { month }),
+  };
   const query = useCraList(filters);
-  const filtersActive = consultantIds.length > 0 || statuses.length > 0;
+  const filtersActive =
+    consultantIds.length > 0 || statuses.length > 0 || year !== undefined || month !== undefined;
 
   if (query.isPending) return <ListSkeleton />;
 
@@ -203,7 +229,14 @@ export function CraListScreen({ role, consultantIds, statuses }: CraListScreenPr
           "Consultant" column nor an "Ouvrir" action for that role (a pre-existing gap, not one
           item 7 introduces), so a filter naming consultants nothing on screen identifies would
           be worse than no filter at all. */}
-      {role === 'manager' && <CraListFilters consultantIds={consultantIds} statuses={statuses} />}
+      {role === 'manager' && (
+        <CraListFilters
+          consultantIds={consultantIds}
+          statuses={statuses}
+          year={year}
+          month={month}
+        />
+      )}
 
       <DataTable
         columns={columnsFor(role)}
@@ -239,12 +272,17 @@ export function CraListScreen({ role, consultantIds, statuses }: CraListScreenPr
 function CraListFilters({
   consultantIds,
   statuses,
+  year,
+  month,
 }: {
   readonly consultantIds: readonly string[];
   readonly statuses: readonly CraStatus[];
+  readonly year: number | undefined;
+  readonly month: number | undefined;
 }): ReactElement {
   const navigate = useNavigate();
   const roster = useConsultantRoster();
+  const calendar = useCalendar();
 
   // `undefined`, not `[]`, once a filter clears back to empty — the search schema treats both the
   // same way ("no filter"), and this is what keeps a cleared filter's URL as plain `/cra` again
@@ -320,6 +358,27 @@ function CraListFilters({
     });
   }
 
+  // Item 4 (QA round 2). A single `Select`, not `MultiSelectCombobox`/`TogglePillGroup`: each
+  // change fully replaces the one value it owns, so there is no multi-value diff to race —
+  // `toggleDiff`/`applyDiff` above exist for exactly the ambiguity a single-value control never
+  // has. `YEAR_ALL`/`MONTH_ALL` are sentinels: Radix's `SelectItem` refuses an empty string value,
+  // and this is the "clear this one filter" option every `Select` here needs one of.
+  function setYear(next: string): void {
+    const parsed = next === FILTER_ALL ? undefined : Number.parseInt(next, 10);
+    void navigate({
+      to: '/cra',
+      search: (prev) => ({ ...prev, year: parsed }),
+    });
+  }
+
+  function setMonth(next: string): void {
+    const parsed = next === FILTER_ALL ? undefined : Number.parseInt(next, 10);
+    void navigate({
+      to: '/cra',
+      search: (prev) => ({ ...prev, month: parsed }),
+    });
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <MultiSelectCombobox
@@ -344,6 +403,39 @@ function CraListFilters({
         selected={statuses}
         onChange={setStatuses}
       />
+      <Select value={year === undefined ? FILTER_ALL : String(year)} onValueChange={setYear}>
+        <SelectTrigger aria-label={LABELS.cra.filters.yearLabel} className="w-36">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={FILTER_ALL}>{LABELS.cra.filters.yearAll}</SelectItem>
+          {/* Ascending order across the whole calendar (`useCalendar`, ADR-0004/ADR-0078), not
+              only the years this office's own Cras happen to cover: the same "known working
+              calendar" list `OpenAnotherMonth` already reads from, so a year with nothing to show
+              is still pickable (and answers the filtered-empty state) rather than silently
+              impossible to select at all. */}
+          {[...(calendar.data?.years ?? [])]
+            .sort((a, b) => a - b)
+            .map((calendarYear) => (
+              <SelectItem key={calendarYear} value={String(calendarYear)}>
+                {calendarYear}
+              </SelectItem>
+            ))}
+        </SelectContent>
+      </Select>
+      <Select value={month === undefined ? FILTER_ALL : String(month)} onValueChange={setMonth}>
+        <SelectTrigger aria-label={LABELS.cra.filters.monthLabel} className="w-40">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={FILTER_ALL}>{LABELS.cra.filters.monthAll}</SelectItem>
+          {MONTH_NUMBERS.map((monthNumber) => (
+            <SelectItem key={monthNumber} value={String(monthNumber)}>
+              {frenchMonthName(monthNumber)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

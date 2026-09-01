@@ -39,6 +39,17 @@ export interface CraListQuery {
    */
   readonly consultantIds?: readonly ConsultantId[];
   readonly statuses?: readonly CraStatus[];
+  /**
+   * Item 4 (QA round 2): "a year and/or month filter", independent of `period` above and of each
+   * other — `year` alone narrows to every period in that calendar year, `month` alone to that
+   * calendar month across every year, both together to the one `year-month` combination (the same
+   * result `period` would give, reached a different way: a manager picking two dropdowns, not
+   * typing a `YYYY-MM`). Narrows within `consultantIds`/`statuses` the same way those narrow
+   * within the office boundary — never widens it. `undefined` means "every year"/"every month",
+   * the same absence-reading every other optional field on this interface already uses.
+   */
+  readonly year?: number;
+  readonly month?: number;
 }
 
 export interface CraRepository {

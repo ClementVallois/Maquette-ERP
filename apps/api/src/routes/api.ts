@@ -112,6 +112,17 @@ const CommaSeparatedStatuses = z
   .pipe(z.array(z.enum(CRA_STATUSES)).optional());
 
 /**
+ * Item 4 (QA round 2): "a year and/or month filter". Two independent, optional numbers rather
+ * than a `period` string — a manager picks a year and a month from two separate dropdowns, not
+ * types a `YYYY-MM`, and either one alone has to narrow on its own (every March, any year; every
+ * period in 2024, any month). `CraListQuery.year`/`.month` (`packages/timesheet`) carry the same
+ * shape through to the repository, which matches each against `period`'s own text directly (that
+ * column is `YYYY-MM` text, not a real date type — migration 002's own comment).
+ */
+const YearQuery = z.coerce.number().int().min(2000).max(2100).optional();
+const MonthQuery = z.coerce.number().int().min(1).max(12).optional();
+
+/**
  * Item 7 (QA round 1): "for these three consultants, every CRA not yet validated" — both
  * dimensions, non-exclusive within themselves (an id/status list is an OR) and ANDed with each
  * other, pushed to the domain's `CraListQuery` (`packages/timesheet`) so item 6's larger office
@@ -121,11 +132,14 @@ const CraListParams = Pagination.extend({
   // `limit` overrides the base schema's field, at `CRA_LIST_MAX_PAGE_SIZE` rather than
   // `MAX_PAGE_SIZE` — this route's own cap, ADR-0081.
   limit: z.coerce.number().int().min(1).max(CRA_LIST_MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
-  // No `period`: unlike `/api/v1/pre-facturier`, this route has never taken one — every period
-  // the actor may see, always — and item 7 does not ask for one either (the CRA list already
-  // shows every period at once, with its own `period` column).
+  // No exact `period`: unlike `/api/v1/pre-facturier`, this route has never taken one, and item 7
+  // did not ask for one either (the CRA list already shows every period at once, with its own
+  // `period` column) — `year`/`month` below (item 4, QA round 2) narrow *within* that same
+  // always-every-period list, they do not add a single-period mode back.
   consultantIds: CommaSeparatedIds,
   statuses: CommaSeparatedStatuses,
+  year: YearQuery,
+  month: MonthQuery,
 });
 
 const IdParam = z.object({ id: z.string().min(1).max(64) });
@@ -302,6 +316,8 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
             ? {}
             : { consultantIds: query.value.consultantIds }),
           ...(query.value.statuses === undefined ? {} : { statuses: query.value.statuses }),
+          ...(query.value.year === undefined ? {} : { year: query.value.year }),
+          ...(query.value.month === undefined ? {} : { month: query.value.month }),
         });
 
         // `consultantName`, presentation rather than a rule — the same source and the same

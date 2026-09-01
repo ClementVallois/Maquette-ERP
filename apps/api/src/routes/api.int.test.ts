@@ -335,6 +335,81 @@ describe('GET /api/v1/cras — consultantIds/statuses (item 7, QA round 1)', () 
   });
 });
 
+describe('GET /api/v1/cras — year/month (item 4, QA round 2)', () => {
+  // Both fixture rows (`CRA`, `CRA_TWO`) sit at '2026-06' — the same "one real value proves the
+  // positive case, a nearby wrong one proves the filter actually reads the value" shape the
+  // statuses tests above use.
+  it('narrows to the given year, independent of month', async () => {
+    const matching = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?year=2026',
+      headers: as('manager-paris'),
+    });
+    expect(matching.statusCode).toBe(200);
+    expect(
+      matching.json<{ cras: { consultantId: string }[] }>().cras.map((cra) => cra.consultantId),
+    ).toStrictEqual(expect.arrayContaining([ALICE, CHLOE]));
+
+    const wrongYear = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?year=2025',
+      headers: as('manager-paris'),
+    });
+    expect(wrongYear.statusCode).toBe(200);
+    expect(wrongYear.json<{ cras: unknown[] }>().cras).toStrictEqual([]);
+  });
+
+  it('narrows to the given month, independent of year', async () => {
+    const matching = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?month=6',
+      headers: as('manager-paris'),
+    });
+    expect(matching.statusCode).toBe(200);
+    expect(
+      matching.json<{ cras: { consultantId: string }[] }>().cras.map((cra) => cra.consultantId),
+    ).toStrictEqual(expect.arrayContaining([ALICE, CHLOE]));
+
+    const wrongMonth = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?month=7',
+      headers: as('manager-paris'),
+    });
+    expect(wrongMonth.statusCode).toBe(200);
+    expect(wrongMonth.json<{ cras: unknown[] }>().cras).toStrictEqual([]);
+  });
+
+  it('ANDs year and month together, same as any other two filters', async () => {
+    const both = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?year=2026&month=6',
+      headers: as('manager-paris'),
+    });
+    expect(both.statusCode).toBe(200);
+    expect(
+      both.json<{ cras: { consultantId: string }[] }>().cras.map((cra) => cra.consultantId),
+    ).toStrictEqual(expect.arrayContaining([ALICE, CHLOE]));
+
+    const rightYearWrongMonth = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?year=2026&month=7',
+      headers: as('manager-paris'),
+    });
+    expect(rightYearWrongMonth.statusCode).toBe(200);
+    expect(rightYearWrongMonth.json<{ cras: unknown[] }>().cras).toStrictEqual([]);
+  });
+
+  it('refuses a month outside 1-12 rather than silently ignoring it', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?month=13',
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+});
+
 describe('GET /api/v1/consultants (item 7, QA round 1)', () => {
   it("answers the manager's own office roster, consultants only", async () => {
     const response = await app.inject({

@@ -43,11 +43,22 @@ const CONSULTANT_ROSTER_QUERY_KEY = ['cra', 'consultant-roster'] as const;
  */
 function craListQueryKey(
   filters: CraListFilters,
-): readonly [...typeof CRA_LIST_QUERY_KEY, readonly string[], readonly string[]] {
+): readonly [
+  ...typeof CRA_LIST_QUERY_KEY,
+  readonly string[],
+  readonly string[],
+  number | undefined,
+  number | undefined,
+] {
   return [
     ...CRA_LIST_QUERY_KEY,
     [...(filters.consultantIds ?? [])].sort(),
     [...(filters.statuses ?? [])].sort(),
+    // Item 4 (QA round 2): `year`/`month` need no sorting — each is a single optional number, not
+    // a list — but still belong in the key, the same reason `consultantIds`/`statuses` are: two
+    // different filter values must never share a cache entry.
+    filters.year,
+    filters.month,
   ];
 }
 

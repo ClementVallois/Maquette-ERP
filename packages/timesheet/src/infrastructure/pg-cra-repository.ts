@@ -106,6 +106,8 @@ export class PgCraRepository implements CraRepository {
          AND ($5::text IS NULL OR c.period = $5)
          AND ($6::text[] IS NULL OR c.consultant_id = ANY($6))
          AND ($7::text[] IS NULL OR c.status = ANY($7))
+         AND ($8::text IS NULL OR left(c.period, 4) = $8)
+         AND ($9::text IS NULL OR right(c.period, 2) = $9)
        GROUP BY c.id, c.consultant_id, c.office_id, c.period, c.status
        ORDER BY c.period DESC, c.consultant_id
        LIMIT $3 OFFSET $4`,
@@ -119,6 +121,12 @@ export class PgCraRepository implements CraRepository {
           ? query.consultantIds
           : null,
         query.statuses !== undefined && query.statuses.length > 0 ? query.statuses : null,
+        // `period` is `YYYY-MM` text (migration 002's own comment) — `left`/`right` on that
+        // string is what item 4 (QA round 2)'s year-alone/month-alone filtering needs, cheaper
+        // than a real date type this column was never given. Zero-padded to two digits: `period`
+        // itself always is, and an unpadded '6' would never match `right(c.period, 2)`'s '06'.
+        query.year === undefined ? null : String(query.year),
+        query.month === undefined ? null : String(query.month).padStart(2, '0'),
       ],
     );
 

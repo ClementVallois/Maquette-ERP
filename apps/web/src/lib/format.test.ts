@@ -5,6 +5,7 @@ import {
   frenchDays,
   frenchEuros,
   frenchMonth,
+  frenchMonthName,
   frenchPercent,
   frenchWeekday,
 } from './format.ts';
@@ -107,6 +108,14 @@ describe('frenchDate and frenchMonth', () => {
     expect(frenchMonth('2026-06')).toBe('juin 2026');
     expect(frenchMonth('2026-01')).toBe('janvier 2026');
     expect(frenchMonth('2026-12')).toBe('décembre 2026');
+  });
+});
+
+describe('frenchMonthName', () => {
+  it('names a calendar month on its own, no year attached', () => {
+    expect(frenchMonthName(1)).toBe('janvier');
+    expect(frenchMonthName(6)).toBe('juin');
+    expect(frenchMonthName(12)).toBe('décembre');
   });
 });
 
