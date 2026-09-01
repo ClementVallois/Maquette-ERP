@@ -8,8 +8,21 @@
          `dist/assets/`, which `apps/api/src/web/spa.ts` already serves; a file dropped in
          `public/` would land at `dist/favicon.svg` and 404 in production (ADR-0063). CSP's
          `img-src 'self'` (`apps/api/src/web/reply.ts`) is why this is a same-origin file and not
-         a `data:` URI. -->
-    <link rel="icon" type="image/svg+xml" href="/src/assets/favicon.svg" />
+         a `data:` URI.
+
+         Item 6, QA round 2 ("not visible in dev"): investigated, no defect found here to fix.
+         `curl` against a running `pnpm --filter @erp/web dev` answers 200 `image/svg+xml` at this
+         exact href, the tag is present in the served HTML on `/`, `/cra` and `/tableau-de-bord`
+         alike, no stray `public/favicon.*` competes with it, and `routing.spec.ts`'s "item 5" test
+         already asserts this same 200/content-type in the dev project, green. Headless Chromium
+         never issues a favicon request at all (verified: 124 requests on a full page load, zero
+         of them favicon-related) — a real browser's tab icon is not observable from this
+         environment, so the two things that would actually explain what was seen are ones only a
+         human can check: a tab that has been open since before `b157327` landed, and a browser's
+         own per-origin favicon cache. `sizes="any"` added below is cheap, standard hardening
+         (Chrome deprioritises an SVG icon of unstated intrinsic size against a same-size
+         alternative) — not a fix for a reproduced bug, since none was reproduced. -->
+    <link rel="icon" type="image/svg+xml" href="/src/assets/favicon.svg" sizes="any" />
   </head>
   <body>
     <div id="root"></div>
