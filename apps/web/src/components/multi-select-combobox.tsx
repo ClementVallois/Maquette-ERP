@@ -1,8 +1,7 @@
-import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
+import { ChevronDownIcon, XIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -79,8 +78,9 @@ export function MultiSelectCombobox({
         >
           {/* A count, never the selected names themselves: joined names would duplicate
               whatever the filtered table already shows them against (and grow without bound
-              well before 40+ consultants), so "3 consultants" is what a manager reads here,
-              and their names live only inside the popover's own chip list below. */}
+              well before 40+ consultants), so "3 consultants" is what a manager reads here —
+              item 11 (QA round 2) removed the popover's own repeat of those same names, the
+              checkbox state below already being the one place that answers "which". */}
           <span className="truncate">
             {selectedLabels.length === 0
               ? noneSelectedLabel
@@ -99,15 +99,6 @@ export function MultiSelectCombobox({
           aria-label={placeholder}
           autoFocus
         />
-        {selected.length > 0 && (
-          <div className="flex flex-wrap gap-1 pt-1.5">
-            {selectedLabels.map((entry) => (
-              <Badge key={entry} variant="secondary" className="gap-1">
-                {entry}
-              </Badge>
-            ))}
-          </div>
-        )}
         {/* A checkbox group, not a listbox: `role="listbox"` demands `role="option"` children
             (axe: `aria-required-children`, impact critical), and a plain `<li>` only ever carries
             the implicit `listitem` role. This list is a set of checkboxes with labels — `<ul>` is
@@ -129,7 +120,6 @@ export function MultiSelectCombobox({
                     }}
                   />
                   <span className="flex-1 truncate">{option.label}</span>
-                  {checked && <CheckIcon aria-hidden="true" className="size-3.5 text-primary" />}
                 </label>
               </li>
             );

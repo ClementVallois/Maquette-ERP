@@ -661,6 +661,103 @@ test.describe('task 6.1 — the month list', () => {
  * below decides anything, and must leave Claire's June exactly as it found it — "submitted",
  * still the one pending row J2 depends on.
  */
+/**
+ * Items 3 + 11 (QA round 2), one commit, same component: the consultant selector used to close
+ * the moment a checkbox was ticked (item 3) and, before that, showed a checkbox, a redundant
+ * check icon and a redundant badge list for the same fact (item 11). Item 3's real cause: ticking
+ * a box navigates (`CraListFilters.setConsultantIds`), which used to flip `useCraList`'s
+ * `isPending` back to `true` and swap the whole screen for `<ListSkeleton />` — unmounting the
+ * popover along with everything else, resetting its own local `open` state. Fixed with
+ * `placeholderData: keepPreviousData` on `craListQueryOptions` (`features/cra/hooks.ts`), not by
+ * touching `MultiSelectCombobox`/`Popover`/`Checkbox` at all — none of those were ever at fault.
+ */
+test.describe('items 3 + 11 — the consultant selector stays open, and shows only checkboxes', () => {
+  test('checking two boxes in a row keeps the popover open, with no extra icon or badge', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'manager-paris');
+    await page.goto('/cra');
+
+    await page.getByRole('button', { name: 'Consultants' }).click();
+    const content = page.locator('[data-slot="popover-content"]');
+    await expect(content).toBeVisible();
+
+    const rows = content.locator('ul li');
+    const aliceRow = rows.filter({ hasText: 'Alice Martin' });
+    const claireRow = rows.filter({ hasText: 'Claire Dubois' });
+
+    // The checkbox itself, not its label text — the exact click item 3's own bug needed and the
+    // previous round's own filter test (below) never exercised.
+    await aliceRow.locator('[data-slot="checkbox"]').click();
+    await expect(content).toBeVisible();
+    await claireRow.locator('[data-slot="checkbox"]').click();
+    await expect(content).toBeVisible();
+
+    // Item 11: one `svg` per checked row (the checkbox's own indicator), not two — the redundant
+    // `CheckIcon` this item removed would have made this two.
+    await expect(aliceRow.locator('svg')).toHaveCount(1);
+    await expect(claireRow.locator('svg')).toHaveCount(1);
+
+    // Item 11: the popover renders each selected name once — inside its own row — not a second
+    // time in a badge list above the search field.
+    await expect(content.getByText('Alice Martin')).toHaveCount(1);
+    await expect(content.getByText('Claire Dubois')).toHaveCount(1);
+
+    // The trigger's own `aria-label` stays the fixed "Consultants" (that is its accessible name);
+    // the count lives in its visible text only.
+    await expect(page.getByRole('button', { name: 'Consultants', exact: true })).toContainText(
+      'Consultants (2)',
+    );
+  });
+
+  /**
+   * The race `toggleDiff`/`applyDiff` (ADR-0083) guards against: two `onChange` calls firing in
+   * the same task, before React has had a chance to re-render `CraListFilters` with the first
+   * one's result — so both compute their "next selection" from the same, now-stale
+   * `consultantIds` prop. Without the diff machinery, the second `navigate()`'s `search` callback
+   * set `consultantIds` to whatever `next` its own stale `selected` prop computed, silently
+   * dropping the first click's id.
+   *
+   * Two ordinary, separately-awaited `page.click()` calls do **not** reproduce this — each one's
+   * own actionability wait is enough of a task boundary for React to flush the first navigation's
+   * render before the second click's handler runs (checked empirically: that version of this test
+   * passed identically with `toggleDiff`/`applyDiff` deleted). Only dispatching both native
+   * `click` events from a single `page.evaluate` — genuinely the same task, not just
+   * "no `await expect` between them" — reproduces the drop: verified to fail (one id, not two)
+   * against a build with the diff machinery removed, and to pass against this one.
+   */
+  test('two same-tick clicks both land in the URL, not just the last one', async ({ page }) => {
+    await choosePersona(page, 'manager-paris');
+    await page.goto('/cra');
+
+    await page.getByRole('button', { name: 'Consultants' }).click();
+    const content = page.locator('[data-slot="popover-content"]');
+    await expect(content).toBeVisible();
+    await expect(content.getByText('Alice Martin')).toBeVisible();
+    await expect(content.getByText('Claire Dubois')).toBeVisible();
+
+    await page.evaluate(() => {
+      const rows = Array.from(document.querySelectorAll('[data-slot="popover-content"] ul li'));
+      const findCheckbox = (name: string) =>
+        rows.find((row) => row.textContent.includes(name))?.querySelector('[data-slot="checkbox"]');
+
+      findCheckbox('Alice Martin')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true }),
+      );
+      findCheckbox('Claire Dubois')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true }),
+      );
+    });
+
+    await expect(page.getByRole('button', { name: 'Consultants', exact: true })).toContainText(
+      'Consultants (2)',
+    );
+    const url = new URL(page.url());
+    const consultantIds = JSON.parse(url.searchParams.get('consultantIds') ?? '[]') as string[];
+    expect(consultantIds).toHaveLength(2);
+  });
+});
+
 test.describe('item 7 — consultant and status filters on the manager’s CRA list', () => {
   test('both filters narrow, together, and the state survives a reload via the URL', async ({
     page,
@@ -709,9 +806,29 @@ test.describe('item 7 — consultant and status filters on the manager’s CRA l
     // Switching to 'Soumis' (submitted) brings her back to exactly one row — her June, the only
     // submitted Cra in the whole office at this point — proving the status pill is read live, not
     // only that "some filter" suppresses every row.
+    //
+    // The `aria-pressed="false"` wait between the untoggle and the next click is a synchronisation
+    // point this test always depended on, made explicit rather than left implicit: before item 3
+    // (QA round 2)'s `keepPreviousData` fix, every filter change forced a skeleton swap that
+    // incidentally serialised rapid clicks; without it, untoggling 'Refusé' and clicking 'Soumis'
+    // back to back (nothing awaited between them) races the second click's `activate()` against
+    // the first navigation's own re-render, under load reliably enough to flip this from "passes"
+    // to "fails" depending on machine load (found running the full `journeys` project, never in
+    // isolation) — a load-dependent test gap, not an app bug: found instrumenting the actual
+    // `navigate()`/`search` calls, which always resolved in the intended order once observed.
+    // `aria-pressed` is rendered from the URL-derived `statuses` prop, so it flipping to `false`
+    // is proof the first navigation has actually committed and re-rendered.
     await page.getByRole('button', { name: 'Refusé', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Refusé', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
     await page.getByRole('button', { name: 'Soumis', exact: true }).click();
-    await expect(page.getByText('Claire Dubois')).toBeVisible();
+    // `.first()`: Claire's own row count depends on which status narrows her down, and at this
+    // exact point that is "her one submitted Cra" — but `getByText` alone would still be a strict
+    // mode violation if the previous status transition were mid-flight, same reasoning lines
+    // 772/787/793 already use for the same name earlier in this test.
+    await expect(page.getByText('Claire Dubois').first()).toBeVisible();
     await expect(page.getByRole('link', { name: 'Ouvrir' })).toHaveCount(1);
 
     // "Effacer les filtres" (inside the still-open-from-the-status-click combobox is closed by

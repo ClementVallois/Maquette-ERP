@@ -249,20 +249,74 @@ function CraListFilters({
   // `undefined`, not `[]`, once a filter clears back to empty — the search schema treats both the
   // same way ("no filter"), and this is what keeps a cleared filter's URL as plain `/cra` again
   // rather than permanently carrying `?consultantIds=%5B%5D`.
+  //
+  // `next` is computed by `MultiSelectCombobox`/`TogglePillGroup` from the `selected` **prop**
+  // this component handed them — always exactly one value away from that same prop (their own
+  // `toggle`/`activate` never changes more than one at a time; "Effacer les filtres" is the one
+  // exception, an explicit `onChange([])` with no single value to name). That prop can itself lag
+  // the router's own state by one render when two toggles fire in quick succession (found chasing
+  // item 3/11's own fix, ADR-0083: two `navigate()` calls in flight let the second commit before
+  // the first, so the first's toggle silently disappears). `toggleDiff` names the one value that
+  // changed by diffing `next` against `current` — the prop `next` was actually computed from, the
+  // only baseline the diff is guaranteed to be exactly one value from — and `applyDiff` replays
+  // that same single change against `search`'s own `prev`, which the router keeps current
+  // regardless of React's render timing, so a stale `next` replays the right diff late rather than
+  // losing it or applying a different one.
+  //
+  // `next.length === 0` is ambiguous on its own: `toggle` unticking the *last* remaining box
+  // (`current.length === 1`) and "Effacer les filtres" (`onChange([])`, reachable from any
+  // `current`) both land here, and only one of them means "wipe everything". `toggle` never
+  // removes more than one value at a time, so `current.length > 1` going to `next.length === 0`
+  // is reachable only through the explicit clear — that is the one case treated as `clear`.
+  // `current.length <= 1` is read as "remove the one value that was there" instead: against a
+  // *stale* `current` (the exact case this machinery exists for), that stale value may no longer
+  // be the router's only entry, and `clear` would wipe out whatever raced in ahead of it.
+  type ToggleDiff =
+    { readonly kind: 'add' | 'remove'; readonly value: string } | { readonly kind: 'clear' };
+
+  function toggleDiff(current: readonly string[], next: readonly string[]): ToggleDiff {
+    if (next.length === 0) {
+      const [onlyValue] = current;
+      return current.length <= 1 && onlyValue !== undefined
+        ? { kind: 'remove', value: onlyValue }
+        : { kind: 'clear' };
+    }
+    const added = next.find((value) => !current.includes(value));
+    if (added !== undefined) return { kind: 'add', value: added };
+    const removed = current.find((value) => !next.includes(value));
+    return removed !== undefined ? { kind: 'remove', value: removed } : { kind: 'clear' };
+  }
+
+  function applyDiff(current: readonly string[], diff: ToggleDiff): readonly string[] {
+    switch (diff.kind) {
+      case 'add':
+        return current.includes(diff.value) ? current : [...current, diff.value];
+      case 'remove':
+        return current.filter((value) => value !== diff.value);
+      case 'clear':
+        return [];
+    }
+  }
+
   function setConsultantIds(next: readonly string[]): void {
+    const diff = toggleDiff(consultantIds, next);
     void navigate({
       to: '/cra',
-      search: (prev) => ({ ...prev, consultantIds: next.length === 0 ? undefined : [...next] }),
+      search: (prev) => {
+        const updated = applyDiff(prev.consultantIds ?? [], diff);
+        return { ...prev, consultantIds: updated.length === 0 ? undefined : [...updated] };
+      },
     });
   }
 
   function setStatuses(next: readonly string[]): void {
+    const diff = toggleDiff(statuses, next);
     void navigate({
       to: '/cra',
-      search: (prev) => ({
-        ...prev,
-        statuses: next.length === 0 ? undefined : (next as CraStatus[]),
-      }),
+      search: (prev) => {
+        const updated = applyDiff(prev.statuses ?? [], diff);
+        return { ...prev, statuses: updated.length === 0 ? undefined : (updated as CraStatus[]) };
+      },
     });
   }
 

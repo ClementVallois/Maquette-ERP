@@ -1,4 +1,10 @@
-import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
 import { unwrap } from '@/lib/api-client';
@@ -80,6 +86,18 @@ export function craListQueryOptions(filters: CraListFilters = {}) {
   return queryOptions({
     queryKey: craListQueryKey(filters),
     queryFn: async () => unwrap(await fetchCraList(filters)),
+    // Item 3 (QA round 1) built the URL-driven filters as a real `navigate()` per change, which
+    // is what a linkable/reloadable filter has to be — but without this, every checkbox click
+    // changed the query key, flipped `isPending` back to true, and `CraListScreen` swapped its
+    // whole render for `<ListSkeleton />` mid-click. The consultant popover this filter renders
+    // has its own open/closed state (`MultiSelectCombobox`'s local `useState`), which the
+    // skeleton swap unmounted and reset — the actual mechanism behind item 3 (QA round 2)'s
+    // "closes as soon as you tick one", found by instrumenting `focusout`/`pointerdown` rather
+    // than assumed to be a Popover/Checkbox interaction bug. Keeping the previous page's rows
+    // on screen during a filter refetch is also the better UX on its own terms (no skeleton
+    // flash per click), which is why this is the fix rather than lifting `open` state out of the
+    // component that was never the one at fault.
+    placeholderData: keepPreviousData,
   });
 }
 
