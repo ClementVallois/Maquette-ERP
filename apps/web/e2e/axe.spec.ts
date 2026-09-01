@@ -7,10 +7,11 @@ import { expect, test, type Page } from '@playwright/test';
  * without depending on `journeys.spec.ts` having run first, so this spec stands on its own on the
  * `desktop`/`mobile-shell` projects, in whatever order `playwright test` (no `--project` filter,
  * CI's own invocation) happens to run them in. `2026-12` audits the **editable** grid — not
- * `2026-07` (item 6, QA round 1, densified it for every active consultant including Alice) and
- * not `2026-08` either (Alice's own one withheld dense month, but `journeys.spec.ts`'s J1 fills
- * and submits it interactively, so it is only blank if that spec has not run yet — exactly the
- * ordering dependency this file's own header rules out). `2026-12` is outside `DENSE_PERIODS`,
+ * `2026-06`/`07`/`08` (item 6, QA round 1, densified all three for every active consultant
+ * including Alice) and not `2026-09` either (the one month `DENSE_PERIODS` leaves blank on
+ * purpose — item 2, QA round 2 — but `journeys.spec.ts`'s J1 fills and submits it interactively,
+ * so it is only blank if that spec has not run yet — exactly the ordering dependency this file's
+ * own header rules out). `2026-12` is outside `DENSE_PERIODS`,
  * outside `HISTORICAL_VETERANS`'s span, and outside every period any spec in this repository ever
  * writes to (`journeys.spec.ts`'s task 7.6 reads it, read-only, for the pré-facturier's own empty
  * state) — genuinely blank regardless of run order. `2026-06` audits the **read-only, validated**

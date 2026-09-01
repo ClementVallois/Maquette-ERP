@@ -58,7 +58,6 @@ import {
   consultantHabilitations,
   consultants,
   CRA_PERIOD,
-  DENSE_PERIOD_EXCLUSIONS,
   DENSE_PERIODS,
   gradeTjmDefaults,
   grades,
@@ -775,16 +774,13 @@ async function seed(): Promise<void> {
 
     // ── Dense 2026 months (item 6, QA round 1) ─────────────────────────────
     //
-    // Every active consultant gets June, July and August 2026 — except a per-consultant,
-    // per-period withhold list (`DENSE_PERIOD_EXCLUSIONS`): Alice's August has to stay genuinely
-    // unopened for `apps/web/e2e/journeys.spec.ts`'s own interactive create/submit/validate
-    // journey, which would be false on a fresh database otherwise.
+    // Every active consultant gets June, July and August 2026 (item 2, QA round 2: Alice
+    // included — the mockup is reviewed in September, so all three should read as closed out for
+    // everyone). September itself is deliberately outside `DENSE_PERIODS`, which is what keeps it
+    // blank for `apps/web/e2e/journeys.spec.ts`'s own interactive create/submit/validate journey.
     for (const periodIso of DENSE_PERIODS) {
       let denseCount = 0;
       for (const consultant of consultantsWithCrasFor(periodIso)) {
-        const withheld =
-          DENSE_PERIOD_EXCLUSIONS.get(consultant.email)?.includes(periodIso) ?? false;
-        if (withheld) continue;
         await openSubmitValidate(consultant, periodIso);
         denseCount++;
       }
@@ -816,8 +812,8 @@ async function seed(): Promise<void> {
       const before = seededCras.length;
       await openSubmitValidate(consultant, periodIso);
       // `openSubmitValidate` pushed at most one entry (it never pushes one for a withheld
-      // validation, which no historical period triggers — `DENSE_PERIOD_EXCLUSIONS` only ever
-      // withholds a `DENSE_PERIODS` entry).
+      // validation, which no historical period triggers — `withheldFromValidation` only ever
+      // fires for `CRA_PERIOD`/`SUBMITTED_NOT_VALIDATED_EMAIL`).
       if (seededCras.length > before) {
         const pushed = seededCras[seededCras.length - 1];
         if (pushed !== undefined) {

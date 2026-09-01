@@ -69,10 +69,12 @@ The seed data must look like the reality of a consulting firm:
   veterans** carry sparse historical CRAs back to 2016 on missions extended to cover that span,
   and **one of them (Marine) has left the firm** (`departure_date`, ADR-0079) — her old CRAs and
   invoices stay readable, and she is absent from every current roster read. Every active
-  consultant has a dense Cra for June, July and August 2026 (Alice's own August is the one
-  deliberate exception, reserved for `apps/web/e2e/journeys.spec.ts`'s interactive
-  create/submit/validate journey). Invoice history runs from 2016 in draft, issued and
-  cancelled-by-credit-note statuses, issued through the domain in date order.
+  consultant has a dense Cra for June, July and August 2026, Alice included (item 2, QA round 2 —
+  the mockup is reviewed in September, so August has to read as closed out for everyone). The
+  in-progress month, September, stays genuinely blank for everyone, which is what
+  `apps/web/e2e/journeys.spec.ts`'s interactive create/submit/validate journey relies on. Invoice
+  history runs from 2016 in draft, issued and cancelled-by-credit-note statuses, issued through the
+  domain in date order.
 
 ## Schedule constraint
 

@@ -7,7 +7,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  * `playwright.config.ts`'s `journeys` project (`fullyParallel: false`, `workers: 1`) is what stops
  * a second worker from picking one of these up out of turn. Order matters below: the persona-cache
  * test runs first (nothing it needs depends on anything another test writes), then J1 (which
- * creates `2026-08`'s Cra as a side effect — later tests that need a still-blank future month pick
+ * creates `2026-09`'s Cra as a side effect — later tests that need a still-blank future month pick
  * whatever the "Ouvrir un autre mois" control offers rather than assuming a specific one), then the
  * manager-facing reads (ADR-0071), which are read-only and safe anywhere after the seed exists.
  *
@@ -27,7 +27,7 @@ class FixtureAssumptionError extends Error {}
 
 const DORA = 'Audit DORA — Banque Nationale';
 const PASSI = 'Audit PASSI — Banque Nationale';
-const EDIT_PERIOD = '2026-08';
+const EDIT_PERIOD = '2026-09';
 
 const API_ORIGIN = 'http://127.0.0.1:3000';
 
@@ -269,17 +269,17 @@ test.describe('item 2 — no skeleton flash between choosing a persona and landi
  * dialogs the pré-facturier table itself uses (moved to `features/cra/components/` so `features/cra`
  * does not import from `features/pre-facturier` — see `refuse-dialog.tsx`'s header).
  *
- * 2026-09 rather than the seed's own June or J1's own August: both are claimed by other tests in
- * this file by the time it finishes, and this test needs a Cra nothing else decides first. Filled
- * the fast way (one day, then "Remplir les jours ouvrés vides") — the fill mechanism itself is
- * `J1`'s own test's job, not this one's.
+ * 2026-10 rather than the seed's own June or J1's own September: both are claimed by other tests
+ * in this file by the time it finishes, and this test needs a Cra nothing else decides first.
+ * Filled the fast way (one day, then "Remplir les jours ouvrés vides") — the fill mechanism itself
+ * is `J1`'s own test's job, not this one's.
  */
 test.describe('item 3 — a manager opens and decides a CRA from the pré-facturier', () => {
   test('the pré-facturier’s “Ouvrir” link reaches the CRA, and validating from there lands back on the pré-facturier', async ({
     page,
   }) => {
     test.setTimeout(90_000);
-    const period = '2026-09';
+    const period = '2026-10';
 
     await choosePersona(page, 'consultant-paris');
     await page.goto('/cra/2026-06');
@@ -287,6 +287,8 @@ test.describe('item 3 — a manager opens and decides a CRA from the pré-factur
     await page.waitForURL('/cra/2026-07');
     await page.getByRole('link', { name: 'Mois suivant' }).click();
     await page.waitForURL('/cra/2026-08');
+    await page.getByRole('link', { name: 'Mois suivant' }).click();
+    await page.waitForURL('/cra/2026-09');
     await page.getByRole('link', { name: 'Mois suivant' }).click();
     await page.waitForURL(`/cra/${period}`);
 
@@ -384,9 +386,11 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     await choosePersona(page, 'consultant-paris');
     await page.goto('/cra/2026-06');
 
-    // The gesture, not a `goto`: two clicks of "Mois suivant" (task 6.3's own navigation tool).
+    // The gesture, not a `goto`: three clicks of "Mois suivant" (task 6.3's own navigation tool).
     await page.getByRole('link', { name: 'Mois suivant' }).click();
     await page.waitForURL('/cra/2026-07');
+    await page.getByRole('link', { name: 'Mois suivant' }).click();
+    await page.waitForURL('/cra/2026-08');
     await page.getByRole('link', { name: 'Mois suivant' }).click();
     await page.waitForURL(`/cra/${EDIT_PERIOD}`);
 
@@ -414,11 +418,11 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     // A prefix match, not an exact one: a day total out of range appends the reason to its own
     // accessible name (`TOTAL_TONES[…].sentence`, `cra-matrix-table.tsx`) so a screen reader hears
     // *why* the figure is flagged, and ¼ of a day makes this very cell incomplete two steps below.
-    const mondayDayTotal = page.locator('[aria-label^="Total du jour — 03/08/2026"]');
+    const firstDayTotal = page.locator('[aria-label^="Total du jour — 03/09/2026"]');
 
     // Keyboard-focus evidence (task 6.2).
-    const monday = cell(page, DORA, '03/08/2026');
-    await monday.focus();
+    const firstDay = cell(page, DORA, '03/09/2026');
+    await firstDay.focus();
     await page.screenshot({
       animations: 'disabled',
       path: 'tests/visual/review/6.2-cra-grid-keyboard-focus.png',
@@ -429,23 +433,23 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     // otherwise cycles its own option on every arrow key (Left/Right no less than Up/Down),
     // changing the cell being left, or the one about to be entered. Both cells are still blank
     // here, so a value changing either way would show up as `'1'` (a full day), not `'0'`.
-    const tuesday = cell(page, DORA, '04/08/2026');
+    const secondDay = cell(page, DORA, '04/09/2026');
     await page.keyboard.press('ArrowRight');
-    await expect(tuesday).toBeFocused();
-    await expect(monday).toHaveValue('0');
-    await expect(tuesday).toHaveValue('0');
+    await expect(secondDay).toBeFocused();
+    await expect(firstDay).toHaveValue('0');
+    await expect(secondDay).toHaveValue('0');
     await page.keyboard.press('ArrowLeft');
-    await expect(monday).toBeFocused();
-    await expect(monday).toHaveValue('0');
-    await expect(tuesday).toHaveValue('0');
+    await expect(firstDay).toBeFocused();
+    await expect(firstDay).toHaveValue('0');
+    await expect(secondDay).toHaveValue('0');
 
     // A quarter-day, and the day total reflects it immediately (task 6.2's own contract) — read
     // off the row's own month total, which sums the same local state the cell just changed.
     // `frenchDays(1)` (`lib/format.ts`), not the cell's own `¼` glyph — the two are different
     // display conventions for the same quantity.
-    await monday.selectOption({ label: '¼' });
+    await firstDay.selectOption({ label: '¼' });
     await expect(doraMonthTotal).toHaveText(/0,25\s*j/u);
-    await expect(mondayDayTotal).toHaveText(/0,25\s*j/u);
+    await expect(firstDayTotal).toHaveText(/0,25\s*j/u);
     await page.screenshot({
       animations: 'disabled',
       path: 'tests/visual/review/6.2-cra-grid-draft.png',
@@ -454,8 +458,8 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
 
     // Complete that one day (topping the quarter up to a full day), then let the row tool fill
     // every other workable day — "remplir les jours ouvrés vides" never touches a day that
-    // already carries anything, which 03/08 now does.
-    await monday.selectOption({ label: '1' });
+    // already carries anything, which 03/09 now does.
+    await firstDay.selectOption({ label: '1' });
     await page.getByRole('button', { name: `Remplir les jours ouvrés vides — ${DORA}` }).click();
 
     await page.getByRole('button', { name: 'Enregistrer' }).click();
@@ -464,7 +468,7 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     // Reopen: a full page reload, not the SPA's own cache — proof the write reached the server.
     await page.reload();
     await page.getByRole('rowheader', { name: DORA }).waitFor({ state: 'visible' });
-    await expect(cell(page, DORA, '03/08/2026')).toHaveValue('4');
+    await expect(cell(page, DORA, '03/09/2026')).toHaveValue('4');
 
     const reread = await fetchGrid(page, EDIT_PERIOD);
     expect(reread.status).toBe('draft');
@@ -496,7 +500,7 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     const craId = before.craId;
 
     await switchPersonaViaApi(page, 'manager-paris');
-    const reason = 'Le 03/08 doit être reventilé sur un seul projet — motif de démonstration e2e.';
+    const reason = 'Le 03/09 doit être reventilé sur un seul projet — motif de démonstration e2e.';
     const refusal = await page.request.post(`${API_ORIGIN}/pre-facturier/refus/${craId}`, {
       form: { reason, periode: EDIT_PERIOD },
       headers: { origin: browserOrigin() },
@@ -664,9 +668,9 @@ test.describe('item 7 — consultant and status filters on the manager’s CRA l
     await choosePersona(page, 'manager-paris');
     await page.goto('/cra');
 
-    // `.first()`: item 6 (QA round 1) gives both Alice and Claire a dense June/July (Alice's
-    // August stays withheld, `DENSE_PERIOD_EXCLUSIONS`) — Alice also carries more than one row by
-    // this later point in the file (item 3, run earlier, left her a validated September on top of
+    // `.first()`: item 6 (QA round 1) gives both Alice and Claire a dense June/July/August (item 2,
+    // QA round 2, ends August's own exclusion for Alice) — Alice also carries more than one row by
+    // this later point in the file (item 3, run earlier, left her a validated October on top of
     // that) — this check only needs "she/she is listed at all", not "exactly once".
     await expect(page.getByText('Alice Martin').first()).toBeVisible();
     await expect(page.getByText('Claire Dubois').first()).toBeVisible();
@@ -732,7 +736,7 @@ test.describe('item 7 — consultant and status filters on the manager’s CRA l
  * Phase 7's own journeys (Annexe B, "Phase" column = 7). Placed after every Phase 6 test rather
  * than interleaved: `test.describe.configure({ mode: 'serial' })` at the top of this file orders
  * every describe block in the file, not only the ones inside a given block, so appending here is
- * what actually runs these last — after J1 has left `2026-08` in the state J3 below needs.
+ * what actually runs these last — after J1 has left `2026-09` in the state J3 below needs.
  *
  * J5 is not repeated as its own block: "items 4/5" above (`a manager of another office is
  * refused, out-of-scope, on the same deep link`) already deep-links `manager-lyon` into a Paris
@@ -781,7 +785,7 @@ test.describe('J2 — manager-paris (Bruno): validates Claire’s submitted June
     });
 
     // Explicit period: Bruno's own `/pre-facturier` (no `period`) defaults to the office's most
-    // recent Cra period, which J1 (run earlier in this file) may have pushed to `2026-08` by now
+    // recent Cra period, which J1 (run earlier in this file) may have pushed to `2026-09` by now
     // — this journey is about the seed's June data specifically, so it never relies on that
     // default.
     await page.goto('/pre-facturier?period=2026-06');
@@ -1015,7 +1019,7 @@ test.describe('J3 — manager-paris (Bruno): refuses the month Alice submitted i
     // route (`docs/open-questions.md`, row dated 25/08/2026 — the JSON route Phase 7 adds had
     // nothing to be driven against until this phase). Annexe B's J3 wants "the month Alice
     // submitted in J1" refused through the SPA's own dialog; that submission was already spent
-    // proving the SSR path, so this resubmits the exact same August matrix — nothing is retyped,
+    // proving the SSR path, so this resubmits the exact same September matrix — nothing is retyped,
     // the grid the refusal left behind (still carrying every line J1 filled) is simply handed
     // back to the manager — before refusing it again, this time through the dialog Phase 7 built.
     await choosePersona(page, 'consultant-paris');
@@ -1035,7 +1039,7 @@ test.describe('J3 — manager-paris (Bruno): refuses the month Alice submitted i
 
     const refuseDialog = page.getByRole('dialog');
     await refuseDialog.getByText('Refuser le CRA de Alice Martin').waitFor({ state: 'visible' });
-    const reason = 'Le 03/08 doit être reventilé sur un seul projet — motif de démonstration J3.';
+    const reason = 'Le 03/09 doit être reventilé sur un seul projet — motif de démonstration J3.';
     await refuseDialog.getByLabel('Motif du refus').fill(reason);
     await page.screenshot({
       animations: 'disabled',

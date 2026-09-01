@@ -1125,25 +1125,13 @@ export const CRA_PERIOD = '2026-06';
 /**
  * Item 6 (QA round 1): dense CRAs for every active consultant across three consecutive months,
  * not just the original June — the mockup is reviewed in September 2026, so June/July/August
- * should all read as already closed out.
+ * should all read as already closed out. Every active consultant, Alice included (item 2, QA
+ * round 2 — her own August used to be withheld here for `journeys.spec.ts`'s interactive
+ * create/submit/validate journey; that journey now runs against September instead, which stays
+ * genuinely blank for everyone simply by not being in this list, so no per-consultant withhold
+ * list is needed any more).
  */
 export const DENSE_PERIODS = ['2026-06', '2026-07', '2026-08'] as const;
-
-/**
- * Periods `DENSE_PERIODS` would otherwise cover for a given consultant, withheld on purpose.
- * Keyed by email, the same idiom `SUBMITTED_NOT_VALIDATED_EMAIL`/`VARIED_MONTH.email` already use.
- *
- * Alice's August (and, by construction, everything after it) has to stay genuinely unopened:
- * `apps/web/e2e/journeys.spec.ts`'s J1 and "item 3" describe blocks interactively create,
- * fill, submit and validate her August/September Cra as part of the demonstrated journey — a
- * seed that pre-fills August would make "Ce mois n'a pas encore été commencé" false on a fresh
- * database. July is not withheld: nothing in that suite asserts Alice's July is empty, only that
- * clicking "Mois suivant" twice from June reaches August (`journeys.spec.ts:386-388`), which holds
- * whether or not July already has a Cra.
- */
-export const DENSE_PERIOD_EXCLUSIONS: ReadonlyMap<string, readonly string[]> = new Map([
-  [alice.email, ['2026-08']],
-]);
 
 /** One historical Cra-period list per veteran/departed consultant (item 6's own "sparse back to
  * 2016" and "at least one departure"), keyed by email like the exclusions above. Every 24 months
