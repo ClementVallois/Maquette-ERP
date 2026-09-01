@@ -51,7 +51,15 @@ export function PersonaBlock({ persona }: { readonly persona: PersonaSummary }):
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="flex items-center gap-2 rounded-lg border border-border bg-card px-2 py-1.5 text-left transition-colors duration-120 ease-out hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          // Item 1 (QA round 2): the topbar is a fixed 56px (`h-14`, direction-visuelle.md §6) and
+          // this button's own content — two text lines, the second one carrying `RoleBadge`'s own
+          // box height — already filled it edge to edge with the old `py-1.5`, so its border sat
+          // flush on the topbar's own border. Trading `py-1.5` for `py-[3px]` plus a new
+          // `my-[3px]` opens real clearance from the bar without touching the 56px constant
+          // everything else in the topbar is built against, measured at ~3px top and bottom
+          // against the current content height — not an enforced invariant: if `RoleBadge`'s own
+          // box ever grows, this button grows with it and the margin is what gives, unguarded.
+          className="my-[3px] flex items-center gap-2 rounded-lg border border-border bg-card px-2 py-[3px] text-left transition-colors duration-120 ease-out hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <Avatar size="sm">
             <AvatarFallback>{initialsOf(persona.displayName)}</AvatarFallback>
