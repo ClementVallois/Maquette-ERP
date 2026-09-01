@@ -3658,11 +3658,14 @@ checkpoints were resolved in place in their own commits.
 
 **Corrections to the Wave 2 outcome section above, 01/09/2026.** Two numbers in it were measured
 before item 2 restored Alice's August and are now wrong: the seed holds **148 Cras**, not 147, and
-**66 invoices**, not 65 (53 draft, 12 issued, 1 cancelled by credit note). `.github/workflows/ci.yml`
+**66 invoices**, not 65. Counted against a clean `db:reset` on 01/09/2026: 54 draft, 11 issued, 1 cancelled by credit note, spanning supply periods 2016-06 to 2026-08. `.github/workflows/ci.yml`
 asserts those two figures per table on every pull request, which is what caught them. The same
 section says Alice's August is "withheld on purpose (`DENSE_PERIOD_EXCLUSIONS`)": that constant was
 deleted by item 2 of round 2 — every active consultant now has a dense August, and the interactive
-journey moved to September, which is genuinely blank for everyone.
+journey moved to September, which is genuinely blank for everyone. The same section's line about
+**docs/todo.md** being "updated in place, not committed" is true of the day it was written and stays
+as written: that file is still untracked and on no clone, and what it recorded is now
+`docs/qa-rounds.md`, which is tracked.
 
 **What the two merge reviewers found, and what was done with it.** `rules-auditor` and `cold-reader`
 both ran against `d218881` before the merge. Everything they raised that this branch itself made
