@@ -6,9 +6,15 @@
  * invoiced) · one Intercontrat consultant · one PASSI Habilitation constraining an assignment ·
  * Réunion client at 8.5 % · EU B2B client under Autoliquidation · Guyane client outside VAT scope ·
  * Grade carrying the default Tjm grid · Cjm as the sensitive value the scope test protects.
+ *
+ * Item 6 (QA round 1) added volume on top of that shape, further down this file: 39 more
+ * consultants and a third manager, none of them in `personas`; dense Cras for June, July and
+ * August 2026; four veterans carrying a sparse history back to 2016, one of whom has left the
+ * firm; and invoices from 2016 in three statuses. The nine named individuals above are unchanged.
  */
 
 import { deterministicIdFactory } from '@erp/api';
+import { TechnicalFailure } from '@erp/platform';
 
 // A frozen timestamp for the whole dataset: 2026-06-15T00:00:00.000Z.
 // Arbitrary but stable: every UUIDv7 in the seed shares this prefix.
@@ -199,8 +205,12 @@ function emailOf(firstName: string, lastName: string): string {
 }
 
 /** Thrown only if a pool this file itself sizes turns out too small -- a defensive check
- * `noUncheckedIndexedAccess` requires the code to make, never expected to actually fire. */
-class RosterPoolExhaustedError extends Error {}
+ * `noUncheckedIndexedAccess` requires the code to make, never expected to actually fire.
+ * Technical rather than business, and not retryable: re-running the seed cannot make a literal
+ * array longer (BUILD-RULES: an error is business or technical, never a bare `Error`). */
+class RosterPoolExhaustedError extends TechnicalFailure {
+  readonly retryable = false;
+}
 
 function cyclic<T>(pool: readonly T[], index: number): T {
   const value = pool[index % pool.length];
@@ -457,8 +467,8 @@ export const consultantGrades = [
   }, // 190 €/j
   // Roster expansion (item 6, QA round 1): one grade per new consultant, cycling
   // Junior/Confirmé/Senior (Karim, the new manager, gets the Manager grade). `fromDate` matches
-  // each roster member's own join date — 2016 for the four veterans/departure, 2024 for Karim,
-  // 2025 for every dense-only filler (a year of margin before the earliest 2026 CRA).
+  // each roster member's own join date — 2016 for the four veterans and for Karim, 2025 for every
+  // dense-only filler (a year of margin before the earliest 2026 CRA).
   ...rosterConsultants.map((c, index) => {
     const isVeteran = index < 4; // julien, marine, camille, theo
     const isManager = c.role === 'manager'; // karim
@@ -1157,13 +1167,10 @@ export const HISTORICAL_VETERANS: readonly HistoricalVeteran[] = [
   { email: theo.email, periods: VETERAN_PERIODS },
 ];
 
-// A fixed clock instant for submit/validate timestamps: deterministic across runs.
-export const SEED_CLOCK_INSTANT = new Date('2026-07-05T10:00:00.000Z');
-
 /** The clock a historical period's submit/validate is stamped with: the 5th of the month after
- * the period closes, same offset `SEED_CLOCK_INSTANT` uses for June 2026 (period closes 30/06,
- * clock reads 05/07) — kept a function rather than a second frozen constant so every historical
- * period gets its own plausible timestamp instead of all sharing one. */
+ * the period closes at 10:00 UTC (June 2026 closes 30/06, its clock reads 05/07) — a function
+ * rather than one frozen constant so every period gets its own plausible timestamp instead of all
+ * sharing one. It replaced that constant when the historical periods arrived (item 6, QA round 1). */
 export function clockInstantAfter(period: string): Date {
   const [year, month] = period.split('-').map(Number) as [number, number];
   const nextMonth = month === 12 ? 1 : month + 1;
