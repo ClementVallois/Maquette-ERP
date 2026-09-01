@@ -29,8 +29,11 @@ const CraListSearch = z.object({
   // Item 4 (QA round 2): independent of each other and of the two filters above. `.catch(undefined)`
   // rather than `.catch([])` — these are single values, not lists — so a hand-typed `?year=bogus`
   // degrades to "no filter" the same way an unrecognised status already does, instead of a 400 the
-  // visitor cannot self-correct from a URL bar.
-  year: z.coerce.number().int().optional().catch(undefined),
+  // visitor cannot self-correct from a URL bar. Both carry the API's own bounds (`YearQuery` and
+  // `MonthQuery`, `apps/api/src/routes/api.ts`): a value the API would refuse has to fail here,
+  // where it degrades, rather than reach it — `?year=1900` is an integer and would otherwise pass
+  // this schema and land on a 400, which is exactly what the paragraph above says must not happen.
+  year: z.coerce.number().int().min(2000).max(2100).optional().catch(undefined),
   month: z.coerce.number().int().min(1).max(12).optional().catch(undefined),
 });
 
