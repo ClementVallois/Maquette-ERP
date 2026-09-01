@@ -240,6 +240,26 @@ describe('GET /api/v1/dashboard — consultant', () => {
       myMonthStatus: 'draft',
       recordedQuarterDays: 20,
       remainingWorkableDays: 17,
+      refusedPeriods: [],
+    });
+  });
+
+  it('ADR-0082: names a refusal from another period, alongside the requested month', async () => {
+    // Alice's May: refused, resolved neither way yet. Requesting June (her current draft) must
+    // not make this disappear — the whole point of the fix.
+    await transaction.client.query(
+      `INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+       VALUES ($1, $2, $3, '2026-05', 'refused')`,
+      [uuidv7(), ALICE, PARIS],
+    );
+
+    const response = await dashboard('consultant-paris');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      period: '2026-06',
+      myMonthStatus: 'draft',
+      refusedPeriods: ['2026-05'],
     });
   });
 });
@@ -272,6 +292,27 @@ describe('GET /api/v1/dashboard — manager', () => {
       // 22 days × 800 € = 17 600 € HT.
       billableCents: 1_760_000,
       lateCras: 1,
+    });
+  });
+
+  it('ADR-0082: counts a decision pending in another period too, requested period unchanged', async () => {
+    // Chloé's May: submitted, decided by nobody yet — a month before the one requested below.
+    // Before this fix, a manager viewing June never learned this existed.
+    await transaction.client.query(
+      `INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+       VALUES ($1, $2, $3, '2026-05', 'submitted')`,
+      [uuidv7(), CHLOE, PARIS],
+    );
+
+    const response = await dashboard('manager-paris');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      period: '2026-06',
+      // Chloé's June, plus Chloé's May.
+      pendingDecisions: 2,
+      // 22 workable June days × 800 € — the requested period's own total, unaffected by May.
+      billableCents: 0,
     });
   });
 });

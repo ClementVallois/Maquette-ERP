@@ -1060,6 +1060,27 @@ test.describe('J3 — manager-paris (Bruno): refuses the month Alice submitted i
   });
 });
 
+/**
+ * Item 5 (QA round 2), ADR-0082: J3 above leaves Alice's September `refused` — this test asks the
+ * dashboard for a *different* period (June, already `validated`) and checks the refusal from the
+ * other month still surfaces there, instead of disappearing the moment `period` moves past it.
+ */
+test.describe('item 5 — the consultant dashboard names a refusal from another period', () => {
+  test('a refusal from another month stays visible, and its own link opens that month', async ({
+    page,
+  }) => {
+    await choosePersona(page, 'consultant-paris');
+    await page.goto('/tableau-de-bord?period=2026-06');
+
+    await page
+      .getByText('Le CRA de septembre 2026 a été refusé', { exact: false })
+      .waitFor({ state: 'visible' });
+
+    await page.getByRole('link', { name: 'Ouvrir ce CRA' }).click();
+    await page.waitForURL(`/cra/${EDIT_PERIOD}`);
+  });
+});
+
 test.describe('J6 — billing-paris (Henri): the margin URL refuses him, by role, and names the rule', () => {
   test('deep-linking a marge URL as billing renders the designed 403, naming insufficient-role', async ({
     page,

@@ -9,6 +9,7 @@ const consultant = (overrides: Partial<ConsultantDashboard> = {}): ConsultantDas
   myMonthStatus: null,
   recordedQuarterDays: 0,
   remainingWorkableDays: 21,
+  refusedPeriods: [],
   ...overrides,
 });
 
@@ -49,7 +50,7 @@ describe('the dashboard call to action, per role', () => {
 
   it('carries the manager to the pré-facturier, and counts in words', () => {
     expect(callToAction(manager({ pendingDecisions: 0 })).sentence).toBe(
-      'Aucun CRA n’attend votre décision ce mois.',
+      'Aucun CRA n’attend votre décision.',
     );
     expect(callToAction(manager({ pendingDecisions: 1 })).sentence).toBe(
       '1 CRA en attente de votre décision.',

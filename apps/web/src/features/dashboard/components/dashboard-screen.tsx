@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { ErrorState } from '@/components/feedback/error-state';
 import { StatCard } from '@/components/stat-card';
+import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Role } from '@/features/session/types';
@@ -58,6 +59,42 @@ const CONSULTANT_STATUS_LABEL: Record<NonNullable<ConsultantDashboard['myMonthSt
   refused: LABELS.cra.statuses.refused,
 };
 
+/**
+ * ADR-0082: `refusedPeriods` other than the one already covered by `hints.refused` (via
+ * `ActionCard`/`callToAction` above) — a refusal does not stop needing a correction just because
+ * `period` moved past it. One row per period, each opening that period's own Cra: unlike the
+ * single `ActionCard`, there can genuinely be more than one at once.
+ */
+function RefusedElsewhereNotices({
+  data,
+}: {
+  readonly data: ConsultantDashboard;
+}): ReactElement | null {
+  const labels = LABELS.dashboard.consultant;
+  const elsewhere = data.refusedPeriods.filter((period) => period !== data.period);
+
+  if (elsewhere.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      {elsewhere.map((period) => (
+        <Alert key={period} variant="destructive">
+          <AlertDescription>
+            {labels.refusedElsewhere.replace('{month}', frenchMonth(period))}
+          </AlertDescription>
+          <AlertAction>
+            <Button asChild size="sm" variant="outline">
+              <Link to="/cra/$period" params={{ period }}>
+                {labels.openRefused}
+              </Link>
+            </Button>
+          </AlertAction>
+        </Alert>
+      ))}
+    </div>
+  );
+}
+
 function ConsultantCards({ data }: { readonly data: ConsultantDashboard }): ReactElement {
   const labels = LABELS.dashboard.consultant;
   const status = data.myMonthStatus;
@@ -73,6 +110,7 @@ function ConsultantCards({ data }: { readonly data: ConsultantDashboard }): Reac
         <StatCard label={labels.remaining} value={String(data.remainingWorkableDays)} />
       </div>
       <ActionCard {...callToAction(data)} />
+      <RefusedElsewhereNotices data={data} />
     </div>
   );
 }

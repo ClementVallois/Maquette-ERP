@@ -84,6 +84,13 @@ export const LABELS = {
         refused: 'Votre mois a été refusé : une correction est attendue.',
       },
       open: 'Ouvrir mon CRA',
+      /**
+       * ADR-0082: `refusedPeriods` may name a period other than the one already reported by
+       * `hints.refused` above — `{month}` interpolated with `frenchMonth(period)`, one sentence
+       * per period since each opens a different Cra.
+       */
+      refusedElsewhere: 'Le CRA de {month} a été refusé : une correction est attendue.',
+      openRefused: 'Ouvrir ce CRA',
     },
     manager: {
       pending: 'CRA en attente de décision',
@@ -93,7 +100,9 @@ export const LABELS = {
        * de votre décision »), singular/plural chosen at the call site. */
       pendingSentenceOne: '1 CRA en attente de votre décision.',
       pendingSentenceMany: '{count} CRA en attente de votre décision.',
-      pendingSentenceNone: 'Aucun CRA n’attend votre décision ce mois.',
+      // ADR-0082: this counts across every period, not just the one shown — "ce mois" would be
+      // false the moment a pending Cra sits in another month.
+      pendingSentenceNone: 'Aucun CRA n’attend votre décision.',
       open: 'Ouvrir le pré-facturier',
     },
     billing: {

@@ -1,5 +1,11 @@
 import { API_PROBLEM_TYPES } from '@erp/contracts';
-import { daysOf, isoDateInFirmTimeZone, periodFromIso, QUARTER_DAYS_PER_DAY } from '@erp/platform';
+import {
+  daysOf,
+  isoDateInFirmTimeZone,
+  lastDayOf,
+  periodFromIso,
+  QUARTER_DAYS_PER_DAY,
+} from '@erp/platform';
 import { CRA_STATUSES, workingCalendar } from '@erp/timesheet';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -70,6 +76,15 @@ const Pagination = z.object({
  * different value.
  */
 const CRA_LIST_MAX_PAGE_SIZE = 200;
+
+/**
+ * Every `CraStatus` but `validated` (ADR-0082): the dashboard's own definition of "actionable" —
+ * `submitted` awaits a manager's decision, `refused` awaits the consultant's correction, `draft`
+ * is what a Cra past its own period's close still not validated looks like on the way there. Kept
+ * as a literal tuple rather than `CRA_STATUSES.filter(…)` so its type stays the readonly-tuple
+ * `CraListQuery.statuses` wants, not a widened `CraStatus[]`.
+ */
+const NON_VALIDATED_CRA_STATUSES = ['draft', 'submitted', 'refused'] as const;
 
 const PeriodQuery = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u) });
 
@@ -567,9 +582,17 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           (day) => calendar.nonWorkableReason(day) === null,
         );
 
-        const cra = await dependencies.transactionally((unit) =>
-          unit.cras.findByConsultantAndPeriod(actor.consultantId, period, actor),
-        );
+        const { cra, refused } = await dependencies.transactionally(async (unit) => ({
+          cra: await unit.cras.findByConsultantAndPeriod(actor.consultantId, period, actor),
+          // ADR-0082: a refusal stays visible past the period it happened in, so a consultant who
+          // has moved on to the next month still sees that last month's correction is still owed.
+          refused: await unit.cras.list({
+            actor,
+            statuses: ['refused'],
+            limit: CRA_LIST_MAX_PAGE_SIZE,
+            offset: 0,
+          }),
+        }));
 
         const recordedByDay = new Map<string, number>();
         for (const line of cra?.lines ?? []) {
@@ -586,32 +609,42 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           remainingWorkableDays: workableDays.filter(
             (day) => (recordedByDay.get(day) ?? 0) < QUARTER_DAYS_PER_DAY,
           ).length,
+          refusedPeriods: refused.map((row) => row.period),
         };
       }
 
       if (actor.role === 'manager') {
         const today = isoDateInFirmTimeZone(dependencies.clock.now());
-        // The same composition `GET /api/v1/pre-facturier` answers from (ADR-0053, ADR-0065): the
-        // dashboard's three manager figures are read off it rather than recomputed, so they cannot
-        // disagree with the screen that already shows them in full. That also means this branch
-        // inherits ADR-0053's own fifty-row cap on the office's Cras for the period — its
-        // reconsideration threshold ("reopen when the office page exceeds the cap") is the one that
-        // governs here too, not a second one for the dashboard.
-        const composition = await dependencies.transactionally((unit) =>
-          preFacturierComposition(unit, { actor, requestedPeriod: query.value.period, today }),
-        );
+        // `billableCents` still reads off `preFacturierComposition` for the requested period
+        // specifically (ADR-0053, ADR-0065) — a month's own billable total, not an actionable
+        // state. `pendingDecisions`/`lateCras` no longer come from it (ADR-0082): a Cra awaiting a
+        // decision or already late does not stop being either just because the requested period
+        // changed, so both are read across every period the manager may see instead.
+        const { composition, actionable } = await dependencies.transactionally(async (unit) => ({
+          composition: await preFacturierComposition(unit, {
+            actor,
+            requestedPeriod: query.value.period,
+            today,
+          }),
+          actionable: await unit.cras.list({
+            actor,
+            statuses: NON_VALIDATED_CRA_STATUSES,
+            limit: CRA_LIST_MAX_PAGE_SIZE,
+            offset: 0,
+          }),
+        }));
 
         return {
           period: query.value.period,
           role: 'manager' as const,
-          pendingDecisions: composition.cras.filter((row) => row.status === 'submitted').length,
+          pendingDecisions: actionable.filter((row) => row.status === 'submitted').length,
           billableCents: composition.billable.reduce(
             (total, row) => total + row.totalExcludingVatCents,
             0,
           ),
-          lateCras: composition.cras.filter(
-            (row) => composition.periodClosed && row.status !== 'validated',
-          ).length,
+          // ADR-0054: a closed period's Cra that never reached `validated`. `actionable` already
+          // excludes `validated`, so only the closed-period test is left to apply.
+          lateCras: actionable.filter((row) => lastDayOf(periodFromIso(row.period)) < today).length,
         };
       }
 
