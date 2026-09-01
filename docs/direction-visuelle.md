@@ -258,10 +258,9 @@ everywhere but the selector" reading): `consultant` reads blue (`--tone-blue`), 
 (`--tone-amber`), `billing` green (`--tone-green`) — the same three hues §4.1's status tones already
 use, aliased rather than invented, and the same three the no-JS shell's `roleTag`
 (`apps/api/src/web/style.css`) already assigned to these roles before this section caught up to it.
-Dot-free, unlike `StatusBadge`: a role is not a status, so it does not compete for the "coloured dot
-
-- label" reading §4.1–4.3 reserve for one. `RoleBadge` (`apps/web/src/components/role-badge.tsx`) is
-  the one renderer.
+Dot-free, unlike `StatusBadge`: a role is not a status, so it does not compete for the
+"coloured dot + label" reading §4.1–4.3 reserve for one. `RoleBadge`
+(`apps/web/src/components/role-badge.tsx`) is the one renderer.
 
 ## 5. Typography
 

@@ -361,8 +361,8 @@ function CraListFilters({
   // Item 4 (QA round 2). A single `Select`, not `MultiSelectCombobox`/`TogglePillGroup`: each
   // change fully replaces the one value it owns, so there is no multi-value diff to race —
   // `toggleDiff`/`applyDiff` above exist for exactly the ambiguity a single-value control never
-  // has. `YEAR_ALL`/`MONTH_ALL` are sentinels: Radix's `SelectItem` refuses an empty string value,
-  // and this is the "clear this one filter" option every `Select` here needs one of.
+  // has. `FILTER_ALL` is a sentinel: Radix's `SelectItem` refuses an empty string value, and this
+  // is the "clear this one filter" option both of these `Select`s need one of.
   function setYear(next: string): void {
     const parsed = next === FILTER_ALL ? undefined : Number.parseInt(next, 10);
     void navigate({

@@ -715,13 +715,6 @@ test.describe('task 6.1 — the month list', () => {
 });
 
 /**
- * Item 7 (QA round 1): the manager's own `/cra` filters, non-exclusive on both dimensions and
- * ANDed with each other — the brief's own example, "for these three consultants, every CRA not
- * yet validated". Read-only throughout (no validate/refuse/save here): this test runs before J2
- * below decides anything, and must leave Claire's June exactly as it found it — "submitted",
- * still the one pending row J2 depends on.
- */
-/**
  * Items 3 + 11 (QA round 2), one commit, same component: the consultant selector used to close
  * the moment a checkbox was ticked (item 3) and, before that, showed a checkbox, a redundant
  * check icon and a redundant badge list for the same fact (item 11). Item 3's real cause: ticking
@@ -818,6 +811,13 @@ test.describe('items 3 + 11 — the consultant selector stays open, and shows on
   });
 });
 
+/**
+ * Item 7 (QA round 1): the manager's own `/cra` filters, non-exclusive on both dimensions and
+ * ANDed with each other — the brief's own example, "for these three consultants, every CRA not
+ * yet validated". Read-only throughout (no validate/refuse/save here): this test runs before J2
+ * below decides anything, and must leave Claire's June exactly as it found it — "submitted",
+ * still the one pending row J2 depends on.
+ */
 test.describe('item 7 — consultant and status filters on the manager’s CRA list', () => {
   test('both filters narrow, together, and the state survives a reload via the URL', async ({
     page,

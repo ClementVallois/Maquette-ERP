@@ -172,8 +172,8 @@ export const LABELS = {
     emptyListHint:
       'Ce n’est pas un refus : la liste est bien la vôtre, elle ne contient simplement rien pour ce mois.',
     /** Item 7 (QA round 1) — the manager-only consultant/status filter on `/cra`. A consultant
-     * persona never sees this (they have one CRA), so these strings render for a manager or
-     * billing persona only. */
+     * persona never sees this (they have one CRA) and neither does a billing one, so these
+     * strings render for a manager and nobody else. */
     filters: {
       consultantLabel: 'Consultants',
       consultantPlaceholder: 'Rechercher un consultant…',

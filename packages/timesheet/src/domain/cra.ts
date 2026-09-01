@@ -79,7 +79,7 @@ export class Cra {
     period: Period;
     /**
      * The consultant's own departure date, `null` for someone still with the firm (ADR-0079).
-     * Optional, not defaulted to `null` implicitly: every caller that has a consultant to hand
+     * Required, and deliberately not defaulted to `null`: every caller that has a consultant to hand
      * has this value one query away (`public.consultants.departure_date`), and an omitted
      * argument reading as "no departure" would let a caller silently skip the check by forgetting
      * to pass it, rather than by deciding to.
