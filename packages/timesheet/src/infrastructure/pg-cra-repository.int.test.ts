@@ -341,6 +341,61 @@ describe('PgCraRepository', () => {
     expect(await repo().list({ actor: parisManager, limit: 10, offset: 0 })).toHaveLength(2);
   });
 
+  it('narrows by year, by month, and by both — the single-digit month padded', async () => {
+    // Item 4 (QA round 2). The trap this covers is in the SQL, not in the API: `period` is
+    // `YYYY-MM` text (migration 002), so the filter is `left(period, 4)` and `right(period, 2)`,
+    // and an unpadded '6' would never match '06'. `api.int.test.ts` exercises the same filters
+    // end to end; this is the layer that does the padding.
+    await seedOffices();
+    await repo().save(makeCra()); // 2026-06
+    await tx.client.query(`
+      INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+      VALUES ('cra-2016-06', 'consultant-1', 'office-paris', '2016-06', 'validated');
+      INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+      VALUES ('cra-2026-11', 'consultant-1', 'office-paris', '2026-11', 'draft');
+    `);
+
+    const of2016 = await repo().list({ actor: parisManager, limit: 10, offset: 0, year: 2016 });
+    expect(of2016.map((row) => row.id)).toStrictEqual(['cra-2016-06']);
+
+    // Month alone crosses years: June 2016 and June 2026 both answer, and November does not.
+    const everyJune = await repo().list({ actor: parisManager, limit: 10, offset: 0, month: 6 });
+    expect(everyJune.map((row) => row.id).sort()).toStrictEqual(['cra-001', 'cra-2016-06']);
+
+    const june2026 = await repo().list({
+      actor: parisManager,
+      limit: 10,
+      offset: 0,
+      year: 2026,
+      month: 6,
+    });
+    expect(june2026.map((row) => row.id)).toStrictEqual(['cra-001']);
+
+    // A double-digit month is the other half of the padding: `right(period, 2)` reads '11'.
+    const november = await repo().list({ actor: parisManager, limit: 10, offset: 0, month: 11 });
+    expect(november.map((row) => row.id)).toStrictEqual(['cra-2026-11']);
+
+    expect(await repo().list({ actor: parisManager, limit: 10, offset: 0 })).toHaveLength(3);
+  });
+
+  it('the year and month filters narrow within the actor’s own scope, and never widen it', async () => {
+    // Same negative as `consultantIds` above: the office boundary is applied before these two in
+    // the SQL, so a Lyon manager asking for a year that only Paris holds gets nothing rather than
+    // the Paris row.
+    await seedOffices();
+    await repo().save(makeCra());
+
+    expect(
+      await repo().list({ actor: lyonManager, limit: 10, offset: 0, year: 2026, month: 6 }),
+    ).toStrictEqual([]);
+
+    // And a year nobody holds is empty rather than unfiltered — the filter is not silently
+    // dropped when it matches no row.
+    expect(
+      await repo().list({ actor: parisManager, limit: 10, offset: 0, year: 2024 }),
+    ).toStrictEqual([]);
+  });
+
   it('caps pagination at MAX_PAGE_SIZE (200), however large the caller asks', async () => {
     // Seeded past the cap on purpose. Asking for 1000 against an empty table also returns "no
     // more than the cap" and proves nothing — the cap has to be the reason the answer is short.
