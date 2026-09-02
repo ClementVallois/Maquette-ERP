@@ -153,6 +153,33 @@ function columnsFor(role: Role): ColumnDef<CraListItem>[] {
   return columns;
 }
 
+function ConsultantCraCards({ rows }: { readonly rows: readonly CraListItem[] }): ReactElement {
+  return (
+    <ul className="flex flex-col gap-3 sm:hidden">
+      {rows.map((row) => (
+        <li key={row.id}>
+          <article className="rounded-xl bg-card p-4 shadow-card ring-1 ring-border">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-foreground">{frenchMonth(row.period)}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {LABELS.cra.recorded} : {frenchDays(row.recordedQuarterDays)}
+                </p>
+              </div>
+              <StatusBadge variant={STATUS_VARIANT[row.status]} />
+            </div>
+            <Button asChild className="mt-4 w-full" variant="outline">
+              <Link to="/cra/$period" params={{ period: row.period }}>
+                {LABELS.cra.show}
+              </Link>
+            </Button>
+          </article>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 interface CraListScreenProps {
   readonly role: Role;
   /** Item 7 (QA round 1). Always `[]` for a consultant persona — the route never renders the
@@ -225,6 +252,22 @@ export function CraListScreen({
 
   const rows = query.data.cras;
   const hasAnyCra = rows.length > 0;
+  const emptyState = (
+    <EmptyState
+      icon={CalendarIcon}
+      title={filtersActive ? LABELS.cra.filters.emptyTitle : LABELS.cra.emptyList}
+      body={filtersActive ? LABELS.cra.filters.emptyBody : LABELS.cra.emptyListHint}
+      {...(!hasAnyCra && !filtersActive && role === 'consultant'
+        ? {
+            action: {
+              label: LABELS.cra.show,
+              to: '/cra/$period',
+              params: { period: currentPeriod() },
+            },
+          }
+        : {})}
+    />
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -246,27 +289,30 @@ export function CraListScreen({
         />
       )}
 
-      <DataTable
-        columns={columnsFor(role)}
-        data={rows}
-        getRowId={(row) => row.id}
-        emptyState={
-          <EmptyState
-            icon={CalendarIcon}
-            title={filtersActive ? LABELS.cra.filters.emptyTitle : LABELS.cra.emptyList}
-            body={filtersActive ? LABELS.cra.filters.emptyBody : LABELS.cra.emptyListHint}
-            {...(!hasAnyCra && !filtersActive && role === 'consultant'
-              ? {
-                  action: {
-                    label: LABELS.cra.show,
-                    to: '/cra/$period',
-                    params: { period: currentPeriod() },
-                  },
-                }
-              : {})}
-          />
-        }
-      />
+      {role === 'consultant' ? (
+        <>
+          {hasAnyCra ? (
+            <ConsultantCraCards rows={rows} />
+          ) : (
+            <div className="sm:hidden">{emptyState}</div>
+          )}
+          <div className="hidden sm:block">
+            <DataTable
+              columns={columnsFor(role)}
+              data={rows}
+              getRowId={(row) => row.id}
+              emptyState={emptyState}
+            />
+          </div>
+        </>
+      ) : (
+        <DataTable
+          columns={columnsFor(role)}
+          data={rows}
+          getRowId={(row) => row.id}
+          emptyState={emptyState}
+        />
+      )}
       <PaginationControls
         total={query.data.total}
         limit={query.data.limit}

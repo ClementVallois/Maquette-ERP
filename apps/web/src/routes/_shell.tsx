@@ -118,7 +118,7 @@ function ShellLayout(): ReactElement {
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar title={title} showBreadcrumb={showBreadcrumb} entries={entries} persona={persona} />
         <main id="main-content" className="flex-1 overflow-y-auto">
-          <div className="mx-auto flex max-w-[1360px] flex-col gap-6 px-6 py-6">
+          <div className="mx-auto flex max-w-[1360px] flex-col gap-6 px-3 py-4 sm:px-6 sm:py-6">
             <Outlet />
           </div>
         </main>

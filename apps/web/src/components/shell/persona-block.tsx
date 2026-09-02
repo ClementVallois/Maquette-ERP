@@ -64,7 +64,7 @@ export function PersonaBlock({ persona }: { readonly persona: PersonaSummary }):
           <Avatar size="sm">
             <AvatarFallback>{initialsOf(persona.displayName)}</AvatarFallback>
           </Avatar>
-          <span className="flex flex-col items-start gap-0.5 leading-tight">
+          <span className="hidden flex-col items-start gap-0.5 leading-tight sm:flex">
             <span className="text-sm font-medium text-foreground">{persona.displayName}</span>
             {/* Item 4, QA round 1: the role reads as a coloured badge (ADR-0076) rather than
                 plain text — the middle dot direction-visuelle.md §6's ASCII sketch describes

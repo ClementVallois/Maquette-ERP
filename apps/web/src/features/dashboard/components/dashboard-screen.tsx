@@ -409,13 +409,8 @@ interface DashboardScreenProps {
  * `/tableau-de-bord` (task 8.4) — the first screen after the persona selector. `GET
  * /api/v1/dashboard?period=` answers a discriminated union keyed by `role`
  * (`features/dashboard/types.ts`'s own header explains why the Phase 3 placeholder had the wrong
- * shape); this component picks the card set matching it.
- *
- * Rank A1: three tiers, every role. "À faire maintenant" (`WorkQueue`) is an actionable queue
- * across every period, each row linking the exact object rather than a screen to search on. "Ce
- * mois" is the former lone `StatCard` trio, demoted to a secondary summary. "Activité récente"
- * (domain-events-backed) is not built yet — a real gap, not a placeholder claiming otherwise; see
- * the phase checkpoint.
+ * shape); this component picks the card set matching it. Rank A1 adds the three tiers and rank A3
+ * fills recent activity from persisted lifecycle timestamps.
  */
 export function DashboardScreen({ role, period }: DashboardScreenProps): ReactElement {
   const query = useDashboard(period);
