@@ -93,11 +93,14 @@ export async function validateCraAndDraftInvoices(
     const billingReference = await reference.billing();
     const seller = await reference.seller();
     const missionNames = await reference.missionNames();
+    const consultantNames = await reference.consultantNames();
     const hierarchy = await reference.hierarchy();
 
     // The subscriber, running inside the emitter's transaction. It writes through `unit`, which
     // IS the ambient transaction — the one thing ADR-0001 forbids is I/O that leaves it.
     const onValidated = async (event: TimesheetValidated): Promise<void> => {
+      const consultantName =
+        consultantNames.get(event.payload.consultantId) ?? event.payload.consultantId;
       const result = draftInvoicesFrom(
         {
           reference: billingReference,
@@ -106,7 +109,7 @@ export async function validateCraAndDraftInvoices(
           mentions: MENTIONS,
           newInvoiceId: () => dependencies.newId(),
           designation: ({ missionId, period }) =>
-            `Prestation ${missionNames.get(missionId) ?? missionId} — ${period}`,
+            `Prestation ${missionNames.get(missionId) ?? missionId} — ${consultantName} — ${period}`,
         },
         event,
       );
