@@ -183,6 +183,22 @@ export class PgCraRepository implements CraRepository {
     return Number.parseInt(rows[0]!.count, 10);
   }
 
+  async listPeriods(actor: Actor): Promise<readonly string[]> {
+    const scope = readScope(actor, 'cra');
+    if (scope === 'none') return [];
+
+    const { rows } = await this.#client.query<{ period: string }>(
+      `SELECT DISTINCT c.period
+       FROM timesheet.cras c
+       WHERE c.office_id = $1
+         AND ($2::text IS NULL OR c.consultant_id = $2)
+       ORDER BY c.period DESC`,
+      [actor.officeId, scope === 'own' ? actor.consultantId : null],
+    );
+
+    return rows.map((row) => row.period);
+  }
+
   async save(cra: Cra): Promise<void> {
     await this.#client.query(
       `INSERT INTO timesheet.cras (

@@ -95,10 +95,8 @@ export interface PreFacturierComposition {
  * Cra list's picker, and that screen is `apps/web`'s now — it reads the `offeredPeriods` field of
  * the composition below, like every other consumer.
  */
-function offeredPeriods(cras: readonly { period: string }[]): string[] {
-  return [...new Set(cras.map((cra) => cra.period))].sort((left, right) =>
-    right.localeCompare(left),
-  );
+function offeredPeriods(periods: readonly string[]): string[] {
+  return [...new Set(periods)].sort((left, right) => right.localeCompare(left));
 }
 
 /**
@@ -152,11 +150,13 @@ export async function preFacturierComposition(
 ): Promise<PreFacturierComposition> {
   const { actor, requestedPeriod, today } = input;
 
-  const recent = await unit.cras.list({ actor, limit: MAX_MONTHS, offset: 0 });
-  const period = requestedPeriod ?? offeredPeriods(recent)[0] ?? null;
+  const availablePeriods = await unit.cras.listPeriods(actor);
+  const period = requestedPeriod ?? availablePeriods[0] ?? null;
   // The month asked for is offered even when this office has no Cra in it. A picker that dropped
   // the current selection would answer a shared link by silently showing another month.
-  const offered = offeredPeriods(period === null ? recent : [...recent, { period }]);
+  const offered = offeredPeriods(
+    period === null ? availablePeriods : [...availablePeriods, period],
+  );
 
   if (period === null) {
     return {

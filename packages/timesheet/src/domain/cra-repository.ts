@@ -73,6 +73,8 @@ export interface CraRepository {
    * "1-50 sur 300" is built from. Never itself paginated: a count is one row, however large.
    */
   count(query: Omit<CraListQuery, 'limit' | 'offset'>): Promise<number>;
+  /** Every distinct period visible to the actor, newest first; never derived from a page. */
+  listPeriods(actor: Actor): Promise<readonly string[]>;
   findByConsultantAndPeriod(
     consultantId: ConsultantId,
     period: Period,
