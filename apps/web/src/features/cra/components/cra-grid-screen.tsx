@@ -191,6 +191,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
     setMobileWeekIndex(0);
     setDesktopWeekIndex(0);
     setUndo(null);
+    setCopyingPreviousMonth(false);
   }
 
   const saveMonth = useSaveMonth(period);
