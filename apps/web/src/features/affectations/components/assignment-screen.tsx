@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
+import { GlossaryTerm } from '@/components/glossary-term';
 import { StatCard } from '@/components/stat-card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -202,14 +203,17 @@ export function AssignmentScreen(): ReactElement {
         </form>
 
         {selectedMission !== undefined && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            {selectedMission.requiredHabilitations.length === 0
-              ? LABELS.assignment.noHabilitation
-              : LABELS.assignment.requiredHabilitations.replace(
-                  '{names}',
-                  selectedMission.requiredHabilitations.join(', '),
-                )}
-          </p>
+          <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+            <GlossaryTerm term="habilitation" />
+            <p>
+              {selectedMission.requiredHabilitations.length === 0
+                ? LABELS.assignment.noHabilitation
+                : LABELS.assignment.requiredHabilitations.replace(
+                    '{names}',
+                    selectedMission.requiredHabilitations.join(', '),
+                  )}
+            </p>
+          </div>
         )}
         {mutationProblem !== null && (
           <Alert variant="destructive" className="mt-4">

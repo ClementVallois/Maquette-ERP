@@ -10,6 +10,7 @@ import { PaginationControls } from '@/components/data-table/pagination-controls'
 import { DeniedState } from '@/components/feedback/denied-state';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
+import { GlossaryTerm } from '@/components/glossary-term';
 import { StatCard } from '@/components/stat-card';
 import { StatusBadge, type StatusBadgeVariant } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -471,7 +472,15 @@ export function PreFacturierScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      <PeriodSelector period={period} offered={data.offeredPeriods} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PeriodSelector period={period} offered={data.offeredPeriods} />
+        <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <GlossaryTerm term="preFacturier" />
+          <GlossaryTerm term="regie" />
+          <GlossaryTerm term="forfait" />
+          <GlossaryTerm term="intercontrat" />
+        </p>
+      </div>
 
       <form className="flex max-w-xl items-end gap-2" onSubmit={submitConsultantSearch}>
         <label className="flex flex-1 flex-col gap-1 text-sm font-medium">

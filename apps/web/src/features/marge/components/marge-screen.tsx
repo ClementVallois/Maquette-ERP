@@ -7,11 +7,12 @@ import { DataTable } from '@/components/data-table/data-table';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
+import { GlossaryTerm } from '@/components/glossary-term';
 import { StatCard } from '@/components/stat-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
-import { frenchEuros, frenchMonth } from '@/lib/format';
+import { frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
@@ -46,12 +47,12 @@ const MISSION_COLUMNS: ColumnDef<MissionEconomics>[] = [
     id: 'quantity',
     accessorFn: (row) => row.quarterDays,
     header: LABELS.margin.quantity,
-    cell: ({ row }) => <span className="tabular-nums">{row.original.quarterDays}</span>,
+    cell: ({ row }) => <span className="tabular-nums">{frenchDays(row.original.quarterDays)}</span>,
   },
   {
     id: 'tjm',
     accessorFn: (row) => row.tjmCents,
-    header: LABELS.margin.tjm,
+    header: () => <GlossaryTerm term="tjm" />,
     cell: ({ row }) => <span className="tabular-nums">{frenchEuros(row.original.tjmCents)}</span>,
   },
   {
@@ -129,7 +130,11 @@ export function MargeScreen({ consultantId, period, role }: MargeScreenProps): R
           <h2 className="text-card-title">{data.displayName}</h2>
           <p className="text-sm text-muted-foreground">{frenchMonth(data.period)}</p>
         </div>
-        <StatCard label={LABELS.margin.cjm} value={frenchEuros(data.cjmCents)} className="w-48" />
+        <StatCard
+          label={<GlossaryTerm term="cjm" />}
+          value={frenchEuros(data.cjmCents)}
+          className="w-48"
+        />
       </div>
 
       <div className="grid grid-cols-3 gap-4">

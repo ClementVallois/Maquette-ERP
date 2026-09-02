@@ -1,9 +1,9 @@
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
 interface StatCardProps {
-  readonly label: string;
+  readonly label: ReactNode;
   /** Pre-formatted — `src/lib/format.ts` (Phase 3.4) is the only place a number becomes a string. */
   readonly value: string;
   readonly helpText?: string;

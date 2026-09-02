@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 
 import { DeniedState } from '@/components/feedback/denied-state';
 import { ErrorState } from '@/components/feedback/error-state';
+import { GlossaryTerm } from '@/components/glossary-term';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -447,7 +448,7 @@ function WeekNavigator({
 
 function MonthNav({ period }: { readonly period: string }): ReactElement {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <Button asChild variant="outline" size="icon-sm" aria-label={LABELS.cra.matrix.previousMonth}>
         <Link to="/cra/$period" params={{ period: previousPeriod(period) }}>
           ‹
@@ -459,6 +460,9 @@ function MonthNav({ period }: { readonly period: string }): ReactElement {
           ›
         </Link>
       </Button>
+      <span className="ml-1 text-sm text-muted-foreground">
+        <GlossaryTerm term="cra" />
+      </span>
     </div>
   );
 }

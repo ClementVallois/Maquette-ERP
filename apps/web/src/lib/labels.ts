@@ -33,6 +33,48 @@
  */
 export const LABELS = {
   appName: 'CRA → Facture',
+  glossary: {
+    open: 'Définition : {term}',
+    cra: {
+      label: 'CRA',
+      definition:
+        'Compte rendu d’activité mensuel : le relevé des jours travaillés d’un consultant.',
+    },
+    tjm: {
+      label: 'TJM',
+      definition:
+        'Taux journalier moyen convenu avec le client pour un consultant sur une mission. Il est daté.',
+    },
+    cjm: {
+      label: 'CJM',
+      definition:
+        'Coût journalier moyen du consultant pour l’entreprise. Cette donnée est réservée au management de son implantation.',
+    },
+    regie: {
+      label: 'Régie',
+      definition: 'Facturation des jours réellement travaillés, multipliés par le TJM applicable.',
+    },
+    forfait: {
+      label: 'Forfait',
+      definition:
+        'Montant convenu pour un livrable, indépendant des jours travaillés. Ce modèle n’est pas facturé dans cette maquette.',
+    },
+    preFacturier: {
+      label: 'Pré-facturier',
+      definition:
+        'Vue mensuelle de ce qui est facturable et, pour chaque jour qui ne l’est pas, de la raison qui bloque.',
+    },
+    habilitation: {
+      label: 'Habilitation',
+      definition:
+        'Qualification certifiée qu’un consultant doit détenir pour être affecté à certaines missions.',
+    },
+    intercontrat: {
+      label: 'Intercontrat',
+      definition:
+        'Période sans mission client, enregistrée ici sur une mission interne au forfait afin de conserver un CRA complet.',
+    },
+  },
   appTagline: 'Maquette d’un module ERP interne',
 
   nav: {
