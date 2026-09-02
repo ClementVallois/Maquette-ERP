@@ -327,6 +327,12 @@ export const LABELS = {
     totalExcludingVat: 'Total HT',
     totalIncludingVat: 'Total TTC',
     notNumberedYet: '—',
+    /** Rank A7: the discriminant that tells two drafts to the same client apart. */
+    invoiceConsultant: 'Consultant',
+    invoiceMissions: 'Mission(s)',
+    invoiceLines: 'Lignes',
+    invoiceCreatedAt: 'Créée le',
+    invoiceOpen: 'Ouvrir',
     cras: 'Les CRA du mois',
     consultant: 'Consultant',
     craStatus: 'Statut du CRA',

@@ -392,13 +392,55 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
 
       const actor = requireActor(request);
 
-      return dependencies.transactionally(async (unit) => ({
-        invoices: await unit.invoices.list({
+      return dependencies.transactionally(async (unit) => {
+        const page = await unit.invoices.list({
           actor,
           limit: query.value.limit,
           offset: query.value.offset,
-        }),
-      }));
+        });
+
+        const reference = new PgReferenceReader(unit.client);
+        const consultantNames = await reference.consultantNames();
+        const missionNames = await reference.missionNames();
+
+        // Rank A7: the same discriminant the pré-facturier already carries
+        // (`PreFacturierInvoiceRow`) — a draft's client and period alone do not tell two invoices
+        // to the same client apart. One more read per row, bounded by the page, plus one Cra
+        // lookup per row's single source Cra (`saveDraft` records exactly one). Sequential, not
+        // `Promise.all`: every read here shares the one checked-out client this transaction is
+        // (`validate-cra.ts`'s own header explains why overlapping them buys nothing).
+        const invoices = [];
+        for (const item of page) {
+          const invoice = await unit.invoices.findById(item.id, actor);
+          const sourceCraId = invoice?.lines[0]?.origin.craId;
+          const sourceCra =
+            sourceCraId === undefined ? null : await unit.cras.findById(sourceCraId, actor);
+          const lineMissionIds = [
+            ...new Set((invoice?.lines ?? []).map((line) => line.origin.missionId)),
+          ];
+          const createdAt =
+            sourceCra === null
+              ? null
+              : ((
+                  sourceCra.validatedAt ??
+                  sourceCra.refusal?.at ??
+                  sourceCra.submittedAt
+                )?.toISOString() ?? null);
+
+          invoices.push({
+            ...item,
+            consultantName:
+              sourceCra === null
+                ? '—'
+                : (consultantNames.get(sourceCra.consultantId) ?? sourceCra.consultantId),
+            missionNames: lineMissionIds.map((id) => missionNames.get(id) ?? id),
+            lineCount: invoice?.lines.length ?? 0,
+            createdAt,
+          });
+        }
+
+        return { invoices };
+      });
     },
   );
 

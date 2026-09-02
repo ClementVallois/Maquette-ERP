@@ -30,6 +30,20 @@ export interface BillableRow {
   readonly totalIncludingVatCents: number;
 }
 
+/**
+ * `InvoiceListItem` plus what tells two drafts to the same client, same month, apart (Rank A7):
+ * the source consultant, the mission(s) worked, how many lines, and when the draft was created —
+ * `saveDraft` writes exactly one source Cra per invoice (the unique index on `(source_cra_ids[1],
+ * billed_to_client_id)`), so that Cra's validation timestamp is the closest honest answer this
+ * schema has to "when was this invoice created" — there is no `created_at` column on `invoices`.
+ */
+export interface PreFacturierInvoiceRow extends InvoiceListItem {
+  readonly consultantName: string;
+  readonly missionNames: readonly string[];
+  readonly lineCount: number;
+  readonly createdAt: string | null;
+}
+
 /** Why a quarter-day of this month is not on an invoice. Exactly two shapes, and they differ in kind. */
 export type Blocking =
   /** The Cra was validated and the day still produced no line — ADR-0037's typed reason. */
@@ -50,8 +64,11 @@ export interface PreFacturierComposition {
   /** `null` when this office has no Cra at all — an empty state, not a refusal. */
   readonly period: string | null;
   readonly offeredPeriods: readonly string[];
-  /** The raw page of the month's invoices, in the shape `GET /api/v1/invoices` already answers. */
-  readonly invoices: readonly InvoiceListItem[];
+  /**
+   * The month's invoices, `GET /api/v1/invoices`'s own shape plus the discriminant a screen needs
+   * to tell two drafts to the same client apart (Rank A7) — see `PreFacturierInvoiceRow`.
+   */
+  readonly invoices: readonly PreFacturierInvoiceRow[];
   /** The same invoices, with the HT/TTC totals `billing.pages/pre-facturier.ts` prints. */
   readonly billable: readonly BillableRow[];
   readonly cras: readonly CraRow[];
@@ -164,11 +181,17 @@ export async function preFacturierComposition(
   const reference = new PgReferenceReader(unit.client);
   const consultantNames = await reference.consultantNames();
   const missionNames = await reference.missionNames();
+  // `saveDraft` records exactly one source Cra per invoice — the unique index on
+  // `(source_cra_ids[1], billed_to_client_id)` is what makes `cras`, already scoped to this same
+  // period, the right (and only) place to resolve an invoice's consultant and "created" timestamp
+  // from, rather than a second cross-module read.
+  const craById = new Map(cras.map((cra) => [cra.id, cra]));
 
   // One read per invoice, and the totals come off the aggregate rather than out of a `SUM`
   // (ADR-0053): a draft's `total_ttc_cents` column is NULL by design, and VAT is rounded once per
   // rate in the domain — a total assembled in SQL would be a different number.
   const billable: BillableRow[] = [];
+  const invoiceRows: PreFacturierInvoiceRow[] = [];
   for (const item of invoices) {
     const invoice = await unit.invoices.findById(item.id, actor);
     if (invoice === null) continue;
@@ -180,6 +203,21 @@ export async function preFacturierComposition(
       invoiceNumber: invoice.number,
       totalExcludingVatCents: invoice.totals.totalExcludingVatCents,
       totalIncludingVatCents: invoice.totals.totalIncludingVatCents,
+    });
+
+    const sourceCraId = invoice.lines[0]?.origin.craId;
+    const sourceCra = sourceCraId === undefined ? undefined : craById.get(sourceCraId);
+    const lineMissionIds = [...new Set(invoice.lines.map((line) => line.origin.missionId))];
+
+    invoiceRows.push({
+      ...item,
+      consultantName:
+        sourceCra === undefined
+          ? '—'
+          : (consultantNames.get(sourceCra.consultantId) ?? sourceCra.consultantId),
+      missionNames: lineMissionIds.map((id) => missionNames.get(id) ?? id),
+      lineCount: invoice.lines.length,
+      createdAt: sourceCra?.statusChangedAt ?? null,
     });
   }
 
@@ -201,7 +239,7 @@ export async function preFacturierComposition(
   return {
     period,
     offeredPeriods: offered,
-    invoices,
+    invoices: invoiceRows,
     billable,
     cras: rows,
     // ADR-0054: quarter-days of a closed month that have not reached `Validated`. Summed over the

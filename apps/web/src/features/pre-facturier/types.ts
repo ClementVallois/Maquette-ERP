@@ -1,23 +1,16 @@
 /**
  * `GET /api/v1/pre-facturier?period=` — Annexe A points at frontend-plan.md task 5.1 by name and
  * documents no shape of its own; task 5.1's prose (fenced JSON block) was the first draft of this
- * file, and it turned out to disagree with what the route actually returns in two places, both
- * confirmed against `apps/api/src/routes/api.ts` (the handler's own object literal, ~line 372) and
- * against a live call (`curl` with a `manager-paris` cookie, `?period=2026-06`, seed reset) rather
- * than guessed (rule 0bis.8):
+ * file, and it turned out to disagree with what the route actually returns, confirmed against
+ * `apps/api/src/routes/api.ts` and `apps/api/src/composition/pre-facturier.ts` rather than guessed
+ * (rule 0bis.8):
  *
- * - **No HT (`totalExcludingVatCents`) field exists on `invoices[]`.** The composition
- *   (`composition/pre-facturier.ts`) computes a `BillableRow` with both HT and TTC from the live
- *   aggregate, but the route hands back `composition.invoices` — the raw, lighter
- *   `InvoiceListItem[]` read `GET /api/v1/invoices` also answers — not `composition.billable`. Only
- *   the **aggregate** total (`summary.billableCents`, HT) survives onto the wire; no per-row HT
- *   does. Confirmed deliberate, not an oversight: `routes/pre-facturier.int.test.ts` asserts this
- *   exact shape with `totalTtcCents: null` on a draft row. Recorded in
- *   `docs/open-questions.md` (row dated 27/08/2026 — this comment is not that record on its own,
- *   `CLAUDE.md`'s double checkpoint requires the row): task 7.1's own prose asks for an HT column
- *   this endpoint cannot fill; the table below renders TTC only.
- * - **`invoices[].totalTtcCents` is `null` until the invoice is issued** (Phase 8), which in
- *   Phase 7 is every row — validating a Cra only ever drafts an invoice, it does not issue one.
+ * - **`invoices[]` is `PreFacturierInvoiceRow` in the composition (`InvoiceListItem` plus a
+ *   discriminant), not the bare `InvoiceListItem[]` `GET /api/v1/invoices` answers** — Rank A7
+ *   added `consultantName`/`missionNames`/`lineCount`/`createdAt` so two drafts to the same client
+ *   in the same month stop being indistinguishable rows.
+ * - **`totalTtcCents` is never null** (Rank B1): a draft's TTC is computed from its lines rather
+ *   than stored, and `totalsAreProvisional` says whether it is frozen yet.
  * - **`blockingReasons` narrows to `DeclineReason`, verified rather than left as `string[]`**:
  *   `blockingReasonsOf` (`routes/api.ts`) filters `CraRow['blocking']` to `kind === 'declined'`
  *   before mapping to `.reason`, so nothing but the closed four-value vocabulary reaches this
@@ -44,6 +37,12 @@ export interface PreFacturierInvoiceRow {
   /** Never null: a draft's TTC is computed from its lines. See `totalsAreProvisional`. */
   readonly totalTtcCents: number | null;
   readonly totalsAreProvisional: boolean;
+  /** Rank A7's discriminant: the consultant whose Cra drafted this invoice. */
+  readonly consultantName: string;
+  readonly missionNames: readonly string[];
+  readonly lineCount: number;
+  /** The source Cra's validation timestamp — the closest thing this schema has to "created at". */
+  readonly createdAt: string | null;
 }
 
 export interface PreFacturierCraRow {

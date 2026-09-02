@@ -26,7 +26,7 @@ import { useCraList, useValidateCra } from '@/features/cra/hooks';
 import type { CraStatus, ValidationResponse } from '@/features/cra/types';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
-import { frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
+import { frenchDate, frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
@@ -127,6 +127,33 @@ function invoiceColumns(): ColumnDef<PreFacturierInvoiceRow>[] {
       cell: ({ row }) => <StatusBadge variant={INVOICE_STATUS_VARIANT[row.original.status]} />,
     },
     {
+      // Rank A7: what tells two drafts to the same client, same month, apart — without this,
+      // several rows above were the client's name and nothing else.
+      id: 'consultant',
+      header: LABELS.preFacturier.invoiceConsultant,
+      cell: ({ row }) => row.original.consultantName,
+    },
+    {
+      id: 'missions',
+      header: LABELS.preFacturier.invoiceMissions,
+      cell: ({ row }) => row.original.missionNames.join(', '),
+    },
+    {
+      id: 'lineCount',
+      header: LABELS.preFacturier.invoiceLines,
+      cell: ({ row }) => <span className="tabular-nums">{row.original.lineCount}</span>,
+    },
+    {
+      id: 'createdAt',
+      header: LABELS.preFacturier.invoiceCreatedAt,
+      cell: ({ row }) =>
+        row.original.createdAt === null ? (
+          LABELS.preFacturier.notNumberedYet
+        ) : (
+          <span className="tabular-nums">{frenchDate(row.original.createdAt.slice(0, 10))}</span>
+        ),
+    },
+    {
       id: 'invoiceNumber',
       header: LABELS.preFacturier.invoiceNumber,
       cell: ({ row }) => (
@@ -153,6 +180,19 @@ function invoiceColumns(): ColumnDef<PreFacturierInvoiceRow>[] {
             </span>
           )}
         </span>
+      ),
+    },
+    {
+      id: 'open',
+      header: () => <span className="sr-only">{LABELS.action.tableActions}</span>,
+      cell: ({ row }) => (
+        <Link
+          to="/factures/$id"
+          params={{ id: row.original.id }}
+          className="ml-auto block w-fit text-sm text-primary hover:underline"
+        >
+          {LABELS.preFacturier.invoiceOpen}
+        </Link>
       ),
     },
   ];

@@ -64,6 +64,13 @@ function columns(): ColumnDef<InvoiceListItem>[] {
       cell: ({ row }) => <StatusBadge variant={INVOICE_STATUS_VARIANT[row.original.status]} />,
     },
     {
+      // Rank A7: the same discriminant the pré-facturier carries — without it, several rows here
+      // are the same client and nothing else.
+      id: 'consultant',
+      header: LABELS.preFacturier.invoiceConsultant,
+      cell: ({ row }) => row.original.consultantName,
+    },
+    {
       id: 'period',
       header: LABELS.invoice.supplyPeriod,
       cell: ({ row }) => frenchMonth(row.original.supplyPeriod),

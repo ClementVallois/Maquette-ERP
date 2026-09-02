@@ -41,6 +41,15 @@ export interface InvoiceListItem {
   readonly issueDate: string | null;
   readonly totalTtcCents: number | null;
   readonly totalsAreProvisional: boolean;
+  /**
+   * Rank A7: what tells two invoices to the same client, same month, apart. `GET /api/v1/invoices`
+   * resolves them the same way `PreFacturierInvoiceRow` does — the source Cra `saveDraft` recorded
+   * (exactly one per invoice) and its consultant/mission(s).
+   */
+  readonly consultantName: string;
+  readonly missionNames: readonly string[];
+  readonly lineCount: number;
+  readonly createdAt: string | null;
 }
 
 export interface InvoiceListResponse {
