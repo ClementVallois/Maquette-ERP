@@ -2,6 +2,7 @@ import type { Actor } from '@erp/platform';
 
 import type { DeclineReason } from './declined-days.ts';
 import type { CraId, InvoiceId, MissionId, OfficeId } from './ids.ts';
+import type { InvoiceStatus } from './invoice-status.ts';
 import type { Invoice } from './invoice.ts';
 
 export interface InvoiceListItem {
@@ -30,6 +31,10 @@ export interface InvoiceListQuery {
    * a page of invoices across all months.
    */
   readonly period?: string;
+  readonly status?: InvoiceStatus;
+  readonly year?: number;
+  /** Case-insensitive client-name or legal-number search. */
+  readonly search?: string;
 }
 
 /** A row of the pré-facturier's blocking-reason column: days that produced no line (ADR-0037). */

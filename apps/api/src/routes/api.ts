@@ -1,3 +1,4 @@
+import { INVOICE_STATUSES } from '@erp/billing';
 import { API_PROBLEM_TYPES } from '@erp/contracts';
 import {
   daysOf,
@@ -147,6 +148,12 @@ const CraListParams = Pagination.extend({
   statuses: CommaSeparatedStatuses,
   year: YearQuery,
   month: MonthQuery,
+});
+
+const InvoiceListParams = Pagination.extend({
+  status: z.enum(INVOICE_STATUSES).optional(),
+  year: YearQuery,
+  search: z.string().trim().min(1).max(100).optional(),
 });
 
 const IdParam = z.object({ id: z.string().min(1).max(64) });
@@ -313,10 +320,8 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       // `consultantIds`/`statuses` (item 7, QA round 1) narrow within that same filtering — never
       // widen it, the repository's own contract (`CraListQuery`'s header, `packages/timesheet`).
       return dependencies.transactionally(async (unit) => {
-        const cras = await unit.cras.list({
+        const filters = {
           actor,
-          limit: query.value.limit,
-          offset: query.value.offset,
           // `exactOptionalPropertyTypes` refuses an explicit `undefined` — omitted, not passed,
           // when the query carried no filter on that dimension.
           ...(query.value.consultantIds === undefined
@@ -325,7 +330,13 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           ...(query.value.statuses === undefined ? {} : { statuses: query.value.statuses }),
           ...(query.value.year === undefined ? {} : { year: query.value.year }),
           ...(query.value.month === undefined ? {} : { month: query.value.month }),
+        };
+        const cras = await unit.cras.list({
+          ...filters,
+          limit: query.value.limit,
+          offset: query.value.offset,
         });
+        const total = await unit.cras.count(filters);
 
         // `consultantName`, presentation rather than a rule — the same source and the same
         // justification `preFacturierComposition` already uses (ADR-0071): a manager's row needs a
@@ -337,6 +348,9 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
             ...cra,
             consultantName: consultantNames.get(cra.consultantId) ?? cra.consultantId,
           })),
+          total,
+          limit: query.value.limit,
+          offset: query.value.offset,
         };
       });
     },
@@ -434,17 +448,36 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
     '/api/v1/invoices',
     { config: { access: forRoles('manager', 'billing') } },
     async (request, reply) => {
-      const query = parseInput(Pagination, request.query);
+      const query = parseInput(InvoiceListParams, request.query);
       if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
 
       const actor = requireActor(request);
 
       return dependencies.transactionally(async (unit) => {
-        const page = await unit.invoices.list({
+        const sharedFilters = {
           actor,
+          ...(query.value.year === undefined ? {} : { year: query.value.year }),
+          ...(query.value.search === undefined ? {} : { search: query.value.search }),
+        };
+        const filters = {
+          ...sharedFilters,
+          ...(query.value.status === undefined ? {} : { status: query.value.status }),
+        };
+        const page = await unit.invoices.list({
+          ...filters,
           limit: query.value.limit,
           offset: query.value.offset,
         });
+        const total = await unit.invoices.count(filters);
+        const statusCounts = {
+          all: await unit.invoices.count(sharedFilters),
+          draft: await unit.invoices.count({ ...sharedFilters, status: 'draft' }),
+          issued: await unit.invoices.count({ ...sharedFilters, status: 'issued' }),
+          cancelledByCreditNote: await unit.invoices.count({
+            ...sharedFilters,
+            status: 'cancelledByCreditNote',
+          }),
+        };
 
         const reference = new PgReferenceReader(unit.client);
         const consultantNames = await reference.consultantNames();
@@ -486,7 +519,13 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           });
         }
 
-        return { invoices };
+        return {
+          invoices,
+          total,
+          limit: query.value.limit,
+          offset: query.value.offset,
+          statusCounts,
+        };
       });
     },
   );

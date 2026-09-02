@@ -74,9 +74,23 @@ export class PgInvoiceRepository implements InvoiceRepository {
       `${INVOICE_LIST_SELECT}
        WHERE i.office_id = $1
          AND ($4::text IS NULL OR i.supply_period = $4)
+         AND ($5::text IS NULL OR i.status = $5)
+         AND ($6::text IS NULL OR left(i.supply_period, 4) = $6)
+         AND ($7::text IS NULL OR (
+           i.billed_to_name ILIKE '%' || $7 || '%'
+           OR COALESCE(i.invoice_number, '') ILIKE '%' || $7 || '%'
+         ))
        ORDER BY i.supply_period DESC, i.billed_to_name
        LIMIT $2 OFFSET $3`,
-      [actor.officeId, limit, query.offset, query.period ?? null],
+      [
+        actor.officeId,
+        limit,
+        query.offset,
+        query.period ?? null,
+        query.status ?? null,
+        query.year === undefined ? null : String(query.year),
+        query.search ?? null,
+      ],
     );
 
     return rows.map(toListItem);
@@ -91,8 +105,20 @@ export class PgInvoiceRepository implements InvoiceRepository {
       `SELECT COUNT(*) AS count
        FROM billing.invoices i
        WHERE i.office_id = $1
-         AND ($2::text IS NULL OR i.supply_period = $2)`,
-      [actor.officeId, query.period ?? null],
+         AND ($2::text IS NULL OR i.supply_period = $2)
+         AND ($3::text IS NULL OR i.status = $3)
+         AND ($4::text IS NULL OR left(i.supply_period, 4) = $4)
+         AND ($5::text IS NULL OR (
+           i.billed_to_name ILIKE '%' || $5 || '%'
+           OR COALESCE(i.invoice_number, '') ILIKE '%' || $5 || '%'
+         ))`,
+      [
+        actor.officeId,
+        query.period ?? null,
+        query.status ?? null,
+        query.year === undefined ? null : String(query.year),
+        query.search ?? null,
+      ],
     );
 
     return exactInteger('count', rows[0]!.count);
