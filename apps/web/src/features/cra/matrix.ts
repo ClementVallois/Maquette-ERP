@@ -183,6 +183,16 @@ export function isRowEmpty(matrix: MatrixState, rowKey: string, days: readonly s
   return rowTotal(matrix, rowKey, days) === 0;
 }
 
+/**
+ * The progress-bar signal (A9): a workable day is "complete" once it carries exactly one full day,
+ * across every row — neither short (`isDayIncomplete`) nor over (`isDayOverbooked`). The caller
+ * filters on `days[].nonWorkable` first, same as `isDayIncomplete` — this function holds no
+ * calendar of its own.
+ */
+export function isDayComplete(matrix: MatrixState, day: string): boolean {
+  return dayTotal(matrix, day) === FULL_DAY;
+}
+
 /** One `MonthEntry` per non-empty cell (ADR-0070) — the shape `PUT /api/v1/cras/:period/entries`
  * wants, one entry per matrix cell rather than per slot: the server's own `linesOf` would group
  * these right back into the `CraLine`s they came from, so nothing here groups anything itself. */

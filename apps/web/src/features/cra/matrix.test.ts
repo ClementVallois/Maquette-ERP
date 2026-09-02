@@ -8,6 +8,7 @@ import {
   entriesFromMatrix,
   fillEmptyWorkdays,
   initMatrix,
+  isDayComplete,
   isDayIncomplete,
   isDayOverbooked,
   isRowEmpty,
@@ -166,6 +167,39 @@ describe('isDayIncomplete', () => {
 
     expect(isDayIncomplete(matrix, '2026-08-03', true)).toBe(false);
     expect(isDayOverbooked(matrix, '2026-08-03')).toBe(true);
+  });
+});
+
+describe('isDayComplete', () => {
+  it('is false on a day nobody has typed into', () => {
+    const matrix = initMatrix(gridResponse());
+
+    expect(isDayComplete(matrix, '2026-08-03')).toBe(false);
+  });
+
+  it('is true at exactly one full day, summed across every row', () => {
+    let matrix = addRow(initMatrix(gridResponse()), MISSION_A);
+    matrix = addRow(matrix, MISSION_B);
+    matrix = withValue(matrix, MISSION_A, '2026-08-03', 3);
+    matrix = withValue(matrix, MISSION_B, '2026-08-03', 1);
+
+    expect(isDayComplete(matrix, '2026-08-03')).toBe(true);
+  });
+
+  it('is false short of a full day', () => {
+    let matrix = addRow(initMatrix(gridResponse()), MISSION_A);
+    matrix = withValue(matrix, MISSION_A, '2026-08-03', 2);
+
+    expect(isDayComplete(matrix, '2026-08-03')).toBe(false);
+  });
+
+  it('is false past a full day — overbooked, not complete', () => {
+    let matrix = addRow(initMatrix(gridResponse()), MISSION_A);
+    matrix = addRow(matrix, MISSION_B);
+    matrix = withValue(matrix, MISSION_A, '2026-08-03', 4);
+    matrix = withValue(matrix, MISSION_B, '2026-08-03', 1);
+
+    expect(isDayComplete(matrix, '2026-08-03')).toBe(false);
   });
 });
 
