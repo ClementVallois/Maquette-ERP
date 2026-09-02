@@ -37,6 +37,9 @@ export interface CraListItem {
 
 export interface CraListResponse {
   readonly cras: readonly CraListItem[];
+  readonly total: number;
+  readonly limit: number;
+  readonly offset: number;
 }
 
 /** `GET /api/v1/consultants` (item 7, QA round 1) — a manager's own office roster, consultants

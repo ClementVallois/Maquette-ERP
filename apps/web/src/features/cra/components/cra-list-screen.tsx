@@ -5,6 +5,7 @@ import type { ReactElement } from 'react';
 import { useState } from 'react';
 
 import { DataTable } from '@/components/data-table/data-table';
+import { PaginationControls } from '@/components/data-table/pagination-controls';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -161,6 +162,8 @@ interface CraListScreenProps {
   /** Item 4 (QA round 2), same "always present, manager-only controls" shape as the two above. */
   readonly year: number | undefined;
   readonly month: number | undefined;
+  readonly page: number;
+  readonly pageSize: number;
 }
 
 /**
@@ -175,6 +178,8 @@ export function CraListScreen({
   statuses,
   year,
   month,
+  page,
+  pageSize,
 }: CraListScreenProps): ReactElement {
   // `exactOptionalPropertyTypes` refuses an explicit `year: undefined`/`month: undefined` — the
   // spread omits the key entirely when there is no value, matching `CraListFilters`'s own
@@ -184,8 +189,11 @@ export function CraListScreen({
     statuses,
     ...(year === undefined ? {} : { year }),
     ...(month === undefined ? {} : { month }),
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
   };
   const query = useCraList(filters);
+  const navigate = useNavigate();
   const filtersActive =
     consultantIds.length > 0 || statuses.length > 0 || year !== undefined || month !== undefined;
 
@@ -257,6 +265,26 @@ export function CraListScreen({
                 }
               : {})}
           />
+        }
+      />
+      <PaginationControls
+        total={query.data.total}
+        limit={query.data.limit}
+        offset={query.data.offset}
+        onPageChange={(offset) =>
+          void navigate({
+            to: '/cra',
+            search: (previous) => ({
+              ...previous,
+              page: Math.floor(offset / pageSize) + 1,
+            }),
+          })
+        }
+        onPageSizeChange={(limit) =>
+          void navigate({
+            to: '/cra',
+            search: (previous) => ({ ...previous, page: 1, pageSize: limit }),
+          })
         }
       />
     </div>
@@ -342,7 +370,11 @@ function CraListFilters({
       to: '/cra',
       search: (prev) => {
         const updated = applyDiff(prev.consultantIds ?? [], diff);
-        return { ...prev, consultantIds: updated.length === 0 ? undefined : [...updated] };
+        return {
+          ...prev,
+          page: 1,
+          consultantIds: updated.length === 0 ? undefined : [...updated],
+        };
       },
     });
   }
@@ -353,7 +385,11 @@ function CraListFilters({
       to: '/cra',
       search: (prev) => {
         const updated = applyDiff(prev.statuses ?? [], diff);
-        return { ...prev, statuses: updated.length === 0 ? undefined : (updated as CraStatus[]) };
+        return {
+          ...prev,
+          page: 1,
+          statuses: updated.length === 0 ? undefined : (updated as CraStatus[]),
+        };
       },
     });
   }
@@ -367,7 +403,7 @@ function CraListFilters({
     const parsed = next === FILTER_ALL ? undefined : Number.parseInt(next, 10);
     void navigate({
       to: '/cra',
-      search: (prev) => ({ ...prev, year: parsed }),
+      search: (prev) => ({ ...prev, year: parsed, page: 1 }),
     });
   }
 
@@ -375,7 +411,7 @@ function CraListFilters({
     const parsed = next === FILTER_ALL ? undefined : Number.parseInt(next, 10);
     void navigate({
       to: '/cra',
-      search: (prev) => ({ ...prev, month: parsed }),
+      search: (prev) => ({ ...prev, month: parsed, page: 1 }),
     });
   }
 
