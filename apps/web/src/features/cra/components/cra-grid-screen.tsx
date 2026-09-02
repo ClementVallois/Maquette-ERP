@@ -16,6 +16,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
 import { frenchDate, frenchMonth, frenchWeekday } from '@/lib/format';
@@ -30,6 +32,7 @@ import {
   entriesFromMatrix,
   fillEmptyWorkdays,
   initMatrix,
+  isDayComplete,
   isRowEmpty,
   removeRow,
   withValue,
@@ -38,9 +41,16 @@ import {
 import { missingDaysFrom } from '../missing-days';
 import type { CraGridResponse, GridDay } from '../types';
 
-import { CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
+import { CraLegend, CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
 import type { CellQuantity } from './cra-quantity-cell';
 import { CraTimeline } from './cra-timeline';
+
+/**
+ * Tailwind's `md:` breakpoint (768px, unmodified default), read here to decide — at click time,
+ * not at render — whether "Aller au premier jour incomplet" should move the desktop week index or
+ * the mobile one. Mirrors the `md:hidden` / `hidden md:block` pair below rather than a new value.
+ */
+const DESKTOP_BREAKPOINT_QUERY = '(min-width: 768px)';
 
 /**
  * `/releve/:id` — the printable Cra (SSR, `apps/api/src/web/paths.ts`'s `PATHS.craPrint`), not
@@ -139,6 +149,10 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   const [matrix, setMatrix] = useState<MatrixState>(() => initMatrix(data));
   const [dirty, setDirty] = useState(false);
   const [mobileWeekIndex, setMobileWeekIndex] = useState(0);
+  // A9's desktop month/week toggle — reuses A11's own slicing (`calendarWeeks`, `WeekNavigator`,
+  // `compact`), so this is a second, independent index rather than a new mechanism.
+  const [desktopView, setDesktopView] = useState<'month' | 'week'>('month');
+  const [desktopWeekIndex, setDesktopWeekIndex] = useState(0);
   const [lastWrite, setLastWrite] = useState<{
     readonly kind: 'saved' | 'submitted';
     readonly at: string;
@@ -154,6 +168,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
     setMatrix(initMatrix(data));
     setDirty(false);
     setMobileWeekIndex(0);
+    setDesktopWeekIndex(0);
   }
 
   const saveMonth = useSaveMonth(period);
@@ -260,6 +275,44 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   const missingDays = missingDaysFrom(mutationProblem);
   const weeks = calendarWeeks(data.days);
   const mobileDays = weeks[mobileWeekIndex] ?? weeks[0] ?? [];
+  const desktopDays = weeks[desktopWeekIndex] ?? weeks[0] ?? [];
+
+  // A9's progress bar: a workable day counts once it holds exactly one full day, across every row
+  // (`isDayComplete`, `matrix.ts`) — the same bound the totals row's own amber/red tones mirror.
+  // `workableGridDays` (the `GridDay`s), not `workableDays` above (the day-string list
+  // `fillEmptyWorkdays` wants) — same filter, different shape, kept distinct rather than reusing
+  // one and re-deriving the other.
+  const workableGridDays = data.days.filter((day) => day.nonWorkable === null);
+  const completeWorkableDayCount = workableGridDays.filter((day) =>
+    isDayComplete(matrix, day.date),
+  ).length;
+
+  // A9's "Aller au premier jour incomplet": focuses the earliest day the server named, whichever
+  // of the three simultaneously-mounted matrices (mobile week, desktop month, desktop week) is
+  // currently visible — `offsetParent` is null on the CSS-hidden ones (`md:hidden` /
+  // `hidden md:block`), so it doubles as the visibility check without reading either breakpoint's
+  // own media query twice.
+  function goToFirstIncompleteDay(): void {
+    const target = [...missingDays].sort().at(0);
+    if (target === undefined) return;
+
+    const onDesktop = window.matchMedia(DESKTOP_BREAKPOINT_QUERY).matches;
+    const weekIndex = weeks.findIndex((week) => week.some((day) => day.date === target));
+    if (onDesktop && desktopView === 'week' && weekIndex >= 0) setDesktopWeekIndex(weekIndex);
+    else if (!onDesktop && weekIndex >= 0) setMobileWeekIndex(weekIndex);
+
+    // Two frames: one lets the index update above re-render the matrix (if it changed), the next
+    // runs after that layout has settled — a single frame can still race the DOM update on a slow
+    // render.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const candidates = document.querySelectorAll<HTMLElement>(`[data-cra-day="${target}"]`);
+        const visible = [...candidates].find((element) => element.offsetParent !== null);
+        visible?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        visible?.focus();
+      });
+    });
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -268,6 +321,10 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
       <StatusBanner data={data} />
 
       <CraTimeline timeline={data.timeline} />
+
+      {workableGridDays.length > 0 && (
+        <CraProgress completed={completeWorkableDayCount} total={workableGridDays.length} />
+      )}
 
       {data.editable && (
         <div className="flex items-center gap-2">
@@ -280,6 +337,8 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
           )}
         </div>
       )}
+
+      <CraLegend />
 
       <div className="md:hidden">
         <WeekNavigator
@@ -297,6 +356,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
             editable={data.editable}
             compact
             totalLabel={LABELS.cra.weekTotal}
+            cellIdPrefix="mobile"
             flaggedDays={flaggedDays}
             missingDays={missingDays}
             onChangeCell={data.editable ? updateCell : undefined}
@@ -304,13 +364,37 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
         </div>
       </div>
 
-      <div className="hidden md:block">
+      <div className="hidden flex-col gap-2 md:flex">
+        <Tabs
+          value={desktopView}
+          onValueChange={(value) => {
+            if (value === 'month' || value === 'week') setDesktopView(value);
+          }}
+        >
+          <TabsList>
+            <TabsTrigger value="month">{LABELS.cra.matrix.viewMonth}</TabsTrigger>
+            <TabsTrigger value="week">{LABELS.cra.matrix.viewWeek}</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {desktopView === 'week' && (
+          <WeekNavigator
+            days={desktopDays}
+            index={desktopWeekIndex}
+            count={weeks.length}
+            onChange={setDesktopWeekIndex}
+          />
+        )}
+
         <CraMatrixTable
           period={period}
-          days={data.days}
+          days={desktopView === 'week' ? desktopDays : data.days}
           rows={rows}
           matrix={matrix}
           editable={data.editable}
+          compact={desktopView === 'week'}
+          totalLabel={desktopView === 'week' ? LABELS.cra.weekTotal : LABELS.cra.monthTotal}
+          cellIdPrefix={desktopView === 'week' ? 'desktop-week' : 'month'}
           flaggedDays={flaggedDays}
           missingDays={missingDays}
           onChangeCell={data.editable ? updateCell : undefined}
@@ -343,7 +427,20 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
       {mutationProblem !== null && (
         <Alert variant="destructive">
           <AlertTitle>{headingFor(mutationProblem)}</AlertTitle>
-          <AlertDescription>{sentenceFor(mutationProblem)}</AlertDescription>
+          <AlertDescription>
+            {sentenceFor(mutationProblem)}
+            {missingDays.size > 0 && (
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="mt-1 block h-auto p-0 text-left text-destructive underline"
+                onClick={goToFirstIncompleteDay}
+              >
+                {LABELS.cra.matrix.goToFirstIncompleteDay}
+              </Button>
+            )}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -388,6 +485,45 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * A9's progress bar — "X/Y jours ouvrés complets", counted over `data.days` (the whole month), not
+ * whichever slice is currently on screen: the mobile week view and the desktop week toggle both
+ * show a fragment, and the reader needs the month's own state regardless of which fragment they're
+ * looking at. No `Math.round` on the fill width (this codebase reserves rounding for money,
+ * `isoWeekNumber`'s own comment above explains the convention) — a CSS percentage tolerates a
+ * fractional value fine, so the exact fraction is passed through untouched.
+ */
+function CraProgress({
+  completed,
+  total,
+}: {
+  readonly completed: number;
+  readonly total: number;
+}): ReactElement {
+  const label = LABELS.cra.matrix.workdaysComplete
+    .replace('{completed}', String(completed))
+    .replace('{total}', String(total));
+
+  return (
+    <div className="flex items-center gap-2">
+      <div
+        role="progressbar"
+        aria-valuenow={completed}
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-label={label}
+        className="h-1.5 w-full max-w-64 shrink-0 overflow-hidden rounded-full bg-muted"
+      >
+        <div
+          className="h-full rounded-full bg-primary transition-[width]"
+          style={{ width: `${String((completed / total) * 100)}%` }}
+        />
+      </div>
+      <p className="text-xs text-nowrap text-muted-foreground">{label}</p>
     </div>
   );
 }
@@ -467,6 +603,34 @@ function MonthNav({ period }: { readonly period: string }): ReactElement {
   );
 }
 
+/**
+ * A9: a real, visible tooltip on hover/focus (`components/ui/tooltip.tsx`, Radix) — not the
+ * `title` attribute ADR-0061 rejected (invisible on touch, unreliable focus/timing) and not
+ * `aria-label` alone, which carries the accessible name but shows nothing to a sighted pointer or
+ * keyboard user. Both are kept: `aria-label` names the button, `TooltipContent` shows the same
+ * words on hover/focus.
+ */
+function RowToolButton({
+  label,
+  onClick,
+  children,
+}: {
+  readonly label: string;
+  readonly onClick: () => void;
+  readonly children: ReactElement;
+}): ReactElement {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="ghost" size="icon-sm" aria-label={label} onClick={onClick}>
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 function RowTools({
   row,
   empty,
@@ -482,33 +646,19 @@ function RowTools({
 }): ReactElement {
   return (
     <>
-      {/* No `title` (ADR-0061: not exposed on touch, not focusable, not announced consistently)
-          — `aria-label` alone already carries the same words, disambiguated by row. */}
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={`${LABELS.cra.matrix.fillEmptyWorkdays} — ${row.label}`}
+      <RowToolButton
+        label={`${LABELS.cra.matrix.fillEmptyWorkdays} — ${row.label}`}
         onClick={onFill}
       >
         <ListChecksIcon />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={`${LABELS.cra.matrix.clearRow} — ${row.label}`}
-        onClick={onClear}
-      >
+      </RowToolButton>
+      <RowToolButton label={`${LABELS.cra.matrix.clearRow} — ${row.label}`} onClick={onClear}>
         <EraserIcon />
-      </Button>
+      </RowToolButton>
       {row.key !== ABSENCE_ROW_KEY && empty && (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={`${LABELS.cra.matrix.removeRow} — ${row.label}`}
-          onClick={onRemove}
-        >
+        <RowToolButton label={`${LABELS.cra.matrix.removeRow} — ${row.label}`} onClick={onRemove}>
           <Trash2Icon />
-        </Button>
+        </RowToolButton>
       )}
     </>
   );
