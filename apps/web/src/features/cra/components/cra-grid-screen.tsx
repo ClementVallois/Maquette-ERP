@@ -1,5 +1,5 @@
 import { Link, useBlocker } from '@tanstack/react-router';
-import { EraserIcon, ListChecksIcon, PlusIcon, Trash2Icon } from 'lucide-react';
+import { EraserIcon, ListChecksIcon, PlusIcon, Trash2Icon, Undo2Icon } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useMemo, useState } from 'react';
 
@@ -162,6 +162,12 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
     readonly kind: 'saved' | 'submitted';
     readonly at: string;
   } | null>(null);
+  // O7: single-level undo for "remplir/vider la ligne" — the matrix as it stood just before that
+  // one action, plus a label naming it for the button's own accessible name. Cleared once used, or
+  // whenever a fresh `data` resyncs the whole matrix below.
+  const [undo, setUndo] = useState<{ readonly matrix: MatrixState; readonly label: string } | null>(
+    null,
+  );
   // React's own documented pattern for "reset state when a prop changes" (react.dev, "Adjusting
   // state when a prop changes"): compared and reassigned during render, not inside an effect —
   // `react-hooks/set-state-in-effect` is why this is not a `useEffect`. ADR-0067: the grid's
@@ -174,6 +180,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
     setDirty(false);
     setMobileWeekIndex(0);
     setDesktopWeekIndex(0);
+    setUndo(null);
   }
 
   const saveMonth = useSaveMonth(period);
@@ -235,6 +242,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
 
   function handleFillRow(rowKey: string): void {
     const row = rowsByKey.get(rowKey);
+    setUndo({ matrix, label: `${LABELS.cra.matrix.fillEmptyWorkdays} — ${row?.label ?? rowKey}` });
     setMatrix((previous) =>
       fillEmptyWorkdays(previous, rowKey, workableDays, row?.assignableDays ?? null),
     );
@@ -242,7 +250,16 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   }
 
   function handleClearRow(rowKey: string): void {
+    const row = rowsByKey.get(rowKey);
+    setUndo({ matrix, label: `${LABELS.cra.matrix.clearRow} — ${row?.label ?? rowKey}` });
     setMatrix((previous) => clearRow(previous, rowKey));
+    setDirty(true);
+  }
+
+  function handleUndo(): void {
+    if (undo === null) return;
+    setMatrix(undo.matrix);
+    setUndo(null);
     setDirty(true);
   }
 
@@ -332,13 +349,22 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
       )}
 
       {data.editable && (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {availableToAdd.length > 0 ? (
             <AddActivityControl missions={availableToAdd} onAdd={handleAddActivity} />
           ) : (
             data.missions.length > 0 && (
               <p className="text-sm text-muted-foreground">{LABELS.cra.matrix.noActivityToAdd}</p>
             )
+          )}
+          {/* O7: single-level undo for the row tools' own fill/clear — `undo.label` names which
+              row and which of the two actions, so the button reads as a sentence, not a bare
+              "Annuler" nobody can place. */}
+          {undo !== null && (
+            <Button type="button" variant="ghost" size="sm" onClick={handleUndo}>
+              <Undo2Icon aria-hidden="true" />
+              {LABELS.cra.matrix.undo} — {undo.label}
+            </Button>
           )}
         </div>
       )}

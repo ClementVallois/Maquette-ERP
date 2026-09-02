@@ -373,6 +373,10 @@ export const LABELS = {
        * `WeekNavigator`), so only the two tab labels are new. */
       viewMonth: 'Mois',
       viewWeek: 'Semaine',
+      /** O7: single-level undo on the row tools' own "remplir"/"vider" — the button reads
+       * "{undo} — {action}", `action` being `fillEmptyWorkdays`/`clearRow` re-used verbatim with
+       * the row's name appended, so this key stays the one bare word. */
+      undo: 'Annuler',
     },
     /** ADR-0071 — a manager's read-only view of a named consultant's month. `{name}` interpolated. */
     managerView: {
