@@ -21,6 +21,26 @@ import {
 import { cn } from '@/lib/utils';
 
 /**
+ * `header.column.columnDef.meta.headerAdornment`: a column whose header itself carries an
+ * interactive affordance (a glossary term's Popover trigger, e.g. `features/marge`'s `tjm`
+ * column) cannot be `flexRender`ed inside this component's own sort `<button>` — axe's
+ * `nested-interactive` rule (WCAG 4.1.2) forbids a control inside a control, and a screen reader
+ * cannot announce the inner one reliably either. `header` stays the plain sortable label (what
+ * every other column already passes); `headerAdornment` renders as that label's sibling, next to
+ * the sort button rather than inside it, so both affordances — sort, and the term's own
+ * definition — stay reachable.
+ */
+declare module '@tanstack/react-table' {
+  // `TData`/`TValue` are required, unused, by TypeScript's own declaration-merging rule (TS2428:
+  // every declaration of an interface must repeat identical type parameters) — table-core's own
+  // `ColumnMeta<TData extends RowData, TValue>` names them, so this merge must too.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData, TValue> {
+    readonly headerAdornment?: ReactNode;
+  }
+}
+
+/**
  * The generic table `docs/frontend-plan.md` §3 names (`components/data-table/`), headless via
  * TanStack Table (task 6.1's dependency) with the design 100% on `components/ui/table.tsx`'s
  * tokens. No toolbar/pagination in this phase: every table Phase 6 renders fits inside the API's
@@ -79,6 +99,31 @@ export function DataTable<TData>({
                 const headerContent = header.isPlaceholder
                   ? null
                   : flexRender(header.column.columnDef.header, header.getContext());
+                const headerAdornment = header.column.columnDef.meta?.headerAdornment;
+                const sortIcon =
+                  sorted === 'asc' ? (
+                    <ArrowUpIcon className="size-3.5" aria-hidden="true" />
+                  ) : sorted === 'desc' ? (
+                    <ArrowDownIcon className="size-3.5" aria-hidden="true" />
+                  ) : (
+                    <ArrowUpDownIcon className="size-3.5 opacity-50" aria-hidden="true" />
+                  );
+                const sortButton = (
+                  <button
+                    type="button"
+                    className={cn(
+                      'inline-flex items-center gap-1 hover:text-foreground',
+                      // The `ml-auto` that right-aligns a numeric column's sort button moves to
+                      // the wrapping `<div>` below when a `headerAdornment` sits beside it —
+                      // otherwise it stays here, unchanged from before this column ever had one.
+                      numericColumnIds.has(header.column.id) && !headerAdornment && 'ml-auto',
+                    )}
+                    onClick={header.column.getToggleSortingHandler()}
+                  >
+                    {headerContent}
+                    {sortIcon}
+                  </button>
+                );
 
                 return (
                   <TableHead
@@ -89,25 +134,24 @@ export function DataTable<TData>({
                     }
                   >
                     {header.column.getCanSort() ? (
-                      <button
-                        type="button"
-                        className={cn(
-                          'inline-flex items-center gap-1 hover:text-foreground',
-                          numericColumnIds.has(header.column.id) && 'ml-auto',
-                        )}
-                        onClick={header.column.getToggleSortingHandler()}
-                      >
-                        {headerContent}
-                        {sorted === 'asc' ? (
-                          <ArrowUpIcon className="size-3.5" aria-hidden="true" />
-                        ) : sorted === 'desc' ? (
-                          <ArrowDownIcon className="size-3.5" aria-hidden="true" />
-                        ) : (
-                          <ArrowUpDownIcon className="size-3.5 opacity-50" aria-hidden="true" />
-                        )}
-                      </button>
+                      headerAdornment ? (
+                        <div
+                          className={cn(
+                            'inline-flex items-center gap-1',
+                            numericColumnIds.has(header.column.id) && 'ml-auto',
+                          )}
+                        >
+                          {sortButton}
+                          {headerAdornment}
+                        </div>
+                      ) : (
+                        sortButton
+                      )
                     ) : (
-                      headerContent
+                      <>
+                        {headerContent}
+                        {headerAdornment}
+                      </>
                     )}
                   </TableHead>
                 );

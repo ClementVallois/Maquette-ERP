@@ -68,7 +68,12 @@ const MISSION_COLUMNS: ColumnDef<MissionEconomics>[] = [
   {
     id: 'tjm',
     accessorFn: (row) => row.tjmCents,
-    header: () => <GlossaryTerm term="tjm" />,
+    // Plain label, not `<GlossaryTerm>` directly: `DataTable` nests a sortable column's `header`
+    // inside its own sort `<button>`, and `GlossaryTerm` is itself a Popover-trigger button — one
+    // control inside another is axe's `nested-interactive` (WCAG 4.1.2, serious). The term's own
+    // trigger moves to `meta.headerAdornment`, rendered as that button's sibling instead.
+    header: LABELS.margin.tjm,
+    meta: { headerAdornment: <GlossaryTerm term="tjm" /> },
     cell: ({ row }) => <span className="tabular-nums">{frenchEuros(row.original.tjmCents)}</span>,
   },
   {
