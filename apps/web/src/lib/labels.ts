@@ -497,6 +497,24 @@ export const LABELS = {
     },
     validateSuccessToast: 'CRA validé.',
     validateReplayedToast: 'Ce CRA était déjà validé : résultat d’origine affiché.',
+    /** O4: a récapitulatif before the (otherwise instant) "Valider" — never a second confirmation
+     * of an already-reversible action past this point, only of one that immediately drafts an
+     * invoice per client. `{name}` interpolated; the recap lines themselves are built by each
+     * caller from what it already has on hand (`ValidateConfirmDialog`'s own `facts` prop) rather
+     * than a fixed schema this key would have to describe. */
+    validateConfirmDialog: {
+      title: 'Valider le CRA de {name} ?',
+      lead: 'Cette action est immédiate et fige le mois : plus aucune saisie n’est possible après, et un brouillon de facture est créé pour chaque client concerné.',
+      confirm: 'Valider',
+      cancel: 'Annuler',
+      periodFactLabel: 'Période',
+      flaggedDaysFactLabel: 'Jours signalés',
+      clientsFactLabel: 'Clients avec du temps saisi ce mois',
+      recordedDaysFactLabel: 'Jours saisis',
+      lateFactLabel: 'Signalé en retard',
+      yes: 'Oui',
+      no: 'Non',
+    },
     /** task 7.3 — the reason is mandatory (1-500 chars, `POST /api/v1/cras/:id/refusal`); the
      * client-side "empty" message reuses the domain's own sentence
      * (`problem.sentences['/problems/refusal-reason-required']`) rather than a second wording for

@@ -25,6 +25,10 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RefuseDialog } from '@/features/cra/components/refuse-dialog';
+import {
+  ValidateConfirmDialog,
+  type ValidateConfirmFact,
+} from '@/features/cra/components/validate-confirm-dialog';
 import { ValidateResultDialog } from '@/features/cra/components/validate-result-dialog';
 import { useValidateCra } from '@/features/cra/hooks';
 import type { CraStatus, ValidationResponse } from '@/features/cra/types';
@@ -206,6 +210,31 @@ function invoiceColumns(returnTo: string): ColumnDef<PreFacturierInvoiceRow>[] {
   ];
 }
 
+/**
+ * O4's recap for this screen: `PreFacturierCraRow` carries no mission/client breakdown (unlike
+ * `ManagerCraGridResponse`, whose own `ValidateConfirmDialog` caller in
+ * `manager-cra-grid-screen.tsx` lists clients) — this dialog shows what the row already has
+ * instead of inventing a number it would have to fetch a second payload for.
+ */
+function validateFactsFor(row: PreFacturierCraRow, period: string): ValidateConfirmFact[] {
+  return [
+    {
+      label: LABELS.preFacturier.validateConfirmDialog.periodFactLabel,
+      value: frenchMonth(period),
+    },
+    {
+      label: LABELS.preFacturier.validateConfirmDialog.recordedDaysFactLabel,
+      value: frenchDays(row.recordedQuarterDays),
+    },
+    {
+      label: LABELS.preFacturier.validateConfirmDialog.lateFactLabel,
+      value: row.late
+        ? LABELS.preFacturier.validateConfirmDialog.yes
+        : LABELS.preFacturier.validateConfirmDialog.no,
+    },
+  ];
+}
+
 function craColumns(
   role: Role,
   period: string,
@@ -383,6 +412,8 @@ export function PreFacturierScreen({
     readonly data: ValidationResponse;
   } | null>(null);
   const [refusing, setRefusing] = useState<PreFacturierCraRow | null>(null);
+  // O4: "Valider" opens this recap instead of acting instantly — confirmed here.
+  const [confirmingValidate, setConfirmingValidate] = useState<PreFacturierCraRow | null>(null);
 
   function submitConsultantSearch(event: SyntheticEvent<HTMLFormElement, SubmitEvent>): void {
     event.preventDefault();
@@ -400,12 +431,12 @@ export function PreFacturierScreen({
   }
 
   /**
-   * Validation has no separate confirm step (unlike refusal, it needs no reason and is not
-   * destructive) — clicking "Valider" performs the action immediately and the dialog shows its
-   * result, exactly as task 7.2 describes it. `replayed: true` is still success (ADR-0021: 200,
-   * never 409), so it gets an informational toast rather than the ordinary success one, and the
-   * result dialog shows the **original** invoices/declined days either way — "résultat d'origine
-   * affiché" is a fact about which toast appears, not about whether the dialog opens.
+   * O4: "Valider" opens `ValidateConfirmDialog` first — `craColumns`'s own `onValidate` below sets
+   * `confirmingValidate`, this function only runs once that dialog's own confirm button calls it.
+   * `replayed: true` is still success (ADR-0021: 200, never 409), so it gets an informational toast
+   * rather than the ordinary success one, and the result dialog shows the **original**
+   * invoices/declined days either way — "résultat d'origine affiché" is a fact about which toast
+   * appears, not about whether the dialog opens.
    */
   async function handleValidate(row: PreFacturierCraRow): Promise<void> {
     try {
@@ -591,14 +622,7 @@ export function PreFacturierScreen({
           <p className="text-sm text-muted-foreground">{LABELS.preFacturier.revealNote}</p>
         )}
         <DataTable
-          columns={craColumns(
-            role,
-            period,
-            (row) => {
-              void handleValidate(row);
-            },
-            setRefusing,
-          )}
+          columns={craColumns(role, period, setConfirmingValidate, setRefusing)}
           data={data.cras}
           getRowId={(row) => row.craId}
           numericColumns={['recorded']}
@@ -643,6 +667,21 @@ export function PreFacturierScreen({
         />
       </section>
 
+      {confirmingValidate !== null && (
+        <ValidateConfirmDialog
+          consultantName={confirmingValidate.consultantName}
+          facts={validateFactsFor(confirmingValidate, period)}
+          pending={validateMutation.isPending}
+          onCancel={() => {
+            setConfirmingValidate(null);
+          }}
+          onConfirm={() => {
+            const row = confirmingValidate;
+            setConfirmingValidate(null);
+            void handleValidate(row);
+          }}
+        />
+      )}
       {validationResult !== null && (
         <ValidateResultDialog
           cra={validationResult.cra}

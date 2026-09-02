@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
+import { frenchMonth } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
@@ -21,6 +22,7 @@ import type { ManagerCraGridResponse, ValidationResponse } from '../types';
 import { CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
 import { CraTimeline } from './cra-timeline';
 import { RefuseDialog } from './refuse-dialog';
+import { ValidateConfirmDialog, type ValidateConfirmFact } from './validate-confirm-dialog';
 import { ValidateResultDialog } from './validate-result-dialog';
 
 const CRA_PRINT_PATH = '/releve';
@@ -107,6 +109,8 @@ function ManagerCraGridBody({
   const validateMutation = useValidateCra(period);
   const [validationResult, setValidationResult] = useState<ValidationResponse | null>(null);
   const [refusing, setRefusing] = useState(false);
+  // O4: "Valider" opens this recap instead of acting instantly — confirmed here.
+  const [confirmingValidate, setConfirmingValidate] = useState(false);
 
   // Mirrors the server's own `decidable` (`composition/pre-facturier.ts`:
   // `mayDecide && status === 'submitted'`, where `mayDecide` is a role capability, not a per-row
@@ -146,6 +150,39 @@ function ManagerCraGridBody({
     () => new Map(data.missions.map((mission) => [mission.missionId, mission])),
     [data.missions],
   );
+  // O4's recap: clients with at least one recorded worked day this month — an honest "who this
+  // touches" list, not a claim about which will actually be billed (régie/forfait, an agreed
+  // rate… the domain's own eligibility rules stay the domain's, not re-derived here).
+  const billedClientNames = useMemo(() => {
+    const missionIdsWithWork = new Set(
+      data.lines
+        .filter((line) => line.dayType === 'worked' && line.quarterDays > 0)
+        .map((line) => line.missionId)
+        .filter((id): id is string => id !== null),
+    );
+
+    return [
+      ...new Set(
+        data.missions
+          .filter((mission) => missionIdsWithWork.has(mission.missionId))
+          .map((mission) => mission.clientName),
+      ),
+    ].sort((a, b) => a.localeCompare(b, 'fr'));
+  }, [data.lines, data.missions]);
+  const validateFacts: ValidateConfirmFact[] = [
+    {
+      label: LABELS.preFacturier.validateConfirmDialog.periodFactLabel,
+      value: frenchMonth(period),
+    },
+    {
+      label: LABELS.preFacturier.validateConfirmDialog.flaggedDaysFactLabel,
+      value: String(flaggedDays.size),
+    },
+    {
+      label: LABELS.preFacturier.validateConfirmDialog.clientsFactLabel,
+      value: billedClientNames.length === 0 ? LABELS.cra.nothing : billedClientNames.join(', '),
+    },
+  ];
 
   // Same invariant `cra-grid-screen.tsx` relies on: `rowOrder` places every mission row
   // contiguously from index 0, Absence last, so the array position is already the tone index.
@@ -190,7 +227,7 @@ function ManagerCraGridBody({
               size="sm"
               disabled={validateMutation.isPending}
               onClick={() => {
-                void handleValidate();
+                setConfirmingValidate(true);
               }}
             >
               {LABELS.preFacturier.validate}
@@ -269,6 +306,21 @@ function ManagerCraGridBody({
           would go false right as the dialog is meant to open, which is what item 3's own first
           version of this file got wrong (found by `journeys.spec.ts`'s own regression test timing
           out waiting for a dialog that could never render). */}
+      {confirmingValidate && canDecide && (
+        <ValidateConfirmDialog
+          consultantName={data.consultantName}
+          facts={validateFacts}
+          pending={validateMutation.isPending}
+          onCancel={() => {
+            setConfirmingValidate(false);
+          }}
+          onConfirm={() => {
+            setConfirmingValidate(false);
+            void handleValidate();
+          }}
+        />
+      )}
+
       {validationResult !== null && (
         <ValidateResultDialog
           cra={{ consultantName: data.consultantName }}
