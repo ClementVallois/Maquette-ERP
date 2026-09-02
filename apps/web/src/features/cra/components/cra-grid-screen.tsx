@@ -399,7 +399,11 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
           missingDays={missingDays}
           onChangeCell={data.editable ? updateCell : undefined}
           renderRowTools={
-            data.editable
+            // Fill/clear/remove act on the whole month (`handleFillRow` reads `workableDays`,
+            // `clearRow`/`removeRow` wipe the row month-wide) — offered only on the month view, so
+            // a "Total semaine" the user is looking at never moves by more than the row action's
+            // own visible effect implies.
+            data.editable && desktopView === 'month'
               ? (row) => (
                   <RowTools
                     row={row}
