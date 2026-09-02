@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect, useRouterState } from '@tanstack/rea
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 
+import type { PageHeaderParentCrumb } from '@/components/shell/page-header';
 import { Sidebar } from '@/components/shell/sidebar';
 import { Topbar } from '@/components/shell/topbar';
 import { navEntryForPath, navigationForRole } from '@/config/navigation';
@@ -39,7 +40,7 @@ function titleFor(
     const client = typeof search['client'] === 'string' ? search['client'] : null;
     const period = typeof search['period'] === 'string' ? search['period'] : null;
     if (client !== null && period !== null) {
-      return `${LABELS.invoice.nav} → ${client} — ${frenchMonth(period)}`;
+      return `${client} — ${frenchMonth(period)}`;
     }
   }
 
@@ -47,6 +48,32 @@ function titleFor(
   if (match?.[1] === undefined) return entryLabel;
 
   return `${entryLabel} — ${frenchMonth(match[1])}`;
+}
+
+const PRE_FACTURIER_PATH_PREFIX = '/pre-facturier';
+
+/**
+ * O12's one middle crumb: `/factures/$id` (task 8.2) is reached from two different lists — the
+ * invoice list and the pré-facturier — so "Factures" alone would misname the way back for the
+ * second. `search['from']` is the same string `invoice-detail-screen.tsx`'s own "Retour à la
+ * liste" already reads (`routes/_shell/factures.$id.tsx`'s `from`, task 8.2) — read again here
+ * rather than threaded through a second channel, and validated the same narrow way `titleFor`
+ * reads `client`/`period` off the raw location search above.
+ */
+function parentCrumbFor(
+  pathname: string,
+  search: Readonly<Record<string, unknown>>,
+): PageHeaderParentCrumb | undefined {
+  if (!INVOICE_DETAIL_PATH.test(pathname)) return undefined;
+
+  const from = typeof search['from'] === 'string' ? search['from'] : null;
+  if (from === null) return undefined;
+
+  const label = from.startsWith(PRE_FACTURIER_PATH_PREFIX)
+    ? LABELS.preFacturier.nav
+    : LABELS.invoice.nav;
+
+  return { label, href: from };
 }
 
 /** A UI preference (direction-visuelle.md §6: "collapse state is a UI preference, not session
@@ -115,6 +142,7 @@ function ShellLayout(): ReactElement {
   const entries = navigationForRole(persona.role);
   const activeEntry = navEntryForPath(entries, pathname);
   const title = titleFor(activeEntry?.label ?? LABELS.appName, pathname, search);
+  const parent = parentCrumbFor(pathname, search);
   const showBreadcrumb = activeEntry?.path !== '/tableau-de-bord';
 
   const toggleCollapsed = (): void => {
@@ -130,7 +158,13 @@ function ShellLayout(): ReactElement {
     <div className="flex h-dvh overflow-hidden bg-background">
       <Sidebar entries={entries} collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar title={title} showBreadcrumb={showBreadcrumb} entries={entries} persona={persona} />
+        <Topbar
+          title={title}
+          showBreadcrumb={showBreadcrumb}
+          parent={parent}
+          entries={entries}
+          persona={persona}
+        />
         <main id="main-content" className="flex-1 overflow-y-auto">
           <div className="mx-auto flex max-w-[1360px] flex-col gap-6 px-3 py-4 sm:px-6 sm:py-6">
             <Outlet />
