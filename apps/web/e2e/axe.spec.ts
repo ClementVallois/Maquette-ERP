@@ -69,7 +69,15 @@ test.describe('accessibility — Mon CRA', () => {
   test('the read-only, validated grid has no critical/serious violation', async ({ page }) => {
     await choosePersona(page, 'consultant-paris');
     await page.goto('/cra/2026-06');
-    await page.getByText('CRA validé', { exact: false }).waitFor({ state: 'visible' });
+    // `getByText('CRA validé', { exact: false })` used to match both the timeline's status entry
+    // (labels.ts's `timeline.validated`) and the immutability banner's own sentence ("...et un CRA
+    // validé est immuable."), which shares the substring. Scope to the timeline's `listitem` role:
+    // the banner lives in an `Alert`, not a list, so this is unambiguous without narrowing to
+    // `exact: true` (which would still not separate the two — both render the bare phrase).
+    await page
+      .getByRole('listitem')
+      .filter({ hasText: 'CRA validé' })
+      .waitFor({ state: 'visible' });
 
     await assertAccessible(page);
   });
@@ -77,7 +85,7 @@ test.describe('accessibility — Mon CRA', () => {
   test('the editable, empty grid has no critical/serious violation', async ({ page }) => {
     await choosePersona(page, 'consultant-paris');
     await page.goto('/cra/2026-12');
-    await page.locator('select').first().waitFor({ state: 'visible' });
+    await page.locator('select:visible').first().waitFor({ state: 'visible' });
 
     await assertAccessible(page);
   });
