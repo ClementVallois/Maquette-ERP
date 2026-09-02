@@ -42,7 +42,8 @@ export interface CraGridComposition {
   readonly status: CraStatus | null;
   readonly lines: readonly CraLine[];
   readonly flags: readonly { day: string; reason: NonWorkableDay }[];
-  readonly refusal: { reason: string } | null;
+  readonly submittedAt: string | null;
+  readonly refusal: { reason: string; at: string; by: string } | null;
   /**
    * `draft` and `refused` are editable; `submitted` and `validated` are not, and the domain is the
    * one that says so (ADR-0005). Both callers read this fact rather than owning a second copy of
@@ -65,6 +66,7 @@ export interface CraGridComposition {
    * (task 6.6: "une bannière nommant `validatedBy`" reads oddly naming a UUID).
    */
   readonly validatedBy: string | null;
+  readonly validatedAt: string | null;
 }
 
 export interface CraGridInput {
@@ -144,13 +146,21 @@ export async function craGridComposition(
     status: cra?.status ?? null,
     lines: cra?.lines ?? [],
     flags: cra?.flags ?? [],
+    submittedAt: cra?.submittedAt?.toISOString() ?? null,
     refusal:
-      cra?.refusal === null || cra?.refusal === undefined ? null : { reason: cra.refusal.reason },
+      cra?.refusal === null || cra?.refusal === undefined
+        ? null
+        : {
+            reason: cra.refusal.reason,
+            at: cra.refusal.at.toISOString(),
+            by: consultantNames.get(cra.refusal.by) ?? cra.refusal.by,
+          },
     editable: cra === null || cra.status === 'draft' || cra.status === 'refused',
     missions,
     validatedBy:
       cra?.validatedBy === null || cra?.validatedBy === undefined
         ? null
         : (consultantNames.get(cra.validatedBy) ?? cra.validatedBy),
+    validatedAt: cra?.validatedAt?.toISOString() ?? null,
   };
 }

@@ -19,6 +19,7 @@ import { ABSENCE_ROW_KEY, initMatrix } from '../matrix';
 import type { ManagerCraGridResponse, ValidationResponse } from '../types';
 
 import { CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
+import { CraTimeline } from './cra-timeline';
 import { RefuseDialog } from './refuse-dialog';
 import { ValidateResultDialog } from './validate-result-dialog';
 
@@ -240,6 +241,8 @@ function ManagerCraGridBody({
           <AlertDescription>{LABELS.cra.notStartedYet}</AlertDescription>
         </Alert>
       )}
+
+      <CraTimeline timeline={data.timeline} />
 
       <CraMatrixTable
         period={period}

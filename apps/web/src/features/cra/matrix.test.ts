@@ -49,6 +49,7 @@ function gridResponse(overrides: Partial<CraGridResponse> = {}): CraGridResponse
     refusal: null,
     editable: true,
     validatedBy: null,
+    timeline: [],
     ...overrides,
   };
 }

@@ -47,6 +47,15 @@ export const LABELS = {
     next: 'Page suivante',
   },
 
+  timeline: {
+    heading: 'Chronologie métier',
+    submitted: 'CRA soumis',
+    refused: 'CRA refusé',
+    validated: 'CRA validé',
+    drafted: 'Brouillon de facture créé',
+    issued: 'Facture émise',
+  },
+
   persona: {
     sessionInvalidatedTitle: 'Session interrompue',
     heading: 'Choisir un persona',

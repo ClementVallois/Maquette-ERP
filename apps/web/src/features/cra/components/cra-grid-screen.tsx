@@ -40,6 +40,7 @@ import type { CraGridResponse } from '../types';
 
 import { CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
 import type { CellQuantity } from './cra-quantity-cell';
+import { CraTimeline } from './cra-timeline';
 
 /**
  * `/releve/:id` — the printable Cra (SSR, `apps/api/src/web/paths.ts`'s `PATHS.craPrint`), not
@@ -244,6 +245,8 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
       <MonthNav period={period} />
 
       <StatusBanner data={data} />
+
+      <CraTimeline timeline={data.timeline} />
 
       {data.editable && (
         <div className="flex items-center gap-2">

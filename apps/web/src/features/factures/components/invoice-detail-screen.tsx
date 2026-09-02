@@ -2,6 +2,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 
+import { BusinessTimeline } from '@/components/business-timeline';
 import { DataTable } from '@/components/data-table/data-table';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -263,6 +264,16 @@ export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): Rea
           ],
           [LABELS.invoice.paymentTerms, termsSentence(data.terms)],
         ]}
+      />
+
+      <BusinessTimeline
+        title={LABELS.timeline.heading}
+        items={data.timeline.map((item, index) => ({
+          key: `${item.kind}-${item.at}-${String(index)}`,
+          title: LABELS.timeline[item.kind],
+          at: item.at,
+          actorName: item.actorName,
+        }))}
       />
 
       <section className="flex flex-col gap-2">

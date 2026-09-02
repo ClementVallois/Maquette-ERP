@@ -141,10 +141,16 @@ export interface CraGridResponse {
   readonly missions: readonly GridMission[];
   readonly lines: readonly CraLine[];
   readonly flags: readonly CraFlag[];
-  readonly refusal: { readonly reason: string } | null;
+  readonly refusal: { readonly reason: string; readonly at: string; readonly by: string } | null;
   /** The domain's own answer (ADR-0065): never re-derived from `status` in this SPA. */
   readonly editable: boolean;
   readonly validatedBy: string | null;
+  readonly timeline: readonly {
+    readonly kind: 'submitted' | 'refused' | 'validated';
+    readonly at: string;
+    readonly actorName: string;
+    readonly detail?: string;
+  }[];
 }
 
 /**

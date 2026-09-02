@@ -262,7 +262,37 @@ function gridResponseOf(
   refusal: CraGridComposition['refusal'];
   editable: boolean;
   validatedBy: string | null;
+  timeline: {
+    kind: 'submitted' | 'refused' | 'validated';
+    at: string;
+    actorName: string;
+    detail?: string;
+  }[];
 } {
+  const timeline = [];
+  if (grid.submittedAt !== null) {
+    timeline.push({
+      kind: 'submitted' as const,
+      at: grid.submittedAt,
+      actorName: grid.consultantName,
+    });
+  }
+  if (grid.refusal !== null) {
+    timeline.push({
+      kind: 'refused' as const,
+      at: grid.refusal.at,
+      actorName: grid.refusal.by,
+      detail: grid.refusal.reason,
+    });
+  }
+  if (grid.validatedAt !== null && grid.validatedBy !== null) {
+    timeline.push({
+      kind: 'validated' as const,
+      at: grid.validatedAt,
+      actorName: grid.validatedBy,
+    });
+  }
+
   return {
     period,
     craId: grid.craId,
@@ -279,6 +309,7 @@ function gridResponseOf(
     refusal: grid.refusal,
     editable: grid.editable,
     validatedBy: grid.validatedBy,
+    timeline,
   };
 }
 
@@ -544,10 +575,37 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
 
       const actor = requireActor(request);
-      const invoice = await dependencies.transactionally((unit) =>
-        unit.invoices.findById(params.value.id, actor),
-      );
-      if (invoice === null) return sendProblem(reply, notFound(request, 'invoice'));
+      const detail = await dependencies.transactionally(async (unit) => {
+        const invoice = await unit.invoices.findById(params.value.id, actor);
+        if (invoice === null) return null;
+
+        const sourceCraId = invoice.lines[0]?.origin.craId;
+        const sourceCra =
+          sourceCraId === undefined ? null : await unit.cras.findById(sourceCraId, actor);
+        const consultantNames = await new PgReferenceReader(unit.client).consultantNames();
+        return { invoice, sourceCra, consultantNames };
+      });
+      if (detail === null) return sendProblem(reply, notFound(request, 'invoice'));
+
+      const { invoice, sourceCra, consultantNames } = detail;
+      const timeline = [];
+      if (sourceCra?.validatedAt !== null && sourceCra?.validatedAt !== undefined) {
+        const validatedBy = sourceCra.validatedBy;
+        timeline.push({
+          kind: 'validated' as const,
+          at: sourceCra.validatedAt.toISOString(),
+          actorName:
+            validatedBy === null ? null : (consultantNames.get(validatedBy) ?? validatedBy),
+        });
+        timeline.push({
+          kind: 'drafted' as const,
+          at: sourceCra.validatedAt.toISOString(),
+          actorName: null,
+        });
+      }
+      if (invoice.issueDate !== null) {
+        timeline.push({ kind: 'issued' as const, at: invoice.issueDate, actorName: null });
+      }
 
       return {
         id: invoice.id,
@@ -567,6 +625,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         // is what tells the reader that difference; nothing here persists the draft's totals.
         totals: invoice.totals,
         totalsAreProvisional: invoice.status === 'draft',
+        timeline,
       };
     },
   );

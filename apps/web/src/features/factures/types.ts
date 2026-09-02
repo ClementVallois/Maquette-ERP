@@ -177,6 +177,11 @@ export interface InvoiceDetail {
   readonly vatBreakdown: readonly VatGroup[];
   readonly totals: DocumentTotals;
   readonly totalsAreProvisional: boolean;
+  readonly timeline: readonly {
+    readonly kind: 'validated' | 'drafted' | 'issued';
+    readonly at: string;
+    readonly actorName: string | null;
+  }[];
 }
 
 export interface IssuanceResponse {
