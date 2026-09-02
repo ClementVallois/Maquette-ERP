@@ -140,8 +140,7 @@ export const LABELS = {
      * (Phase 6.2's "deux totaux, lus du même état local"). */
     dayTotal: 'Total du jour',
     monthTotal: 'Total du mois',
-    totalsAsOf:
-      'Totaux calculés côté serveur, à jour du dernier enregistrement — pas à chaque frappe (ADR-0050).',
+    totalsAsOf: 'Totaux à jour du dernier enregistrement.',
     /**
      * The SPA's own note, distinct from `totalsAsOf` above: that sentence describes the
      * server-rendered screen (ADR-0009/ADR-0050), which has no client script and genuinely cannot
@@ -195,7 +194,7 @@ export const LABELS = {
     openAnotherMonthHint:
       'Choisissez un mois à venir pour commencer sa saisie à partir d’une grille vide.',
     openAnotherMonthPlaceholder: 'Choisir un mois…',
-    noOtherMonthToOpen: 'Le calendrier ouvré ne couvre aucun autre mois pour l’instant (ADR-0004).',
+    noOtherMonthToOpen: 'Aucun autre mois n’est disponible dans le calendrier.',
     nonWorkable: {
       weekend: 'Week-end',
       publicHoliday: 'Férié',
@@ -285,7 +284,7 @@ export const LABELS = {
       'Jours saisis alors que le calendrier ne les dit pas ouvrés. Ils ne sont pas refusés : le manager les a acceptés en validant.',
     signature: 'Bon pour accord',
     signatureNote:
-      'Ce relevé couvre le mois entier du consultant, missions confondues (ADR-0056). Le nom du signataire n’est pas pré-imprimé : il dépend du destinataire, pas du relevé.',
+      'Ce relevé couvre le mois entier du consultant, missions confondues. Le nom du signataire n’est pas pré-imprimé : il dépend du destinataire, pas du relevé.',
     signatureName: 'Nom et qualité',
     signatureDate: 'Date',
     signatureMark: 'Signature',
@@ -296,7 +295,7 @@ export const LABELS = {
   preFacturier: {
     heading: 'Pré-facturier',
     nav: 'Pré-facturier',
-    lead: 'Ce qui est facturable sur le mois, et pour tout le reste la raison qui bloque. Rien ne se décide ici : l’écran ne fait qu’assembler ce que les deux modules savent (ADR-0053).',
+    lead: 'Ce qui est facturable sur le mois, et pour tout le reste la raison qui bloque. Rien ne se décide ici : l’écran ne fait qu’assembler ce que les deux modules savent.',
     noPeriod: 'Aucun CRA dans cette implantation, sur aucun mois.',
     noPeriodHint:
       'Ce n’est pas un refus : la liste est bien celle de votre implantation, elle est vide.',
@@ -332,7 +331,7 @@ export const LABELS = {
     summaryLate: 'Jours en retard',
     summaryCras: 'CRA du mois',
     lateNote:
-      'Jours saisis sur un mois clos dont le CRA n’est pas encore validé (ADR-0054). Le mois en cours affiche zéro : rien n’y est en retard, puisque rien n’y est encore dû.',
+      'Jours saisis sur un mois clos dont le CRA n’est pas encore validé. Le mois en cours affiche zéro : rien n’y est en retard, puisque rien n’y est encore dû.',
     lateNoneYet: 'Mois en cours — rien n’est encore dû.',
     lateTag: 'En retard',
     awaitingManager: 'En attente de validation par le manager',
@@ -431,7 +430,7 @@ export const LABELS = {
     notCharged: 'Non soumis à TVA',
     issue: 'Émettre la facture',
     issueNote:
-      'L’émission alloue un numéro dans une série sans trou et fige le document : rien n’y bouge ensuite. Le formulaire porte sa clé d’idempotence, pour qu’un renvoi ne brûle pas un second numéro (ADR-0059).',
+      'L’émission alloue un numéro dans une série sans trou et fige le document : rien n’y bouge ensuite. Le formulaire porte sa clé d’idempotence, pour qu’un renvoi ne brûle pas un second numéro.',
     cannotIssue:
       'Cette facture est déjà émise : elle porte un numéro et une date, et une facture émise ne se modifie pas.',
 
@@ -563,7 +562,7 @@ export const LABELS = {
       '/problems/day-overbooked':
         'Une journée compte quatre quarts de journée : celle-ci est déjà complète.',
       '/problems/validated-cra-is-immutable':
-        'Ce CRA est validé : un relevé de temps validé ne se modifie plus (ADR-0005).',
+        'Ce CRA est validé : un relevé de temps validé ne se modifie plus.',
       '/problems/cra-transition-not-allowed':
         'Le CRA n’est pas dans un état qui permet cette action.',
       '/problems/mission-not-running': 'La mission ne tourne pas à cette date.',
@@ -571,11 +570,11 @@ export const LABELS = {
       '/problems/missing-habilitation':
         'La mission exige une habilitation que le consultant ne détenait pas ce jour-là.',
       '/problems/cra-incomplete': 'Le mois n’est pas complet au regard du calendrier ouvré.',
-      '/problems/cra-after-departure': 'Ce mois commence après le départ du consultant (ADR-0079).',
+      '/problems/cra-after-departure': 'Ce mois commence après le départ du consultant.',
       '/problems/self-validation-forbidden':
-        'Qui saisit un CRA ne le juge pas — ni pour le valider, ni pour le refuser : c’est la première règle de séparation des tâches (ADR-0006).',
+        'Qui saisit un CRA ne le juge pas — ni pour le valider, ni pour le refuser : c’est la première règle de séparation des tâches.',
       '/problems/not-the-manager':
-        'Le CRA d’un mois se répond — validation comme refus — par le manager de ce mois-là, pas par un autre (ADR-0034).',
+        'Le CRA d’un mois se répond — validation comme refus — par le manager de ce mois-là, pas par un autre.',
 
       // @erp/billing
       '/problems/payment-terms-too-long':
@@ -591,10 +590,10 @@ export const LABELS = {
       '/problems/document-does-not-add-up':
         'Le document ne s’additionne pas : totaux et lignes divergent, il ne part pas.',
       '/problems/cra-already-processed':
-        'Ce CRA a déjà produit une facture pour ce client : il n’en produira pas une seconde (ADR-0021).',
+        'Ce CRA a déjà produit une facture pour ce client : il n’en produira pas une seconde.',
       '/problems/not-an-issued-invoice': 'Seule une facture émise peut être corrigée par un avoir.',
       '/problems/validator-cannot-issue':
-        'Qui valide un CRA n’émet pas la facture qui en découle : c’est la seconde règle de séparation des tâches (ADR-0006).',
+        'Qui valide un CRA n’émet pas la facture qui en découle : c’est la seconde règle de séparation des tâches.',
     },
 
     deniedBy: 'Règle qui a refusé',
@@ -626,7 +625,7 @@ export const LABELS = {
   /**
    * The shell itself (frontend-plan.md Phase 4, tasks 4.2-4.4): the sidebar's collapse control,
    * the mobile `Sheet` trigger, the "à venir" placeholder every Phase 6-8 route renders until its
-   * own phase builds it, the styled 404, and the invalidated-session copy (ADR-0074).
+   * own phase builds it, the styled 404, and the invalidated-session copy.
    */
   shell: {
     collapse: 'Réduire la navigation',
