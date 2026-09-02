@@ -485,6 +485,28 @@ article.document {
   padding: calc(var(--space) * 1.5);
 }
 
+/* The invoice's own masthead (ADR-0055): title and document identity — number, dates, period,
+   operation category — together above the parties, the way a real invoice's header reads before
+   naming who it is addressed to. `cra-print.ts` has no `.letterhead`: its own `dl.facts` (the
+   consultant, the office, the period) stays where it was, directly under its `h1`, because there
+   is no second block competing with it for the top of that document. */
+.letterhead {
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: calc(var(--space) * 0.75);
+  margin-bottom: var(--space);
+}
+
+.letterhead h1 {
+  margin-bottom: 0.6rem;
+}
+
+/* The invoice number, the dates, the period: prose and dates, not identifiers — unlike the SIREN
+   and VAT number `dl.facts` renders elsewhere on this same document, which stay monospace for
+   column alignment (`dl.facts dd` above). */
+.letterhead dl.facts dd {
+  font-family: inherit;
+}
+
 .parties {
   display: flex;
   flex-wrap: wrap;
@@ -537,6 +559,14 @@ table.vat {
 }
 
 @media print {
+  /* Sane margins on the page box itself — unset, the browser's own default stands, which is
+     rarely what a document that carries legal mentions in its bottom third wants. Both documents
+     `article.document` renders (the invoice, the printable Cra) are sized for this A4 box. */
+  @page {
+    size: A4;
+    margin: 16mm;
+  }
+
   /* On paper the panel chrome is noise: the sheet edge is the border. */
   article.document {
     border: none;

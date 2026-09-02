@@ -267,25 +267,29 @@ export function invoicePage(view: InvoiceView, persona: Persona | undefined): Ht
   return shell(
     { title: heading, persona },
     html`<article class="document">
-      <h1>${heading}</h1>
+      <div class="letterhead">
+        <h1>${heading}</h1>
+        <dl class="facts">
+          <dt>${LABELS.invoice.number}</dt>
+          <dd>${number ?? LABELS.cra.nothing}</dd>
+          <dt>${LABELS.invoice.issueDate}</dt>
+          <dd>
+            ${invoice.issueDate === null ? LABELS.cra.nothing : frenchDate(invoice.issueDate)}
+          </dd>
+          <dt>${LABELS.invoice.dueDate}</dt>
+          <dd>${view.dueDate === null ? LABELS.cra.nothing : frenchDate(view.dueDate)}</dd>
+          <dt>${LABELS.invoice.supplyPeriod}</dt>
+          <dd>${frenchMonth(invoice.supplyPeriod)}</dd>
+          <dt>${LABELS.invoice.operationCategory}</dt>
+          <dd>${LABELS.invoice.operationCategories[invoice.mentions.operationCategory]}</dd>
+        </dl>
+      </div>
       ${
         number === null
           ? html`<div class="note no-print"><p>${LABELS.invoice.draftNotice}</p></div>`
           : null
       }
       <div class="parties">${sellerBlock(invoice.seller)} ${billedToBlock(invoice)}</div>
-      <dl class="facts">
-        <dt>${LABELS.invoice.number}</dt>
-        <dd>${number ?? LABELS.cra.nothing}</dd>
-        <dt>${LABELS.invoice.issueDate}</dt>
-        <dd>${invoice.issueDate === null ? LABELS.cra.nothing : frenchDate(invoice.issueDate)}</dd>
-        <dt>${LABELS.invoice.dueDate}</dt>
-        <dd>${view.dueDate === null ? LABELS.cra.nothing : frenchDate(view.dueDate)}</dd>
-        <dt>${LABELS.invoice.supplyPeriod}</dt>
-        <dd>${frenchMonth(invoice.supplyPeriod)}</dd>
-        <dt>${LABELS.invoice.operationCategory}</dt>
-        <dd>${LABELS.invoice.operationCategories[invoice.mentions.operationCategory]}</dd>
-      </dl>
       ${lineTable(invoice)} ${vatTable(invoice.vatBreakdown, invoice)} ${mentionsBlock(invoice)}
       ${originBlock(invoice)} ${issuanceForm(view)}
       <p class="actions no-print">
