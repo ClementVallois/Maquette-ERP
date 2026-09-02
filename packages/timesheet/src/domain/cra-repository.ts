@@ -67,6 +67,12 @@ export interface CraRepository {
    */
   findById(id: CraId, actor: Actor): Promise<Cra | null>;
   list(query: CraListQuery): Promise<readonly CraListItem[]>;
+  /**
+   * Rank A12: the same `WHERE` predicate `list` applies, minus `limit`/`offset` — what makes
+   * truncation observable (`total` vs. the page length) and what a page-size selector's own
+   * "1-50 sur 300" is built from. Never itself paginated: a count is one row, however large.
+   */
+  count(query: Omit<CraListQuery, 'limit' | 'offset'>): Promise<number>;
   findByConsultantAndPeriod(
     consultantId: ConsultantId,
     period: Period,

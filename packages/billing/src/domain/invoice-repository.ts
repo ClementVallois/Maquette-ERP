@@ -59,6 +59,12 @@ export interface InvoiceRepository {
   findById(id: InvoiceId, actor: Actor): Promise<Invoice | null>;
   list(query: InvoiceListQuery): Promise<readonly InvoiceListItem[]>;
   /**
+   * Rank A12: `list`'s own `WHERE`, minus `limit`/`offset` — what makes truncation observable
+   * (`total` vs. the page length actually returned) instead of indistinguishable from "there were
+   * exactly this many".
+   */
+  count(query: Omit<InvoiceListQuery, 'limit' | 'offset'>): Promise<number>;
+  /**
    * `issuanceIdempotencyKey` is written only by an issuance, and only once: the unique index in
    * migration 009 is what makes a retry visible rather than a second numbered document (ADR-0044).
    */

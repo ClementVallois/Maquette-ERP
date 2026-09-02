@@ -147,6 +147,42 @@ export class PgCraRepository implements CraRepository {
     }));
   }
 
+  /** Rank A12: `list`'s own `WHERE`, minus the join/aggregation a count does not need. */
+  async count(query: Omit<CraListQuery, 'limit' | 'offset'>): Promise<number> {
+    const { actor } = query;
+    const scope = readScope(actor, 'cra');
+
+    if (scope === 'none') return 0;
+
+    const { rows } = await this.#client.query<{ count: string }>(
+      `SELECT COUNT(*) AS count
+       FROM timesheet.cras c
+       WHERE c.office_id = $1
+         AND ($2::text IS NULL OR c.consultant_id = $2)
+         AND ($3::text IS NULL OR c.period = $3)
+         AND ($4::text[] IS NULL OR c.consultant_id = ANY($4))
+         AND ($5::text[] IS NULL OR c.status = ANY($5))
+         AND ($6::text IS NULL OR left(c.period, 4) = $6)
+         AND ($7::text IS NULL OR right(c.period, 2) = $7)`,
+      [
+        actor.officeId,
+        scope === 'own' ? actor.consultantId : null,
+        query.period ?? null,
+        query.consultantIds !== undefined && query.consultantIds.length > 0
+          ? query.consultantIds
+          : null,
+        query.statuses !== undefined && query.statuses.length > 0 ? query.statuses : null,
+        query.year === undefined ? null : String(query.year),
+        query.month === undefined ? null : String(query.month).padStart(2, '0'),
+      ],
+    );
+
+    // `COUNT(*)` is `bigint`, and `pg` hands that back as a string — an office's Cra count cannot
+    // approach the 32-bit bound, so a plain parse is safe (same reasoning `recordedQuarterDays`'s
+    // own comment gives for its `::int` cast, without the cast: `COUNT` has no `::int` overload).
+    return Number.parseInt(rows[0]!.count, 10);
+  }
+
   async save(cra: Cra): Promise<void> {
     await this.#client.query(
       `INSERT INTO timesheet.cras (

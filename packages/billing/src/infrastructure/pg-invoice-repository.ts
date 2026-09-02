@@ -82,6 +82,22 @@ export class PgInvoiceRepository implements InvoiceRepository {
     return rows.map(toListItem);
   }
 
+  async count(query: Omit<InvoiceListQuery, 'limit' | 'offset'>): Promise<number> {
+    const { actor } = query;
+
+    if (readScope(actor, 'invoice') === 'none') return 0;
+
+    const { rows } = await this.#client.query<{ count: string }>(
+      `SELECT COUNT(*) AS count
+       FROM billing.invoices i
+       WHERE i.office_id = $1
+         AND ($2::text IS NULL OR i.supply_period = $2)`,
+      [actor.officeId, query.period ?? null],
+    );
+
+    return exactInteger('count', rows[0]!.count);
+  }
+
   async save(invoice: Invoice, options?: { issuanceIdempotencyKey: string }): Promise<void> {
     await this.#upsertInvoice(invoice, undefined, options?.issuanceIdempotencyKey);
     await this.#replaceLines(invoice);
