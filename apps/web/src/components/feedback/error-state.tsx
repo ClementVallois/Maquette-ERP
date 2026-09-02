@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
-import { OctagonAlertIcon } from 'lucide-react';
+import { CopyIcon, OctagonAlertIcon, RefreshCwIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
+import { toast } from 'sonner';
 
 import { type ActionLink, linkOf } from '@/components/action-link';
 import { Button } from '@/components/ui/button';
@@ -14,29 +15,71 @@ import { LABELS } from '@/lib/labels';
  *
  * Used by `routes/__root.tsx`'s global error boundary (4.4) for both an `ApiProblemError` (with a
  * `correlationId`) and an unexpected JS error (without one, since no request produced it).
+ *
+ * O11: the screen already named the right facts, it just had no way out. `onRetry` re-runs
+ * whichever query produced the refusal (a caller passes its own `refetch`); `action` stays the one
+ * `<Link>`-based navigation `routes/__root.tsx`'s global boundary uses, unchanged.
  */
 interface ErrorStateProps {
   readonly title: string;
   readonly body: string;
   readonly correlationId?: string;
   readonly action?: ActionLink;
+  readonly onRetry?: () => void;
 }
 
-export function ErrorState({ title, body, correlationId, action }: ErrorStateProps): ReactElement {
+export function ErrorState({
+  title,
+  body,
+  correlationId,
+  action,
+  onRetry,
+}: ErrorStateProps): ReactElement {
+  async function copyCorrelationId(id: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(id);
+      toast.success(LABELS.problem.correlationIdCopied);
+    } catch {
+      // Clipboard access can throw (non-secure origin, denied permission) — the id is still on
+      // screen, selectable by hand, so there is nothing else to do here.
+    }
+  }
+
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-3 rounded-xl bg-card p-8 text-center shadow-card ring-1 ring-border">
       <OctagonAlertIcon aria-hidden="true" className="size-8 text-destructive" />
       <h1 className="text-card-title">{title}</h1>
       <p className="text-sm text-muted-foreground">{body}</p>
       {correlationId !== undefined && (
-        <p className="font-mono text-[0.75rem] text-muted-foreground">
+        <p className="flex items-center gap-1.5 font-mono text-[0.75rem] text-muted-foreground">
           {LABELS.problem.correlationId} : {correlationId}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={LABELS.problem.copyCorrelationId}
+            onClick={() => {
+              void copyCorrelationId(correlationId);
+            }}
+          >
+            <CopyIcon />
+          </Button>
         </p>
       )}
-      {action !== undefined && (
-        <Button asChild size="sm" className="mt-1">
-          <Link {...linkOf(action)}>{action.label}</Link>
-        </Button>
+      {(onRetry !== undefined || action !== undefined) && (
+        <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+          {onRetry !== undefined && (
+            <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+              <RefreshCwIcon aria-hidden="true" />
+              {LABELS.problem.retry}
+            </Button>
+          )}
+          {action !== undefined && (
+            <Button asChild size="sm">
+              <Link {...linkOf(action)}>{action.label}</Link>
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );
