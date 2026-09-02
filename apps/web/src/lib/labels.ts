@@ -247,7 +247,6 @@ export const LABELS = {
     // dans format.ts (frenchDays). Un en-tête « Demi-journées » au-dessus d'une valeur « 21 j »
     // était la contradiction — la colonne s'intitule comme celle du pré-facturier.
     recorded: 'Jours saisis',
-    savedToast: 'Enregistré',
     submittedToast: 'Soumis',
     saveState: {
       dirty: 'Modifications non enregistrées',

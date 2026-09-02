@@ -363,7 +363,7 @@ test.describe('item 3 — a manager opens and decides a CRA from the pré-factur
     await page.getByRole('button', { name: `Remplir les jours ouvrés vides — ${DORA}` }).click();
 
     await page.getByRole('button', { name: 'Enregistrer' }).click();
-    await page.getByText('Enregistré', { exact: true }).waitFor({ state: 'visible' });
+    await page.getByText(/^Enregistré à /u).waitFor({ state: 'visible' });
     await page.getByRole('button', { name: 'Soumettre au manager' }).click();
     await page.getByText('Soumis', { exact: true }).waitFor({ state: 'visible' });
 
@@ -523,7 +523,7 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     await page.getByRole('button', { name: `Remplir les jours ouvrés vides — ${DORA}` }).click();
 
     await page.getByRole('button', { name: 'Enregistrer' }).click();
-    await page.getByText('Enregistré', { exact: true }).waitFor({ state: 'visible' });
+    await page.getByText(/^Enregistré à /u).waitFor({ state: 'visible' });
 
     // Reopen: a full page reload, not the SPA's own cache — proof the write reached the server.
     await page.reload();
