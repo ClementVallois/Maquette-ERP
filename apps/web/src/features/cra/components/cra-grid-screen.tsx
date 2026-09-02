@@ -1,5 +1,12 @@
 import { Link, useBlocker } from '@tanstack/react-router';
-import { EraserIcon, ListChecksIcon, PlusIcon, Trash2Icon, Undo2Icon } from 'lucide-react';
+import {
+  CopyIcon,
+  EraserIcon,
+  ListChecksIcon,
+  PlusIcon,
+  Trash2Icon,
+  Undo2Icon,
+} from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useMemo, useState } from 'react';
 
@@ -41,6 +48,7 @@ import {
 import { missingDaysFrom } from '../missing-days';
 import type { CraGridResponse, GridDay } from '../types';
 
+import { CopyPreviousMonthDialog } from './copy-previous-month-dialog';
 import { CraLegend, CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
 import type { CellQuantity } from './cra-quantity-cell';
 import { CraTimeline } from './cra-timeline';
@@ -168,6 +176,8 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   const [undo, setUndo] = useState<{ readonly matrix: MatrixState; readonly label: string } | null>(
     null,
   );
+  // O6: "Copier le mois précédent" — a preview dialog, not a direct mutation.
+  const [copyingPreviousMonth, setCopyingPreviousMonth] = useState(false);
   // React's own documented pattern for "reset state when a prop changes" (react.dev, "Adjusting
   // state when a prop changes"): compared and reassigned during render, not inside an effect —
   // `react-hooks/set-state-in-effect` is why this is not a `useEffect`. ADR-0067: the grid's
@@ -357,6 +367,17 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
               <p className="text-sm text-muted-foreground">{LABELS.cra.matrix.noActivityToAdd}</p>
             )
           )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setCopyingPreviousMonth(true);
+            }}
+          >
+            <CopyIcon aria-hidden="true" />
+            {LABELS.cra.matrix.copyPreviousMonth}
+          </Button>
           {/* O7: single-level undo for the row tools' own fill/clear — `undo.label` names which
               row and which of the two actions, so the button reads as a sentence, not a bare
               "Annuler" nobody can place. */}
@@ -458,6 +479,24 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
           }
         />
       </div>
+
+      {copyingPreviousMonth && (
+        <CopyPreviousMonthDialog
+          sourcePeriod={previousPeriod(period)}
+          missions={data.missions}
+          workableDays={workableDays}
+          matrix={matrix}
+          onCancel={() => {
+            setCopyingPreviousMonth(false);
+          }}
+          onConfirm={(nextMatrix) => {
+            setUndo({ matrix, label: LABELS.cra.matrix.copyPreviousMonth });
+            setMatrix(nextMatrix);
+            setDirty(true);
+            setCopyingPreviousMonth(false);
+          }}
+        />
+      )}
 
       {mutationProblem !== null && (
         <Alert variant="destructive">

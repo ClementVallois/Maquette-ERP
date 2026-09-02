@@ -377,6 +377,19 @@ export const LABELS = {
        * "{undo} — {action}", `action` being `fillEmptyWorkdays`/`clearRow` re-used verbatim with
        * the row's name appended, so this key stays the one bare word. */
       undo: 'Annuler',
+      /** O6 — "Copier le mois précédent", with a preview (`copy-previous-month-dialog.tsx`): never
+       * overwrites a cell already carrying something, built on the row tools' own
+       * `fillEmptyWorkdays`. */
+      copyPreviousMonth: 'Copier le mois précédent',
+      copyPreviousMonthDialog: {
+        title: 'Copier le mois précédent',
+        lead: 'Les missions qui portaient du temps saisi en {month} sont proposées ci-dessous, sur les jours ouvrés encore vides de ce mois-ci. Rien d’existant n’est remplacé.',
+        loadError: 'Le mois précédent n’a pas pu être chargé.',
+        empty: 'Rien à copier depuis le mois précédent.',
+        daysToFill: '{days} j',
+        confirm: 'Copier',
+        cancel: 'Annuler',
+      },
     },
     /** ADR-0071 — a manager's read-only view of a named consultant's month. `{name}` interpolated. */
     managerView: {
