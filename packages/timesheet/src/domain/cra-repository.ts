@@ -16,6 +16,13 @@ export interface CraListItem {
    * pré-facturier can sum a month without fetching every Cra in full (ADR-0053).
    */
   readonly recordedQuarterDays: number;
+  /**
+   * When the current status was reached — submission for `submitted`, refusal for `refused`,
+   * validation for `validated`. `null` for `draft` (never submitted) and for a legacy row this
+   * column predates. Lets a work queue sort "awaiting a decision" oldest first without loading
+   * every full `Cra` aggregate.
+   */
+  readonly statusChangedAt: string | null;
 }
 
 export interface CraListQuery {

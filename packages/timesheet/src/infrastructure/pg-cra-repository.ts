@@ -98,7 +98,8 @@ export class PgCraRepository implements CraRepository {
       // (consultantIds) and `$7` (statuses) are ANDed onto it, never substituted for it, so
       // neither can widen what the actor may see, only narrow it further (item 7, QA round 1).
       `SELECT c.id, c.consultant_id, c.office_id, c.period, c.status,
-              COALESCE(SUM(l.quarter_days), 0)::int AS recorded_quarter_days
+              COALESCE(SUM(l.quarter_days), 0)::int AS recorded_quarter_days,
+              COALESCE(c.validated_at, c.refusal_at, c.submitted_at) AS status_changed_at
        FROM timesheet.cras c
        LEFT JOIN timesheet.cra_lines l ON l.cra_id = c.id
        WHERE c.office_id = $1
@@ -108,7 +109,8 @@ export class PgCraRepository implements CraRepository {
          AND ($7::text[] IS NULL OR c.status = ANY($7))
          AND ($8::text IS NULL OR left(c.period, 4) = $8)
          AND ($9::text IS NULL OR right(c.period, 2) = $9)
-       GROUP BY c.id, c.consultant_id, c.office_id, c.period, c.status
+       GROUP BY c.id, c.consultant_id, c.office_id, c.period, c.status,
+                c.validated_at, c.refusal_at, c.submitted_at
        ORDER BY c.period DESC, c.consultant_id
        LIMIT $3 OFFSET $4`,
       [
@@ -141,6 +143,7 @@ export class PgCraRepository implements CraRepository {
       // quarter-days cannot approach the 32-bit bound, and `quarterDays` refuses anything that is
       // not a whole non-negative count if the cast ever stops holding.
       recordedQuarterDays: quarterDays(row.recorded_quarter_days),
+      statusChangedAt: row.status_changed_at === null ? null : row.status_changed_at.toISOString(),
     }));
   }
 
@@ -259,6 +262,7 @@ interface CraListRow {
   period: string;
   status: string;
   recorded_quarter_days: number;
+  status_changed_at: Date | null;
 }
 
 interface CraLineRow {

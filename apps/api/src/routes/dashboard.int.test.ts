@@ -276,6 +276,15 @@ describe('GET /api/v1/dashboard — manager', () => {
       billableCents: 0,
       // Both Cras are unvalidated in a month the clock has closed (ADR-0054).
       lateCras: 2,
+      awaitingDecision: [
+        {
+          craId: CRA_CHLOE,
+          consultantId: CHLOE,
+          consultantName: 'Chloé Nguyen',
+          period: '2026-06',
+          statusChangedAt: '2026-07-01T09:00:00.000Z',
+        },
+      ],
     });
   });
 
@@ -292,6 +301,7 @@ describe('GET /api/v1/dashboard — manager', () => {
       // 22 days × 800 € = 17 600 € HT.
       billableCents: 1_760_000,
       lateCras: 1,
+      awaitingDecision: [],
     });
   });
 
@@ -324,13 +334,33 @@ describe('GET /api/v1/dashboard — billing', () => {
     const response = await dashboard('billing-paris');
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toStrictEqual({
+    const body = response.json<{
+      readonly draftInvoices: number;
+      readonly issuedInvoices: number;
+      readonly totalTtcIssuedCents: number;
+      readonly oldestDrafts: readonly {
+        readonly billedToName: string;
+        readonly supplyPeriod: string;
+        readonly totalTtcCents: number;
+      }[];
+    }>();
+    expect(body).toMatchObject({
       period: '2026-06',
       role: 'billing',
       draftInvoices: 1,
       issuedInvoices: 0,
       totalTtcIssuedCents: 0,
     });
+    // Chloé's draft: HT is 22 days × 800 € = 17 600 €, TTC at 20% is 21 120 € — computed from the
+    // lines, not stored, since a draft's totals are provisional (Rank B1).
+    expect(body.oldestDrafts).toStrictEqual([
+      {
+        invoiceId: expect.any(String),
+        billedToName: 'Banque Nationale de Test',
+        supplyPeriod: '2026-06',
+        totalTtcCents: 2_112_000,
+      },
+    ]);
   });
 
   it('moves the invoice from draft to issued, and sums its TTC total', async () => {
@@ -362,6 +392,7 @@ describe('GET /api/v1/dashboard — billing', () => {
       issuedInvoices: 1,
       // 17 600 € HT × 1,20 = 21 120 € TTC.
       totalTtcIssuedCents: 2_112_000,
+      oldestDrafts: [],
     });
   });
 });

@@ -19,6 +19,7 @@ const manager = (overrides: Partial<ManagerDashboard> = {}): ManagerDashboard =>
   pendingDecisions: 0,
   billableCents: 0,
   lateCras: 0,
+  awaitingDecision: [],
   ...overrides,
 });
 
@@ -28,6 +29,7 @@ const billing = (overrides: Partial<BillingDashboard> = {}): BillingDashboard =>
   draftInvoices: 0,
   issuedInvoices: 0,
   totalTtcIssuedCents: 0,
+  oldestDrafts: [],
   ...overrides,
 });
 

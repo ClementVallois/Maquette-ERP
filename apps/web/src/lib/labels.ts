@@ -109,6 +109,9 @@ export const LABELS = {
       // false the moment a pending Cra sits in another month.
       pendingSentenceNone: 'Aucun CRA n’attend votre décision.',
       open: 'Ouvrir le pré-facturier',
+      /** One work-queue row's action — opens that row's own period, not the one on screen
+       * (the bug the queue exists to fix: the counter used to point at the displayed month). */
+      decide: 'Décider',
     },
     billing: {
       draft: 'Factures en brouillon',
@@ -118,6 +121,22 @@ export const LABELS = {
       draftSentenceMany: '{count} factures en brouillon, prêtes à émettre.',
       draftSentenceNone: 'Aucune facture en brouillon ce mois.',
       open: 'Voir les factures',
+    },
+    /** Rank A1/A5: the three tiers every role's dashboard now shares — an actionable queue first,
+     * the former `StatCard` trio demoted under it, then recent activity. */
+    queue: {
+      now: 'À faire maintenant',
+      nowEmpty: 'Rien n’attend une action.',
+      thisMonth: 'Ce mois',
+      recentActivity: 'Activité récente',
+      recentActivityEmpty: 'Aucune activité récente.',
+      /** `{days}` interpolated, 0 reading as "aujourd’hui" at the call site. */
+      ageToday: 'Aujourd’hui',
+      ageOneDay: 'Depuis 1 jour',
+      ageManyDays: 'Depuis {days} jours',
+      emptyMonthNotice:
+        'Ce mois ne contient aucune donnée : c’est un mois en cours, pas un défaut.',
+      seeMonthsWithData: 'Voir un mois avec des données',
     },
   },
 

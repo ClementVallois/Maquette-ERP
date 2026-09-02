@@ -31,6 +31,8 @@ export interface CraListItem {
   readonly period: string;
   readonly status: CraStatus;
   readonly recordedQuarterDays: number;
+  /** When the current status was reached; `null` for a `draft` never submitted. */
+  readonly statusChangedAt: string | null;
 }
 
 export interface CraListResponse {

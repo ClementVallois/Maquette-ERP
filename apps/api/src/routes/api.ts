@@ -638,24 +638,40 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         // state. `pendingDecisions`/`lateCras` no longer come from it (ADR-0082): a Cra awaiting a
         // decision or already late does not stop being either just because the requested period
         // changed, so both are read across every period the manager may see instead.
-        const { composition, actionable } = await dependencies.transactionally(async (unit) => ({
-          composition: await preFacturierComposition(unit, {
-            actor,
-            requestedPeriod: query.value.period,
-            today,
+        const { composition, actionable, consultantNames } = await dependencies.transactionally(
+          async (unit) => ({
+            composition: await preFacturierComposition(unit, {
+              actor,
+              requestedPeriod: query.value.period,
+              today,
+            }),
+            actionable: await unit.cras.list({
+              actor,
+              statuses: NON_VALIDATED_CRA_STATUSES,
+              limit: CRA_LIST_MAX_PAGE_SIZE,
+              offset: 0,
+            }),
+            consultantNames: await new PgReferenceReader(unit.client).consultantNames(),
           }),
-          actionable: await unit.cras.list({
-            actor,
-            statuses: NON_VALIDATED_CRA_STATUSES,
-            limit: CRA_LIST_MAX_PAGE_SIZE,
-            offset: 0,
-          }),
-        }));
+        );
+
+        const awaitingDecision = actionable
+          .filter((row) => row.status === 'submitted')
+          .toSorted((left, right) =>
+            (left.statusChangedAt ?? '').localeCompare(right.statusChangedAt ?? ''),
+          )
+          .map((row) => ({
+            craId: row.id,
+            consultantId: row.consultantId,
+            consultantName: consultantNames.get(row.consultantId) ?? row.consultantId,
+            period: row.period,
+            statusChangedAt: row.statusChangedAt,
+          }));
 
         return {
           period: query.value.period,
           role: 'manager' as const,
-          pendingDecisions: actionable.filter((row) => row.status === 'submitted').length,
+          pendingDecisions: awaitingDecision.length,
           billableCents: composition.billable.reduce(
             (total, row) => total + row.totalExcludingVatCents,
             0,
@@ -663,6 +679,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           // ADR-0054: a closed period's Cra that never reached `validated`. `actionable` already
           // excludes `validated`, so only the closed-period test is left to apply.
           lateCras: actionable.filter((row) => lastDayOf(periodFromIso(row.period)) < today).length,
+          awaitingDecision,
         };
       }
 
@@ -670,9 +687,30 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       // below are bounded by `MAX_PAGE_SIZE`, the cap every list read in this file shares. The
       // seed reaches three invoices in a month; an office that reached fifty-one would read the
       // fifty-first as absent, and the fix then is a counting query, not a larger page.
-      const invoices = await dependencies.transactionally((unit) =>
-        unit.invoices.list({ actor, limit: MAX_PAGE_SIZE, offset: 0, period: query.value.period }),
-      );
+      //
+      // `everyPeriod` is a second, unfiltered read of the same page bound (ADR-0082's own
+      // reasoning applied to billing): the queue below is "the oldest drafts across every month",
+      // not "this month's drafts", so it cannot come off the period-scoped `invoices` read.
+      const { invoices, everyPeriod } = await dependencies.transactionally(async (unit) => ({
+        invoices: await unit.invoices.list({
+          actor,
+          limit: MAX_PAGE_SIZE,
+          offset: 0,
+          period: query.value.period,
+        }),
+        everyPeriod: await unit.invoices.list({ actor, limit: MAX_PAGE_SIZE, offset: 0 }),
+      }));
+
+      const oldestDrafts = everyPeriod
+        .filter((invoice) => invoice.status === 'draft')
+        .toSorted((left, right) => left.supplyPeriod.localeCompare(right.supplyPeriod))
+        .slice(0, 10)
+        .map((invoice) => ({
+          invoiceId: invoice.id,
+          billedToName: invoice.billedToName,
+          supplyPeriod: invoice.supplyPeriod,
+          totalTtcCents: invoice.totalTtcCents ?? 0,
+        }));
 
       return {
         period: query.value.period,
@@ -682,6 +720,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         totalTtcIssuedCents: invoices
           .filter((invoice) => invoice.status === 'issued')
           .reduce((total, invoice) => total + (invoice.totalTtcCents ?? 0), 0),
+        oldestDrafts,
       };
     },
   );
