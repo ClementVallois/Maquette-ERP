@@ -145,7 +145,7 @@ test.describe('item 1 — switching persona drops stale data without a reload', 
     await switchPersonaViaUi(page, 'manager-paris');
     // Client-side, not `page.goto` — the sidebar's own "CRA" entry for a manager.
     await page.getByRole('link', { name: 'CRA', exact: true }).click();
-    await page.waitForURL('/cra');
+    await page.waitForURL(/\/cra(\?|$)/);
 
     await expect(page.getByRole('columnheader', { name: 'Consultant' })).toBeVisible();
     // Claire Dubois can only appear here if the office-wide query actually ran: Alice's own
@@ -636,7 +636,7 @@ test.describe('items 4/5 — a manager sees consultants, picks one, opens a read
     await expect(cell(page, DORA, '11/06/2026')).toHaveText('½');
 
     await page.getByRole('link', { name: 'Retour à la liste' }).click();
-    await page.waitForURL('/cra');
+    await page.waitForURL(/\/cra(\?|$)/);
 
     await page.screenshot({
       animations: 'disabled',
