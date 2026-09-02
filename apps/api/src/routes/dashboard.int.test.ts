@@ -241,6 +241,9 @@ describe('GET /api/v1/dashboard — consultant', () => {
       recordedQuarterDays: 20,
       remainingWorkableDays: 17,
       refusedPeriods: [],
+      // Alice's only Cra is a draft: no submission, refusal or validation ever set
+      // `statusChangedAt` on it, so there is nothing to show yet.
+      recentActivity: [],
     });
   });
 
@@ -285,6 +288,20 @@ describe('GET /api/v1/dashboard — manager', () => {
           statusChangedAt: '2026-07-01T09:00:00.000Z',
         },
       ],
+      // The one Cra with a `statusChangedAt` — Alice's is still a draft. `at` is the fixture's
+      // own literal `submitted_at`, not a clock read at request time.
+      recentActivity: [
+        {
+          key: CRA_CHLOE,
+          kind: 'cra',
+          recordId: CRA_CHLOE,
+          status: 'submitted',
+          period: '2026-06',
+          name: 'Chloé Nguyen',
+          at: '2026-07-01T09:00:00.000Z',
+          consultantId: CHLOE,
+        },
+      ],
     });
   });
 
@@ -302,6 +319,20 @@ describe('GET /api/v1/dashboard — manager', () => {
       billableCents: 1_760_000,
       lateCras: 1,
       awaitingDecision: [],
+      // Same Cra, now validated: `statusChangedAt` moves to `NOW`, the fixed clock
+      // `validateChloeJune()`'s own request runs under — deterministic, not a wall-clock read.
+      recentActivity: [
+        {
+          key: CRA_CHLOE,
+          kind: 'cra',
+          recordId: CRA_CHLOE,
+          status: 'validated',
+          period: '2026-06',
+          name: 'Chloé Nguyen',
+          at: NOW.toISOString(),
+          consultantId: CHLOE,
+        },
+      ],
     });
   });
 
@@ -393,6 +424,21 @@ describe('GET /api/v1/dashboard — billing', () => {
       // 17 600 € HT × 1,20 = 21 120 € TTC.
       totalTtcIssuedCents: 2_112_000,
       oldestDrafts: [],
+      // `invoiceId` above is the only non-deterministic value here — `uuidv7`, not the fixed
+      // clock — so it is read back rather than hard-coded; `at` is `issueDate`, derived from
+      // `NOW` in the firm's own time zone (UTC+2 in July), which is why it is a bare date and not
+      // a full instant.
+      recentActivity: [
+        {
+          key: invoiceId,
+          kind: 'invoice',
+          recordId: invoiceId,
+          status: 'issued',
+          period: '2026-06',
+          name: 'Banque Nationale de Test',
+          at: '2026-07-02',
+        },
+      ],
     });
   });
 });
