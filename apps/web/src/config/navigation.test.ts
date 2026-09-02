@@ -19,13 +19,14 @@ describe('navigationForRole', () => {
     expect(labels).toStrictEqual([LABELS.dashboard.heading, LABELS.cra.nav]);
   });
 
-  it('shows exactly the manager entries: Tableau de bord, Pré-facturier, CRA, Factures', () => {
+  it('shows exactly the manager entries: Tableau de bord, Pré-facturier, CRA, Affectations, Factures', () => {
     const labels = navigationForRole('manager').map((entry) => entry.label);
 
     expect(labels).toStrictEqual([
       LABELS.dashboard.heading,
       LABELS.preFacturier.nav,
       LABELS.cra.navManager,
+      LABELS.assignment.nav,
       LABELS.invoice.nav,
     ]);
   });
