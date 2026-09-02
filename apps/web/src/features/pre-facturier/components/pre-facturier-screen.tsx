@@ -172,18 +172,23 @@ function invoiceColumns(returnTo: string): ColumnDef<PreFacturierInvoiceRow>[] {
       accessorFn: (row) => row.totalTtcCents ?? -1,
       header: LABELS.preFacturier.totalIncludingVat,
       cell: ({ row }) => (
-        <span
-          className="tabular-nums"
-          title={row.original.totalsAreProvisional ? LABELS.invoice.provisionalTotals : undefined}
-        >
+        // ADR-0061 (l. 44): no `title` here — it was the only channel carrying "provisional", and
+        // a `title` is never exposed on touch and unreliable via keyboard/screen reader anyway.
+        // The `*` stays a decorative, `aria-hidden` glyph; the `sr-only` span carries the same
+        // sentence the removed `title` did, read out with the amount. The visible explanation
+        // lives once, in the legend below the table (`LABELS.invoice.provisionalTotals`).
+        <span className="tabular-nums">
           {row.original.totalTtcCents === null
             ? LABELS.preFacturier.notNumberedYet
             : frenchEuros(row.original.totalTtcCents)}
           {row.original.totalsAreProvisional && (
-            <span aria-hidden="true" className="text-muted-foreground">
-              {' '}
-              *
-            </span>
+            <>
+              <span aria-hidden="true" className="text-muted-foreground">
+                {' '}
+                *
+              </span>
+              <span className="sr-only"> {LABELS.invoice.provisionalTotals}</span>
+            </>
           )}
         </span>
       ),
@@ -591,6 +596,9 @@ export function PreFacturierScreen({
             />
           }
         />
+        {data.invoices.some((invoice) => invoice.totalsAreProvisional) && (
+          <p className="text-xs text-muted-foreground">* {LABELS.invoice.provisionalTotals}</p>
+        )}
         <PaginationControls
           {...data.pagination.invoices}
           onPageChange={(offset) =>
