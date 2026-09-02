@@ -359,6 +359,20 @@ export const LABELS = {
       },
       unsavedChangesConfirm:
         'Des modifications ne sont pas enregistrées sur ce mois. Changer de mois maintenant les perdra. Continuer ?',
+      /** A9's progress bar — `{completed}`/`{total}` interpolated, counted over workable days only
+       * (`isDayComplete`, `matrix.ts`). */
+      workdaysComplete: '{completed}/{total} jours ouvrés complets',
+      /** A9's post-refusal action: focuses the earliest day named by `/problems/cra-incomplete`
+       * (`missingDaysFrom`, `missing-days.ts`). Shown only once that set is non-empty. */
+      goToFirstIncompleteDay: 'Aller au premier jour incomplet',
+      /** A9's collapsible legend — trigger text and the swatch sentences below reuse the existing
+       * `nonWorkable` / `dayOverbooked*` / `dayIncomplete*` / `flagged` strings, so only the
+       * heading and the toggle need their own key. */
+      legendToggle: 'Légende',
+      /** A9's desktop month/week toggle — reuses A11's own `compact` slicing (`calendarWeeks`,
+       * `WeekNavigator`), so only the two tab labels are new. */
+      viewMonth: 'Mois',
+      viewWeek: 'Semaine',
     },
     /** ADR-0071 — a manager's read-only view of a named consultant's month. `{name}` interpolated. */
     managerView: {

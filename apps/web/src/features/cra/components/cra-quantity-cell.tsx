@@ -52,6 +52,7 @@ interface CraQuantityCellProps {
   readonly onChange: (value: CellQuantity) => void;
   readonly onNavigate: (direction: NavigationDirection) => void;
   readonly registerRef: (element: HTMLSelectElement | null) => void;
+  readonly dayDataAttribute?: string;
 }
 
 export function CraQuantityCell({
@@ -65,6 +66,7 @@ export function CraQuantityCell({
   onChange,
   onNavigate,
   registerRef,
+  dayDataAttribute,
 }: CraQuantityCellProps): ReactElement {
   const cellId = `cra-cell-${rowKey}-${day}`;
   const accessibleName = `${activityLabel} — ${dayLabel}`;
@@ -100,6 +102,7 @@ export function CraQuantityCell({
   return (
     <select
       id={cellId}
+      data-cra-day={dayDataAttribute}
       ref={registerRef}
       value={String(value)}
       // The accessible name, and deliberately not a paired `sr-only` <label>: `sr-only` is
