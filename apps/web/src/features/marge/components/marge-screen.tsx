@@ -10,14 +10,30 @@ import { ErrorState } from '@/components/feedback/error-state';
 import { GlossaryTerm } from '@/components/glossary-term';
 import { StatCard } from '@/components/stat-card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { WhyResult } from '@/components/why-result';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
-import { frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
+import { frenchDate, frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
 import { useConsultantEconomics } from '../hooks';
 import type { MissionEconomics } from '../types';
+
+/**
+ * ADR-0034's own reference date, recomputed here for display only: `apps/api/src/economics/
+ * consultant-economics.ts` resolves both dated rates at `lastDayOf(period)`, a pure calendar
+ * function this mirrors the same way `cra-matrix-table.tsx`'s own `isoWeekNumber` mirrors the
+ * API's week numbering — UI chrome, not a value compared against anything the API computes.
+ */
+function lastDayOfPeriod(period: string): string {
+  const [year, month] = period.split('-').map((part) => Number.parseInt(part, 10));
+  // Day 0 of the following month, UTC: the last calendar day of `period` without a days-in-month
+  // table, and without a wall-clock read.
+  const last = new Date(Date.UTC(year ?? 0, month ?? 1, 0));
+
+  return `${String(last.getUTCFullYear())}-${String(last.getUTCMonth() + 1).padStart(2, '0')}-${String(last.getUTCDate()).padStart(2, '0')}`;
+}
 
 function MargeSkeleton(): ReactElement {
   return (
@@ -131,9 +147,26 @@ export function MargeScreen({ consultantId, period, role }: MargeScreenProps): R
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-card-title">{data.displayName}</h2>
-          <p className="text-sm text-muted-foreground">{frenchMonth(data.period)}</p>
+        <div className="flex items-center gap-1.5">
+          <div>
+            <h2 className="text-card-title">{data.displayName}</h2>
+            <p className="text-sm text-muted-foreground">{frenchMonth(data.period)}</p>
+          </div>
+          <WhyResult
+            trigger={LABELS.margin.whyResult.trigger}
+            title={LABELS.margin.whyResult.title}
+          >
+            <li>{LABELS.margin.whyResult.revenueFormula}</li>
+            <li>{LABELS.margin.whyResult.costFormula}</li>
+            <li>{LABELS.margin.whyResult.marginFormula}</li>
+            <li>
+              {LABELS.margin.whyResult.referenceDate.replace(
+                '{date}',
+                frenchDate(lastDayOfPeriod(data.period)),
+              )}
+            </li>
+            <li>{LABELS.margin.noMission}</li>
+          </WhyResult>
         </div>
         <StatCard
           label={<GlossaryTerm term="cjm" />}

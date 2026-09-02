@@ -716,6 +716,20 @@ export const LABELS = {
     noMissionTitle: 'Aucune mission facturée ce mois',
     noMission:
       'Aucune mission en régie sur ce mois : une mission au forfait n’a pas de TJM daté, et elle est écartée plutôt que comptée à zéro.',
+    /** O2 — the one "Pourquoi ce résultat ?" surface built (marge only, per the plan's own note
+     * that it recoupe A3/A4 elsewhere): the formula, the reference date and the applied rule,
+     * read straight off `apps/api/src/economics/consultant-economics.ts` rather than restated
+     * from memory. `{date}` interpolated with the last day of the period (ADR-0034: both dated
+     * rates resolve there). */
+    whyResult: {
+      trigger: 'Pourquoi ces montants ?',
+      title: 'Comment ces montants sont calculés',
+      revenueFormula: 'Chiffre d’affaires = somme, par mission, de (jours travaillés × TJM daté)',
+      costFormula: 'Coût = jours travaillés (toutes missions) × CJM daté',
+      marginFormula: 'Marge = Chiffre d’affaires − Coût',
+      referenceDate:
+        'Date de référence : {date}, le dernier jour du mois — c’est la date à laquelle le TJM et le CJM en vigueur sont recherchés.',
+    },
   },
 
   problem: {
