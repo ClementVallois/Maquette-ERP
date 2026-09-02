@@ -1,4 +1,4 @@
-import { INVOICE_STATUSES } from '@erp/billing';
+import { INVOICE_STATUSES, vatGroupKey } from '@erp/billing';
 import { API_PROBLEM_TYPES } from '@erp/contracts';
 import {
   daysOf,
@@ -573,12 +573,14 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         const sourceCraId = invoice.lines[0]?.origin.craId;
         const sourceCra =
           sourceCraId === undefined ? null : await unit.cras.findById(sourceCraId, actor);
-        const consultantNames = await new PgReferenceReader(unit.client).consultantNames();
-        return { invoice, sourceCra, consultantNames };
+        const reference = new PgReferenceReader(unit.client);
+        const consultantNames = await reference.consultantNames();
+        const missionNames = await reference.missionNames();
+        return { invoice, sourceCra, consultantNames, missionNames };
       });
       if (detail === null) return sendProblem(reply, notFound(request, 'invoice'));
 
-      const { invoice, sourceCra, consultantNames } = detail;
+      const { invoice, sourceCra, consultantNames, missionNames } = detail;
       const timeline = [];
       if (sourceCra?.validatedAt !== null && sourceCra?.validatedAt !== undefined) {
         const validatedBy = sourceCra.validatedBy;
@@ -597,6 +599,32 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       if (invoice.issueDate !== null) {
         timeline.push({ kind: 'issued' as const, at: invoice.issueDate, actorName: null });
       }
+
+      const lineage = invoice.lines.map((line) => {
+        const vatGroup = invoice.vatBreakdown.find((group) => group.key === vatGroupKey(line.vat));
+
+        return {
+          craId: line.origin.craId,
+          period: line.origin.period,
+          missionId: line.origin.missionId,
+          missionName: missionNames.get(line.origin.missionId) ?? line.origin.missionId,
+          sourceDays:
+            sourceCra?.lines
+              .filter(
+                (sourceLine) =>
+                  sourceLine.dayType === 'worked' && sourceLine.missionId === line.origin.missionId,
+              )
+              .map((sourceLine) => ({
+                day: sourceLine.day,
+                quarterDays: sourceLine.quarterDays,
+              })) ?? [],
+          quantityQuarterDays: line.quantityQuarterDays,
+          tjmCents: line.origin.tjmCents,
+          lineAmountCents: line.amountCents,
+          vatGroup: vatGroup ?? null,
+          invoiceTotalTtcCents: invoice.totals.totalIncludingVatCents,
+        };
+      });
 
       return {
         id: invoice.id,
@@ -617,6 +645,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         totals: invoice.totals,
         totalsAreProvisional: invoice.status === 'draft',
         timeline,
+        lineage,
       };
     },
   );

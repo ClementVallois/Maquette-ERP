@@ -156,6 +156,23 @@ export interface DocumentTotals {
   readonly totalIncludingVatCents: number;
 }
 
+export interface InvoiceLineage {
+  readonly craId: string;
+  readonly period: string;
+  readonly missionId: string;
+  readonly missionName: string;
+  readonly sourceDays: readonly {
+    readonly day: string;
+    readonly quarterDays: number;
+  }[];
+  readonly quantityQuarterDays: number;
+  readonly tjmCents: number;
+  readonly lineAmountCents: number;
+  /** The legal recap group, not a made-up per-line VAT allocation. */
+  readonly vatGroup: VatGroup | null;
+  readonly invoiceTotalTtcCents: number;
+}
+
 /**
  * The invoice detail (`GET /api/v1/invoices/:id`) — the second of the two "complex payloads"
  * frontend-plan.md task 3.7 names for optional zod parsing at the fetch boundary. Not written
@@ -182,6 +199,7 @@ export interface InvoiceDetail {
     readonly at: string;
     readonly actorName: string | null;
   }[];
+  readonly lineage: readonly InvoiceLineage[];
 }
 
 export interface IssuanceResponse {

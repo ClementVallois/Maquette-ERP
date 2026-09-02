@@ -484,6 +484,18 @@ export const LABELS = {
     originLine: 'CRA {cra} — {period} — {mission}',
     originNote:
       'Chaque ligne porte le CRA dont elle vient : c’est ce lien, et non une déclaration, qui matérialise la piste d’audit fiable (art. 289-VII du CGI).',
+    lineage: {
+      heading: 'Filiation des montants',
+      lead: 'Dépliez une ligne pour suivre son calcul depuis les jours saisis jusqu’au total de la facture.',
+      line: 'Ligne {number}',
+      cra: 'Jours du CRA',
+      mission: 'Mission',
+      quantityAndRate: 'Quantité × TJM daté',
+      lineExcludingVat: 'Ligne HT',
+      vatGroup: 'Groupe de TVA',
+      invoiceIncludingVat: 'Facture TTC',
+      unavailable: 'Groupe indisponible',
+    },
     validatedBy: 'Validé par',
     notCharged: 'Non soumis à TVA',
     issue: 'Émettre la facture',

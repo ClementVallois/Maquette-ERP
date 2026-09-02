@@ -12,12 +12,19 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
-import { frenchDate, frenchEuros, frenchMonth, frenchPercent } from '@/lib/format';
+import { frenchDate, frenchDays, frenchEuros, frenchMonth, frenchPercent } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
 import { useInvoiceDetail } from '../hooks';
-import type { InvoiceDetail, InvoiceLine, InvoiceStatus, PostalAddress, VatGroup } from '../types';
+import type {
+  InvoiceDetail,
+  InvoiceLine,
+  InvoiceLineage,
+  InvoiceStatus,
+  PostalAddress,
+  VatGroup,
+} from '../types';
 
 import { IssuanceDialog } from './issuance-dialog';
 
@@ -27,6 +34,7 @@ import { IssuanceDialog } from './issuance-dialog';
  * `cra-grid-screen.tsx`'s own `CRA_PRINT_PATH` already documents for `/releve`.
  */
 const INVOICE_PRINT_PATH = '/facture';
+const CRA_PRINT_PATH = '/releve';
 
 function DetailSkeleton(): ReactElement {
   return (
@@ -93,13 +101,15 @@ function lineColumns(): ColumnDef<InvoiceLine>[] {
     {
       id: 'origin',
       header: LABELS.invoice.origin,
-      // No `title` (ADR-0061: not exposed on touch, not focusable, not announced consistently) —
-      // the Cra id it used to show on hover is not shown anywhere else on this row either, so it
-      // is simply not rendered rather than moved: nothing in this screen reads it today.
       cell: ({ row }) => (
-        <span className="font-mono text-[0.75rem] text-muted-foreground">
+        <a
+          href={`${CRA_PRINT_PATH}/${row.original.origin.craId}`}
+          target="_blank"
+          rel="noreferrer"
+          className="font-mono text-[0.75rem] text-primary underline underline-offset-2"
+        >
           {frenchMonth(row.original.origin.period)}
-        </span>
+        </a>
       ),
     },
     {
@@ -127,6 +137,70 @@ function lineColumns(): ColumnDef<InvoiceLine>[] {
       ),
     },
   ];
+}
+
+function LineageCard({ item, index }: { item: InvoiceLineage; index: number }): ReactElement {
+  const vat = item.vatGroup;
+
+  return (
+    <details className="rounded-xl bg-card p-4 shadow-card ring-1 ring-border" open={index === 0}>
+      <summary className="cursor-pointer font-medium text-foreground">
+        {LABELS.invoice.lineage.line.replace('{number}', String(index + 1))} — {item.missionName}
+      </summary>
+      <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-6">
+        <div>
+          <p className="text-muted-foreground">{LABELS.invoice.lineage.cra}</p>
+          <a
+            href={`${CRA_PRINT_PATH}/${item.craId}`}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-primary underline underline-offset-2"
+          >
+            {frenchMonth(item.period)}
+          </a>
+          <ul className="mt-1 text-xs text-muted-foreground">
+            {item.sourceDays.map((sourceDay) => (
+              <li key={sourceDay.day}>
+                {frenchDate(sourceDay.day)} · {frenchDays(sourceDay.quarterDays)}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <LineageStep label={LABELS.invoice.lineage.mission} value={item.missionName} />
+        <LineageStep
+          label={LABELS.invoice.lineage.quantityAndRate}
+          value={`${frenchDays(item.quantityQuarterDays)} × ${frenchEuros(item.tjmCents)} / j`}
+        />
+        <LineageStep
+          label={LABELS.invoice.lineage.lineExcludingVat}
+          value={frenchEuros(item.lineAmountCents)}
+        />
+        <LineageStep
+          label={LABELS.invoice.lineage.vatGroup}
+          value={
+            vat === null
+              ? LABELS.invoice.lineage.unavailable
+              : `${vatRateCell(vat.treatment)} · ${frenchEuros(vat.baseCents)} HT · ${
+                  vat.vatCents === null ? LABELS.invoice.notCharged : frenchEuros(vat.vatCents)
+                }`
+          }
+        />
+        <LineageStep
+          label={LABELS.invoice.lineage.invoiceIncludingVat}
+          value={frenchEuros(item.invoiceTotalTtcCents)}
+        />
+      </div>
+    </details>
+  );
+}
+
+function LineageStep({ label, value }: { label: string; value: string }): ReactElement {
+  return (
+    <div className="border-l-2 border-primary/30 pl-3">
+      <p className="text-muted-foreground">{label}</p>
+      <p className="mt-1 font-medium text-foreground">{value}</p>
+    </div>
+  );
 }
 
 function vatColumns(): ColumnDef<VatGroup>[] {
@@ -285,6 +359,20 @@ export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): Rea
           getRowId={(row) => row.origin.craId + row.designation}
           emptyState={null}
         />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div>
+          <h3 className="text-card-title">{LABELS.invoice.lineage.heading}</h3>
+          <p className="text-sm text-muted-foreground">{LABELS.invoice.lineage.lead}</p>
+        </div>
+        {data.lineage.map((item, index) => (
+          <LineageCard
+            key={`${item.craId}-${item.missionId}-${String(index)}`}
+            item={item}
+            index={index}
+          />
+        ))}
       </section>
 
       <section className="flex flex-col gap-2">
