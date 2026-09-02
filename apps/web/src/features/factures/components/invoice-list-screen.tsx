@@ -3,6 +3,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { ReceiptTextIcon } from 'lucide-react';
 import type { ReactElement, SyntheticEvent } from 'react';
 
+import { CopyLinkButton } from '@/components/copy-link-button';
 import { DataTable } from '@/components/data-table/data-table';
 import { PaginationControls } from '@/components/data-table/pagination-controls';
 import { DeniedState } from '@/components/feedback/denied-state';
@@ -290,6 +291,7 @@ export function InvoiceListScreen({
             {LABELS.invoice.clearFilters}
           </Button>
         )}
+        <CopyLinkButton />
       </form>
       {/* Item 8 (QA round 1): a segmented pill per status, `exclusive` (item 7's own multi-select
        * CRA-status filter is the non-exclusive sibling) — obviously individually clickable rather

@@ -799,6 +799,12 @@ export const LABELS = {
     correlationHint:
       'À citer en cas de signalement : il relie cette page à la ligne de journal qui la décrit.',
     back: 'Revenir à l’accueil',
+    /** O11: a concrete way out of an `ErrorState`, alongside the existing `action` link —
+     * `retry` re-runs the query that failed, `copyCorrelationId` puts the id on the clipboard so
+     * it can be pasted into a report without retyping it. */
+    retry: 'Réessayer',
+    copyCorrelationId: 'Copier l’identifiant',
+    correlationIdCopied: 'Identifiant copié',
   },
 
   action: {
@@ -817,6 +823,11 @@ export const LABELS = {
      * visible verb (`LABELS.cra.show`, …), so the header only needs to be named for a screen reader
      * walking column headers, not repeated visibly over every row's button. */
     tableActions: 'Actions',
+    /** O9 (`components/copy-link-button.tsx`): the filters already live in the URL — this copies
+     * `window.location.href` verbatim, nothing serialized here. */
+    copyLink: 'Copier le lien de cette vue',
+    linkCopied: 'Lien copié',
+    linkCopyFailed: 'Impossible de copier le lien.',
   },
 
   /**

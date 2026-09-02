@@ -5,6 +5,7 @@ import type { ReactElement, SyntheticEvent } from 'react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { CopyLinkButton } from '@/components/copy-link-button';
 import { DataTable } from '@/components/data-table/data-table';
 import { PaginationControls } from '@/components/data-table/pagination-controls';
 import { DeniedState } from '@/components/feedback/denied-state';
@@ -480,6 +481,7 @@ export function PreFacturierScreen({
           <GlossaryTerm term="forfait" />
           <GlossaryTerm term="intercontrat" />
         </p>
+        <CopyLinkButton />
       </div>
 
       <form className="flex max-w-xl items-end gap-2" onSubmit={submitConsultantSearch}>

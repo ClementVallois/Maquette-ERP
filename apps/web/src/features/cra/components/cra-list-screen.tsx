@@ -4,6 +4,7 @@ import { CalendarIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 
+import { CopyLinkButton } from '@/components/copy-link-button';
 import { DataTable } from '@/components/data-table/data-table';
 import { PaginationControls } from '@/components/data-table/pagination-controls';
 import { DeniedState } from '@/components/feedback/denied-state';
@@ -524,6 +525,7 @@ function CraListFilters({
           ))}
         </SelectContent>
       </Select>
+      <CopyLinkButton />
     </div>
   );
 }
