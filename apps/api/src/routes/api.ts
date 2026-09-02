@@ -95,6 +95,12 @@ const NON_VALIDATED_CRA_STATUSES = ['draft', 'submitted', 'refused'] as const;
 const DENSE_MONTHS = ['2026-06', '2026-07', '2026-08'] as const;
 
 const PeriodQuery = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u) });
+const PreFacturierParams = PeriodQuery.extend({
+  craLimit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
+  craOffset: z.coerce.number().int().min(0).default(0),
+  invoiceLimit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
+  invoiceOffset: z.coerce.number().int().min(0).default(0),
+});
 
 /**
  * A single query-string value, comma-separated, rather than a repeated key
@@ -603,7 +609,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
     '/api/v1/pre-facturier',
     { config: { access: forRoles('manager', 'billing') } },
     async (request, reply) => {
-      const query = parseInput(PeriodQuery, request.query);
+      const query = parseInput(PreFacturierParams, request.query);
       if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
 
       const actor = requireActor(request);
@@ -613,7 +619,15 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       // this JSON payload and the numbers on `GET /pre-facturier` come from one function, so they
       // cannot answer a different question for the same period.
       const composition = await dependencies.transactionally((unit) =>
-        preFacturierComposition(unit, { actor, requestedPeriod: query.value.period, today }),
+        preFacturierComposition(unit, {
+          actor,
+          requestedPeriod: query.value.period,
+          today,
+          craLimit: query.value.craLimit,
+          craOffset: query.value.craOffset,
+          invoiceLimit: query.value.invoiceLimit,
+          invoiceOffset: query.value.invoiceOffset,
+        }),
       );
 
       return {
@@ -628,7 +642,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           // on the wire uses, and what `frenchDays` (both copies) takes as its argument. A
           // consumer that divides by four before formatting prints a quarter of the truth.
           lateDays: composition.lateQuarterDays,
-          craCount: composition.cras.length,
+          craCount: composition.pagination.cras.total,
         },
         invoices: composition.invoices,
         cras: composition.cras.map((row) => ({
@@ -641,6 +655,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           blockingReasons: blockingReasonsOf(row),
           decidable: composition.mayDecide && row.status === 'submitted',
         })),
+        pagination: composition.pagination,
       };
     },
   );

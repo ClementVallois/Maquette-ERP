@@ -62,4 +62,8 @@ export interface PreFacturierResponse {
   readonly summary: PreFacturierSummary;
   readonly invoices: readonly PreFacturierInvoiceRow[];
   readonly cras: readonly PreFacturierCraRow[];
+  readonly pagination: {
+    readonly cras: { readonly total: number; readonly limit: number; readonly offset: number };
+    readonly invoices: { readonly total: number; readonly limit: number; readonly offset: number };
+  };
 }

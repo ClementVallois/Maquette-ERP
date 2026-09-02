@@ -72,6 +72,10 @@ export interface PreFacturierComposition {
   /** The same invoices, with the HT/TTC totals `billing.pages/pre-facturier.ts` prints. */
   readonly billable: readonly BillableRow[];
   readonly cras: readonly CraRow[];
+  readonly pagination: {
+    readonly cras: { readonly total: number; readonly limit: number; readonly offset: number };
+    readonly invoices: { readonly total: number; readonly limit: number; readonly offset: number };
+  };
   /** ADR-0054: quarter-days of a **closed** month that have not reached `Validated`. */
   readonly lateQuarterDays: number;
   readonly periodClosed: boolean;
@@ -142,6 +146,10 @@ export interface PreFacturierInput {
   readonly requestedPeriod: string | undefined;
   /** `isoDateInFirmTimeZone(clock.now())`, computed by the caller before the transaction opens. */
   readonly today: IsoDate;
+  readonly craLimit?: number;
+  readonly craOffset?: number;
+  readonly invoiceLimit?: number;
+  readonly invoiceOffset?: number;
 }
 
 export async function preFacturierComposition(
@@ -149,6 +157,10 @@ export async function preFacturierComposition(
   input: PreFacturierInput,
 ): Promise<PreFacturierComposition> {
   const { actor, requestedPeriod, today } = input;
+  const craLimit = input.craLimit ?? MAX_MONTHS;
+  const craOffset = input.craOffset ?? 0;
+  const invoiceLimit = input.invoiceLimit ?? MAX_MONTHS;
+  const invoiceOffset = input.invoiceOffset ?? 0;
 
   const availablePeriods = await unit.cras.listPeriods(actor);
   const period = requestedPeriod ?? availablePeriods[0] ?? null;
@@ -165,18 +177,32 @@ export async function preFacturierComposition(
       invoices: [],
       billable: [],
       cras: [],
+      pagination: {
+        cras: { total: 0, limit: craLimit, offset: craOffset },
+        invoices: { total: 0, limit: invoiceLimit, offset: invoiceOffset },
+      },
       lateQuarterDays: 0,
       periodClosed: false,
       mayDecide: carries(DECIDES_CRA, actor.role),
     };
   }
 
-  const cras = await unit.cras.list({ actor, limit: MAX_MONTHS, offset: 0, period });
+  const craTotal = await unit.cras.count({ actor, period });
+  const allCras = [];
+  for (let offset = 0; offset < craTotal; offset += MAX_MONTHS) {
+    allCras.push(...(await unit.cras.list({ actor, limit: MAX_MONTHS, offset, period })));
+  }
+  const cras = allCras.slice(craOffset, craOffset + craLimit);
   const declined = await unit.invoices.findDeclinedDays(
     cras.map((cra) => cra.id),
     actor,
   );
-  const invoices = await unit.invoices.list({ actor, limit: MAX_MONTHS, offset: 0, period });
+  const invoiceTotal = await unit.invoices.count({ actor, period });
+  const allInvoices = [];
+  for (let offset = 0; offset < invoiceTotal; offset += MAX_MONTHS) {
+    allInvoices.push(...(await unit.invoices.list({ actor, limit: MAX_MONTHS, offset, period })));
+  }
+  const invoices = allInvoices.slice(invoiceOffset, invoiceOffset + invoiceLimit);
 
   const reference = new PgReferenceReader(unit.client);
   const consultantNames = await reference.consultantNames();
@@ -185,14 +211,15 @@ export async function preFacturierComposition(
   // `(source_cra_ids[1], billed_to_client_id)` is what makes `cras`, already scoped to this same
   // period, the right (and only) place to resolve an invoice's consultant and "created" timestamp
   // from, rather than a second cross-module read.
-  const craById = new Map(cras.map((cra) => [cra.id, cra]));
+  const craById = new Map(allCras.map((cra) => [cra.id, cra]));
 
   // One read per invoice, and the totals come off the aggregate rather than out of a `SUM`
   // (ADR-0053): a draft's `total_ttc_cents` column is NULL by design, and VAT is rounded once per
   // rate in the domain — a total assembled in SQL would be a different number.
   const billable: BillableRow[] = [];
   const invoiceRows: PreFacturierInvoiceRow[] = [];
-  for (const item of invoices) {
+  const visibleInvoiceIds = new Set(invoices.map((invoice) => invoice.id));
+  for (const item of allInvoices) {
     const invoice = await unit.invoices.findById(item.id, actor);
     if (invoice === null) continue;
 
@@ -204,6 +231,8 @@ export async function preFacturierComposition(
       totalExcludingVatCents: invoice.totals.totalExcludingVatCents,
       totalIncludingVatCents: invoice.totals.totalIncludingVatCents,
     });
+
+    if (!visibleInvoiceIds.has(item.id)) continue;
 
     const sourceCraId = invoice.lines[0]?.origin.craId;
     const sourceCra = sourceCraId === undefined ? undefined : craById.get(sourceCraId);
@@ -242,11 +271,15 @@ export async function preFacturierComposition(
     invoices: invoiceRows,
     billable,
     cras: rows,
+    pagination: {
+      cras: { total: craTotal, limit: craLimit, offset: craOffset },
+      invoices: { total: invoiceTotal, limit: invoiceLimit, offset: invoiceOffset },
+    },
     // ADR-0054: quarter-days of a closed month that have not reached `Validated`. Summed over the
     // rows the repository already scoped, so there is no second place the office rule could be
     // forgotten.
     lateQuarterDays: periodClosed
-      ? rows
+      ? allCras
           .filter((row) => row.status !== 'validated')
           .reduce((total, row) => total + row.recordedQuarterDays, 0)
       : 0,

@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { DataTable } from '@/components/data-table/data-table';
+import { PaginationControls } from '@/components/data-table/pagination-controls';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -325,6 +326,9 @@ function craColumns(
 interface PreFacturierScreenProps {
   readonly period: string;
   readonly role: Role;
+  readonly craPage: number;
+  readonly invoicePage: number;
+  readonly pageSize: number;
 }
 
 /**
@@ -334,8 +338,15 @@ interface PreFacturierScreenProps {
  * never had one" (`data.period === null`, reachable only if every office Cra vanished between the
  * redirect and this render, kept as a defensive branch rather than an assumed-unreachable one).
  */
-export function PreFacturierScreen({ period, role }: PreFacturierScreenProps): ReactElement {
-  const query = usePreFacturier(period);
+export function PreFacturierScreen({
+  period,
+  role,
+  craPage,
+  invoicePage,
+  pageSize,
+}: PreFacturierScreenProps): ReactElement {
+  const query = usePreFacturier(period, { craPage, invoicePage, pageSize });
+  const navigate = useNavigate();
   const validateMutation = useValidateCra(period);
   const [validationResult, setValidationResult] = useState<{
     readonly cra: PreFacturierCraRow;
@@ -438,6 +449,29 @@ export function PreFacturierScreen({ period, role }: PreFacturierScreenProps): R
             />
           }
         />
+        <PaginationControls
+          {...data.pagination.invoices}
+          onPageChange={(offset) =>
+            void navigate({
+              to: '/pre-facturier',
+              search: (previous) => ({
+                ...previous,
+                invoicePage: Math.floor(offset / pageSize) + 1,
+              }),
+            })
+          }
+          onPageSizeChange={(limit) =>
+            void navigate({
+              to: '/pre-facturier',
+              search: (previous) => ({
+                ...previous,
+                craPage: 1,
+                invoicePage: 1,
+                pageSize: limit,
+              }),
+            })
+          }
+        />
       </section>
 
       <section className="flex flex-col gap-2">
@@ -462,6 +496,29 @@ export function PreFacturierScreen({ period, role }: PreFacturierScreenProps): R
               title={LABELS.preFacturier.crasEmpty}
               body={LABELS.preFacturier.crasEmptyHint}
             />
+          }
+        />
+        <PaginationControls
+          {...data.pagination.cras}
+          onPageChange={(offset) =>
+            void navigate({
+              to: '/pre-facturier',
+              search: (previous) => ({
+                ...previous,
+                craPage: Math.floor(offset / pageSize) + 1,
+              }),
+            })
+          }
+          onPageSizeChange={(limit) =>
+            void navigate({
+              to: '/pre-facturier',
+              search: (previous) => ({
+                ...previous,
+                craPage: 1,
+                invoicePage: 1,
+                pageSize: limit,
+              }),
+            })
           }
         />
       </section>

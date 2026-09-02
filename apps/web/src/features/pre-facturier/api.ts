@@ -8,8 +8,22 @@ import type { PreFacturierResponse } from './types';
  * so every caller of this function already has one, either picked from the period selector or
  * computed by the route's own `beforeLoad` default (`routes/_shell/pre-facturier.tsx`).
  */
-export function fetchPreFacturier(period: string): Promise<ApiResult<PreFacturierResponse>> {
-  return apiFetch<PreFacturierResponse>(
-    `/api/v1/pre-facturier?period=${encodeURIComponent(period)}`,
-  );
+export interface PreFacturierPagination {
+  readonly craPage: number;
+  readonly invoicePage: number;
+  readonly pageSize: number;
+}
+
+export function fetchPreFacturier(
+  period: string,
+  pagination: PreFacturierPagination,
+): Promise<ApiResult<PreFacturierResponse>> {
+  const params = new URLSearchParams({
+    period,
+    craLimit: String(pagination.pageSize),
+    craOffset: String((pagination.craPage - 1) * pagination.pageSize),
+    invoiceLimit: String(pagination.pageSize),
+    invoiceOffset: String((pagination.invoicePage - 1) * pagination.pageSize),
+  });
+  return apiFetch<PreFacturierResponse>(`/api/v1/pre-facturier?${params.toString()}`);
 }
