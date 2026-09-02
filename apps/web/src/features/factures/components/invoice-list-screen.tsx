@@ -1,15 +1,17 @@
 import { Link, useNavigate } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import { ReceiptTextIcon } from 'lucide-react';
-import type { ReactElement } from 'react';
-import { useMemo } from 'react';
+import type { ReactElement, SyntheticEvent } from 'react';
 
 import { DataTable } from '@/components/data-table/data-table';
+import { PaginationControls } from '@/components/data-table/pagination-controls';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
 import { StatusBadge, type StatusBadgeVariant } from '@/components/status-badge';
 import { TogglePillGroup } from '@/components/toggle-pill-group';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
@@ -127,6 +129,10 @@ function columns(): ColumnDef<InvoiceListItem>[] {
 interface InvoiceListScreenProps {
   readonly status: InvoiceStatusFilter;
   readonly role: Role;
+  readonly year: number | undefined;
+  readonly search: string;
+  readonly page: number;
+  readonly pageSize: number;
 }
 
 /**
@@ -134,26 +140,51 @@ interface InvoiceListScreenProps {
  * status filter is a client-side view (`docs/frontend-plan.md` §8.1's "onglets de vue comme sur
  * les maquettes"), never a second request per pill.
  */
-export function InvoiceListScreen({ status, role }: InvoiceListScreenProps): ReactElement {
-  const query = useInvoiceList();
+export function InvoiceListScreen({
+  status,
+  role,
+  year,
+  search,
+  page,
+  pageSize,
+}: InvoiceListScreenProps): ReactElement {
+  const query = useInvoiceList({
+    ...(status === 'all' ? {} : { status }),
+    ...(year === undefined ? {} : { year }),
+    ...(search === '' ? {} : { search }),
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
+  });
   const navigate = useNavigate();
 
-  const filtered = useMemo(() => {
-    const invoices = query.data?.invoices ?? [];
+  function searchState(overrides: {
+    readonly status?: InvoiceStatusFilter;
+    readonly year?: number | undefined;
+    readonly search?: string;
+    readonly page?: number;
+    readonly pageSize?: number;
+  }) {
+    const nextStatus = overrides.status ?? status;
+    const nextYear = 'year' in overrides ? overrides.year : year;
+    const nextSearch = overrides.search ?? search;
+    const nextPage = overrides.page ?? page;
+    const nextPageSize = overrides.pageSize ?? pageSize;
 
-    return status === 'all' ? invoices : invoices.filter((invoice) => invoice.status === status);
-  }, [query.data, status]);
+    return {
+      ...(nextStatus === 'all' ? {} : { status: nextStatus }),
+      ...(nextYear === undefined ? {} : { year: nextYear }),
+      ...(nextSearch === '' ? {} : { search: nextSearch }),
+      page: nextPage,
+      pageSize: nextPageSize,
+    };
+  }
 
-  // Item 8 (QA round 1): "a count per status if the data already carries one" — it does, this
-  // page's own already-fetched, unfiltered page (`query.data.invoices`), so every pill's count
-  // reflects the same underlying read regardless of which one is currently selected.
-  const countOf = (candidate: InvoiceStatusFilter): number => {
-    const invoices = query.data?.invoices ?? [];
-
-    return candidate === 'all'
-      ? invoices.length
-      : invoices.filter((invoice) => invoice.status === candidate).length;
-  };
+  function submitSearch(event: SyntheticEvent<HTMLFormElement, SubmitEvent>): void {
+    event.preventDefault();
+    const entry = new FormData(event.currentTarget).get('invoice-search');
+    const value = typeof entry === 'string' ? entry.trim() : '';
+    void navigate({ to: '/factures', search: searchState({ search: value, page: 1 }) });
+  }
 
   if (query.isPending) return <TableSkeleton />;
 
@@ -183,7 +214,8 @@ export function InvoiceListScreen({ status, role }: InvoiceListScreenProps): Rea
 
   // Task 8.5's own designed empty state — this implantation has never issued a single document,
   // distinct from "invoices exist, none match this tab" below (`DataTable`'s own `emptyState`).
-  if (query.data.invoices.length === 0) {
+  const filtersActive = status !== 'all' || year !== undefined || search !== '';
+  if (query.data.total === 0 && !filtersActive) {
     return (
       <EmptyState
         icon={ReceiptTextIcon}
@@ -195,6 +227,51 @@ export function InvoiceListScreen({ status, role }: InvoiceListScreenProps): Rea
 
   return (
     <div className="flex flex-col gap-4">
+      <form className="flex flex-wrap items-end gap-3" onSubmit={submitSearch}>
+        <label className="flex min-w-64 flex-1 flex-col gap-1 text-sm font-medium">
+          {LABELS.invoice.search}
+          <Input
+            key={search}
+            name="invoice-search"
+            type="search"
+            defaultValue={search}
+            placeholder={LABELS.invoice.searchPlaceholder}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          {LABELS.invoice.year}
+          <Input
+            className="w-32"
+            type="number"
+            min={2000}
+            max={2100}
+            value={year ?? ''}
+            placeholder={LABELS.invoice.allYears}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              void navigate({
+                to: '/factures',
+                search: searchState({
+                  year: value === '' ? undefined : Number.parseInt(value, 10),
+                  page: 1,
+                }),
+              });
+            }}
+          />
+        </label>
+        <Button type="submit" variant="outline">
+          {LABELS.invoice.searchAction}
+        </Button>
+        {filtersActive && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => void navigate({ to: '/factures', search: { page: 1, pageSize } })}
+          >
+            {LABELS.invoice.clearFilters}
+          </Button>
+        )}
+      </form>
       {/* Item 8 (QA round 1): a segmented pill per status, `exclusive` (item 7's own multi-select
        * CRA-status filter is the non-exclusive sibling) — obviously individually clickable rather
        * than one wide bar, the brief's own complaint about the previous `Tabs` rendering. */}
@@ -204,19 +281,22 @@ export function InvoiceListScreen({ status, role }: InvoiceListScreenProps): Rea
         options={TAB_ORDER.map((candidate) => ({
           value: candidate,
           label: LABELS.invoice.filters[candidate],
-          count: countOf(candidate),
+          count: query.data.statusCounts[candidate],
         }))}
         selected={[status]}
         onChange={([next]) => {
           void navigate({
             to: '/factures',
-            search: next === undefined || next === 'all' ? {} : { status: next as InvoiceStatus },
+            search: searchState({
+              status: next === undefined ? 'all' : (next as InvoiceStatusFilter),
+              page: 1,
+            }),
           });
         }}
       />
       <DataTable
         columns={columns()}
-        data={filtered}
+        data={query.data.invoices}
         getRowId={(row) => row.id}
         emptyState={
           <EmptyState
@@ -224,6 +304,23 @@ export function InvoiceListScreen({ status, role }: InvoiceListScreenProps): Rea
             title={LABELS.invoice.filters[status]}
             body={LABELS.invoice.filterEmptyBody}
           />
+        }
+      />
+      <PaginationControls
+        total={query.data.total}
+        limit={query.data.limit}
+        offset={query.data.offset}
+        onPageChange={(offset) =>
+          void navigate({
+            to: '/factures',
+            search: searchState({ page: Math.floor(offset / pageSize) + 1 }),
+          })
+        }
+        onPageSizeChange={(limit) =>
+          void navigate({
+            to: '/factures',
+            search: searchState({ page: 1, pageSize: limit }),
+          })
         }
       />
     </div>

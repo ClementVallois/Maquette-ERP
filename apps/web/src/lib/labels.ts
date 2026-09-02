@@ -40,6 +40,13 @@ export const LABELS = {
     main: 'Navigation principale',
   },
 
+  pagination: {
+    range: '{first}–{last} sur {total} résultats',
+    perPage: 'Par page',
+    previous: 'Page précédente',
+    next: 'Page suivante',
+  },
+
   persona: {
     sessionInvalidatedTitle: 'Session interrompue',
     heading: 'Choisir un persona',
@@ -490,6 +497,12 @@ export const LABELS = {
       issued: 'Émises',
       cancelledByCreditNote: 'Annulées',
     },
+    search: 'Rechercher',
+    searchPlaceholder: 'Client ou numéro de facture…',
+    searchAction: 'Rechercher',
+    year: 'Année',
+    allYears: 'Toutes',
+    clearFilters: 'Effacer les filtres',
     emptyTitle: 'Aucune facture',
     emptyBody:
       'Cette implantation n’a encore validé aucun CRA facturable : une facture apparaît ici dès qu’un manager valide un mois en régie (task 7.2).',

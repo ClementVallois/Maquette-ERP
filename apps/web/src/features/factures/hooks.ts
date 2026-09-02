@@ -3,7 +3,13 @@ import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
 import { unwrap } from '@/lib/api-client';
 
-import { fetchInvoiceDetail, fetchInvoiceHistory, fetchInvoiceList, postIssuance } from './api';
+import {
+  fetchInvoiceDetail,
+  fetchInvoiceHistory,
+  fetchInvoiceList,
+  type InvoiceListFilters,
+  postIssuance,
+} from './api';
 import type {
   InvoiceDetail,
   InvoiceHistoryResponse,
@@ -11,19 +17,19 @@ import type {
   IssuanceResponse,
 } from './types';
 
-function invoiceListQueryKey(): readonly [string] {
-  return ['factures'] as const;
+function invoiceListQueryKey(filters?: InvoiceListFilters) {
+  return filters === undefined ? (['factures'] as const) : (['factures', filters] as const);
 }
 
-export function invoiceListQueryOptions() {
+export function invoiceListQueryOptions(filters: InvoiceListFilters) {
   return queryOptions({
-    queryKey: invoiceListQueryKey(),
-    queryFn: async () => unwrap(await fetchInvoiceList()),
+    queryKey: invoiceListQueryKey(filters),
+    queryFn: async () => unwrap(await fetchInvoiceList(filters)),
   });
 }
 
-export function useInvoiceList(): UseQueryResult<InvoiceListResponse> {
-  return useQuery(invoiceListQueryOptions());
+export function useInvoiceList(filters: InvoiceListFilters): UseQueryResult<InvoiceListResponse> {
+  return useQuery(invoiceListQueryOptions(filters));
 }
 
 function invoiceDetailQueryKey(id: string): readonly [string, string] {

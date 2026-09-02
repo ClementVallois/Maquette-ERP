@@ -54,6 +54,10 @@ export interface InvoiceListItem {
 
 export interface InvoiceListResponse {
   readonly invoices: readonly InvoiceListItem[];
+  readonly total: number;
+  readonly limit: number;
+  readonly offset: number;
+  readonly statusCounts: Readonly<Record<'all' | InvoiceStatus, number>>;
 }
 
 export interface PostalAddress {
