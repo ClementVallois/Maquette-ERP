@@ -243,6 +243,7 @@ function vatColumns(): ColumnDef<VatGroup>[] {
 interface InvoiceDetailScreenProps {
   readonly id: string;
   readonly role: Role;
+  readonly returnTo: string;
 }
 
 /**
@@ -251,7 +252,11 @@ interface InvoiceDetailScreenProps {
  * never computed here). Lien « Version imprimable » vers la SSR `/facture/:id`. Task 8.3's
  * issuance button/dialog is `billing`-only, `IssuanceDialog`.
  */
-export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): ReactElement {
+export function InvoiceDetailScreen({
+  id,
+  role,
+  returnTo,
+}: InvoiceDetailScreenProps): ReactElement {
   const query = useInvoiceDetail(id);
   const [issuing, setIssuing] = useState(false);
 
@@ -287,19 +292,21 @@ export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): Rea
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-card-title">{data.billedTo.name}</h2>
           <p className="text-sm text-muted-foreground">{frenchMonth(data.supplyPeriod)}</p>
         </div>
-        <a
-          href={`${INVOICE_PRINT_PATH}/${data.id}`}
-          target="_blank"
-          rel="noreferrer"
-          className="text-sm font-medium text-primary underline underline-offset-2"
-        >
-          {LABELS.invoice.printable}
-        </a>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="ghost">
+            <a href={returnTo}>{LABELS.invoice.backToList}</a>
+          </Button>
+          <Button asChild variant="outline">
+            <a href={`${INVOICE_PRINT_PATH}/${data.id}`} target="_blank" rel="noreferrer">
+              {LABELS.invoice.printable}
+            </a>
+          </Button>
+        </div>
       </div>
 
       {data.status !== alreadyIssued && (

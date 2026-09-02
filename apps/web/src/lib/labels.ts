@@ -550,6 +550,7 @@ export const LABELS = {
      * from the route as a finding for whichever phase first needed it, not an invitation to
      * recompute it client-side. */
     printable: 'Version imprimable',
+    backToList: 'Retour à la liste',
     paymentTerms: 'Conditions',
     terms: {
       net: 'Net à {days} jours',

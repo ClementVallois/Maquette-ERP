@@ -104,7 +104,7 @@ function PeriodSelector({ period, offered }: PeriodSelectorProps): ReactElement 
   );
 }
 
-function invoiceColumns(): ColumnDef<PreFacturierInvoiceRow>[] {
+function invoiceColumns(returnTo: string): ColumnDef<PreFacturierInvoiceRow>[] {
   return [
     {
       id: 'client',
@@ -190,6 +190,11 @@ function invoiceColumns(): ColumnDef<PreFacturierInvoiceRow>[] {
         <Link
           to="/factures/$id"
           params={{ id: row.original.id }}
+          search={{
+            client: row.original.billedToName,
+            period: row.original.supplyPeriod,
+            from: returnTo,
+          }}
           className="ml-auto block w-fit text-sm text-primary hover:underline"
         >
           {LABELS.preFacturier.invoiceOpen}
@@ -445,6 +450,14 @@ export function PreFacturierScreen({
   }
 
   const data = query.data;
+  const returnParams = new URLSearchParams({
+    period,
+    craPage: String(craPage),
+    invoicePage: String(invoicePage),
+    pageSize: String(pageSize),
+  });
+  if (consultantSearch !== '') returnParams.set('consultantSearch', consultantSearch);
+  const returnTo = `/pre-facturier?${returnParams.toString()}`;
 
   if (data.period === null) {
     return (
@@ -511,7 +524,7 @@ export function PreFacturierScreen({
       <section className="flex flex-col gap-2">
         <h2 className="text-card-title">{LABELS.preFacturier.billable}</h2>
         <DataTable
-          columns={invoiceColumns()}
+          columns={invoiceColumns(returnTo)}
           data={data.invoices}
           getRowId={(row) => row.id}
           numericColumns={['lineCount', 'totalTtc']}

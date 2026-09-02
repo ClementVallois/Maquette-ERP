@@ -51,7 +51,7 @@ function TableSkeleton(): ReactElement {
   );
 }
 
-function columns(): ColumnDef<InvoiceListItem>[] {
+function columns(returnTo: string): ColumnDef<InvoiceListItem>[] {
   return [
     {
       id: 'client',
@@ -120,6 +120,11 @@ function columns(): ColumnDef<InvoiceListItem>[] {
         <Link
           to="/factures/$id"
           params={{ id: row.original.id }}
+          search={{
+            client: row.original.billedToName,
+            period: row.original.supplyPeriod,
+            from: returnTo,
+          }}
           className="ml-auto block w-fit text-sm text-primary hover:underline"
         >
           {LABELS.invoice.open}
@@ -163,6 +168,13 @@ export function InvoiceListScreen({
     offset: (page - 1) * pageSize,
   });
   const navigate = useNavigate();
+  const returnParams = new URLSearchParams();
+  if (status !== 'all') returnParams.set('status', status);
+  if (year !== undefined) returnParams.set('year', String(year));
+  if (search !== '') returnParams.set('search', search);
+  returnParams.set('page', String(page));
+  returnParams.set('pageSize', String(pageSize));
+  const returnTo = `/factures?${returnParams.toString()}`;
 
   function searchState(overrides: {
     readonly status?: InvoiceStatusFilter;
@@ -302,7 +314,7 @@ export function InvoiceListScreen({
         }}
       />
       <DataTable
-        columns={columns()}
+        columns={columns(returnTo)}
         data={query.data.invoices}
         getRowId={(row) => row.id}
         numericColumns={['ttc']}

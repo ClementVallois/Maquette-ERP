@@ -26,9 +26,22 @@ const CRA_PERIOD_IN_PATH = /^\/cra\/(\d{4}-\d{2})(?:\/|$)/u;
  * Facture" as the page title for a screen that is very much not that.
  */
 const MARGE_PATH_PREFIX = '/marge/';
+const INVOICE_DETAIL_PATH = /^\/factures\/[^/]+$/u;
 
-function titleFor(entryLabel: string, pathname: string): string {
+function titleFor(
+  entryLabel: string,
+  pathname: string,
+  search: Readonly<Record<string, unknown>>,
+): string {
   if (pathname.startsWith(MARGE_PATH_PREFIX)) return LABELS.margin.heading;
+
+  if (INVOICE_DETAIL_PATH.test(pathname)) {
+    const client = typeof search['client'] === 'string' ? search['client'] : null;
+    const period = typeof search['period'] === 'string' ? search['period'] : null;
+    if (client !== null && period !== null) {
+      return `${LABELS.invoice.nav} → ${client} — ${frenchMonth(period)}`;
+    }
+  }
 
   const match = CRA_PERIOD_IN_PATH.exec(pathname);
   if (match?.[1] === undefined) return entryLabel;
@@ -97,10 +110,11 @@ function ShellLayout(): ReactElement {
   const { persona } = Route.useRouteContext();
   const [collapsed, setCollapsed] = useState(readStoredCollapsed);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const search = useRouterState({ select: (state) => state.location.search });
 
   const entries = navigationForRole(persona.role);
   const activeEntry = navEntryForPath(entries, pathname);
-  const title = titleFor(activeEntry?.label ?? LABELS.appName, pathname);
+  const title = titleFor(activeEntry?.label ?? LABELS.appName, pathname, search);
   const showBreadcrumb = activeEntry?.path !== '/tableau-de-bord';
 
   const toggleCollapsed = (): void => {
