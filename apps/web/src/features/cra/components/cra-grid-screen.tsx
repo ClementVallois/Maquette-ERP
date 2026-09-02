@@ -2,7 +2,6 @@ import { Link, useBlocker } from '@tanstack/react-router';
 import { EraserIcon, ListChecksIcon, PlusIcon, Trash2Icon } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useMemo, useState } from 'react';
-import { toast } from 'sonner';
 
 import { DeniedState } from '@/components/feedback/denied-state';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -139,6 +138,10 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   const [matrix, setMatrix] = useState<MatrixState>(() => initMatrix(data));
   const [dirty, setDirty] = useState(false);
   const [mobileWeekIndex, setMobileWeekIndex] = useState(0);
+  const [lastWrite, setLastWrite] = useState<{
+    readonly kind: 'saved' | 'submitted';
+    readonly at: string;
+  } | null>(null);
   // React's own documented pattern for "reset state when a prop changes" (react.dev, "Adjusting
   // state when a prop changes"): compared and reassigned during render, not inside an effect —
   // `react-hooks/set-state-in-effect` is why this is not a `useEffect`. ADR-0067: the grid's
@@ -238,7 +241,11 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
     try {
       await saveMonth.mutateAsync({ submit, entries });
       setDirty(false);
-      toast.success(submit ? LABELS.cra.submittedToast : LABELS.cra.savedToast);
+      const now = new Date();
+      setLastWrite({
+        kind: submit ? 'submitted' : 'saved',
+        at: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+      });
     } catch {
       // The refusal renders inline below, from `saveMonth.error` — nothing else to do here.
     }
@@ -340,7 +347,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
       )}
 
       {data.editable && (
-        <div className="sticky bottom-0 z-20 -mx-3 flex gap-2 border-t border-border bg-background/95 p-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+        <div className="sticky bottom-0 z-20 -mx-3 flex flex-wrap items-center gap-2 border-t border-border bg-background/95 p-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
           <Button
             className="flex-1 md:flex-none"
             variant="outline"
@@ -360,6 +367,24 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
           >
             {LABELS.cra.submit}
           </Button>
+          <p
+            className={
+              saveMonth.isError
+                ? 'w-full text-sm text-destructive md:ml-2 md:w-auto'
+                : 'w-full text-sm text-muted-foreground md:ml-2 md:w-auto'
+            }
+            aria-live="polite"
+          >
+            {saveMonth.isPending
+              ? LABELS.cra.saveState.saving
+              : saveMonth.isError
+                ? LABELS.cra.saveState.failed
+                : dirty
+                  ? LABELS.cra.saveState.dirty
+                  : lastWrite === null
+                    ? LABELS.cra.saveState.unchanged
+                    : LABELS.cra.saveState[lastWrite.kind].replace('{time}', lastWrite.at)}
+          </p>
         </div>
       )}
     </div>
