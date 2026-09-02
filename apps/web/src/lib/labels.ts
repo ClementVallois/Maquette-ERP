@@ -409,6 +409,12 @@ export const LABELS = {
       unknownClient: 'Client inconnu',
     },
     period: 'Mois',
+    searchConsultant: 'Rechercher un consultant',
+    searchConsultantPlaceholder: 'Nom du consultant…',
+    search: 'Rechercher',
+    clearSearch: 'Effacer',
+    searchEmpty: 'Aucun résultat pour ce consultant',
+    searchEmptyBody: 'Effacez la recherche pour retrouver tous les CRA et factures du mois.',
     /** task 7.2's result dialog — drafted invoices **and** declined days, French reasons, and the
      * `replayed: true` case rendered as information rather than as a second success. */
     validateDialog: {

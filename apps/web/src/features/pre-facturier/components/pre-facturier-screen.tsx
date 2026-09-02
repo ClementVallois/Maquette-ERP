@@ -1,7 +1,7 @@
 import { Link, useNavigate } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import { FileTextIcon, ReceiptTextIcon } from 'lucide-react';
-import type { ReactElement } from 'react';
+import type { ReactElement, SyntheticEvent } from 'react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -13,6 +13,7 @@ import { ErrorState } from '@/components/feedback/error-state';
 import { StatCard } from '@/components/stat-card';
 import { StatusBadge, type StatusBadgeVariant } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -107,6 +108,7 @@ function invoiceColumns(): ColumnDef<PreFacturierInvoiceRow>[] {
   return [
     {
       id: 'client',
+      accessorFn: (row) => row.billedToName,
       header: LABELS.preFacturier.client,
       cell: ({ row }) => (
         <span className="font-medium text-foreground">{row.original.billedToName}</span>
@@ -114,6 +116,7 @@ function invoiceColumns(): ColumnDef<PreFacturierInvoiceRow>[] {
     },
     {
       id: 'status',
+      accessorFn: (row) => row.status,
       header: LABELS.preFacturier.invoiceStatus,
       cell: ({ row }) => <StatusBadge variant={INVOICE_STATUS_VARIANT[row.original.status]} />,
     },
@@ -121,21 +124,25 @@ function invoiceColumns(): ColumnDef<PreFacturierInvoiceRow>[] {
       // Rank A7: what tells two drafts to the same client, same month, apart — without this,
       // several rows above were the client's name and nothing else.
       id: 'consultant',
+      accessorFn: (row) => row.consultantName,
       header: LABELS.preFacturier.invoiceConsultant,
       cell: ({ row }) => row.original.consultantName,
     },
     {
       id: 'missions',
+      accessorFn: (row) => row.missionNames.join(', '),
       header: LABELS.preFacturier.invoiceMissions,
       cell: ({ row }) => row.original.missionNames.join(', '),
     },
     {
       id: 'lineCount',
+      accessorFn: (row) => row.lineCount,
       header: LABELS.preFacturier.invoiceLines,
       cell: ({ row }) => <span className="tabular-nums">{row.original.lineCount}</span>,
     },
     {
       id: 'createdAt',
+      accessorFn: (row) => row.createdAt ?? '',
       header: LABELS.preFacturier.invoiceCreatedAt,
       cell: ({ row }) =>
         row.original.createdAt === null ? (
@@ -146,6 +153,7 @@ function invoiceColumns(): ColumnDef<PreFacturierInvoiceRow>[] {
     },
     {
       id: 'invoiceNumber',
+      accessorFn: (row) => row.invoiceNumber ?? '',
       header: LABELS.preFacturier.invoiceNumber,
       cell: ({ row }) => (
         <span className="font-mono text-[0.8125rem] tabular-nums">
@@ -155,6 +163,7 @@ function invoiceColumns(): ColumnDef<PreFacturierInvoiceRow>[] {
     },
     {
       id: 'totalTtc',
+      accessorFn: (row) => row.totalTtcCents ?? -1,
       header: LABELS.preFacturier.totalIncludingVat,
       cell: ({ row }) => (
         <span
@@ -175,6 +184,7 @@ function invoiceColumns(): ColumnDef<PreFacturierInvoiceRow>[] {
     },
     {
       id: 'open',
+      enableSorting: false,
       header: () => <span className="sr-only">{LABELS.action.tableActions}</span>,
       cell: ({ row }) => (
         <Link
@@ -202,6 +212,7 @@ function craColumns(
   const columns: ColumnDef<PreFacturierCraRow>[] = [
     {
       id: 'consultant',
+      accessorFn: (row) => row.consultantName,
       header: LABELS.preFacturier.consultant,
       cell: ({ row }) => (
         <span className="font-medium text-foreground">{row.original.consultantName}</span>
@@ -209,6 +220,7 @@ function craColumns(
     },
     {
       id: 'status',
+      accessorFn: (row) => row.status,
       header: LABELS.preFacturier.craStatus,
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
@@ -219,6 +231,7 @@ function craColumns(
     },
     {
       id: 'recorded',
+      accessorFn: (row) => row.recordedQuarterDays,
       header: LABELS.preFacturier.recorded,
       cell: ({ row }) => (
         <span className="tabular-nums">{frenchDays(row.original.recordedQuarterDays)}</span>
@@ -226,6 +239,7 @@ function craColumns(
     },
     {
       id: 'blocking',
+      enableSorting: false,
       header: LABELS.preFacturier.blocking,
       cell: ({ row }) =>
         row.original.blockingReasons.length === 0 ? (
@@ -253,6 +267,7 @@ function craColumns(
     // already applies to `billing`.
     {
       id: 'marge',
+      enableSorting: false,
       header: () => <span className="sr-only">{LABELS.margin.heading}</span>,
       cell: ({ row }) => (
         <Link
@@ -274,6 +289,7 @@ function craColumns(
     // role check client-side would be a second copy of the same rule, not a second control.
     {
       id: 'actions',
+      enableSorting: false,
       header: () => <span className="sr-only">{LABELS.action.tableActions}</span>,
       // Item 3 (QA round 1): a manager used to have to leave the pré-facturier through the CRA
       // menu (`cra-list-screen.tsx`'s own `Link` to this same route) to look at a row before
@@ -329,6 +345,7 @@ interface PreFacturierScreenProps {
   readonly craPage: number;
   readonly invoicePage: number;
   readonly pageSize: number;
+  readonly consultantSearch: string;
 }
 
 /**
@@ -344,8 +361,14 @@ export function PreFacturierScreen({
   craPage,
   invoicePage,
   pageSize,
+  consultantSearch,
 }: PreFacturierScreenProps): ReactElement {
-  const query = usePreFacturier(period, { craPage, invoicePage, pageSize });
+  const query = usePreFacturier(period, {
+    craPage,
+    invoicePage,
+    pageSize,
+    consultantSearch,
+  });
   const navigate = useNavigate();
   const validateMutation = useValidateCra(period);
   const [validationResult, setValidationResult] = useState<{
@@ -353,6 +376,21 @@ export function PreFacturierScreen({
     readonly data: ValidationResponse;
   } | null>(null);
   const [refusing, setRefusing] = useState<PreFacturierCraRow | null>(null);
+
+  function submitConsultantSearch(event: SyntheticEvent<HTMLFormElement, SubmitEvent>): void {
+    event.preventDefault();
+    const entry = new FormData(event.currentTarget).get('consultant-search');
+    const search = typeof entry === 'string' ? entry.trim() : '';
+    void navigate({
+      to: '/pre-facturier',
+      search: (previous) => ({
+        ...previous,
+        consultantSearch: search === '' ? undefined : search,
+        craPage: 1,
+        invoicePage: 1,
+      }),
+    });
+  }
 
   /**
    * Validation has no separate confirm step (unlike refusal, it needs no reason and is not
@@ -422,6 +460,41 @@ export function PreFacturierScreen({
     <div className="flex flex-col gap-4">
       <PeriodSelector period={period} offered={data.offeredPeriods} />
 
+      <form className="flex max-w-xl items-end gap-2" onSubmit={submitConsultantSearch}>
+        <label className="flex flex-1 flex-col gap-1 text-sm font-medium">
+          {LABELS.preFacturier.searchConsultant}
+          <Input
+            key={consultantSearch}
+            type="search"
+            name="consultant-search"
+            defaultValue={consultantSearch}
+            placeholder={LABELS.preFacturier.searchConsultantPlaceholder}
+          />
+        </label>
+        <Button type="submit" variant="outline">
+          {LABELS.preFacturier.search}
+        </Button>
+        {consultantSearch !== '' && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              void navigate({
+                to: '/pre-facturier',
+                search: (previous) => ({
+                  ...previous,
+                  consultantSearch: undefined,
+                  craPage: 1,
+                  invoicePage: 1,
+                }),
+              });
+            }}
+          >
+            {LABELS.preFacturier.clearSearch}
+          </Button>
+        )}
+      </form>
+
       <div className="grid grid-cols-3 gap-4">
         <StatCard
           label={LABELS.preFacturier.summaryBillable}
@@ -441,11 +514,20 @@ export function PreFacturierScreen({
           columns={invoiceColumns()}
           data={data.invoices}
           getRowId={(row) => row.id}
+          numericColumns={['lineCount', 'totalTtc']}
           emptyState={
             <EmptyState
               icon={ReceiptTextIcon}
-              title={LABELS.preFacturier.billableEmpty}
-              body={LABELS.preFacturier.nothingBlocking}
+              title={
+                consultantSearch === ''
+                  ? LABELS.preFacturier.billableEmpty
+                  : LABELS.preFacturier.searchEmpty
+              }
+              body={
+                consultantSearch === ''
+                  ? LABELS.preFacturier.nothingBlocking
+                  : LABELS.preFacturier.searchEmptyBody
+              }
             />
           }
         />
@@ -490,11 +572,20 @@ export function PreFacturierScreen({
           )}
           data={data.cras}
           getRowId={(row) => row.craId}
+          numericColumns={['recorded']}
           emptyState={
             <EmptyState
               icon={FileTextIcon}
-              title={LABELS.preFacturier.crasEmpty}
-              body={LABELS.preFacturier.crasEmptyHint}
+              title={
+                consultantSearch === ''
+                  ? LABELS.preFacturier.crasEmpty
+                  : LABELS.preFacturier.searchEmpty
+              }
+              body={
+                consultantSearch === ''
+                  ? LABELS.preFacturier.crasEmptyHint
+                  : LABELS.preFacturier.searchEmptyBody
+              }
             />
           }
         />

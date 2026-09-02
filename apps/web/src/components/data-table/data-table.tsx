@@ -1,5 +1,14 @@
-import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table';
+import {
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type ColumnDef,
+  type SortingState,
+} from '@tanstack/react-table';
+import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
+import { useState } from 'react';
 
 import {
   Table,
@@ -9,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 /**
  * The generic table `docs/frontend-plan.md` §3 names (`components/data-table/`), headless via
@@ -24,6 +34,7 @@ interface DataTableProps<TData> {
   readonly getRowId: (row: TData) => string;
   /** Rendered instead of the table body when `data` is empty — the caller's own `EmptyState`. */
   readonly emptyState: ReactNode;
+  readonly numericColumns?: readonly string[];
 }
 
 export function DataTable<TData>({
@@ -31,7 +42,10 @@ export function DataTable<TData>({
   data,
   getRowId,
   emptyState,
+  numericColumns = [],
 }: DataTableProps<TData>): ReactElement {
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const numericColumnIds = new Set(numericColumns);
   // `react-hooks/incompatible-library` flags `useReactTable` by name for every caller, React
   // Compiler or not: it is one of three libraries the rule hardcodes (React Hook Form's
   // `useForm`, TanStack Table's `useReactTable`, TanStack Virtual's `useVirtualizer`) because each
@@ -46,7 +60,10 @@ export function DataTable<TData>({
     data: data as TData[],
     columns: columns as ColumnDef<TData>[],
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
     getRowId,
+    state: { sorting },
+    onSortingChange: setSorting,
   });
 
   if (data.length === 0) return <>{emptyState}</>;
@@ -57,13 +74,44 @@ export function DataTable<TData>({
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="hover:bg-transparent">
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                </TableHead>
-              ))}
+              {headerGroup.headers.map((header) => {
+                const sorted = header.column.getIsSorted();
+                const headerContent = header.isPlaceholder
+                  ? null
+                  : flexRender(header.column.columnDef.header, header.getContext());
+
+                return (
+                  <TableHead
+                    key={header.id}
+                    className={cn(numericColumnIds.has(header.column.id) && 'text-right')}
+                    aria-sort={
+                      sorted === false ? undefined : sorted === 'asc' ? 'ascending' : 'descending'
+                    }
+                  >
+                    {header.column.getCanSort() ? (
+                      <button
+                        type="button"
+                        className={cn(
+                          'inline-flex items-center gap-1 hover:text-foreground',
+                          numericColumnIds.has(header.column.id) && 'ml-auto',
+                        )}
+                        onClick={header.column.getToggleSortingHandler()}
+                      >
+                        {headerContent}
+                        {sorted === 'asc' ? (
+                          <ArrowUpIcon className="size-3.5" aria-hidden="true" />
+                        ) : sorted === 'desc' ? (
+                          <ArrowDownIcon className="size-3.5" aria-hidden="true" />
+                        ) : (
+                          <ArrowUpDownIcon className="size-3.5 opacity-50" aria-hidden="true" />
+                        )}
+                      </button>
+                    ) : (
+                      headerContent
+                    )}
+                  </TableHead>
+                );
+              })}
             </TableRow>
           ))}
         </TableHeader>
@@ -71,7 +119,10 @@ export function DataTable<TData>({
           {table.getRowModel().rows.map((row) => (
             <TableRow key={row.id}>
               {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id}>
+                <TableCell
+                  key={cell.id}
+                  className={cn(numericColumnIds.has(cell.column.id) && 'text-right')}
+                >
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </TableCell>
               ))}

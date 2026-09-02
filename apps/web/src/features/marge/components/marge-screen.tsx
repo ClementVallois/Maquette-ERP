@@ -36,6 +36,7 @@ function MargeSkeleton(): ReactElement {
 const MISSION_COLUMNS: ColumnDef<MissionEconomics>[] = [
   {
     id: 'mission',
+    accessorFn: (row) => row.missionName,
     header: LABELS.margin.mission,
     cell: ({ row }) => (
       <span className="font-medium text-foreground">{row.original.missionName}</span>
@@ -43,16 +44,19 @@ const MISSION_COLUMNS: ColumnDef<MissionEconomics>[] = [
   },
   {
     id: 'quantity',
+    accessorFn: (row) => row.quarterDays,
     header: LABELS.margin.quantity,
     cell: ({ row }) => <span className="tabular-nums">{row.original.quarterDays}</span>,
   },
   {
     id: 'tjm',
+    accessorFn: (row) => row.tjmCents,
     header: LABELS.margin.tjm,
     cell: ({ row }) => <span className="tabular-nums">{frenchEuros(row.original.tjmCents)}</span>,
   },
   {
     id: 'revenue',
+    accessorFn: (row) => row.revenueCents,
     header: LABELS.margin.revenue,
     cell: ({ row }) => (
       <span className="tabular-nums">{frenchEuros(row.original.revenueCents)}</span>
@@ -60,11 +64,13 @@ const MISSION_COLUMNS: ColumnDef<MissionEconomics>[] = [
   },
   {
     id: 'cost',
+    accessorFn: (row) => row.costCents,
     header: LABELS.margin.cost,
     cell: ({ row }) => <span className="tabular-nums">{frenchEuros(row.original.costCents)}</span>,
   },
   {
     id: 'margin',
+    accessorFn: (row) => row.marginCents,
     header: LABELS.margin.margin,
     cell: ({ row }) => (
       <span className="font-medium tabular-nums">{frenchEuros(row.original.marginCents)}</span>
@@ -136,6 +142,7 @@ export function MargeScreen({ consultantId, period, role }: MargeScreenProps): R
         columns={MISSION_COLUMNS}
         data={data.missions}
         getRowId={(row) => row.missionId}
+        numericColumns={['quantity', 'tjm', 'revenue', 'cost', 'margin']}
         emptyState={
           <EmptyState
             icon={TrendingUpIcon}

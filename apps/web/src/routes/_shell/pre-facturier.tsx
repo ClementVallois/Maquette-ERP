@@ -20,6 +20,7 @@ const PreFacturierSearch = z.object({
     .pipe(z.union([z.literal(10), z.literal(20), z.literal(50)]))
     .default(20)
     .catch(20),
+  consultantSearch: z.string().trim().max(100).optional().catch(undefined),
 });
 
 /**
@@ -57,7 +58,7 @@ export const Route = createFileRoute('/_shell/pre-facturier')({
 });
 
 function PreFacturierRoute(): ReactElement {
-  const { period, craPage, invoicePage, pageSize } = Route.useSearch();
+  const { period, craPage, invoicePage, pageSize, consultantSearch } = Route.useSearch();
   const { persona } = Route.useRouteContext();
 
   // Reached only when the office has never had a single Cra, on any period — `beforeLoad` above
@@ -82,6 +83,7 @@ function PreFacturierRoute(): ReactElement {
       craPage={craPage}
       invoicePage={invoicePage}
       pageSize={pageSize}
+      consultantSearch={consultantSearch ?? ''}
     />
   );
 }

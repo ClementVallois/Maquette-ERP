@@ -12,6 +12,7 @@ export interface PreFacturierPagination {
   readonly craPage: number;
   readonly invoicePage: number;
   readonly pageSize: number;
+  readonly consultantSearch: string;
 }
 
 export function fetchPreFacturier(
@@ -25,5 +26,8 @@ export function fetchPreFacturier(
     invoiceLimit: String(pagination.pageSize),
     invoiceOffset: String((pagination.invoicePage - 1) * pagination.pageSize),
   });
+  if (pagination.consultantSearch !== '') {
+    params.set('consultantSearch', pagination.consultantSearch);
+  }
   return apiFetch<PreFacturierResponse>(`/api/v1/pre-facturier?${params.toString()}`);
 }

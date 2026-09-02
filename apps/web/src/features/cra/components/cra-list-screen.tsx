@@ -97,6 +97,7 @@ function columnsFor(role: Role): ColumnDef<CraListItem>[] {
   if (role === 'manager') {
     columns.push({
       id: 'consultantName',
+      accessorFn: (row) => row.consultantName,
       header: LABELS.cra.consultant,
       cell: ({ row }) => (
         <span className="font-medium text-foreground">{row.original.consultantName}</span>
@@ -115,11 +116,13 @@ function columnsFor(role: Role): ColumnDef<CraListItem>[] {
     },
     {
       id: 'status',
+      accessorFn: (row) => row.status,
       header: LABELS.cra.status,
       cell: ({ row }) => <StatusBadge variant={STATUS_VARIANT[row.original.status]} />,
     },
     {
       id: 'recordedQuarterDays',
+      accessorFn: (row) => row.recordedQuarterDays,
       header: LABELS.cra.recorded,
       cell: ({ row }) => (
         <span className="tabular-nums">{frenchDays(row.original.recordedQuarterDays)}</span>
@@ -130,6 +133,7 @@ function columnsFor(role: Role): ColumnDef<CraListItem>[] {
   if (role === 'consultant' || role === 'manager') {
     columns.push({
       id: 'actions',
+      enableSorting: false,
       header: () => <span className="sr-only">{LABELS.action.tableActions}</span>,
       cell: ({ row }) => (
         <Button asChild variant="outline" size="sm" className="ml-auto flex w-fit">
@@ -301,6 +305,7 @@ export function CraListScreen({
               columns={columnsFor(role)}
               data={rows}
               getRowId={(row) => row.id}
+              numericColumns={['recordedQuarterDays']}
               emptyState={emptyState}
             />
           </div>
@@ -310,6 +315,7 @@ export function CraListScreen({
           columns={columnsFor(role)}
           data={rows}
           getRowId={(row) => row.id}
+          numericColumns={['recordedQuarterDays']}
           emptyState={emptyState}
         />
       )}

@@ -150,6 +150,7 @@ export interface PreFacturierInput {
   readonly craOffset?: number;
   readonly invoiceLimit?: number;
   readonly invoiceOffset?: number;
+  readonly consultantSearch?: string;
 }
 
 export async function preFacturierComposition(
@@ -187,31 +188,58 @@ export async function preFacturierComposition(
     };
   }
 
-  const craTotal = await unit.cras.count({ actor, period });
+  const unfilteredCraTotal = await unit.cras.count({ actor, period });
   const allCras = [];
-  for (let offset = 0; offset < craTotal; offset += MAX_MONTHS) {
+  for (let offset = 0; offset < unfilteredCraTotal; offset += MAX_MONTHS) {
     allCras.push(...(await unit.cras.list({ actor, limit: MAX_MONTHS, offset, period })));
   }
-  const cras = allCras.slice(craOffset, craOffset + craLimit);
+  const reference = new PgReferenceReader(unit.client);
+  const consultantNames = await reference.consultantNames();
+  const missionNames = await reference.missionNames();
+  const normalizedSearch = input.consultantSearch?.toLocaleLowerCase('fr') ?? null;
+  const matchingCras =
+    normalizedSearch === null
+      ? allCras
+      : allCras.filter((cra) =>
+          (consultantNames.get(cra.consultantId) ?? cra.consultantId)
+            .toLocaleLowerCase('fr')
+            .includes(normalizedSearch),
+        );
+  const craTotal = matchingCras.length;
+  const cras = matchingCras.slice(craOffset, craOffset + craLimit);
   const declined = await unit.invoices.findDeclinedDays(
     cras.map((cra) => cra.id),
     actor,
   );
-  const invoiceTotal = await unit.invoices.count({ actor, period });
+  const unfilteredInvoiceTotal = await unit.invoices.count({ actor, period });
   const allInvoices = [];
-  for (let offset = 0; offset < invoiceTotal; offset += MAX_MONTHS) {
+  for (let offset = 0; offset < unfilteredInvoiceTotal; offset += MAX_MONTHS) {
     allInvoices.push(...(await unit.invoices.list({ actor, limit: MAX_MONTHS, offset, period })));
   }
-  const invoices = allInvoices.slice(invoiceOffset, invoiceOffset + invoiceLimit);
-
-  const reference = new PgReferenceReader(unit.client);
-  const consultantNames = await reference.consultantNames();
-  const missionNames = await reference.missionNames();
   // `saveDraft` records exactly one source Cra per invoice — the unique index on
   // `(source_cra_ids[1], billed_to_client_id)` is what makes `cras`, already scoped to this same
   // period, the right (and only) place to resolve an invoice's consultant and "created" timestamp
   // from, rather than a second cross-module read.
   const craById = new Map(allCras.map((cra) => [cra.id, cra]));
+  const resolvedMatchingInvoices = [];
+  for (const item of allInvoices) {
+    if (normalizedSearch === null) {
+      resolvedMatchingInvoices.push(item);
+      continue;
+    }
+    const invoice = await unit.invoices.findById(item.id, actor);
+    const sourceCraId = invoice?.lines[0]?.origin.craId;
+    const sourceCra = sourceCraId === undefined ? undefined : craById.get(sourceCraId);
+    const consultantName =
+      sourceCra === undefined
+        ? ''
+        : (consultantNames.get(sourceCra.consultantId) ?? sourceCra.consultantId);
+    if (consultantName.toLocaleLowerCase('fr').includes(normalizedSearch)) {
+      resolvedMatchingInvoices.push(item);
+    }
+  }
+  const invoiceTotal = resolvedMatchingInvoices.length;
+  const invoices = resolvedMatchingInvoices.slice(invoiceOffset, invoiceOffset + invoiceLimit);
 
   // One read per invoice, and the totals come off the aggregate rather than out of a `SUM`
   // (ADR-0053): a draft's `total_ttc_cents` column is NULL by design, and VAT is rounded once per

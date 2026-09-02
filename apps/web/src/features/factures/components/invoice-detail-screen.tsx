@@ -95,11 +95,13 @@ function lineColumns(): ColumnDef<InvoiceLine>[] {
   return [
     {
       id: 'designation',
+      accessorFn: (row) => row.designation,
       header: LABELS.invoice.designation,
       cell: ({ row }) => row.original.designation,
     },
     {
       id: 'origin',
+      accessorFn: (row) => row.origin.period,
       header: LABELS.invoice.origin,
       cell: ({ row }) => (
         <a
@@ -114,11 +116,13 @@ function lineColumns(): ColumnDef<InvoiceLine>[] {
     },
     {
       id: 'quantity',
+      accessorFn: (row) => row.quantityQuarterDays,
       header: LABELS.invoice.quantity,
       cell: ({ row }) => <span className="tabular-nums">{row.original.quantityQuarterDays}</span>,
     },
     {
       id: 'unitPrice',
+      accessorFn: (row) => row.unitPriceCents,
       header: LABELS.invoice.unitPrice,
       cell: ({ row }) => (
         <span className="tabular-nums">{frenchEuros(row.original.unitPriceCents)}</span>
@@ -126,11 +130,13 @@ function lineColumns(): ColumnDef<InvoiceLine>[] {
     },
     {
       id: 'vatRate',
+      accessorFn: (row) => (row.vat.kind === 'taxable' ? row.vat.basisPoints : row.vat.reason),
       header: LABELS.invoice.vatRate,
       cell: ({ row }) => vatRateCell(row.original.vat),
     },
     {
       id: 'amount',
+      accessorFn: (row) => row.amountCents,
       header: LABELS.invoice.amount,
       cell: ({ row }) => (
         <span className="tabular-nums">{frenchEuros(row.original.amountCents)}</span>
@@ -207,11 +213,14 @@ function vatColumns(): ColumnDef<VatGroup>[] {
   return [
     {
       id: 'rate',
+      accessorFn: (row) =>
+        row.treatment.kind === 'taxable' ? row.treatment.basisPoints : row.treatment.reason,
       header: LABELS.invoice.vatRate,
       cell: ({ row }) => vatRateCell(row.original.treatment),
     },
     {
       id: 'base',
+      accessorFn: (row) => row.baseCents,
       header: LABELS.invoice.vatBase,
       cell: ({ row }) => (
         <span className="tabular-nums">{frenchEuros(row.original.baseCents)}</span>
@@ -219,6 +228,7 @@ function vatColumns(): ColumnDef<VatGroup>[] {
     },
     {
       id: 'amount',
+      accessorFn: (row) => row.vatCents ?? -1,
       header: LABELS.invoice.vatAmount,
       cell: ({ row }) =>
         row.original.vatCents === null ? (
@@ -357,6 +367,7 @@ export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): Rea
           columns={lineColumns()}
           data={data.lines}
           getRowId={(row) => row.origin.craId + row.designation}
+          numericColumns={['quantity', 'unitPrice', 'amount']}
           emptyState={null}
         />
       </section>
@@ -381,6 +392,7 @@ export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): Rea
           columns={vatColumns()}
           data={data.vatBreakdown}
           getRowId={(row) => row.key}
+          numericColumns={['base', 'amount']}
           emptyState={null}
         />
       </section>

@@ -97,6 +97,7 @@ const PreFacturierParams = PeriodQuery.extend({
   craOffset: z.coerce.number().int().min(0).default(0),
   invoiceLimit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
   invoiceOffset: z.coerce.number().int().min(0).default(0),
+  consultantSearch: z.string().trim().min(1).max(100).optional(),
 });
 
 /**
@@ -741,6 +742,9 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           craOffset: query.value.craOffset,
           invoiceLimit: query.value.invoiceLimit,
           invoiceOffset: query.value.invoiceOffset,
+          ...(query.value.consultantSearch === undefined
+            ? {}
+            : { consultantSearch: query.value.consultantSearch }),
         }),
       );
 

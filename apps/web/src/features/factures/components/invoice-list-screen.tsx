@@ -55,6 +55,7 @@ function columns(): ColumnDef<InvoiceListItem>[] {
   return [
     {
       id: 'client',
+      accessorFn: (row) => row.billedToName,
       header: LABELS.invoice.client,
       cell: ({ row }) => (
         <span className="font-medium text-foreground">{row.original.billedToName}</span>
@@ -62,6 +63,7 @@ function columns(): ColumnDef<InvoiceListItem>[] {
     },
     {
       id: 'status',
+      accessorFn: (row) => row.status,
       header: LABELS.preFacturier.invoiceStatus,
       cell: ({ row }) => <StatusBadge variant={INVOICE_STATUS_VARIANT[row.original.status]} />,
     },
@@ -69,16 +71,19 @@ function columns(): ColumnDef<InvoiceListItem>[] {
       // Rank A7: the same discriminant the pré-facturier carries — without it, several rows here
       // are the same client and nothing else.
       id: 'consultant',
+      accessorFn: (row) => row.consultantName,
       header: LABELS.preFacturier.invoiceConsultant,
       cell: ({ row }) => row.original.consultantName,
     },
     {
       id: 'period',
+      accessorFn: (row) => row.supplyPeriod,
       header: LABELS.invoice.supplyPeriod,
       cell: ({ row }) => frenchMonth(row.original.supplyPeriod),
     },
     {
       id: 'number',
+      accessorFn: (row) => row.invoiceNumber ?? '',
       header: LABELS.invoice.number,
       cell: ({ row }) => (
         <span className="font-mono text-[0.8125rem] tabular-nums">
@@ -88,6 +93,7 @@ function columns(): ColumnDef<InvoiceListItem>[] {
     },
     {
       id: 'ttc',
+      accessorFn: (row) => row.totalTtcCents ?? -1,
       header: LABELS.invoice.ttc,
       cell: ({ row }) => (
         <span
@@ -108,6 +114,7 @@ function columns(): ColumnDef<InvoiceListItem>[] {
     },
     {
       id: 'actions',
+      enableSorting: false,
       header: () => <span className="sr-only">{LABELS.action.tableActions}</span>,
       cell: ({ row }) => (
         <Link
@@ -298,6 +305,7 @@ export function InvoiceListScreen({
         columns={columns()}
         data={query.data.invoices}
         getRowId={(row) => row.id}
+        numericColumns={['ttc']}
         emptyState={
           <EmptyState
             icon={ReceiptTextIcon}
