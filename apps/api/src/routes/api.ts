@@ -618,6 +618,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
 
       return {
         period: composition.period,
+        offeredPeriods: composition.offeredPeriods,
         summary: {
           billableCents: composition.billable.reduce(
             (total, row) => total + row.totalExcludingVatCents,

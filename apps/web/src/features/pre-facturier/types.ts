@@ -58,6 +58,7 @@ export interface PreFacturierCraRow {
 
 export interface PreFacturierResponse {
   readonly period: string | null;
+  readonly offeredPeriods: readonly string[];
   readonly summary: PreFacturierSummary;
   readonly invoices: readonly PreFacturierInvoiceRow[];
   readonly cras: readonly PreFacturierCraRow[];

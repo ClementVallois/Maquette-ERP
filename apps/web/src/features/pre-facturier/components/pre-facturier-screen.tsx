@@ -22,7 +22,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { RefuseDialog } from '@/features/cra/components/refuse-dialog';
 import { ValidateResultDialog } from '@/features/cra/components/validate-result-dialog';
-import { useCraList, useValidateCra } from '@/features/cra/hooks';
+import { useValidateCra } from '@/features/cra/hooks';
 import type { CraStatus, ValidationResponse } from '@/features/cra/types';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
@@ -66,16 +66,6 @@ function TableSkeleton(): ReactElement {
       <Skeleton className="h-11 w-full" />
     </div>
   );
-}
-
-/** Sorted-descending, deduplicated periods — the same rule the server's own `offeredPeriods`
- * (`apps/api/src/composition/pre-facturier.ts`) applies, ported here because the JSON route
- * (unlike the SSR page) does not put that list on the wire (`docs/open-questions.md`, row dated
- * 2026-08-26). Derived from `GET /api/v1/cras`, already scoped server-side the same way the
- * pré-facturier itself is (office for a manager, office for billing — verified against
- * `pg-cra-repository.ts`'s `list()`). */
-function offeredPeriods(periods: readonly string[]): string[] {
-  return [...new Set(periods)].sort((left, right) => right.localeCompare(left));
 }
 
 interface PeriodSelectorProps {
@@ -346,7 +336,6 @@ interface PreFacturierScreenProps {
  */
 export function PreFacturierScreen({ period, role }: PreFacturierScreenProps): ReactElement {
   const query = usePreFacturier(period);
-  const craList = useCraList();
   const validateMutation = useValidateCra(period);
   const [validationResult, setValidationResult] = useState<{
     readonly cra: PreFacturierCraRow;
@@ -407,7 +396,6 @@ export function PreFacturierScreen({ period, role }: PreFacturierScreenProps): R
   }
 
   const data = query.data;
-  const offered = offeredPeriods([...(craList.data?.cras.map((cra) => cra.period) ?? []), period]);
 
   if (data.period === null) {
     return (
@@ -421,7 +409,7 @@ export function PreFacturierScreen({ period, role }: PreFacturierScreenProps): R
 
   return (
     <div className="flex flex-col gap-4">
-      <PeriodSelector period={period} offered={offered} />
+      <PeriodSelector period={period} offered={data.offeredPeriods} />
 
       <div className="grid grid-cols-3 gap-4">
         <StatCard
