@@ -557,6 +557,40 @@ export const LABELS = {
     issueReplayedToast: 'Cette facture était déjà émise : numéro d’origine affiché.',
   },
 
+  assignment: {
+    nav: 'Affectations',
+    current: 'Affectations en cours',
+    upcoming: 'À venir',
+    consultants: 'Consultants',
+    new: 'Nouvelle affectation',
+    edit: 'Modifier les dates',
+    formLead:
+      'Le périmètre, les dates de mission et les habilitations sont vérifiés à l’enregistrement.',
+    consultant: 'Consultant',
+    mission: 'Mission',
+    from: 'Du',
+    to: 'Au',
+    chooseConsultant: 'Choisir un consultant…',
+    chooseMission: 'Choisir une mission…',
+    create: 'Affecter',
+    save: 'Enregistrer',
+    cancelEdit: 'Annuler la modification',
+    noHabilitation: 'Cette mission ne demande aucune habilitation particulière.',
+    requiredHabilitations: 'Habilitations requises : {names}.',
+    createdToast: 'Affectation créée.',
+    updatedToast: 'Affectation mise à jour.',
+    list: 'Affectations de l’implantation',
+    listLead: 'Les affectations passées restent visibles dans l’historique.',
+    filters: { current: 'En cours', all: 'Toutes' },
+    empty: 'Aucune affectation dans cette vue',
+    emptyBody: 'Créez une affectation ou affichez l’historique complet.',
+    currentBadge: 'En cours',
+    upcomingBadge: 'À venir',
+    endedBadge: 'Terminée',
+    openEnded: 'sans date de fin',
+    editFor: 'Modifier l’affectation de {name}',
+  },
+
   margin: {
     heading: 'Marge',
     lead: 'Ces trois valeurs ne figurent dans aucune liste. Elles ne s’obtiennent que par cette lecture, et chaque ouverture est journalisée : qui a lu, quels champs, sur qui.',
@@ -612,6 +646,18 @@ export const LABELS = {
       '/problems/database-unavailable': 'La base de données ne répond pas.',
       '/problems/internal':
         'L’action n’a pas pu aboutir. Citez l’identifiant de corrélation ci-dessous.',
+      '/problems/assignment-invalid-range':
+        'La date de fin doit être postérieure ou égale à la date de début.',
+      '/problems/assignment-after-departure':
+        'Cette affectation atteint ou dépasse la date de départ du consultant.',
+      '/problems/assignment-outside-mission':
+        'Les dates choisies sortent de la période de la mission.',
+      '/problems/assignment-missing-habilitation':
+        'Le consultant ne possède pas toutes les habilitations requises pendant cette affectation.',
+      '/problems/assignment-overlap':
+        'Une affectation à cette mission couvre déjà tout ou partie de ces dates.',
+      '/problems/assignment-recorded-days':
+        'Cette modification laisserait hors affectation des jours déjà enregistrés dans un CRA.',
 
       // Client-originated (lib/api-client.ts's `CLIENT_PROBLEM_TYPES`), never sent by the API —
       // synthesized here because a proxy error page or a `fetch()` rejection never reached a

@@ -30,6 +30,7 @@ export interface AssignmentView extends AssignmentInput {
 }
 
 export interface AssignmentCatalogue {
+  readonly today: string;
   readonly assignments: readonly AssignmentView[];
   readonly consultants: readonly {
     readonly id: string;
@@ -100,6 +101,7 @@ function nullableDate(value: Date | string | null): IsoDate | null {
 export async function assignmentCatalogue(
   client: PgReadClient,
   actor: Actor,
+  today: string,
 ): Promise<AssignmentCatalogue> {
   const { rows: assignments } = await client.query<AssignmentRow>(
     `SELECT a.id, a.consultant_id,
@@ -135,6 +137,7 @@ export async function assignmentCatalogue(
   );
 
   return {
+    today,
     assignments: assignments.map((row) => ({
       id: row.id,
       consultantId: row.consultant_id,

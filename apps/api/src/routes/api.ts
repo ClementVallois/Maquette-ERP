@@ -681,7 +681,8 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
 
   app.get('/api/v1/assignments', { config: { access: forRoles('manager') } }, async (request) => {
     const actor = requireActor(request);
-    return dependencies.transactionally((unit) => assignmentCatalogue(unit.client, actor));
+    const today = isoDateInFirmTimeZone(dependencies.clock.now());
+    return dependencies.transactionally((unit) => assignmentCatalogue(unit.client, actor, today));
   });
 
   // ── The progressive-disclosure read (BUILD-PLAN 5.3, ADR-0043) ────────────
