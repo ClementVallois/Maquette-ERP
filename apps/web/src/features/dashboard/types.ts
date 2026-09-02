@@ -38,6 +38,17 @@
  */
 export type DashboardCraStatus = 'draft' | 'submitted' | 'validated' | 'refused';
 
+export interface DashboardActivity {
+  readonly key: string;
+  readonly kind: 'cra' | 'invoice';
+  readonly recordId: string;
+  readonly status: DashboardCraStatus | 'issued' | 'cancelledByCreditNote';
+  readonly period: string;
+  readonly name: string | null;
+  readonly at: string;
+  readonly consultantId?: string;
+}
+
 export interface ConsultantDashboard {
   readonly period: string;
   readonly role: 'consultant';
@@ -51,6 +62,7 @@ export interface ConsultantDashboard {
    * `period` itself too (when this month's own refusal is what `myMonthStatus` already reports).
    */
   readonly refusedPeriods: readonly string[];
+  readonly recentActivity: readonly DashboardActivity[];
 }
 
 /** One row of a manager's "à faire maintenant" queue — a submitted Cra awaiting a decision. */
@@ -74,6 +86,7 @@ export interface ManagerDashboard {
    * queue `pendingDecisions` counts but did not, until this field, let a manager reach directly.
    */
   readonly awaitingDecision: readonly ManagerQueueRow[];
+  readonly recentActivity: readonly DashboardActivity[];
 }
 
 /** One row of billing's "à faire maintenant" queue — a draft ready to issue. */
@@ -92,6 +105,7 @@ export interface BillingDashboard {
   readonly totalTtcIssuedCents: number;
   /** Every draft across every period, oldest supply period first. */
   readonly oldestDrafts: readonly BillingQueueRow[];
+  readonly recentActivity: readonly DashboardActivity[];
 }
 
 export type DashboardResponse = ConsultantDashboard | ManagerDashboard | BillingDashboard;

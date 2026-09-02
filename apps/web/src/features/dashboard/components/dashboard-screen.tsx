@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useInvoiceHistory } from '@/features/factures/hooks';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
-import { frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
+import { frenchDate, frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
@@ -20,6 +20,8 @@ import { useDashboard } from '../hooks';
 import type {
   BillingDashboard,
   ConsultantDashboard,
+  DashboardActivity,
+  DashboardCraStatus,
   DashboardResponse,
   ManagerDashboard,
 } from '../types';
@@ -111,6 +113,71 @@ function WorkQueue({ items }: { readonly items: readonly QueueItem[] }): ReactEl
               </Button>
             </li>
           ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function activitySentence(item: DashboardActivity): string {
+  if (item.kind === 'invoice') {
+    return `${item.name ?? LABELS.invoice.heading} — ${LABELS.preFacturier.invoiceStatuses[item.status as 'issued' | 'cancelledByCreditNote']}`;
+  }
+
+  const subject = item.name ?? LABELS.cra.heading;
+  return `${subject} — ${LABELS.cra.statuses[item.status as DashboardCraStatus]}`;
+}
+
+function RecentActivity({ data }: { readonly data: DashboardResponse }): ReactElement {
+  const labels = LABELS.dashboard.queue;
+
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-card-title">{labels.recentActivity}</h2>
+      {data.recentActivity.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{labels.recentActivityEmpty}</p>
+      ) : (
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {data.recentActivity.map((item) => {
+            const content = (
+              <>
+                <span className="font-medium text-foreground">{activitySentence(item)}</span>
+                <span className="text-xs text-muted-foreground">
+                  {frenchMonth(item.period)} · {frenchDate(item.at.slice(0, 10))}
+                </span>
+              </>
+            );
+
+            return (
+              <li key={item.key} className="rounded-xl bg-card shadow-card ring-1 ring-border">
+                {item.kind === 'invoice' ? (
+                  <Link
+                    to="/factures/$id"
+                    params={{ id: item.recordId }}
+                    className="flex flex-col gap-1 p-4 hover:bg-muted/40"
+                  >
+                    {content}
+                  </Link>
+                ) : data.role === 'manager' && item.consultantId !== undefined ? (
+                  <Link
+                    to="/cra/$period/$consultantId"
+                    params={{ period: item.period, consultantId: item.consultantId }}
+                    className="flex flex-col gap-1 p-4 hover:bg-muted/40"
+                  >
+                    {content}
+                  </Link>
+                ) : (
+                  <Link
+                    to="/cra/$period"
+                    params={{ period: item.period }}
+                    className="flex flex-col gap-1 p-4 hover:bg-muted/40"
+                  >
+                    {content}
+                  </Link>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
@@ -398,6 +465,8 @@ export function DashboardScreen({ role, period }: DashboardScreenProps): ReactEl
       </section>
 
       {(data.role === 'manager' || data.role === 'billing') && <HistorySection />}
+
+      <RecentActivity data={data} />
     </div>
   );
 }

@@ -79,15 +79,6 @@ const Pagination = z.object({
 const CRA_LIST_MAX_PAGE_SIZE = 200;
 
 /**
- * Every `CraStatus` but `validated` (ADR-0082): the dashboard's own definition of "actionable" —
- * `submitted` awaits a manager's decision, `refused` awaits the consultant's correction, `draft`
- * is what a Cra past its own period's close still not validated looks like on the way there. Kept
- * as a literal tuple rather than `CRA_STATUSES.filter(…)` so its type stays the readonly-tuple
- * `CraListQuery.statuses` wants, not a widened `CraStatus[]`.
- */
-const NON_VALIDATED_CRA_STATUSES = ['draft', 'submitted', 'refused'] as const;
-
-/**
  * The three months the seed actually fills densely (`CLAUDE.md`'s dataset-shape section) — Rank
  * A2's history chart names them explicitly rather than deriving "the last three months", which
  * would silently start rendering zeros the day the wall clock moves past August 2026.
@@ -803,13 +794,10 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           (day) => calendar.nonWorkableReason(day) === null,
         );
 
-        const { cra, refused } = await dependencies.transactionally(async (unit) => ({
+        const { cra, allCras } = await dependencies.transactionally(async (unit) => ({
           cra: await unit.cras.findByConsultantAndPeriod(actor.consultantId, period, actor),
-          // ADR-0082: a refusal stays visible past the period it happened in, so a consultant who
-          // has moved on to the next month still sees that last month's correction is still owed.
-          refused: await unit.cras.list({
+          allCras: await unit.cras.list({
             actor,
-            statuses: ['refused'],
             limit: CRA_LIST_MAX_PAGE_SIZE,
             offset: 0,
           }),
@@ -830,7 +818,25 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           remainingWorkableDays: workableDays.filter(
             (day) => (recordedByDay.get(day) ?? 0) < QUARTER_DAYS_PER_DAY,
           ).length,
-          refusedPeriods: refused.map((row) => row.period),
+          refusedPeriods: allCras
+            .filter((row) => row.status === 'refused')
+            .map((row) => row.period),
+          recentActivity: allCras
+            .filter(
+              (row): row is typeof row & { statusChangedAt: string } =>
+                row.statusChangedAt !== null,
+            )
+            .toSorted((left, right) => right.statusChangedAt.localeCompare(left.statusChangedAt))
+            .slice(0, 5)
+            .map((row) => ({
+              key: row.id,
+              kind: 'cra' as const,
+              recordId: row.id,
+              status: row.status,
+              period: row.period,
+              name: null,
+              at: row.statusChangedAt,
+            })),
         };
       }
 
@@ -841,22 +847,23 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         // state. `pendingDecisions`/`lateCras` no longer come from it (ADR-0082): a Cra awaiting a
         // decision or already late does not stop being either just because the requested period
         // changed, so both are read across every period the manager may see instead.
-        const { composition, actionable, consultantNames } = await dependencies.transactionally(
+        const { composition, allCras, consultantNames } = await dependencies.transactionally(
           async (unit) => ({
             composition: await preFacturierComposition(unit, {
               actor,
               requestedPeriod: query.value.period,
               today,
             }),
-            actionable: await unit.cras.list({
+            allCras: await unit.cras.list({
               actor,
-              statuses: NON_VALIDATED_CRA_STATUSES,
               limit: CRA_LIST_MAX_PAGE_SIZE,
               offset: 0,
             }),
             consultantNames: await new PgReferenceReader(unit.client).consultantNames(),
           }),
         );
+
+        const actionable = allCras.filter((row) => row.status !== 'validated');
 
         const awaitingDecision = actionable
           .filter((row) => row.status === 'submitted')
@@ -883,6 +890,23 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           // excludes `validated`, so only the closed-period test is left to apply.
           lateCras: actionable.filter((row) => lastDayOf(periodFromIso(row.period)) < today).length,
           awaitingDecision,
+          recentActivity: allCras
+            .filter(
+              (row): row is typeof row & { statusChangedAt: string } =>
+                row.statusChangedAt !== null,
+            )
+            .toSorted((left, right) => right.statusChangedAt.localeCompare(left.statusChangedAt))
+            .slice(0, 5)
+            .map((row) => ({
+              key: row.id,
+              kind: 'cra' as const,
+              recordId: row.id,
+              status: row.status,
+              period: row.period,
+              name: consultantNames.get(row.consultantId) ?? row.consultantId,
+              at: row.statusChangedAt,
+              consultantId: row.consultantId,
+            })),
         };
       }
 
@@ -924,6 +948,22 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           .filter((invoice) => invoice.status === 'issued')
           .reduce((total, invoice) => total + (invoice.totalTtcCents ?? 0), 0),
         oldestDrafts,
+        recentActivity: everyPeriod
+          .filter(
+            (invoice): invoice is typeof invoice & { issueDate: string } =>
+              invoice.issueDate !== null,
+          )
+          .toSorted((left, right) => right.issueDate.localeCompare(left.issueDate))
+          .slice(0, 5)
+          .map((invoice) => ({
+            key: invoice.id,
+            kind: 'invoice' as const,
+            recordId: invoice.id,
+            status: invoice.status,
+            period: invoice.supplyPeriod,
+            name: invoice.billedToName,
+            at: invoice.issueDate,
+          })),
       };
     },
   );
