@@ -191,6 +191,7 @@ export const LABELS = {
      * (Phase 6.2's "deux totaux, lus du même état local"). */
     dayTotal: 'Total du jour',
     monthTotal: 'Total du mois',
+    weekTotal: 'Total semaine',
     totalsAsOf: 'Totaux à jour du dernier enregistrement.',
     /**
      * The SPA's own note, distinct from `totalsAsOf` above: that sentence describes the
@@ -273,6 +274,9 @@ export const LABELS = {
       caption: 'CRA — {month}',
       previousMonth: 'Mois précédent',
       nextMonth: 'Mois suivant',
+      previousWeek: 'Semaine précédente',
+      nextWeek: 'Semaine suivante',
+      weekPosition: 'Semaine {current} sur {count}',
       fillEmptyWorkdays: 'Remplir les jours ouvrés vides',
       clearRow: 'Vider la ligne',
       removeRow: 'Retirer la ligne',

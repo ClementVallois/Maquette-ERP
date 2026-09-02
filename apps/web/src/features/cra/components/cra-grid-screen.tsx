@@ -18,7 +18,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
-import { frenchMonth } from '@/lib/format';
+import { frenchDate, frenchMonth, frenchWeekday } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
@@ -36,7 +36,7 @@ import {
   type MatrixState,
 } from '../matrix';
 import { missingDaysFrom } from '../missing-days';
-import type { CraGridResponse } from '../types';
+import type { CraGridResponse, GridDay } from '../types';
 
 import { CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
 import type { CellQuantity } from './cra-quantity-cell';
@@ -126,9 +126,19 @@ interface CraGridBodyProps {
   readonly data: CraGridResponse;
 }
 
+function calendarWeeks(days: readonly GridDay[]): readonly (readonly GridDay[])[] {
+  const weeks: GridDay[][] = [];
+  for (const day of days) {
+    if (weeks.length === 0 || frenchWeekday(day.date) === 'lundi') weeks.push([]);
+    weeks.at(-1)?.push(day);
+  }
+  return weeks;
+}
+
 function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   const [matrix, setMatrix] = useState<MatrixState>(() => initMatrix(data));
   const [dirty, setDirty] = useState(false);
+  const [mobileWeekIndex, setMobileWeekIndex] = useState(0);
   // React's own documented pattern for "reset state when a prop changes" (react.dev, "Adjusting
   // state when a prop changes"): compared and reassigned during render, not inside an effect —
   // `react-hooks/set-state-in-effect` is why this is not a `useEffect`. ADR-0067: the grid's
@@ -139,6 +149,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
     setSyncedWith(data);
     setMatrix(initMatrix(data));
     setDirty(false);
+    setMobileWeekIndex(0);
   }
 
   const saveMonth = useSaveMonth(period);
@@ -239,6 +250,8 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   // reads them. `missingDaysFrom` yields an empty set for every other refusal, so the grid carries
   // server-side flags only for the one that produced them.
   const missingDays = missingDaysFrom(mutationProblem);
+  const weeks = calendarWeeks(data.days);
+  const mobileDays = weeks[mobileWeekIndex] ?? weeks[0] ?? [];
 
   return (
     <div className="flex flex-col gap-4">
@@ -260,39 +273,64 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
         </div>
       )}
 
-      <CraMatrixTable
-        period={period}
-        days={data.days}
-        rows={rows}
-        matrix={matrix}
-        editable={data.editable}
-        flaggedDays={flaggedDays}
-        missingDays={missingDays}
-        onChangeCell={data.editable ? updateCell : undefined}
-        renderRowTools={
-          data.editable
-            ? (row) => (
-                <RowTools
-                  row={row}
-                  empty={isRowEmpty(
-                    matrix,
-                    row.key,
-                    data.days.map((day) => day.date),
-                  )}
-                  onFill={() => {
-                    handleFillRow(row.key);
-                  }}
-                  onClear={() => {
-                    handleClearRow(row.key);
-                  }}
-                  onRemove={() => {
-                    handleRemoveRow(row.key);
-                  }}
-                />
-              )
-            : undefined
-        }
-      />
+      <div className="md:hidden">
+        <WeekNavigator
+          days={mobileDays}
+          index={mobileWeekIndex}
+          count={weeks.length}
+          onChange={setMobileWeekIndex}
+        />
+        <div className="mt-2">
+          <CraMatrixTable
+            period={period}
+            days={mobileDays}
+            rows={rows}
+            matrix={matrix}
+            editable={data.editable}
+            compact
+            totalLabel={LABELS.cra.weekTotal}
+            flaggedDays={flaggedDays}
+            missingDays={missingDays}
+            onChangeCell={data.editable ? updateCell : undefined}
+          />
+        </div>
+      </div>
+
+      <div className="hidden md:block">
+        <CraMatrixTable
+          period={period}
+          days={data.days}
+          rows={rows}
+          matrix={matrix}
+          editable={data.editable}
+          flaggedDays={flaggedDays}
+          missingDays={missingDays}
+          onChangeCell={data.editable ? updateCell : undefined}
+          renderRowTools={
+            data.editable
+              ? (row) => (
+                  <RowTools
+                    row={row}
+                    empty={isRowEmpty(
+                      matrix,
+                      row.key,
+                      data.days.map((day) => day.date),
+                    )}
+                    onFill={() => {
+                      handleFillRow(row.key);
+                    }}
+                    onClear={() => {
+                      handleClearRow(row.key);
+                    }}
+                    onRemove={() => {
+                      handleRemoveRow(row.key);
+                    }}
+                  />
+                )
+              : undefined
+          }
+        />
+      </div>
 
       {mutationProblem !== null && (
         <Alert variant="destructive">
@@ -302,8 +340,9 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
       )}
 
       {data.editable && (
-        <div className="flex gap-2">
+        <div className="sticky bottom-0 z-20 -mx-3 flex gap-2 border-t border-border bg-background/95 p-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
           <Button
+            className="flex-1 md:flex-none"
             variant="outline"
             disabled={saveMonth.isPending}
             onClick={() => {
@@ -313,6 +352,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
             {LABELS.cra.save}
           </Button>
           <Button
+            className="flex-1 md:flex-none"
             disabled={saveMonth.isPending}
             onClick={() => {
               void handleSubmitMonth(true);
@@ -322,6 +362,60 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+function WeekNavigator({
+  days,
+  index,
+  count,
+  onChange,
+}: {
+  readonly days: readonly GridDay[];
+  readonly index: number;
+  readonly count: number;
+  readonly onChange: (index: number) => void;
+}): ReactElement {
+  const first = days[0]?.date;
+  const last = days.at(-1)?.date;
+
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg bg-muted p-2">
+      <Button
+        type="button"
+        size="icon-sm"
+        variant="ghost"
+        disabled={index === 0}
+        aria-label={LABELS.cra.matrix.previousWeek}
+        onClick={() => {
+          onChange(index - 1);
+        }}
+      >
+        ‹
+      </Button>
+      <p className="text-center text-sm font-medium">
+        {LABELS.cra.matrix.weekPosition
+          .replace('{current}', String(index + 1))
+          .replace('{count}', String(count))}
+        {first !== undefined && last !== undefined && (
+          <span className="block text-xs font-normal text-muted-foreground">
+            {frenchDate(first)} — {frenchDate(last)}
+          </span>
+        )}
+      </p>
+      <Button
+        type="button"
+        size="icon-sm"
+        variant="ghost"
+        disabled={index >= count - 1}
+        aria-label={LABELS.cra.matrix.nextWeek}
+        onClick={() => {
+          onChange(index + 1);
+        }}
+      >
+        ›
+      </Button>
     </div>
   );
 }
