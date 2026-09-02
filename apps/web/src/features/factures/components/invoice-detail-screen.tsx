@@ -454,9 +454,11 @@ export function InvoiceDetailScreen({
       )}
 
       {/* O8: the page above stacks six blocks (parties, invoice facts, timeline, lines, lineage,
-          VAT recap) — this keeps the client, the total and the two navigation actions reachable
-          without scrolling back to the top. Same sticky-bottom pattern as the CRA grid's own save
-          bar (`cra-grid-screen.tsx`). */}
+          VAT recap) — this keeps the client, the total and the primary action reachable without
+          scrolling back to the top. Same sticky-bottom pattern as the CRA grid's own save bar
+          (`cra-grid-screen.tsx`). Navigation (back to the list, the printable link) is the header's
+          job (above) — a real middle breadcrumb crumb (`5f7abd8`) keeps "back" reachable while
+          scrolled, so this bar does not need to repeat it. */}
       <div className="sticky bottom-0 z-20 -mx-3 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-background/95 p-3 backdrop-blur sm:-mx-6">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-foreground">{data.billedTo.name}</p>
@@ -465,26 +467,16 @@ export function InvoiceDetailScreen({
             {data.totalsAreProvisional && <span aria-hidden="true"> *</span>}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm">
-            <a href={returnTo}>{LABELS.invoice.backToList}</a>
+        {canIssue && data.status !== alreadyIssued && (
+          <Button
+            size="sm"
+            onClick={() => {
+              setIssuing(true);
+            }}
+          >
+            {LABELS.invoice.issue}
           </Button>
-          <Button asChild variant="outline" size="sm">
-            <a href={`${INVOICE_PRINT_PATH}/${data.id}`} target="_blank" rel="noreferrer">
-              {LABELS.invoice.printable}
-            </a>
-          </Button>
-          {canIssue && data.status !== alreadyIssued && (
-            <Button
-              size="sm"
-              onClick={() => {
-                setIssuing(true);
-              }}
-            >
-              {LABELS.invoice.issue}
-            </Button>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
