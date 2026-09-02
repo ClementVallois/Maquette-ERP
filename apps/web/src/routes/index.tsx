@@ -84,6 +84,7 @@ function PersonaSelectorPage(): ReactElement {
               ? sentenceFor(personas.error.problem)
               : LABELS.shell.unexpectedErrorBody
           }
+          onRetry={() => void personas.refetch()}
           {...(personas.error instanceof ApiProblemError &&
           personas.error.problem.correlationId !== undefined
             ? { correlationId: personas.error.problem.correlationId }

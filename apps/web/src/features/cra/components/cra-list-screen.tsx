@@ -243,6 +243,7 @@ export function CraListScreen({
         <ErrorState
           title={headingFor(error.problem)}
           body={sentenceFor(error.problem)}
+          onRetry={() => void query.refetch()}
           {...(error.problem.correlationId === undefined
             ? {}
             : { correlationId: error.problem.correlationId })}
@@ -251,7 +252,11 @@ export function CraListScreen({
     }
 
     return (
-      <ErrorState title={LABELS.problem.heading.internal} body={LABELS.shell.unexpectedErrorBody} />
+      <ErrorState
+        title={LABELS.problem.heading.internal}
+        body={LABELS.shell.unexpectedErrorBody}
+        onRetry={() => void query.refetch()}
+      />
     );
   }
 

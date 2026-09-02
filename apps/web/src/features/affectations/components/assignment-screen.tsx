@@ -59,6 +59,7 @@ export function AssignmentScreen(): ReactElement {
       <ErrorState
         title={problem === null ? LABELS.problem.heading.internal : headingFor(problem)}
         body={problem === null ? LABELS.shell.unexpectedErrorBody : sentenceFor(problem)}
+        onRetry={() => void query.refetch()}
         {...(problem?.correlationId === undefined ? {} : { correlationId: problem.correlationId })}
       />
     );
