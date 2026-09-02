@@ -237,6 +237,7 @@ interface PreFacturierBody {
     readonly invoiceNumber: string | null;
     readonly issueDate: string | null;
     readonly totalTtcCents: number | null;
+    readonly totalsAreProvisional: boolean;
   }[];
   readonly cras: readonly {
     readonly craId: string;
@@ -277,8 +278,11 @@ describe('GET /api/v1/pre-facturier', () => {
       billedToName: 'Banque Nationale de Test',
       invoiceNumber: null,
       issueDate: null,
-      totalTtcCents: null,
+      totalsAreProvisional: true,
     });
+    // A draft's TTC is computed from its lines rather than stored (Rank B1): a real number, not
+    // a placeholder, since the totals are not frozen until issuance.
+    expect(body.invoices[0]?.totalTtcCents).toBeGreaterThan(0);
 
     const alice = body.cras.find((row) => row.consultantId === ALICE);
     expect(alice).toMatchObject({

@@ -26,9 +26,11 @@ export type InvoiceStatus = 'draft' | 'issued' | 'cancelledByCreditNote';
 /**
  * The list projection of an invoice, shared by `GET /api/v1/invoices`, Phase 5.1's
  * `GET /api/v1/pre-facturier` and `POST /api/v1/cras/:id/validation` (Annexe A gives all three the
- * same shape). `totalTtcCents` is `null` until the invoice is issued, and so are `invoiceNumber`
- * and `issueDate` — a draft has no number (ADR-0007's gapless sequence allocates one at issuance,
- * never before).
+ * same shape). `invoiceNumber` and `issueDate` are `null` until the invoice is issued — a draft
+ * has no number (ADR-0007's gapless sequence allocates one at issuance, never before).
+ * `totalTtcCents` is never null: for a draft it is computed from the lines rather than frozen, and
+ * `totalsAreProvisional` (true only for a draft) is what tells the reader the number can still
+ * move before issuance.
  */
 export interface InvoiceListItem {
   readonly id: string;
@@ -38,6 +40,7 @@ export interface InvoiceListItem {
   readonly invoiceNumber: string | null;
   readonly issueDate: string | null;
   readonly totalTtcCents: number | null;
+  readonly totalsAreProvisional: boolean;
 }
 
 export interface InvoiceListResponse {
@@ -144,7 +147,8 @@ export interface DocumentTotals {
  * The invoice detail (`GET /api/v1/invoices/:id`) — the second of the two "complex payloads"
  * frontend-plan.md task 3.7 names for optional zod parsing at the fetch boundary. Not written
  * here: the parser belongs in this feature's `api.ts`, which does not exist yet in Phase 3.
- * `totals` is `null` until `status === 'issued'` (Annexe A, verbatim in the route).
+ * `totals` is never null: a draft's totals are computed from its lines rather than frozen, and
+ * `totalsAreProvisional` (true only for `status === 'draft'`) says whether they can still move.
  */
 export interface InvoiceDetail {
   readonly id: string;
@@ -158,7 +162,8 @@ export interface InvoiceDetail {
   readonly mentions: LegalMentions;
   readonly lines: readonly InvoiceLine[];
   readonly vatBreakdown: readonly VatGroup[];
-  readonly totals: DocumentTotals | null;
+  readonly totals: DocumentTotals;
+  readonly totalsAreProvisional: boolean;
 }
 
 export interface IssuanceResponse {

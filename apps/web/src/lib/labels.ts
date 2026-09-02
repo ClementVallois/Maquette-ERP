@@ -409,6 +409,7 @@ export const LABELS = {
     totalExcludingVat: 'Total HT',
     totalVat: 'Total TVA',
     totalIncludingVat: 'Total TTC',
+    provisionalTotals: 'Montants provisoires — figés à l’émission.',
     mentions: 'Mentions obligatoires',
     latePayment:
       'En cas de retard de paiement, application d’intérêts de retard au taux annuel de {rate}, exigibles sans rappel.',

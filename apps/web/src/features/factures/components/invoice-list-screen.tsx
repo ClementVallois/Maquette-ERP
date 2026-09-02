@@ -81,10 +81,19 @@ function columns(): ColumnDef<InvoiceListItem>[] {
       id: 'ttc',
       header: LABELS.invoice.ttc,
       cell: ({ row }) => (
-        <span className="tabular-nums">
+        <span
+          className="tabular-nums"
+          title={row.original.totalsAreProvisional ? LABELS.invoice.provisionalTotals : undefined}
+        >
           {row.original.totalTtcCents === null
             ? LABELS.preFacturier.notNumberedYet
             : frenchEuros(row.original.totalTtcCents)}
+          {row.original.totalsAreProvisional && (
+            <span aria-hidden="true" className="text-muted-foreground">
+              {' '}
+              *
+            </span>
+          )}
         </span>
       ),
     },

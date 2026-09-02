@@ -282,6 +282,7 @@ describe('PgInvoiceRepository', () => {
       'status',
       'supplyPeriod',
       'totalTtcCents',
+      'totalsAreProvisional',
     ]);
   });
 

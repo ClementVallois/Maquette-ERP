@@ -286,8 +286,8 @@ export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): Rea
         />
       </section>
 
-      {data.totals !== null && (
-        <div className="grid grid-cols-3 gap-4">
+      <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <StatCard
             label={LABELS.invoice.totalExcludingVat}
             value={frenchEuros(data.totals.totalExcludingVatCents)}
@@ -301,7 +301,10 @@ export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): Rea
             value={frenchEuros(data.totals.totalIncludingVatCents)}
           />
         </div>
-      )}
+        {data.totalsAreProvisional && (
+          <p className="text-sm text-muted-foreground">{LABELS.invoice.provisionalTotals}</p>
+        )}
+      </div>
 
       {canIssue && data.status !== alreadyIssued && (
         <div>

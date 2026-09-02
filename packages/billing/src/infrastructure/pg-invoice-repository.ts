@@ -70,11 +70,10 @@ export class PgInvoiceRepository implements InvoiceRepository {
     if (readScope(actor, 'invoice') === 'none') return [];
 
     const { rows } = await this.#client.query<InvoiceListRow>(
-      `SELECT id, status, supply_period, billed_to_name, invoice_number, issue_date, total_ttc_cents
-       FROM billing.invoices
-       WHERE office_id = $1
-         AND ($4::text IS NULL OR supply_period = $4)
-       ORDER BY supply_period DESC, billed_to_name
+      `${INVOICE_LIST_SELECT}
+       WHERE i.office_id = $1
+         AND ($4::text IS NULL OR i.supply_period = $4)
+       ORDER BY i.supply_period DESC, i.billed_to_name
        LIMIT $2 OFFSET $3`,
       [actor.officeId, limit, query.offset, query.period ?? null],
     );
@@ -106,10 +105,9 @@ export class PgInvoiceRepository implements InvoiceRepository {
     if (readScope(actor, 'invoice') === 'none') return [];
 
     const { rows } = await this.#client.query<InvoiceListRow>(
-      `SELECT id, status, supply_period, billed_to_name, invoice_number, issue_date, total_ttc_cents
-       FROM billing.invoices
-       WHERE $1 = ANY(source_cra_ids) AND office_id = $2
-       ORDER BY billed_to_name`,
+      `${INVOICE_LIST_SELECT}
+       WHERE $1 = ANY(i.source_cra_ids) AND i.office_id = $2
+       ORDER BY i.billed_to_name`,
       [craId, actor.officeId],
     );
 
@@ -185,9 +183,8 @@ export class PgInvoiceRepository implements InvoiceRepository {
     if (readScope(actor, 'invoice') === 'none') return null;
 
     const { rows } = await this.#client.query<InvoiceListRow>(
-      `SELECT id, status, supply_period, billed_to_name, invoice_number, issue_date, total_ttc_cents
-       FROM billing.invoices
-       WHERE issuance_idempotency_key = $1 AND office_id = $2`,
+      `${INVOICE_LIST_SELECT}
+       WHERE i.issuance_idempotency_key = $1 AND i.office_id = $2`,
       [key, actor.officeId],
     );
     const row = rows[0];
@@ -526,6 +523,7 @@ function toListItem(row: InvoiceListRow): InvoiceListItem {
     issueDate: row.issue_date === null ? null : isoDateOf(row.issue_date),
     totalTtcCents:
       row.total_ttc_cents !== null ? exactInteger('total_ttc_cents', row.total_ttc_cents) : null,
+    totalsAreProvisional: row.status === 'draft',
   };
 }
 
@@ -545,6 +543,30 @@ interface InvoiceListRow {
   issue_date: Date | string | null;
   total_ttc_cents: string | number | null;
 }
+
+/**
+ * Every list-shaped read joins two aggregated subqueries onto `billing.invoices` so a draft's
+ * (still-null) `total_ttc_cents` reads as the sum of its lines instead of `NULL` — the same
+ * computation `Invoice.totals` does in memory (domain/invoice.ts), reproduced here in integer SQL
+ * because listing a page of invoices should not mean reconstituting every aggregate in it.
+ * `COALESCE` prefers the frozen column: once issued, that is the number of record.
+ */
+const INVOICE_LIST_SELECT = `
+  SELECT i.id, i.status, i.supply_period, i.billed_to_name, i.invoice_number, i.issue_date,
+         COALESCE(i.total_ttc_cents, COALESCE(lt.ht_cents, 0) + COALESCE(vt.tax_cents, 0))
+           AS total_ttc_cents
+  FROM billing.invoices i
+  LEFT JOIN (
+    SELECT invoice_id, SUM(amount_cents) AS ht_cents
+    FROM billing.invoice_lines
+    GROUP BY invoice_id
+  ) lt ON lt.invoice_id = i.id
+  LEFT JOIN (
+    SELECT invoice_id, SUM(tax_cents) AS tax_cents
+    FROM billing.invoice_vat_groups
+    GROUP BY invoice_id
+  ) vt ON vt.invoice_id = i.id
+`;
 
 interface InvoiceLineRow {
   id: string;

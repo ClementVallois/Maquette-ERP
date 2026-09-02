@@ -11,7 +11,13 @@ export interface InvoiceListItem {
   readonly billedToName: string;
   readonly invoiceNumber: string | null;
   readonly issueDate: string | null;
+  /**
+   * A draft's TTC is computed from its lines, not stored — issuing can still change them, so
+   * `totalsAreProvisional` (true for every draft) is what tells a reader this number is not yet
+   * frozen. Never null: a draft's computed total stands in for the absent frozen one.
+   */
   readonly totalTtcCents: number | null;
+  readonly totalsAreProvisional: boolean;
 }
 
 export interface InvoiceListQuery {

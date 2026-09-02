@@ -427,10 +427,12 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         mentions: invoice.mentions,
         lines: invoice.lines,
         vatBreakdown: invoice.vatBreakdown,
-        // Mirrors assertInvoiceStateIsCoherent (billing/domain/invoice.ts): draft is the only
-        // status with no totals — issued, cancelledByCreditNote and any other non-draft status
-        // carry them.
-        totals: invoice.status === 'draft' ? null : invoice.totals,
+        // `Invoice.totals` (billing/domain/invoice.ts) computes from the lines when nothing is
+        // frozen yet, so a draft's totals are real numbers, not a placeholder — but they are not
+        // yet the document's totals, since issuing can still change the lines. `totalsAreProvisional`
+        // is what tells the reader that difference; nothing here persists the draft's totals.
+        totals: invoice.totals,
+        totalsAreProvisional: invoice.status === 'draft',
       };
     },
   );

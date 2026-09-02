@@ -41,7 +41,9 @@ export interface PreFacturierInvoiceRow {
   readonly billedToName: string;
   readonly invoiceNumber: string | null;
   readonly issueDate: string | null;
+  /** Never null: a draft's TTC is computed from its lines. See `totalsAreProvisional`. */
   readonly totalTtcCents: number | null;
+  readonly totalsAreProvisional: boolean;
 }
 
 export interface PreFacturierCraRow {
