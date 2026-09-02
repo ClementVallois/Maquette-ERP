@@ -59,6 +59,7 @@ export type {
   InvoiceListItem,
   InvoiceListQuery,
   InvoiceRepository,
+  InvoiceYearStatusCount,
 } from './domain/invoice-repository.ts';
 export { PgInvoiceRepository } from './infrastructure/pg-invoice-repository.ts';
 export { PgNumberingCounter } from './infrastructure/pg-numbering-counter.ts';

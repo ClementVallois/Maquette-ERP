@@ -16,6 +16,7 @@ import type {
   InvoiceListItem,
   InvoiceListQuery,
   InvoiceRepository,
+  InvoiceYearStatusCount,
 } from '../domain/invoice-repository.ts';
 import type { InvoiceStatus } from '../domain/invoice-status.ts';
 import { type BilledParty, Invoice } from '../domain/invoice.ts';
@@ -162,6 +163,26 @@ export class PgInvoiceRepository implements InvoiceRepository {
       missionId: row.mission_id as MissionId,
       quarterDays: exactInteger('quarter_days', row.quarter_days),
       reason: row.reason as DeclinedDaysRecord['reason'],
+    }));
+  }
+
+  /** Rank A2: the dashboard's history chart — one row per (year, status), never a page to truncate. */
+  async countByYearAndStatus(actor: Actor): Promise<readonly InvoiceYearStatusCount[]> {
+    if (readScope(actor, 'invoice') === 'none') return [];
+
+    const { rows } = await this.#client.query<{ year: string; status: string; count: string }>(
+      `SELECT left(supply_period, 4) AS year, status, COUNT(*) AS count
+       FROM billing.invoices
+       WHERE office_id = $1
+       GROUP BY left(supply_period, 4), status
+       ORDER BY year, status`,
+      [actor.officeId],
+    );
+
+    return rows.map((row) => ({
+      year: row.year,
+      status: row.status,
+      count: exactInteger('count', row.count),
     }));
   }
 

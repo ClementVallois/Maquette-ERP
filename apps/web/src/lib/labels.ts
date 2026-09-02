@@ -138,6 +138,22 @@ export const LABELS = {
         'Ce mois ne contient aucune donnée : c’est un mois en cours, pas un défaut.',
       seeMonthsWithData: 'Voir un mois avec des données',
     },
+    /** Rank A2 — manager/billing only. Two honest series, never a twelve-month curve (the header
+     * comment of `invoice-history-chart.tsx` explains why a chart was refused until now). */
+    history: {
+      heading: 'Historique des factures',
+      byYearTitle: 'Factures par année et par statut',
+      byYearCaption:
+        'Six années où cette implantation a eu au moins une facture — les années sans barre n’ont eu aucune facture, ce n’est pas une donnée manquante.',
+      byYearAxisLabel: 'Nombre de factures',
+      denseMonthsTitle: 'Facturable — juin, juillet, août 2026',
+      denseMonthsCaption:
+        'Trois mois, pas une tendance : le jeu de données ne couvre densément que ces trois mois de 2026.',
+      denseMonthsAxisLabel: 'Facturable HT',
+      tableCaption: 'Les mêmes chiffres, en tableau.',
+      year: 'Année',
+      total: 'Total',
+    },
   },
 
   cra: {

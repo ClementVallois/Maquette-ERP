@@ -1,6 +1,11 @@
 import { apiFetch, type ApiResult } from '@/lib/api-client';
 
-import type { InvoiceDetail, InvoiceListResponse, IssuanceResponse } from './types';
+import type {
+  InvoiceDetail,
+  InvoiceHistoryResponse,
+  InvoiceListResponse,
+  IssuanceResponse,
+} from './types';
 
 /**
  * The fetch functions for `Annexe A — Billing`'s invoice endpoints (task 8.1-8.3). Never called
@@ -38,4 +43,9 @@ export function postIssuance(
     method: 'POST',
     headers: { 'idempotency-key': idempotencyKey },
   });
+}
+
+/** Rank A2's history chart — manager/billing only, `forRoles('manager', 'billing')` on the API. */
+export function fetchInvoiceHistory(): Promise<ApiResult<InvoiceHistoryResponse>> {
+  return apiFetch<InvoiceHistoryResponse>('/api/v1/invoices/history');
 }

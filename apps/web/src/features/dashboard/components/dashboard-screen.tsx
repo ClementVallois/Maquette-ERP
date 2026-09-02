@@ -8,6 +8,7 @@ import { StatCard } from '@/components/stat-card';
 import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useInvoiceHistory } from '@/features/factures/hooks';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
 import { frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
@@ -22,6 +23,8 @@ import type {
   DashboardResponse,
   ManagerDashboard,
 } from '../types';
+
+import { InvoiceHistoryChart } from './invoice-history-chart';
 
 /** The dense months the seed actually fills — A5's escape hatch off a genuinely blank one. */
 const MONTHS_WITH_DATA = ['2026-06', '2026-07', '2026-08'] as const;
@@ -293,6 +296,25 @@ function BillingCards({ data }: { readonly data: BillingDashboard }): ReactEleme
   );
 }
 
+/**
+ * Rank A2 — manager and billing only: both roles already read invoice data elsewhere
+ * (`GET /api/v1/invoices`, `forRoles('manager', 'billing')`), and `GET /api/v1/invoices/history`
+ * carries the same gate. A consultant has no invoice visibility anywhere in this application, so
+ * this section renders nothing for that role rather than a 403 nobody asked for.
+ */
+function HistorySection(): ReactElement | null {
+  const query = useInvoiceHistory();
+
+  if (query.isPending) {
+    return <Skeleton className="h-64 w-full" />;
+  }
+  if (query.isError) {
+    return null;
+  }
+
+  return <InvoiceHistoryChart data={query.data} />;
+}
+
 /** Whether this role's month reads as genuinely empty — the A5 trigger for `SeeMonthsWithData`. */
 function isEmpty(data: DashboardResponse): boolean {
   switch (data.role) {
@@ -374,6 +396,8 @@ export function DashboardScreen({ role, period }: DashboardScreenProps): ReactEl
         {data.role === 'manager' && <ManagerCards data={data} />}
         {data.role === 'billing' && <BillingCards data={data} />}
       </section>
+
+      {(data.role === 'manager' || data.role === 'billing') && <HistorySection />}
     </div>
   );
 }

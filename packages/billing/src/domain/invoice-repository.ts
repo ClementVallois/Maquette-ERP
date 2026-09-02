@@ -40,6 +40,17 @@ export interface DeclinedDaysRecord {
   readonly reason: DeclineReason;
 }
 
+/**
+ * Rank A2's chart: how many invoices of each status exist per supply-period year. `year` is the
+ * four-digit prefix of `supply_period` (`YYYY-MM` text — migration 002's own comment on why it is
+ * text, not a date), the same convention `CraListQuery.year` already reads against.
+ */
+export interface InvoiceYearStatusCount {
+  readonly year: string;
+  readonly status: string;
+  readonly count: number;
+}
+
 export interface InvoiceRepository {
   /**
    * `null` means there is no such invoice; an invoice that exists and is out of reach raises
@@ -76,4 +87,6 @@ export interface InvoiceRepository {
    * set answers nothing — never everything.
    */
   findDeclinedDays(craIds: readonly string[], actor: Actor): Promise<readonly DeclinedDaysRecord[]>;
+  /** Rank A2: one row per (year, status) this office's invoices span — the dashboard's history chart. */
+  countByYearAndStatus(actor: Actor): Promise<readonly InvoiceYearStatusCount[]>;
 }

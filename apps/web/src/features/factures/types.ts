@@ -182,3 +182,25 @@ export interface IssuanceResponse {
   readonly issueDate: string;
   readonly totalTtcCents: number;
 }
+
+/**
+ * `GET /api/v1/invoices/history` (Rank A2) — the dashboard's history chart. Two honest series:
+ * every (year, status) this office's invoices span, and the three dense 2026 months' billable HT.
+ * `year` is a four-digit string, the `supply_period` prefix `PgInvoiceRepository.countByYearAndStatus`
+ * groups by.
+ */
+export interface InvoiceYearStatusCount {
+  readonly year: string;
+  readonly status: InvoiceStatus;
+  readonly count: number;
+}
+
+export interface DenseMonthBillable {
+  readonly period: string;
+  readonly billableCents: number;
+}
+
+export interface InvoiceHistoryResponse {
+  readonly byYearAndStatus: readonly InvoiceYearStatusCount[];
+  readonly denseMonths: readonly DenseMonthBillable[];
+}

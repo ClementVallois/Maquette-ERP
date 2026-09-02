@@ -3,8 +3,13 @@ import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
 import { unwrap } from '@/lib/api-client';
 
-import { fetchInvoiceDetail, fetchInvoiceList, postIssuance } from './api';
-import type { InvoiceDetail, InvoiceListResponse, IssuanceResponse } from './types';
+import { fetchInvoiceDetail, fetchInvoiceHistory, fetchInvoiceList, postIssuance } from './api';
+import type {
+  InvoiceDetail,
+  InvoiceHistoryResponse,
+  InvoiceListResponse,
+  IssuanceResponse,
+} from './types';
 
 function invoiceListQueryKey(): readonly [string] {
   return ['factures'] as const;
@@ -34,6 +39,19 @@ export function invoiceDetailQueryOptions(id: string) {
 
 export function useInvoiceDetail(id: string): UseQueryResult<InvoiceDetail> {
   return useQuery(invoiceDetailQueryOptions(id));
+}
+
+/** Rank A2 — no `period` argument: the history chart is fixed (2016→2026, three dense months), not
+ * a view over the dashboard's own `?period=`, so it does not refetch when that changes. */
+export function invoiceHistoryQueryOptions() {
+  return queryOptions({
+    queryKey: ['facture-historique'] as const,
+    queryFn: async () => unwrap(await fetchInvoiceHistory()),
+  });
+}
+
+export function useInvoiceHistory(): UseQueryResult<InvoiceHistoryResponse> {
+  return useQuery(invoiceHistoryQueryOptions());
 }
 
 interface IssueVariables {

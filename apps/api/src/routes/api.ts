@@ -86,6 +86,13 @@ const CRA_LIST_MAX_PAGE_SIZE = 200;
  */
 const NON_VALIDATED_CRA_STATUSES = ['draft', 'submitted', 'refused'] as const;
 
+/**
+ * The three months the seed actually fills densely (`CLAUDE.md`'s dataset-shape section) — Rank
+ * A2's history chart names them explicitly rather than deriving "the last three months", which
+ * would silently start rendering zeros the day the wall clock moves past August 2026.
+ */
+const DENSE_MONTHS = ['2026-06', '2026-07', '2026-08'] as const;
+
 const PeriodQuery = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u) });
 
 /**
@@ -380,6 +387,46 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         flags: cra.flags,
         validatedBy: cra.validatedBy,
       };
+    },
+  );
+
+  /**
+   * Rank A2: the dashboard's history chart. Two honest series and only these two — six real
+   * (year, status) points spanning 2016→2026, and the three dense 2026 months' billable HT,
+   * labelled as three months and never presented as a trend (a twelve-month curve would render
+   * three bars and nine zeros, the same visual lie under a new name).
+   */
+  app.get(
+    '/api/v1/invoices/history',
+    { config: { access: forRoles('manager', 'billing') } },
+    async (request) => {
+      const actor = requireActor(request);
+
+      return dependencies.transactionally(async (unit) => {
+        const byYearAndStatus = await unit.invoices.countByYearAndStatus(actor);
+
+        // `preFacturierComposition` already computes a period's billable HT from the live
+        // aggregate rather than a stored (and, for a draft, absent) total — reused here rather
+        // than reimplemented, for the three months the seed actually fills.
+        const today = isoDateInFirmTimeZone(dependencies.clock.now());
+        const denseMonths = [];
+        for (const period of DENSE_MONTHS) {
+          const composition = await preFacturierComposition(unit, {
+            actor,
+            requestedPeriod: period,
+            today,
+          });
+          denseMonths.push({
+            period,
+            billableCents: composition.billable.reduce(
+              (total, row) => total + row.totalExcludingVatCents,
+              0,
+            ),
+          });
+        }
+
+        return { byYearAndStatus, denseMonths };
+      });
     },
   );
 
