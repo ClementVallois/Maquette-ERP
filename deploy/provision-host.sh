@@ -110,9 +110,13 @@ ask() {
   read -r input || true
   [[ -z "$input" && -n "$current" ]] && input="$current"
   printf -v "$key" '%s' "$input"
+  # Persisting here, and only here, is what makes the banner's "it remembers values already saved"
+  # true. `ask_secret` deliberately does not: a password re-asked on a re-run is a small cost, a
+  # password cached in a second file for the convenience of re-running is a second thing to protect.
+  [[ -n "$input" ]] && write_env "$key" "$input"
 }
 
-# ask_secret KEY "Prompt" — like ask, but input is hidden.
+# ask_secret KEY "Prompt" — like ask, but input is hidden, and never persisted (see `ask`).
 ask_secret() {
   local key="$1" prompt="$2" current input
   current=$(_existing "$key" || true)
@@ -290,8 +294,16 @@ if [[ "$regenerate_secrets" -eq 1 ]]; then
   session_signing_key="$(openssl rand -hex 32)"
   note "generated a new SESSION_SIGNING_KEY (not echoed back — it signs the persona cookie)"
 
-  secrets_tmp="$(mktemp)"
+  # `install` does not create leading directories, and nothing else here creates this one: without
+  # it the install below dies with ENOENT after every credential has already been typed in.
+  run "Create $SECRETS_DIR (root-only)" install -d -o root -g root -m 0700 "$SECRETS_DIR"
+
   umask 077
+  secrets_tmp="$(mktemp)"
+  # The trap, not the `rm` at the end of this block, is what removes it: every command below runs
+  # under `set -e`, so any failure between here and there would otherwise leave both plaintext
+  # database passwords and the signing key sitting in /tmp.
+  trap 'rm -f "$secrets_tmp"' EXIT
   {
     printf 'POSTGRES_DB=%s\n' "$POSTGRES_DB"
     printf 'POSTGRES_USER=%s\n' "$POSTGRES_USER"
@@ -313,6 +325,7 @@ if [[ "$regenerate_secrets" -eq 1 ]]; then
   run "Install $SECRETS_FILE (root:root, 0600)" \
     install -o root -g root -m 0600 "$secrets_tmp" "$SECRETS_FILE"
   rm -f "$secrets_tmp"
+  trap - EXIT
 fi
 
 # ── Stage 6 — GHCR read access ───────────────────────────────────────────────────────────────────
