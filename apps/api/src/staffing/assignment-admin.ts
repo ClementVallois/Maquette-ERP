@@ -1,19 +1,8 @@
+import { STAFFING_PROBLEM_TYPES, type StaffingProblemType } from '@erp/contracts';
 import { isoDate, isoDateOf, type Actor, type IsoDate } from '@erp/platform';
 
 import type { PgReadClient } from '../persistence/pg-client.ts';
 import { PgReferenceReader } from '../persistence/reference-reader.ts';
-
-export const ASSIGNMENT_PROBLEM_TYPES = {
-  invalidRange: '/problems/assignment-invalid-range',
-  departure: '/problems/assignment-after-departure',
-  missionDates: '/problems/assignment-outside-mission',
-  missingHabilitation: '/problems/assignment-missing-habilitation',
-  overlap: '/problems/assignment-overlap',
-  recordedDays: '/problems/assignment-recorded-days',
-} as const;
-
-type AssignmentProblemType =
-  (typeof ASSIGNMENT_PROBLEM_TYPES)[keyof typeof ASSIGNMENT_PROBLEM_TYPES];
 
 export interface AssignmentInput {
   readonly consultantId: string;
@@ -52,7 +41,7 @@ export type AssignmentWriteOutcome =
   | { readonly kind: 'notFound' }
   | {
       readonly kind: 'refused';
-      readonly problemType: AssignmentProblemType;
+      readonly problemType: StaffingProblemType;
       readonly details: Readonly<Record<string, string>>;
     };
 
@@ -167,7 +156,7 @@ export async function assignmentCatalogue(
 }
 
 function refused(
-  problemType: AssignmentProblemType,
+  problemType: StaffingProblemType,
   details: Readonly<Record<string, string>>,
 ): AssignmentWriteOutcome {
   return { kind: 'refused', problemType, details };
@@ -182,7 +171,7 @@ async function validateAssignment(
   const from = isoDate(input.fromDate);
   const to = input.toDate === null ? null : isoDate(input.toDate);
   if (to !== null && to < from) {
-    return refused(ASSIGNMENT_PROBLEM_TYPES.invalidRange, {
+    return refused(STAFFING_PROBLEM_TYPES.invalidRange, {
       fromDate: from,
       toDate: to,
     });
@@ -199,7 +188,7 @@ async function validateAssignment(
 
   const departure = nullableDate(consultant.departure_date);
   if (departure !== null && (from >= departure || (to !== null && to >= departure))) {
-    return refused(ASSIGNMENT_PROBLEM_TYPES.departure, { departureDate: departure });
+    return refused(STAFFING_PROBLEM_TYPES.departure, { departureDate: departure });
   }
 
   const reference = await new PgReferenceReader(client).timesheet();
@@ -209,13 +198,13 @@ async function validateAssignment(
     !reference.runsOn(input.missionId, from) ||
     (to !== null && !reference.runsOn(input.missionId, to))
   ) {
-    return refused(ASSIGNMENT_PROBLEM_TYPES.missionDates, {
+    return refused(STAFFING_PROBLEM_TYPES.missionDates, {
       missionStartDate: mission.startDate,
       missionEndDate: mission.endDate ?? '',
     });
   }
   if (to === null && mission.endDate !== null) {
-    return refused(ASSIGNMENT_PROBLEM_TYPES.missionDates, {
+    return refused(STAFFING_PROBLEM_TYPES.missionDates, {
       missionStartDate: mission.startDate,
       missionEndDate: mission.endDate,
     });
@@ -234,7 +223,7 @@ async function validateAssignment(
       `SELECT id, name FROM public.habilitations WHERE id = ANY($1::text[]) ORDER BY name`,
       [[...missing]],
     );
-    return refused(ASSIGNMENT_PROBLEM_TYPES.missingHabilitation, {
+    return refused(STAFFING_PROBLEM_TYPES.missingHabilitation, {
       habilitations: names.map((row) => row.name).join(', '),
     });
   }
@@ -250,7 +239,7 @@ async function validateAssignment(
     [input.consultantId, input.missionId, from, to, excludedId],
   );
   if (overlaps[0]?.exists === true) {
-    return refused(ASSIGNMENT_PROBLEM_TYPES.overlap, {});
+    return refused(STAFFING_PROBLEM_TYPES.overlap, {});
   }
 
   return null;
@@ -290,7 +279,7 @@ export async function updateAssignment(
   const existing = existingRows[0];
   if (existing === undefined) return { kind: 'notFound' };
   if (existing.consultant_id !== input.consultantId || existing.mission_id !== input.missionId) {
-    return refused(ASSIGNMENT_PROBLEM_TYPES.invalidRange, {});
+    return refused(STAFFING_PROBLEM_TYPES.invalidRange, {});
   }
 
   const refusal = await validateAssignment(client, actor, input, id);
@@ -307,7 +296,7 @@ export async function updateAssignment(
     [input.consultantId, input.missionId, input.fromDate, input.toDate],
   );
   if (recordedDays[0]?.exists === true) {
-    return refused(ASSIGNMENT_PROBLEM_TYPES.recordedDays, {});
+    return refused(STAFFING_PROBLEM_TYPES.recordedDays, {});
   }
 
   await client.query(`UPDATE public.assignments SET from_date = $2, to_date = $3 WHERE id = $1`, [
