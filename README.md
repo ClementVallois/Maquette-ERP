@@ -56,13 +56,14 @@ dessous. **Le point d'entrée est `http://127.0.0.1:3000/`**, le sélecteur de p
 s'atteint en cliquant depuis là. La section « Démarrer » dit comment lancer l'instance, et la même
 chaîne se voit en HTTP ou à l'écran, au choix.
 
-Ce qui n'existe **pas encore** : l'instance hébergée elle-même. Les fichiers de déploiement
-(`deploy/` : image, composition hôte, script de redéploiement pull-based, minuteurs systemd, reset
-nocturne, script humain guidé) sont dans le dépôt depuis la phase 8 et vérifiés en local — build
-réel de l'image, `compose.prod.yml` monté avec un vrai PostgreSQL, migration et seed rejoués —
-mais **rien n'a encore tourné sur l'hôte réel** : ni DNS, ni certificat, ni utilisateur système, ni
-minuteur, ni premier déploiement. Restent aussi la passe de relecture documentaire (phase 9) et le
-gel (phase 10). La phase 0 — outillage, CI, règles d'écriture — précède les autres et est faite.
+**L'instance tourne : [https://erp.clementvallois.fr](https://erp.clementvallois.fr)** — déployée le
+03/09/2026. La chaîne complète de la phase 8 est en service sur l'hôte : l'image publiée par la CI
+et tirée par digest, PostgreSQL sur un réseau privé sans port publié, les migrations et le seed en
+conteneurs éphémères, le minuteur systemd qui interroge GHCR, et la remise à zéro nocturne
+(ADR-0032 — les données sont synthétiques et repartent de zéro chaque nuit à 03h30).
+
+Restent la passe de relecture documentaire (phase 9) et le gel (phase 10). La phase 0 — outillage,
+CI, règles d'écriture — précède les autres et est faite.
 
 **L'interface interactive en SPA React est livrée** — décidée le 24/08/2026, écrite depuis, et
 couverte par les tests Playwright de `apps/web/e2e/`. Elle a son plan de construction
