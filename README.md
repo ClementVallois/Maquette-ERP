@@ -225,7 +225,8 @@ plan de charge et moteur de contraintes de staffing · devis, contrat-cadre, BDC
 sous-traitance · dictionnaire d'indicateurs et TACE · reporting analytique · workflow d'approbation
 générique et délégation · verrouillage optimiste et `ETag` · SCIM, PAM, recertification, SIEM ·
 anti-exfiltration au-delà de la réduction de périmètre · assistant IA et OCR · reprise de
-l'existant · hébergement souverain.
+l'existant · hébergement souverain ou certifié de l'ERP cible (la maquette publique sur le VPS
+personnel ne revendique ni l'un ni l'autre, ADR-0028).
 
 **Hors périmètre par construction :**
 
