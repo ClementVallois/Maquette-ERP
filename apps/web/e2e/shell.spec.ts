@@ -74,7 +74,7 @@ test.describe('nav shows exactly the entries of the session role', () => {
     expect(labels).toStrictEqual(['Tableau de bord', 'Mes CRA']);
   });
 
-  test('manager (Bruno, manager-paris): Tableau de bord, Pré-facturier, CRA, Factures — no standing Marge entry', async ({
+  test('manager (Bruno, manager-paris): Tableau de bord, Pré-facturier, CRA, Affectations, Factures — no standing Marge entry', async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'one viewport is enough for the label check');
@@ -86,10 +86,16 @@ test.describe('nav shows exactly the entries of the session role', () => {
     // added (`docs/open-questions.md`, row dated 24/08/2026, resolved) — the real margin screen
     // is reached only by an explicit click off a pré-facturier row (ADR-0052, "jamais un survol"),
     // never from the sidebar.
-    expect(labels).toStrictEqual(['Tableau de bord', 'Pré-facturier', 'CRA', 'Factures']);
+    expect(labels).toStrictEqual([
+      'Tableau de bord',
+      'Pré-facturier',
+      'CRA',
+      'Affectations',
+      'Factures',
+    ]);
   });
 
-  test('manager (Emma, manager-lyon): the same four entries as any other manager', async ({
+  test('manager (Emma, manager-lyon): the same five entries as any other manager', async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'one viewport is enough for the label check');
@@ -97,7 +103,13 @@ test.describe('nav shows exactly the entries of the session role', () => {
     await choosePersona(page, 'manager-lyon');
     const labels = await navLabels(page);
 
-    expect(labels).toStrictEqual(['Tableau de bord', 'Pré-facturier', 'CRA', 'Factures']);
+    expect(labels).toStrictEqual([
+      'Tableau de bord',
+      'Pré-facturier',
+      'CRA',
+      'Affectations',
+      'Factures',
+    ]);
   });
 
   test('billing (Henri, billing-paris): Tableau de bord, Pré-facturier, Factures — never CRA or Marge', async ({
@@ -398,7 +410,7 @@ test.describe('keyboard navigation of the shell (task 10.2)', () => {
 
     // manager-paris's own nav, `shell.spec.ts`'s own list above — asserted here in tab order
     // rather than copied blind, so a reordering of the config breaks this test too.
-    for (const label of ['Tableau de bord', 'Pré-facturier', 'CRA', 'Factures']) {
+    for (const label of ['Tableau de bord', 'Pré-facturier', 'CRA', 'Affectations', 'Factures']) {
       await page.keyboard.press('Tab');
       focused = await focusedElement(page);
       expect(focused.tag).toBe('A');
