@@ -83,6 +83,22 @@ jobs:
           asset_status="$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:38080$asset_path")"
           test "$asset_status" = 200
 
+  deploy-dry-run:
+    name: Deploy script --dry-run
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      # docs/BUILD-PLAN.md's TDD table: "Deploy scripts | A dry-run assertion where one exists" —
+      # this is that assertion. It runs against deploy/test/fake-docker.sh, a recording stub, and
+      # checks ADR-0029's own five listed absences (no pull, no migrate, no restart, no digest
+      # state written, no backup) rather than only that the process exits 0.
+      - name: pull-and-redeploy.sh --dry-run does none of the five things ADR-0029 forbids it
+        run: bash deploy/test/dry-run.sh
+
   publish:
     name: Publish the signed digest
     if: ${{ github.event_name == 'push' }}
