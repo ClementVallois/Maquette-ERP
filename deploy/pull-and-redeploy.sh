@@ -93,7 +93,13 @@ deploy_digest() {
     echo "no digest on record — seeding the first deployment"
     IMAGE_REF="$IMAGE@$target" compose run --rm seed
   fi
-  IMAGE_REF="$IMAGE@$target" compose up -d --no-deps app
+  # `--force-recreate` because `up` otherwise reuses a container whose config has not changed, and
+  # after a deploy that failed *after* creating one, the config has not changed: the retry starts
+  # the wreckage instead of replacing it. Observed on 03/09/2026 — a port collision left the app
+  # container created but attached to no network, and the next run started it, reached a healthy
+  # container that could not resolve `postgres`, and failed readiness for a reason that had nothing
+  # to do with the digest being deployed.
+  IMAGE_REF="$IMAGE@$target" compose up -d --no-deps --force-recreate app
 
   if wait_for_ready; then
     mkdir -p "$STATE_DIR"
