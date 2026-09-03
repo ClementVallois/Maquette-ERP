@@ -38,6 +38,9 @@ jobs:
 
       - name: The non-root, read-only image reaches its health check
         run: |
+          # The placeholder key below is exactly 32 characters, which is the minimum
+          # `scripts/check-env.ts` accepts. Shortening it makes the container refuse to start and
+          # this job fails as "unhealthy", naming a timeout rather than the key.
           container_id="$(docker run --detach \
             --read-only \
             --tmpfs /tmp:rw,noexec,nosuid,size=64m \
