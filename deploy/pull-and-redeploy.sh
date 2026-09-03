@@ -61,8 +61,8 @@ resolve_remote_digest() {
 }
 
 wait_for_ready() {
-  local attempt
-  for attempt in $(seq 1 "$READY_RETRIES"); do
+  local _attempt
+  for _attempt in $(seq 1 "$READY_RETRIES"); do
     if curl --silent --fail --output /dev/null "$READY_URL"; then
       return 0
     fi

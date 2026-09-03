@@ -435,6 +435,28 @@ jobs:
             ghcr.io/google/osv-scanner@sha256:8108ae94eadea5a02c9bec6e646909d5b790b44bd62d7f5b7f0b1d6d0ffc7734 \
             scan source --lockfile=/src/pnpm-lock.yaml
 
+  shell:
+    name: Shell scripts
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      # Phase 8 put the production deploy path into shell — the redeploy, the nightly reset and
+      # the host wizard all run as root on the host. Semgrep's `p/typescript` and
+      # `p/security-audit` do not read bash, so until this job existed those scripts were the only
+      # executable code in the repository with no static analysis on it at all. Digest-pinned
+      # container for the same reason as osv-scanner and semgrep above.
+      - name: shellcheck
+        run: |
+          docker run --rm -v "$PWD:/mnt" -w /mnt \
+            koalaman/shellcheck@sha256:bb596a0d169b85ddd81d8b6d3a2ff6d5baf5fca10b97f575ebc647c3dff62b3d \
+            --severity=warning \
+            deploy/*.sh deploy/test/*.sh scripts/*.sh
+
   sast:
     name: SAST
     runs-on: ubuntu-latest
