@@ -49,6 +49,7 @@ moves down to "Settled" with its answer, so the record shows it was known rather
 | 03/09/2026 | **`pull-and-redeploy.sh` treats an empty `$STATE_DIR/current-digest` as "this is the very first deployment ever" and seeds accordingly (ADR-0032's bootstrap case) — but the file being empty and the deployment being first are two different facts, and only one of them is checked.** If `$STATE_DIR` (root-only, `/var/lib/erp-deploy`) is ever lost or reset independently of the Postgres data volume — a disk issue, an operator `rm -rf` while debugging, a host migration that forgets one of the two paths — the next tick of `erp-deploy.timer` reads that same absence and reseeds a database that was never actually empty. | A visitor's demonstration and the current day's data disappear outside the nightly 03:30 Europe/Paris window ADR-0032 names, on a trigger that is not "the first real user, the first non-synthetic datum, or a scheduled reset" — it is an unrelated state-directory accident treated as a first-deploy signal. Bounded by ADR-0032 itself (synthetic data only, no durability promised), but still a wider blast radius than the ADR's own reconsideration list anticipates. | **No phase named — nothing currently owns hardening "first deployment" detection beyond state-file presence.** A stronger signal exists (query `schema_migrations`, or a marker table, through the already-open migration connection instead of trusting a host file) but is a real design change to `pull-and-redeploy.sh`, not a one-line fix invented here to close the row. Reopen at the first time `$STATE_DIR` is actually lost, or the next phase that touches this script for another reason. |
 | 03/09/2026 | **`nightly-reset.sh`'s `pg_dump` step has no timeout, and it is the first thing the reset does under `set -e`.** `compose exec -T postgres pg_dump … >"$dump_file.tmp"` runs with no time budget of its own and no `TimeoutStartSec=` on `erp-reset.service`, so systemd's default (`DefaultTimeoutStartSec`, 90s on a stock Debian) is what actually bounds it — a number nobody in this phase chose. It also holds the blocking `flock` on `$STATE_DIR/deploy.lock` for its whole duration, which `pull-and-redeploy.sh` waits on. | A dump slow enough to hit that unchosen budget kills the unit before `migrate` and `seed` ever run, so the nightly reset of ADR-0032 silently does not happen, and `erp-deploy.timer`'s next tick blocks behind the lock until the same kill releases it. The only trace is `journalctl -u erp-reset`, which nothing surfaces to a human who is not already looking. | **No phase named — the trigger is measurable only on a live instance.** Reopen the first time a real reset run is slow enough to matter, or the first time `erp-reset.service` reports a failure. The dataset is the deterministic seed and its dump takes well under a second locally (188 `pg_restore --list` TOC entries), so choosing a timeout now would be picking a second unmeasured number to bound the first. |
 | 03/09/2026 | **`erp-deploy.timer`'s 5-minute poll and `pull-and-redeploy.sh`'s 30 × 2s readiness budget are both picked, not measured.** Nothing in this phase profiled how long this application takes to reach `/readyz` under a real VPS's I/O, as opposed to a laptop's Docker daemon; `READY_RETRIES=30` / `READY_INTERVAL=2` gives 60 seconds, and the local evidence behind it is a container a few hundred milliseconds from its database. | The failure is not a slow deploy, it is a **false rollback**: a healthy new digest that needs 70 seconds on the host is declared failed, `deploy_digest` redeploys the digest it displaced, and the timer re-attempts the same doomed transition every 5 minutes — an outage caused by the recovery path, not by the release. | **No phase named — the number cannot be chosen without the host it describes.** Reopen the first time a real deploy is rolled back automatically, and set both figures from the measured `/readyz` time rather than a second guess. Both are already environment overrides (`READY_RETRIES`, `READY_INTERVAL`, and the timer's `OnUnitActiveSec`), so the correction is a value change on the host, not a code change. |
+| 03/09/2026 | **The host's GHCR read token lands in `/root/.docker/config.json`, which is wider than the sentence ADR-0030 wrote for it.** `deploy/provision-host.sh`'s stage 6 runs `docker login ghcr.io` as root, and root's docker config is read by every rootful `docker` invocation on this box — including the neighbouring services ADR-0030 exists to be isolated from. ADR-0030 § Credential split says the token "exists only where image resolution and pull need it". Base64 in that file is encoding, not encryption. A second, unverified assumption sits under it: the wizard instructs a fine-grained PAT "scoped to this repository only", and whether GitHub's Packages read permission is genuinely repository-scoped rather than account-scoped was not confirmed — if it is account-scoped, the isolation claim is weaker than the instruction implies. | A read-only token for one private package is a small prize, but it is a credential placed in a shared location by a phase whose central argument is that no credential is placed where it is not needed. The choice of storage was made inside a `fix` commit with no ADR and no reconsideration threshold, which is the part that does not match how this repository decides things. | **Clement's decision, and the first one this phase leaves open rather than settles.** Three ways out, in rising cost: make the GHCR _package_ public (its visibility is separate from the repository's, so this removes the credential entirely and is the only option that ends the question); keep the login and write the ADR that records the location, its blast radius and the threshold at which it moves; or give the pull its own credential store away from root's config. Reopen before the first deploy — this is on the go-live path, not after it. |
 ---
 
 ## Front-end Phase 1 checkpoint — `feat/web`, 24/08/2026
@@ -4052,3 +4053,46 @@ seed a starting dataset, then a full `nightly-reset.sh` run — dump (`pg_restor
 TOC entries), migrate (correctly a no-op the second time), reseed (full dataset again) — all
 succeeding with `IMAGE_REF` absent from the script's own env file and present only via the `export`
 this fix adds. Commit follows this one.
+
+### Review pass, 03/09/2026 — what a second reader found after this checkpoint was written
+
+`f141c9b` set the precedent that a defect found after the checkpoint is appended here rather than
+edited into the record above. Six more were found by a review pass over the whole phase — a
+`rules-auditor` run on the diff, which `CLAUDE.md` requires before a merge to `main`, plus an
+independent rebuild and boot of the image. They are listed because the pattern across them matters
+more than any single one: **every defect below is on a path that no test and no gate ever
+executes**, which is exactly where this phase's own point 4 said its confidence was lowest.
+
+1. **The wizard would have died on its first real run with both plaintext database passwords left
+   in `/tmp`** (`99cbf9a`). Nothing created `/etc/erp-maquette`, `install` does not create leading
+   directories, and `set -e` skipped the cleanup on the way out. Reproduced before fixing.
+2. **The wizard promised persistence it did not have** (`99cbf9a`): the banner said re-running
+   remembers saved values, and no stage ever called `write_env`.
+3. **nginx silently overrode the app's referrer policy** (`c906d1a`), detailed in its own commit.
+4. **The checkpoint's shellcheck evidence was untrue** (`49d95d9`), and the check is now a CI job
+   (`837aab9`) rather than a claim — it found two real warnings on its first run.
+5. **No CI job parsed `deploy/compose.prod.yml` at all** (`c9af0de`). ADR-0030's credential split
+   rested on one manual `docker exec … env` in a commit message; it is now asserted, along with
+   the parse itself and the no-published-port rule.
+6. **Two dead `gh secret set` helpers** sat in the wizard of the phase whose ADR-0029 is that CI
+   holds no credential (`f56e78a`).
+
+Two findings are **not** fixed here because they are Clement's to decide, not the agent's:
+
+- **The GHCR token's storage location** — new row above, dated today, on the go-live path.
+- **`deploy/compose.prod.yml`'s bind mount of `../docker/postgres/init` against ADR-0030's "no
+  host bind mount".** Point 3 of this checkpoint resolved it "fix now, not a new ADR" and wrote
+  five lines of reasoning into the compose file's header. The audit's objection is exact and
+  stands: reasoning of that kind belongs in an ADR by this repository's own comment rule, and
+  reading ADR-0030's sentence as covering only the _data_ path narrows what that ADR permits —
+  which is a decision moving, and ADR-0045 sends a moved decision to a new ADR. Either the
+  narrowing is written down as one, or the mount goes and the init script is baked into the image.
+  Left open deliberately: the code is safe as it stands, and this is an authorship question about
+  where a decision lives.
+
+One finding is recorded and **cannot** be fixed: the phase's commits put implementation before
+test in the two places where the split makes the order visible (`39d56e6` before `8ad6ffd`,
+`a15ffec` before `c49f8e1`). `docs/BUILD-PLAN.md` § "What the history shows about test-first"
+already says this repository cannot prove test-first from its history; this phase is the first
+place the history actively shows the reverse. Rewriting the commits to hide that would be worse
+than the record.
