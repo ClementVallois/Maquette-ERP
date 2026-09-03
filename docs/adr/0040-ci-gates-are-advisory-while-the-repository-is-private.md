@@ -1,7 +1,7 @@
 # ADR-0040 — The CI gates are advisory while the repository is private on the free plan
 
 - **Date**: 2026-08-19
-- **Status**: accepted
+- **Status**: superseded by ADR-0086
 
 ## Context
 

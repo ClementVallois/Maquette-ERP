@@ -16,7 +16,7 @@ This mockup takes that single chain and proves, in code, that it can be built wi
 
 ## What this mockup sets out to prove
 
-1. **A real module boundary, enforced mechanically.** The `billing` module cannot import the internals of the `timesheet` module; it reacts to a domain event published by it. Breaking the boundary **must fail the CI**, not produce a warning — "warning" here meaning a rule left at `warn` severity, not an error. It does not mean the merge button locks: branch protection needs GitHub Pro or a public repository and this one is neither, so the gates are advisory and **ADR-0040** says so rather than letting this sentence imply otherwise. At the demo, we break the boundary live and show the CI failing.
+1. **A real module boundary, enforced mechanically.** The `billing` module cannot import the internals of the `timesheet` module; it reacts to a domain event published by it. Breaking the boundary **must fail the CI**, not produce a warning — "warning" here meaning a rule left at `warn` severity, not an error. It also means the merge button locks: the repository was made public on 03/09/2026, branch protection is enabled on `main` with every job required, and **ADR-0086** records that — superseding ADR-0040, which had to say the gates were advisory while protection was unavailable. At the demo, we break the boundary live and show the CI failing.
 2. **Business invariants held by code, not by discipline:**
    - a validated CRA is **immutable**;
    - monetary amounts use **exact arithmetic — never a floating-point number**;

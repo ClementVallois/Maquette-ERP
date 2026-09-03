@@ -467,9 +467,10 @@ jobs:
         with:
           persist-credentials: false
 
-      # Semgrep OSS rather than CodeQL: CodeQL code scanning requires GitHub Advanced Security on
-      # a private repository, so it would fail every run until this repo is made public.
-      # Revisit once it is public.
+      # Semgrep OSS alongside CodeQL, not instead of it. CodeQL needed Advanced Security while
+      # this repository was private; it went public on 03/09/2026 and `codeql.yml` is that revisit
+      # (ADR-0086). Semgrep stays because it is fast enough for the PR pipeline and the two do not
+      # find the same things.
       - name: semgrep
         run: |
           docker run --rm -v "$PWD:/src" -w /src \

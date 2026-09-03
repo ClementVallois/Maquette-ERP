@@ -1,0 +1,43 @@
+name: CodeQL
+
+# ADR-0086 records why this workflow exists now and did not before: CodeQL code scanning needs
+# GitHub Advanced Security on a private repository, so `.github/workflows/ci.yml`'s SAST job ran
+# Semgrep alone and said "revisit once it is public". The repository was made public on 03/09/2026
+# and this is that revisit. Semgrep stays: it is fast enough for the PR pipeline, and the two find
+# different things.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      # `build-mode: none` is correct here and not a shortcut: this repository executes TypeScript
+      # directly (no emit step), so there is no compiled artifact for CodeQL to observe being built.
+      - uses: github/codeql-action/init@5ba2889ada762081db2c4f32a729827dce632c7b # v3
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-and-quality
+
+      - uses: github/codeql-action/analyze@5ba2889ada762081db2c4f32a729827dce632c7b # v3
+        with:
+          category: /language:javascript-typescript

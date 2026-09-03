@@ -64,12 +64,14 @@ mais **rien n'a encore tourné sur l'hôte réel** : ni DNS, ni certificat, ni u
 minuteur, ni premier déploiement. Restent aussi la passe de relecture documentaire (phase 9) et le
 gel (phase 10). La phase 0 — outillage, CI, règles d'écriture — précède les autres et est faite.
 
-N'existe pas encore non plus, et c'est la décision du 24/08/2026 : **l'interface interactive en
-SPA React**, dont aucune ligne n'est écrite. Elle a son propre plan de construction
-([`docs/frontend-plan.md`](docs/frontend-plan.md), en français comme ce README), sa direction
-visuelle ([`docs/direction-visuelle.md`](docs/direction-visuelle.md)) et ses trois arbitrages
-— ADR-0062 (React), ADR-0063 (servie par la même instance Fastify, même origine) et ADR-0064 (la
-CSP admet un script). Les deux documents imprimables, eux, ne bougent pas.
+**L'interface interactive en SPA React est livrée** — décidée le 24/08/2026, écrite depuis, et
+couverte par les tests Playwright de `apps/web/e2e/`. Elle a son plan de construction
+([`docs/frontend-plan.md`](docs/frontend-plan.md)), sa direction visuelle
+([`docs/direction-visuelle.md`](docs/direction-visuelle.md)) et ses trois arbitrages — ADR-0062
+(React), ADR-0063 (servie par la même instance Fastify, même origine) et ADR-0064 (la CSP admet un
+script). Les deux documents imprimables, eux, n'ont pas bougé. ⚠️ Ces deux documents de plan sont
+en anglais, contrairement à ce que cette phrase a longtemps annoncé ; la passe de relecture de la
+phase 9 tranche s'ils sont traduits ou assumés tels quels.
 
 Quatre fichiers répondent aux questions qu'on se pose en arrivant. [`CONTEXT.md`](CONTEXT.md)
 définit le vocabulaire — métier (`Tjm`, `Cjm`, `pré-facturier`, `régie`, `intercontrat`, `avoir`,
@@ -308,8 +310,9 @@ seed.
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm run setup      # env:init + env:check + docker compose + migrate + seed
-pnpm run api        # l'API sur http://127.0.0.1:3000
+pnpm run setup                  # env:init + env:check + docker compose + migrate + seed
+pnpm --filter @erp/web build    # sans ça, `/` renvoie 404 : dist/ n'est pas versionné
+pnpm run api                    # l'API sur http://127.0.0.1:3000
 ```
 
 Les **deux topologies** — dev (Vite sur 5173, deux processus) et prod/démo (Fastify seul sur 3000,
