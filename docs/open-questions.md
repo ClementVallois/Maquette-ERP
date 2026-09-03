@@ -4021,3 +4021,26 @@ app` reaching `{"status":"ready"}` on `/readyz`, `docker exec app env | grep -i 
 --check` clean on every YAML file touched.
 - README: the "pas encore" paragraph now says the deployment files exist and are locally verified,
   and states explicitly that nothing has run on the real host yet — no claim of a live instance.
+
+### Correction, 03/09/2026 — `nightly-reset.sh` would have died on its first host run
+
+Found by `advisor()`, checked empirically before believing it. `deploy/compose.prod.yml` declares
+`image: ${IMAGE_REF:?…}` on `app`, `migrate` and `seed`, and Compose interpolates every `${VAR}` in
+the file on **any** subcommand — `exec` and `ps` included, not only `up`/`run`. The `pg_dump` line
+was the one compose call in this phase with no `IMAGE_REF` set, because on the real host `IMAGE_REF`
+lives in neither the shell environment nor `/etc/erp-maquette/environment` — the wizard deliberately
+never writes it, since `pull-and-redeploy.sh` supplies it per invocation. Reproduced first:
+`docker compose -f deploy/compose.prod.yml --env-file <a file with none of the keys the wizard never
+writes, i.e. no IMAGE_REF> ps` refuses to interpolate at all. This session's own earlier evidence for
+this script rested on env files that happened to carry `IMAGE_REF` — more generous than what the
+host actually provides, which is exactly how the gap passed unnoticed.
+
+**Fixed now**: `nightly-reset.sh` reads `current_digest` (already required before the dump runs)
+and `export`s `IMAGE_REF="$IMAGE@$current_digest"` once, before the dump — not only prefixing the
+`migrate`/`seed` calls that come after it, the way the previous version did. Re-verified for real,
+end to end, against an env file holding exactly the keys `deploy/provision-host.sh` writes (no
+`IMAGE_REF` anywhere): `compose ... up -d --wait postgres`, `run --rm migrate`, `run --rm seed` to
+seed a starting dataset, then a full `nightly-reset.sh` run — dump (`pg_restore --list`-valid, 188
+TOC entries), migrate (correctly a no-op the second time), reseed (full dataset again) — all
+succeeding with `IMAGE_REF` absent from the script's own env file and present only via the `export`
+this fix adds. Commit follows this one.
