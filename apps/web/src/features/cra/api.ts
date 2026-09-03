@@ -25,7 +25,7 @@ import type {
  * route's own cap or a manager past the old 50-row default would see a page silently short of
  * their office's real count again, one layer up.
  */
-const DEFAULT_LIST_LIMIT = 200;
+const DEFAULT_LIST_LIMIT = 20;
 
 export interface CraListFilters {
   readonly consultantIds?: readonly string[];
@@ -34,6 +34,8 @@ export interface CraListFilters {
    * matches `apps/api/src/routes/api.ts`'s own `year`/`month` query params. */
   readonly year?: number;
   readonly month?: number;
+  readonly limit?: number;
+  readonly offset?: number;
 }
 
 /** Comma-separated, matching `apps/api/src/routes/api.ts`'s own `CommaSeparatedIds`/
@@ -41,7 +43,10 @@ export interface CraListFilters {
  * whose value is the empty string, so "no filter" and "filtered to nothing" stay distinguishable
  * on the wire. */
 export function fetchCraList(filters: CraListFilters = {}): Promise<ApiResult<CraListResponse>> {
-  const params = new URLSearchParams({ limit: String(DEFAULT_LIST_LIMIT) });
+  const params = new URLSearchParams({
+    limit: String(filters.limit ?? DEFAULT_LIST_LIMIT),
+    offset: String(filters.offset ?? 0),
+  });
   if (filters.consultantIds !== undefined && filters.consultantIds.length > 0) {
     params.set('consultantIds', filters.consultantIds.join(','));
   }

@@ -191,6 +191,12 @@ describe('the French sentence table of ADR-0060', () => {
   // string it holds is readable at the declaration.
   const sentences: Readonly<Record<string, string | undefined>> = LABELS.problem.sentences;
 
+  // `STAFFING_PROBLEM_TYPES` is deliberately absent from this table, and its absence is not the
+  // gap it looks like: `sendProblem` picks the representation from the **path**, and every route
+  // that can raise one is under `/api/v1/`, which is always `application/problem+json`. A sentence
+  // here would be a sentence no page can ever render. `apps/web/src/lib/labels.test.ts` holds the
+  // SPA's own table to that family instead — that is where those refusals are read.
+
   it('names every refusal a module can raise', () => {
     // Same source as the status table above: the literals are read out of `packages/`, so an error
     // added in a later phase is found here on the day it is written rather than rendered as the

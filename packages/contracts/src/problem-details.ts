@@ -66,3 +66,35 @@ export const API_PROBLEM_TYPES = {
 } as const;
 
 export type ApiProblemType = (typeof API_PROBLEM_TYPES)[keyof typeof API_PROBLEM_TYPES];
+
+/**
+ * The refusals **staffing** owns. A third family, and it is neither of the other two: unlike
+ * `API_PROBLEM_TYPES` every one of these is a fact about the business (a departure date, a missing
+ * habilitation, days already recorded), and unlike a module's own refusal none of them is raised by
+ * `packages/` — assignments are `public.*` reference data that no module writes, so the rules live
+ * in the composition layer (`apps/api/src/staffing/`) and reach the wire as a plain outcome rather
+ * than as a `BusinessError`.
+ *
+ * They are declared here, in the shared contract, for the same reason `API_PROBLEM_TYPES` is: the
+ * SPA branches on `type` and needs a French sentence for each. `apps/web` is granted `@erp/contracts`
+ * and nothing else, and the identifiers are not reachable from `packages/`, so a table that had to
+ * discover them would have no honest source to read — which is exactly how six of them reached
+ * `apps/web/src/lib/labels.ts` with nothing checking them.
+ */
+export const STAFFING_PROBLEM_TYPES = {
+  /** `toDate` is before `fromDate`, or either one does not parse as a date. */
+  invalidRange: '/problems/assignment-invalid-range',
+  /** The assignment would run past the day the consultant left the firm (ADR-0079). */
+  departure: '/problems/assignment-after-departure',
+  /** The assignment falls outside the mission's own start/end dates. */
+  missionDates: '/problems/assignment-outside-mission',
+  /** The mission requires a certification the consultant does not hold (e.g. PASSI). */
+  missingHabilitation: '/problems/assignment-missing-habilitation',
+  /** The same consultant is already assigned to the same mission over overlapping dates. */
+  overlap: '/problems/assignment-overlap',
+  /** Shortening or deleting it would orphan days already recorded on a Cra. */
+  recordedDays: '/problems/assignment-recorded-days',
+} as const;
+
+export type StaffingProblemType =
+  (typeof STAFFING_PROBLEM_TYPES)[keyof typeof STAFFING_PROBLEM_TYPES];

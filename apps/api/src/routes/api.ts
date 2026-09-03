@@ -1,3 +1,4 @@
+import { INVOICE_STATUSES, vatGroupKey } from '@erp/billing';
 import { API_PROBLEM_TYPES } from '@erp/contracts';
 import {
   daysOf,
@@ -26,6 +27,12 @@ import { ApiFailure } from '../errors.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
 import { PgReferenceReader } from '../persistence/reference-reader.ts';
 import { forRoles, requireActor } from '../personas/access.ts';
+import {
+  assignmentCatalogue,
+  createAssignment,
+  type AssignmentWriteOutcome,
+  updateAssignment,
+} from '../staffing/assignment-admin.ts';
 import { malformed, parseInput } from '../validation.ts';
 
 /**
@@ -78,15 +85,20 @@ const Pagination = z.object({
 const CRA_LIST_MAX_PAGE_SIZE = 200;
 
 /**
- * Every `CraStatus` but `validated` (ADR-0082): the dashboard's own definition of "actionable" —
- * `submitted` awaits a manager's decision, `refused` awaits the consultant's correction, `draft`
- * is what a Cra past its own period's close still not validated looks like on the way there. Kept
- * as a literal tuple rather than `CRA_STATUSES.filter(…)` so its type stays the readonly-tuple
- * `CraListQuery.statuses` wants, not a widened `CraStatus[]`.
+ * The three months the seed actually fills densely (`CLAUDE.md`'s dataset-shape section) — Rank
+ * A2's history chart names them explicitly rather than deriving "the last three months", which
+ * would silently start rendering zeros the day the wall clock moves past August 2026.
  */
-const NON_VALIDATED_CRA_STATUSES = ['draft', 'submitted', 'refused'] as const;
+const DENSE_MONTHS = ['2026-06', '2026-07', '2026-08'] as const;
 
 const PeriodQuery = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u) });
+const PreFacturierParams = PeriodQuery.extend({
+  craLimit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
+  craOffset: z.coerce.number().int().min(0).default(0),
+  invoiceLimit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
+  invoiceOffset: z.coerce.number().int().min(0).default(0),
+  consultantSearch: z.string().trim().min(1).max(100).optional(),
+});
 
 /**
  * A single query-string value, comma-separated, rather than a repeated key
@@ -142,6 +154,12 @@ const CraListParams = Pagination.extend({
   month: MonthQuery,
 });
 
+const InvoiceListParams = Pagination.extend({
+  status: z.enum(INVOICE_STATUSES).optional(),
+  year: YearQuery,
+  search: z.string().trim().min(1).max(100).optional(),
+});
+
 const IdParam = z.object({ id: z.string().min(1).max(64) });
 const ConsultantParams = z.object({ consultantId: z.string().min(1).max(64) });
 
@@ -189,6 +207,13 @@ const IdempotencyKey = z.string().min(8).max(200);
  * `RefusalReasonRequiredError` is the "is this a legitimate refusal" half of ADR-0042.
  */
 const RefusalBody = z.object({ reason: z.string().min(1).max(500) });
+const IsoDateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/u);
+const AssignmentBody = z.object({
+  consultantId: z.string().min(1).max(64),
+  missionId: z.string().min(1).max(64),
+  fromDate: IsoDateString,
+  toDate: IsoDateString.nullable().default(null),
+});
 
 function notFound(
   request: FastifyRequest,
@@ -204,6 +229,22 @@ function notFound(
     title: `No such ${what}`,
     status: NOT_FOUND,
     detail: `This ${what} does not exist, or has never existed.`,
+    ...contextOf(request),
+  };
+}
+
+function assignmentRefusal(
+  request: FastifyRequest,
+  outcome: Extract<AssignmentWriteOutcome, { kind: 'refused' }>,
+) {
+  return {
+    type: outcome.problemType,
+    title: 'Assignment refused',
+    status: CONFLICT,
+    invariant: outcome.problemType,
+    errors: Object.fromEntries(
+      Object.entries(outcome.details).map(([field, value]) => [field, [value]]),
+    ),
     ...contextOf(request),
   };
 }
@@ -242,7 +283,37 @@ function gridResponseOf(
   refusal: CraGridComposition['refusal'];
   editable: boolean;
   validatedBy: string | null;
+  timeline: {
+    kind: 'submitted' | 'refused' | 'validated';
+    at: string;
+    actorName: string;
+    detail?: string;
+  }[];
 } {
+  const timeline = [];
+  if (grid.submittedAt !== null) {
+    timeline.push({
+      kind: 'submitted' as const,
+      at: grid.submittedAt,
+      actorName: grid.consultantName,
+    });
+  }
+  if (grid.refusal !== null) {
+    timeline.push({
+      kind: 'refused' as const,
+      at: grid.refusal.at,
+      actorName: grid.refusal.by,
+      detail: grid.refusal.reason,
+    });
+  }
+  if (grid.validatedAt !== null && grid.validatedBy !== null) {
+    timeline.push({
+      kind: 'validated' as const,
+      at: grid.validatedAt,
+      actorName: grid.validatedBy,
+    });
+  }
+
   return {
     period,
     craId: grid.craId,
@@ -259,6 +330,7 @@ function gridResponseOf(
     refusal: grid.refusal,
     editable: grid.editable,
     validatedBy: grid.validatedBy,
+    timeline,
   };
 }
 
@@ -306,10 +378,8 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       // `consultantIds`/`statuses` (item 7, QA round 1) narrow within that same filtering — never
       // widen it, the repository's own contract (`CraListQuery`'s header, `packages/timesheet`).
       return dependencies.transactionally(async (unit) => {
-        const cras = await unit.cras.list({
+        const filters = {
           actor,
-          limit: query.value.limit,
-          offset: query.value.offset,
           // `exactOptionalPropertyTypes` refuses an explicit `undefined` — omitted, not passed,
           // when the query carried no filter on that dimension.
           ...(query.value.consultantIds === undefined
@@ -318,7 +388,13 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           ...(query.value.statuses === undefined ? {} : { statuses: query.value.statuses }),
           ...(query.value.year === undefined ? {} : { year: query.value.year }),
           ...(query.value.month === undefined ? {} : { month: query.value.month }),
+        };
+        const cras = await unit.cras.list({
+          ...filters,
+          limit: query.value.limit,
+          offset: query.value.offset,
         });
+        const total = await unit.cras.count(filters);
 
         // `consultantName`, presentation rather than a rule — the same source and the same
         // justification `preFacturierComposition` already uses (ADR-0071): a manager's row needs a
@@ -330,6 +406,9 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
             ...cra,
             consultantName: consultantNames.get(cra.consultantId) ?? cra.consultantId,
           })),
+          total,
+          limit: query.value.limit,
+          offset: query.value.offset,
         };
       });
     },
@@ -383,22 +462,129 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
     },
   );
 
+  /**
+   * Rank A2: the dashboard's history chart. Two honest series and only these two — six real
+   * (year, status) points spanning 2016→2026, and the three dense 2026 months' billable HT,
+   * labelled as three months and never presented as a trend (a twelve-month curve would render
+   * three bars and nine zeros, the same visual lie under a new name).
+   */
+  app.get(
+    '/api/v1/invoices/history',
+    { config: { access: forRoles('manager', 'billing') } },
+    async (request) => {
+      const actor = requireActor(request);
+
+      return dependencies.transactionally(async (unit) => {
+        const byYearAndStatus = await unit.invoices.countByYearAndStatus(actor);
+
+        // `preFacturierComposition` already computes a period's billable HT from the live
+        // aggregate rather than a stored (and, for a draft, absent) total — reused here rather
+        // than reimplemented, for the three months the seed actually fills.
+        const today = isoDateInFirmTimeZone(dependencies.clock.now());
+        const denseMonths = [];
+        for (const period of DENSE_MONTHS) {
+          const composition = await preFacturierComposition(unit, {
+            actor,
+            requestedPeriod: period,
+            today,
+          });
+          denseMonths.push({
+            period,
+            billableCents: composition.billable.reduce(
+              (total, row) => total + row.totalExcludingVatCents,
+              0,
+            ),
+          });
+        }
+
+        return { byYearAndStatus, denseMonths };
+      });
+    },
+  );
+
   app.get(
     '/api/v1/invoices',
     { config: { access: forRoles('manager', 'billing') } },
     async (request, reply) => {
-      const query = parseInput(Pagination, request.query);
+      const query = parseInput(InvoiceListParams, request.query);
       if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
 
       const actor = requireActor(request);
 
-      return dependencies.transactionally(async (unit) => ({
-        invoices: await unit.invoices.list({
+      return dependencies.transactionally(async (unit) => {
+        const sharedFilters = {
           actor,
+          ...(query.value.year === undefined ? {} : { year: query.value.year }),
+          ...(query.value.search === undefined ? {} : { search: query.value.search }),
+        };
+        const filters = {
+          ...sharedFilters,
+          ...(query.value.status === undefined ? {} : { status: query.value.status }),
+        };
+        const page = await unit.invoices.list({
+          ...filters,
           limit: query.value.limit,
           offset: query.value.offset,
-        }),
-      }));
+        });
+        const total = await unit.invoices.count(filters);
+        const statusCounts = {
+          all: await unit.invoices.count(sharedFilters),
+          draft: await unit.invoices.count({ ...sharedFilters, status: 'draft' }),
+          issued: await unit.invoices.count({ ...sharedFilters, status: 'issued' }),
+          cancelledByCreditNote: await unit.invoices.count({
+            ...sharedFilters,
+            status: 'cancelledByCreditNote',
+          }),
+        };
+
+        const reference = new PgReferenceReader(unit.client);
+        const consultantNames = await reference.consultantNames();
+        const missionNames = await reference.missionNames();
+
+        // Rank A7: the same discriminant the pré-facturier already carries
+        // (`PreFacturierInvoiceRow`) — a draft's client and period alone do not tell two invoices
+        // to the same client apart. One more read per row, bounded by the page, plus one Cra
+        // lookup per row's single source Cra (`saveDraft` records exactly one). Sequential, not
+        // `Promise.all`: every read here shares the one checked-out client this transaction is
+        // (`validate-cra.ts`'s own header explains why overlapping them buys nothing).
+        const invoices = [];
+        for (const item of page) {
+          const invoice = await unit.invoices.findById(item.id, actor);
+          const sourceCraId = invoice?.lines[0]?.origin.craId;
+          const sourceCra =
+            sourceCraId === undefined ? null : await unit.cras.findById(sourceCraId, actor);
+          const lineMissionIds = [
+            ...new Set((invoice?.lines ?? []).map((line) => line.origin.missionId)),
+          ];
+          const createdAt =
+            sourceCra === null
+              ? null
+              : ((
+                  sourceCra.validatedAt ??
+                  sourceCra.refusal?.at ??
+                  sourceCra.submittedAt
+                )?.toISOString() ?? null);
+
+          invoices.push({
+            ...item,
+            consultantName:
+              sourceCra === null
+                ? '—'
+                : (consultantNames.get(sourceCra.consultantId) ?? sourceCra.consultantId),
+            missionNames: lineMissionIds.map((id) => missionNames.get(id) ?? id),
+            lineCount: invoice?.lines.length ?? 0,
+            createdAt,
+          });
+        }
+
+        return {
+          invoices,
+          total,
+          limit: query.value.limit,
+          offset: query.value.offset,
+          statusCounts,
+        };
+      });
     },
   );
 
@@ -410,10 +596,65 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
 
       const actor = requireActor(request);
-      const invoice = await dependencies.transactionally((unit) =>
-        unit.invoices.findById(params.value.id, actor),
-      );
-      if (invoice === null) return sendProblem(reply, notFound(request, 'invoice'));
+      const detail = await dependencies.transactionally(async (unit) => {
+        const invoice = await unit.invoices.findById(params.value.id, actor);
+        if (invoice === null) return null;
+
+        const sourceCraId = invoice.lines[0]?.origin.craId;
+        const sourceCra =
+          sourceCraId === undefined ? null : await unit.cras.findById(sourceCraId, actor);
+        const reference = new PgReferenceReader(unit.client);
+        const consultantNames = await reference.consultantNames();
+        const missionNames = await reference.missionNames();
+        return { invoice, sourceCra, consultantNames, missionNames };
+      });
+      if (detail === null) return sendProblem(reply, notFound(request, 'invoice'));
+
+      const { invoice, sourceCra, consultantNames, missionNames } = detail;
+      const timeline = [];
+      if (sourceCra?.validatedAt !== null && sourceCra?.validatedAt !== undefined) {
+        const validatedBy = sourceCra.validatedBy;
+        timeline.push({
+          kind: 'validated' as const,
+          at: sourceCra.validatedAt.toISOString(),
+          actorName:
+            validatedBy === null ? null : (consultantNames.get(validatedBy) ?? validatedBy),
+        });
+        timeline.push({
+          kind: 'drafted' as const,
+          at: sourceCra.validatedAt.toISOString(),
+          actorName: null,
+        });
+      }
+      if (invoice.issueDate !== null) {
+        timeline.push({ kind: 'issued' as const, at: invoice.issueDate, actorName: null });
+      }
+
+      const lineage = invoice.lines.map((line) => {
+        const vatGroup = invoice.vatBreakdown.find((group) => group.key === vatGroupKey(line.vat));
+
+        return {
+          craId: line.origin.craId,
+          period: line.origin.period,
+          missionId: line.origin.missionId,
+          missionName: missionNames.get(line.origin.missionId) ?? line.origin.missionId,
+          sourceDays:
+            sourceCra?.lines
+              .filter(
+                (sourceLine) =>
+                  sourceLine.dayType === 'worked' && sourceLine.missionId === line.origin.missionId,
+              )
+              .map((sourceLine) => ({
+                day: sourceLine.day,
+                quarterDays: sourceLine.quarterDays,
+              })) ?? [],
+          quantityQuarterDays: line.quantityQuarterDays,
+          tjmCents: line.origin.tjmCents,
+          lineAmountCents: line.amountCents,
+          vatGroup: vatGroup ?? null,
+          invoiceTotalTtcCents: invoice.totals.totalIncludingVatCents,
+        };
+      });
 
       return {
         id: invoice.id,
@@ -427,13 +668,23 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         mentions: invoice.mentions,
         lines: invoice.lines,
         vatBreakdown: invoice.vatBreakdown,
-        // Mirrors assertInvoiceStateIsCoherent (billing/domain/invoice.ts): draft is the only
-        // status with no totals — issued, cancelledByCreditNote and any other non-draft status
-        // carry them.
-        totals: invoice.status === 'draft' ? null : invoice.totals,
+        // `Invoice.totals` (billing/domain/invoice.ts) computes from the lines when nothing is
+        // frozen yet, so a draft's totals are real numbers, not a placeholder — but they are not
+        // yet the document's totals, since issuing can still change the lines. `totalsAreProvisional`
+        // is what tells the reader that difference; nothing here persists the draft's totals.
+        totals: invoice.totals,
+        totalsAreProvisional: invoice.status === 'draft',
+        timeline,
+        lineage,
       };
     },
   );
+
+  app.get('/api/v1/assignments', { config: { access: forRoles('manager') } }, async (request) => {
+    const actor = requireActor(request);
+    const today = isoDateInFirmTimeZone(dependencies.clock.now());
+    return dependencies.transactionally((unit) => assignmentCatalogue(unit.client, actor, today));
+  });
 
   // ── The progressive-disclosure read (BUILD-PLAN 5.3, ADR-0043) ────────────
 
@@ -473,7 +724,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
     '/api/v1/pre-facturier',
     { config: { access: forRoles('manager', 'billing') } },
     async (request, reply) => {
-      const query = parseInput(PeriodQuery, request.query);
+      const query = parseInput(PreFacturierParams, request.query);
       if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
 
       const actor = requireActor(request);
@@ -483,11 +734,23 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       // this JSON payload and the numbers on `GET /pre-facturier` come from one function, so they
       // cannot answer a different question for the same period.
       const composition = await dependencies.transactionally((unit) =>
-        preFacturierComposition(unit, { actor, requestedPeriod: query.value.period, today }),
+        preFacturierComposition(unit, {
+          actor,
+          requestedPeriod: query.value.period,
+          today,
+          craLimit: query.value.craLimit,
+          craOffset: query.value.craOffset,
+          invoiceLimit: query.value.invoiceLimit,
+          invoiceOffset: query.value.invoiceOffset,
+          ...(query.value.consultantSearch === undefined
+            ? {}
+            : { consultantSearch: query.value.consultantSearch }),
+        }),
       );
 
       return {
         period: composition.period,
+        offeredPeriods: composition.offeredPeriods,
         summary: {
           billableCents: composition.billable.reduce(
             (total, row) => total + row.totalExcludingVatCents,
@@ -497,7 +760,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           // on the wire uses, and what `frenchDays` (both copies) takes as its argument. A
           // consumer that divides by four before formatting prints a quarter of the truth.
           lateDays: composition.lateQuarterDays,
-          craCount: composition.cras.length,
+          craCount: composition.pagination.cras.total,
         },
         invoices: composition.invoices,
         cras: composition.cras.map((row) => ({
@@ -510,6 +773,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           blockingReasons: blockingReasonsOf(row),
           decidable: composition.mayDecide && row.status === 'submitted',
         })),
+        pagination: composition.pagination,
       };
     },
   );
@@ -598,13 +862,10 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           (day) => calendar.nonWorkableReason(day) === null,
         );
 
-        const { cra, refused } = await dependencies.transactionally(async (unit) => ({
+        const { cra, allCras } = await dependencies.transactionally(async (unit) => ({
           cra: await unit.cras.findByConsultantAndPeriod(actor.consultantId, period, actor),
-          // ADR-0082: a refusal stays visible past the period it happened in, so a consultant who
-          // has moved on to the next month still sees that last month's correction is still owed.
-          refused: await unit.cras.list({
+          allCras: await unit.cras.list({
             actor,
-            statuses: ['refused'],
             limit: CRA_LIST_MAX_PAGE_SIZE,
             offset: 0,
           }),
@@ -625,7 +886,25 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           remainingWorkableDays: workableDays.filter(
             (day) => (recordedByDay.get(day) ?? 0) < QUARTER_DAYS_PER_DAY,
           ).length,
-          refusedPeriods: refused.map((row) => row.period),
+          refusedPeriods: allCras
+            .filter((row) => row.status === 'refused')
+            .map((row) => row.period),
+          recentActivity: allCras
+            .filter(
+              (row): row is typeof row & { statusChangedAt: string } =>
+                row.statusChangedAt !== null,
+            )
+            .toSorted((left, right) => right.statusChangedAt.localeCompare(left.statusChangedAt))
+            .slice(0, 5)
+            .map((row) => ({
+              key: row.id,
+              kind: 'cra' as const,
+              recordId: row.id,
+              status: row.status,
+              period: row.period,
+              name: null,
+              at: row.statusChangedAt,
+            })),
         };
       }
 
@@ -636,24 +915,41 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         // state. `pendingDecisions`/`lateCras` no longer come from it (ADR-0082): a Cra awaiting a
         // decision or already late does not stop being either just because the requested period
         // changed, so both are read across every period the manager may see instead.
-        const { composition, actionable } = await dependencies.transactionally(async (unit) => ({
-          composition: await preFacturierComposition(unit, {
-            actor,
-            requestedPeriod: query.value.period,
-            today,
+        const { composition, allCras, consultantNames } = await dependencies.transactionally(
+          async (unit) => ({
+            composition: await preFacturierComposition(unit, {
+              actor,
+              requestedPeriod: query.value.period,
+              today,
+            }),
+            allCras: await unit.cras.list({
+              actor,
+              limit: CRA_LIST_MAX_PAGE_SIZE,
+              offset: 0,
+            }),
+            consultantNames: await new PgReferenceReader(unit.client).consultantNames(),
           }),
-          actionable: await unit.cras.list({
-            actor,
-            statuses: NON_VALIDATED_CRA_STATUSES,
-            limit: CRA_LIST_MAX_PAGE_SIZE,
-            offset: 0,
-          }),
-        }));
+        );
+
+        const actionable = allCras.filter((row) => row.status !== 'validated');
+
+        const awaitingDecision = actionable
+          .filter((row) => row.status === 'submitted')
+          .toSorted((left, right) =>
+            (left.statusChangedAt ?? '').localeCompare(right.statusChangedAt ?? ''),
+          )
+          .map((row) => ({
+            craId: row.id,
+            consultantId: row.consultantId,
+            consultantName: consultantNames.get(row.consultantId) ?? row.consultantId,
+            period: row.period,
+            statusChangedAt: row.statusChangedAt,
+          }));
 
         return {
           period: query.value.period,
           role: 'manager' as const,
-          pendingDecisions: actionable.filter((row) => row.status === 'submitted').length,
+          pendingDecisions: awaitingDecision.length,
           billableCents: composition.billable.reduce(
             (total, row) => total + row.totalExcludingVatCents,
             0,
@@ -661,6 +957,24 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           // ADR-0054: a closed period's Cra that never reached `validated`. `actionable` already
           // excludes `validated`, so only the closed-period test is left to apply.
           lateCras: actionable.filter((row) => lastDayOf(periodFromIso(row.period)) < today).length,
+          awaitingDecision,
+          recentActivity: allCras
+            .filter(
+              (row): row is typeof row & { statusChangedAt: string } =>
+                row.statusChangedAt !== null,
+            )
+            .toSorted((left, right) => right.statusChangedAt.localeCompare(left.statusChangedAt))
+            .slice(0, 5)
+            .map((row) => ({
+              key: row.id,
+              kind: 'cra' as const,
+              recordId: row.id,
+              status: row.status,
+              period: row.period,
+              name: consultantNames.get(row.consultantId) ?? row.consultantId,
+              at: row.statusChangedAt,
+              consultantId: row.consultantId,
+            })),
         };
       }
 
@@ -668,9 +982,30 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       // below are bounded by `MAX_PAGE_SIZE`, the cap every list read in this file shares. The
       // seed reaches three invoices in a month; an office that reached fifty-one would read the
       // fifty-first as absent, and the fix then is a counting query, not a larger page.
-      const invoices = await dependencies.transactionally((unit) =>
-        unit.invoices.list({ actor, limit: MAX_PAGE_SIZE, offset: 0, period: query.value.period }),
-      );
+      //
+      // `everyPeriod` is a second, unfiltered read of the same page bound (ADR-0082's own
+      // reasoning applied to billing): the queue below is "the oldest drafts across every month",
+      // not "this month's drafts", so it cannot come off the period-scoped `invoices` read.
+      const { invoices, everyPeriod } = await dependencies.transactionally(async (unit) => ({
+        invoices: await unit.invoices.list({
+          actor,
+          limit: MAX_PAGE_SIZE,
+          offset: 0,
+          period: query.value.period,
+        }),
+        everyPeriod: await unit.invoices.list({ actor, limit: MAX_PAGE_SIZE, offset: 0 }),
+      }));
+
+      const oldestDrafts = everyPeriod
+        .filter((invoice) => invoice.status === 'draft')
+        .toSorted((left, right) => left.supplyPeriod.localeCompare(right.supplyPeriod))
+        .slice(0, 10)
+        .map((invoice) => ({
+          invoiceId: invoice.id,
+          billedToName: invoice.billedToName,
+          supplyPeriod: invoice.supplyPeriod,
+          totalTtcCents: invoice.totalTtcCents ?? 0,
+        }));
 
       return {
         period: query.value.period,
@@ -680,11 +1015,68 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         totalTtcIssuedCents: invoices
           .filter((invoice) => invoice.status === 'issued')
           .reduce((total, invoice) => total + (invoice.totalTtcCents ?? 0), 0),
+        oldestDrafts,
+        recentActivity: everyPeriod
+          .filter(
+            (invoice): invoice is typeof invoice & { issueDate: string } =>
+              invoice.issueDate !== null,
+          )
+          .toSorted((left, right) => right.issueDate.localeCompare(left.issueDate))
+          .slice(0, 5)
+          .map((invoice) => ({
+            key: invoice.id,
+            kind: 'invoice' as const,
+            recordId: invoice.id,
+            status: invoice.status,
+            period: invoice.supplyPeriod,
+            name: invoice.billedToName,
+            at: invoice.issueDate,
+          })),
       };
     },
   );
 
   // ── Writes ────────────────────────────────────────────────────────────────
+
+  app.post(
+    '/api/v1/assignments',
+    { config: { access: forRoles('manager') } },
+    async (request, reply) => {
+      const body = parseInput(AssignmentBody, request.body);
+      if (!body.ok) return sendProblem(reply, malformed(body.errors, contextOf(request)));
+
+      const outcome = await dependencies.transactionally((unit) =>
+        createAssignment(unit.client, requireActor(request), dependencies.newId, body.value),
+      );
+      if (outcome.kind === 'notFound') {
+        return sendProblem(reply, notFound(request, 'consultant or mission'));
+      }
+      if (outcome.kind === 'refused') {
+        return sendProblem(reply, assignmentRefusal(request, outcome));
+      }
+      return reply.code(201).send(outcome);
+    },
+  );
+
+  app.put(
+    '/api/v1/assignments/:id',
+    { config: { access: forRoles('manager') } },
+    async (request, reply) => {
+      const params = parseInput(IdParam, request.params);
+      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
+      const body = parseInput(AssignmentBody, request.body);
+      if (!body.ok) return sendProblem(reply, malformed(body.errors, contextOf(request)));
+
+      const outcome = await dependencies.transactionally((unit) =>
+        updateAssignment(unit.client, requireActor(request), params.value.id, body.value),
+      );
+      if (outcome.kind === 'notFound') return sendProblem(reply, notFound(request, 'assignment'));
+      if (outcome.kind === 'refused') {
+        return sendProblem(reply, assignmentRefusal(request, outcome));
+      }
+      return reply.code(200).send(outcome);
+    },
+  );
 
   /**
    * Replaces the month, and submits it if asked (ADR-0050). `PUT` and not `POST`: sending the same

@@ -2,6 +2,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 
+import { BusinessTimeline } from '@/components/business-timeline';
 import { DataTable } from '@/components/data-table/data-table';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -11,12 +12,19 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
-import { frenchDate, frenchEuros, frenchMonth, frenchPercent } from '@/lib/format';
+import { frenchDate, frenchDays, frenchEuros, frenchMonth, frenchPercent } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
 import { useInvoiceDetail } from '../hooks';
-import type { InvoiceDetail, InvoiceLine, InvoiceStatus, PostalAddress, VatGroup } from '../types';
+import type {
+  InvoiceDetail,
+  InvoiceLine,
+  InvoiceLineage,
+  InvoiceStatus,
+  PostalAddress,
+  VatGroup,
+} from '../types';
 
 import { IssuanceDialog } from './issuance-dialog';
 
@@ -26,6 +34,7 @@ import { IssuanceDialog } from './issuance-dialog';
  * `cra-grid-screen.tsx`'s own `CRA_PRINT_PATH` already documents for `/releve`.
  */
 const INVOICE_PRINT_PATH = '/facture';
+const CRA_PRINT_PATH = '/releve';
 
 function DetailSkeleton(): ReactElement {
   return (
@@ -86,28 +95,34 @@ function lineColumns(): ColumnDef<InvoiceLine>[] {
   return [
     {
       id: 'designation',
+      accessorFn: (row) => row.designation,
       header: LABELS.invoice.designation,
       cell: ({ row }) => row.original.designation,
     },
     {
       id: 'origin',
+      accessorFn: (row) => row.origin.period,
       header: LABELS.invoice.origin,
-      // No `title` (ADR-0061: not exposed on touch, not focusable, not announced consistently) —
-      // the Cra id it used to show on hover is not shown anywhere else on this row either, so it
-      // is simply not rendered rather than moved: nothing in this screen reads it today.
       cell: ({ row }) => (
-        <span className="font-mono text-[0.75rem] text-muted-foreground">
+        <a
+          href={`${CRA_PRINT_PATH}/${row.original.origin.craId}`}
+          target="_blank"
+          rel="noreferrer"
+          className="font-mono text-[0.75rem] text-primary underline underline-offset-2"
+        >
           {frenchMonth(row.original.origin.period)}
-        </span>
+        </a>
       ),
     },
     {
       id: 'quantity',
+      accessorFn: (row) => row.quantityQuarterDays,
       header: LABELS.invoice.quantity,
       cell: ({ row }) => <span className="tabular-nums">{row.original.quantityQuarterDays}</span>,
     },
     {
       id: 'unitPrice',
+      accessorFn: (row) => row.unitPriceCents,
       header: LABELS.invoice.unitPrice,
       cell: ({ row }) => (
         <span className="tabular-nums">{frenchEuros(row.original.unitPriceCents)}</span>
@@ -115,11 +130,13 @@ function lineColumns(): ColumnDef<InvoiceLine>[] {
     },
     {
       id: 'vatRate',
+      accessorFn: (row) => (row.vat.kind === 'taxable' ? row.vat.basisPoints : row.vat.reason),
       header: LABELS.invoice.vatRate,
       cell: ({ row }) => vatRateCell(row.original.vat),
     },
     {
       id: 'amount',
+      accessorFn: (row) => row.amountCents,
       header: LABELS.invoice.amount,
       cell: ({ row }) => (
         <span className="tabular-nums">{frenchEuros(row.original.amountCents)}</span>
@@ -128,15 +145,82 @@ function lineColumns(): ColumnDef<InvoiceLine>[] {
   ];
 }
 
+function LineageCard({ item, index }: { item: InvoiceLineage; index: number }): ReactElement {
+  const vat = item.vatGroup;
+
+  return (
+    <details className="rounded-xl bg-card p-4 shadow-card ring-1 ring-border" open={index === 0}>
+      <summary className="cursor-pointer font-medium text-foreground">
+        {LABELS.invoice.lineage.line.replace('{number}', String(index + 1))} — {item.missionName}
+      </summary>
+      <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-6">
+        <div>
+          <p className="text-muted-foreground">{LABELS.invoice.lineage.cra}</p>
+          <a
+            href={`${CRA_PRINT_PATH}/${item.craId}`}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-primary underline underline-offset-2"
+          >
+            {frenchMonth(item.period)}
+          </a>
+          <ul className="mt-1 text-xs text-muted-foreground">
+            {item.sourceDays.map((sourceDay) => (
+              <li key={sourceDay.day}>
+                {frenchDate(sourceDay.day)} · {frenchDays(sourceDay.quarterDays)}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <LineageStep label={LABELS.invoice.lineage.mission} value={item.missionName} />
+        <LineageStep
+          label={LABELS.invoice.lineage.quantityAndRate}
+          value={`${frenchDays(item.quantityQuarterDays)} × ${frenchEuros(item.tjmCents)} / j`}
+        />
+        <LineageStep
+          label={LABELS.invoice.lineage.lineExcludingVat}
+          value={frenchEuros(item.lineAmountCents)}
+        />
+        <LineageStep
+          label={LABELS.invoice.lineage.vatGroup}
+          value={
+            vat === null
+              ? LABELS.invoice.lineage.unavailable
+              : `${vatRateCell(vat.treatment)} · ${frenchEuros(vat.baseCents)} HT · ${
+                  vat.vatCents === null ? LABELS.invoice.notCharged : frenchEuros(vat.vatCents)
+                }`
+          }
+        />
+        <LineageStep
+          label={LABELS.invoice.lineage.invoiceIncludingVat}
+          value={frenchEuros(item.invoiceTotalTtcCents)}
+        />
+      </div>
+    </details>
+  );
+}
+
+function LineageStep({ label, value }: { label: string; value: string }): ReactElement {
+  return (
+    <div className="border-l-2 border-primary/30 pl-3">
+      <p className="text-muted-foreground">{label}</p>
+      <p className="mt-1 font-medium text-foreground">{value}</p>
+    </div>
+  );
+}
+
 function vatColumns(): ColumnDef<VatGroup>[] {
   return [
     {
       id: 'rate',
+      accessorFn: (row) =>
+        row.treatment.kind === 'taxable' ? row.treatment.basisPoints : row.treatment.reason,
       header: LABELS.invoice.vatRate,
       cell: ({ row }) => vatRateCell(row.original.treatment),
     },
     {
       id: 'base',
+      accessorFn: (row) => row.baseCents,
       header: LABELS.invoice.vatBase,
       cell: ({ row }) => (
         <span className="tabular-nums">{frenchEuros(row.original.baseCents)}</span>
@@ -144,6 +228,7 @@ function vatColumns(): ColumnDef<VatGroup>[] {
     },
     {
       id: 'amount',
+      accessorFn: (row) => row.vatCents ?? -1,
       header: LABELS.invoice.vatAmount,
       cell: ({ row }) =>
         row.original.vatCents === null ? (
@@ -158,6 +243,7 @@ function vatColumns(): ColumnDef<VatGroup>[] {
 interface InvoiceDetailScreenProps {
   readonly id: string;
   readonly role: Role;
+  readonly returnTo: string;
 }
 
 /**
@@ -166,7 +252,11 @@ interface InvoiceDetailScreenProps {
  * never computed here). Lien « Version imprimable » vers la SSR `/facture/:id`. Task 8.3's
  * issuance button/dialog is `billing`-only, `IssuanceDialog`.
  */
-export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): ReactElement {
+export function InvoiceDetailScreen({
+  id,
+  role,
+  returnTo,
+}: InvoiceDetailScreenProps): ReactElement {
   const query = useInvoiceDetail(id);
   const [issuing, setIssuing] = useState(false);
 
@@ -184,6 +274,7 @@ export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): Rea
         <ErrorState
           title={headingFor(error.problem)}
           body={sentenceFor(error.problem)}
+          onRetry={() => void query.refetch()}
           {...(error.problem.correlationId === undefined
             ? {}
             : { correlationId: error.problem.correlationId })}
@@ -192,7 +283,11 @@ export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): Rea
     }
 
     return (
-      <ErrorState title={LABELS.problem.heading.internal} body={LABELS.shell.unexpectedErrorBody} />
+      <ErrorState
+        title={LABELS.problem.heading.internal}
+        body={LABELS.shell.unexpectedErrorBody}
+        onRetry={() => void query.refetch()}
+      />
     );
   }
 
@@ -202,19 +297,21 @@ export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): Rea
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-card-title">{data.billedTo.name}</h2>
           <p className="text-sm text-muted-foreground">{frenchMonth(data.supplyPeriod)}</p>
         </div>
-        <a
-          href={`${INVOICE_PRINT_PATH}/${data.id}`}
-          target="_blank"
-          rel="noreferrer"
-          className="text-sm font-medium text-primary underline underline-offset-2"
-        >
-          {LABELS.invoice.printable}
-        </a>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="ghost">
+            <a href={returnTo}>{LABELS.invoice.backToList}</a>
+          </Button>
+          <Button asChild variant="outline">
+            <a href={`${INVOICE_PRINT_PATH}/${data.id}`} target="_blank" rel="noreferrer">
+              {LABELS.invoice.printable}
+            </a>
+          </Button>
+        </div>
       </div>
 
       {data.status !== alreadyIssued && (
@@ -265,6 +362,16 @@ export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): Rea
         ]}
       />
 
+      <BusinessTimeline
+        title={LABELS.timeline.heading}
+        items={data.timeline.map((item, index) => ({
+          key: `${item.kind}-${item.at}-${String(index)}`,
+          title: LABELS.timeline[item.kind],
+          at: item.at,
+          actorName: item.actorName,
+        }))}
+      />
+
       <section className="flex flex-col gap-2">
         <h3 className="text-card-title">{LABELS.invoice.lines}</h3>
         <p className="text-sm text-muted-foreground">{LABELS.invoice.originNote}</p>
@@ -272,8 +379,23 @@ export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): Rea
           columns={lineColumns()}
           data={data.lines}
           getRowId={(row) => row.origin.craId + row.designation}
+          numericColumns={['quantity', 'unitPrice', 'amount']}
           emptyState={null}
         />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div>
+          <h3 className="text-card-title">{LABELS.invoice.lineage.heading}</h3>
+          <p className="text-sm text-muted-foreground">{LABELS.invoice.lineage.lead}</p>
+        </div>
+        {data.lineage.map((item, index) => (
+          <LineageCard
+            key={`${item.craId}-${item.missionId}-${String(index)}`}
+            item={item}
+            index={index}
+          />
+        ))}
       </section>
 
       <section className="flex flex-col gap-2">
@@ -282,12 +404,13 @@ export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): Rea
           columns={vatColumns()}
           data={data.vatBreakdown}
           getRowId={(row) => row.key}
+          numericColumns={['base', 'amount']}
           emptyState={null}
         />
       </section>
 
-      {data.totals !== null && (
-        <div className="grid grid-cols-3 gap-4">
+      <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <StatCard
             label={LABELS.invoice.totalExcludingVat}
             value={frenchEuros(data.totals.totalExcludingVatCents)}
@@ -301,7 +424,10 @@ export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): Rea
             value={frenchEuros(data.totals.totalIncludingVatCents)}
           />
         </div>
-      )}
+        {data.totalsAreProvisional && (
+          <p className="text-sm text-muted-foreground">{LABELS.invoice.provisionalTotals}</p>
+        )}
+      </div>
 
       {canIssue && data.status !== alreadyIssued && (
         <div>
@@ -326,6 +452,32 @@ export function InvoiceDetailScreen({ id, role }: InvoiceDetailScreenProps): Rea
           }}
         />
       )}
+
+      {/* O8: the page above stacks six blocks (parties, invoice facts, timeline, lines, lineage,
+          VAT recap) — this keeps the client, the total and the primary action reachable without
+          scrolling back to the top. Same sticky-bottom pattern as the CRA grid's own save bar
+          (`cra-grid-screen.tsx`). Navigation (back to the list, the printable link) is the header's
+          job (above) — a real middle breadcrumb crumb (`5f7abd8`) keeps "back" reachable while
+          scrolled, so this bar does not need to repeat it. */}
+      <div className="sticky bottom-0 z-20 -mx-3 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-background/95 p-3 backdrop-blur sm:-mx-6">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-foreground">{data.billedTo.name}</p>
+          <p className="text-xs text-muted-foreground">
+            {frenchMonth(data.supplyPeriod)} · {frenchEuros(data.totals.totalIncludingVatCents)}
+            {data.totalsAreProvisional && <span aria-hidden="true"> *</span>}
+          </p>
+        </div>
+        {canIssue && data.status !== alreadyIssued && (
+          <Button
+            size="sm"
+            onClick={() => {
+              setIssuing(true);
+            }}
+          >
+            {LABELS.invoice.issue}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { MenuIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 
-import { PageHeader } from '@/components/shell/page-header';
+import { PageHeader, type PageHeaderParentCrumb } from '@/components/shell/page-header';
 import { PersonaBlock } from '@/components/shell/persona-block';
 import { SidebarNavList } from '@/components/shell/sidebar';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import { LABELS } from '@/lib/labels';
 interface TopbarProps {
   readonly title: string;
   readonly showBreadcrumb: boolean;
+  readonly parent?: PageHeaderParentCrumb | undefined;
   readonly entries: readonly NavEntry[];
   readonly persona: PersonaSummary;
 }
@@ -30,7 +31,13 @@ interface TopbarProps {
  * (§6: "it stays empty, because an empty reserved zone is more honest than a bell that does
  * nothing") — nothing is added there.
  */
-export function Topbar({ title, showBreadcrumb, entries, persona }: TopbarProps): ReactElement {
+export function Topbar({
+  title,
+  showBreadcrumb,
+  parent,
+  entries,
+  persona,
+}: TopbarProps): ReactElement {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
@@ -67,7 +74,7 @@ export function Topbar({ title, showBreadcrumb, entries, persona }: TopbarProps)
       </Sheet>
 
       <div className="min-w-0 flex-1">
-        <PageHeader title={title} showBreadcrumb={showBreadcrumb} />
+        <PageHeader title={title} showBreadcrumb={showBreadcrumb} parent={parent} />
       </div>
 
       {/* The reserved strip: nothing renders here on purpose (direction-visuelle.md §6). */}

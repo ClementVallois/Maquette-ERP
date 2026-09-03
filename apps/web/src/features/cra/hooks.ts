@@ -49,6 +49,8 @@ function craListQueryKey(
   readonly string[],
   number | undefined,
   number | undefined,
+  number | undefined,
+  number | undefined,
 ] {
   return [
     ...CRA_LIST_QUERY_KEY,
@@ -59,6 +61,8 @@ function craListQueryKey(
     // different filter values must never share a cache entry.
     filters.year,
     filters.month,
+    filters.limit,
+    filters.offset,
   ];
 }
 

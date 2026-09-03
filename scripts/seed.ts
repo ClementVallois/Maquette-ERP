@@ -950,7 +950,11 @@ async function seed(): Promise<void> {
         mentions,
         designation: ({ missionId, period: p }) => {
           const mission = validatedMissions.find((m) => m.id === missionId);
-          return `Prestation ${mission?.name ?? missionId} — ${p}`;
+          const consultant = validatedConsultants.find((c) => c.id === payload.consultantId);
+          const consultantName = consultant
+            ? `${consultant.firstName} ${consultant.lastName}`
+            : payload.consultantId;
+          return `Prestation ${mission?.name ?? missionId} — ${consultantName} — ${p}`;
         },
         newInvoiceId: nextWriteId,
       };

@@ -4,6 +4,7 @@ import {
   LayoutDashboardIcon,
   type LucideIcon,
   ReceiptTextIcon,
+  UserRoundCheckIcon,
 } from 'lucide-react';
 
 import type { Role } from '@/features/session/types';
@@ -77,6 +78,13 @@ export const NAVIGATION: readonly NavEntry[] = [
     label: LABELS.cra.navManager,
     icon: CalendarCheckIcon,
     path: '/cra',
+    roles: MANAGER,
+  },
+  {
+    id: 'assignments',
+    label: LABELS.assignment.nav,
+    icon: UserRoundCheckIcon,
+    path: '/affectations',
     roles: MANAGER,
   },
   {

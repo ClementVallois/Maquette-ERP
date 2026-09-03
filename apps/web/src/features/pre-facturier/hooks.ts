@@ -3,7 +3,7 @@ import type { UseQueryResult } from '@tanstack/react-query';
 
 import { unwrap } from '@/lib/api-client';
 
-import { fetchPreFacturier } from './api';
+import { fetchPreFacturier, type PreFacturierPagination } from './api';
 import type { PreFacturierResponse } from './types';
 
 // Kept private on purpose: `features/cra/hooks.ts`'s `useValidateCra`/`useRefuseCra` invalidate
@@ -12,17 +12,22 @@ import type { PreFacturierResponse } from './types';
 // `features/pre-facturier`, the reverse of the one direction this SPA's features use between each
 // other (see `refuse-dialog.tsx`'s header in `features/cra/components/`). The two files agree on
 // the string `'pre-facturier'` by convention; change one, change both.
-function preFacturierQueryKey(period: string): readonly [string, string] {
-  return ['pre-facturier', period] as const;
+function preFacturierQueryKey(period: string, pagination?: PreFacturierPagination) {
+  return pagination === undefined
+    ? (['pre-facturier', period] as const)
+    : (['pre-facturier', period, pagination] as const);
 }
 
-export function preFacturierQueryOptions(period: string) {
+export function preFacturierQueryOptions(period: string, pagination: PreFacturierPagination) {
   return queryOptions({
-    queryKey: preFacturierQueryKey(period),
-    queryFn: async () => unwrap(await fetchPreFacturier(period)),
+    queryKey: preFacturierQueryKey(period, pagination),
+    queryFn: async () => unwrap(await fetchPreFacturier(period, pagination)),
   });
 }
 
-export function usePreFacturier(period: string): UseQueryResult<PreFacturierResponse> {
-  return useQuery(preFacturierQueryOptions(period));
+export function usePreFacturier(
+  period: string,
+  pagination: PreFacturierPagination,
+): UseQueryResult<PreFacturierResponse> {
+  return useQuery(preFacturierQueryOptions(period, pagination));
 }

@@ -16,6 +16,13 @@ export interface CraListItem {
    * pré-facturier can sum a month without fetching every Cra in full (ADR-0053).
    */
   readonly recordedQuarterDays: number;
+  /**
+   * When the current status was reached — submission for `submitted`, refusal for `refused`,
+   * validation for `validated`. `null` for `draft` (never submitted) and for a legacy row this
+   * column predates. Lets a work queue sort "awaiting a decision" oldest first without loading
+   * every full `Cra` aggregate.
+   */
+  readonly statusChangedAt: string | null;
 }
 
 export interface CraListQuery {
@@ -60,6 +67,14 @@ export interface CraRepository {
    */
   findById(id: CraId, actor: Actor): Promise<Cra | null>;
   list(query: CraListQuery): Promise<readonly CraListItem[]>;
+  /**
+   * Rank A12: the same `WHERE` predicate `list` applies, minus `limit`/`offset` — what makes
+   * truncation observable (`total` vs. the page length) and what a page-size selector's own
+   * "1-50 sur 300" is built from. Never itself paginated: a count is one row, however large.
+   */
+  count(query: Omit<CraListQuery, 'limit' | 'offset'>): Promise<number>;
+  /** Every distinct period visible to the actor, newest first; never derived from a page. */
+  listPeriods(actor: Actor): Promise<readonly string[]>;
   findByConsultantAndPeriod(
     consultantId: ConsultantId,
     period: Period,

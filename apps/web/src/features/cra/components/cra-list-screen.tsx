@@ -4,7 +4,9 @@ import { CalendarIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 
+import { CopyLinkButton } from '@/components/copy-link-button';
 import { DataTable } from '@/components/data-table/data-table';
+import { PaginationControls } from '@/components/data-table/pagination-controls';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -96,6 +98,7 @@ function columnsFor(role: Role): ColumnDef<CraListItem>[] {
   if (role === 'manager') {
     columns.push({
       id: 'consultantName',
+      accessorFn: (row) => row.consultantName,
       header: LABELS.cra.consultant,
       cell: ({ row }) => (
         <span className="font-medium text-foreground">{row.original.consultantName}</span>
@@ -114,11 +117,13 @@ function columnsFor(role: Role): ColumnDef<CraListItem>[] {
     },
     {
       id: 'status',
+      accessorFn: (row) => row.status,
       header: LABELS.cra.status,
       cell: ({ row }) => <StatusBadge variant={STATUS_VARIANT[row.original.status]} />,
     },
     {
       id: 'recordedQuarterDays',
+      accessorFn: (row) => row.recordedQuarterDays,
       header: LABELS.cra.recorded,
       cell: ({ row }) => (
         <span className="tabular-nums">{frenchDays(row.original.recordedQuarterDays)}</span>
@@ -129,6 +134,7 @@ function columnsFor(role: Role): ColumnDef<CraListItem>[] {
   if (role === 'consultant' || role === 'manager') {
     columns.push({
       id: 'actions',
+      enableSorting: false,
       header: () => <span className="sr-only">{LABELS.action.tableActions}</span>,
       cell: ({ row }) => (
         <Button asChild variant="outline" size="sm" className="ml-auto flex w-fit">
@@ -152,6 +158,33 @@ function columnsFor(role: Role): ColumnDef<CraListItem>[] {
   return columns;
 }
 
+function ConsultantCraCards({ rows }: { readonly rows: readonly CraListItem[] }): ReactElement {
+  return (
+    <ul className="flex flex-col gap-3 sm:hidden">
+      {rows.map((row) => (
+        <li key={row.id}>
+          <article className="rounded-xl bg-card p-4 shadow-card ring-1 ring-border">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-foreground">{frenchMonth(row.period)}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {LABELS.cra.recorded} : {frenchDays(row.recordedQuarterDays)}
+                </p>
+              </div>
+              <StatusBadge variant={STATUS_VARIANT[row.status]} />
+            </div>
+            <Button asChild className="mt-4 w-full" variant="outline">
+              <Link to="/cra/$period" params={{ period: row.period }}>
+                {LABELS.cra.show}
+              </Link>
+            </Button>
+          </article>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 interface CraListScreenProps {
   readonly role: Role;
   /** Item 7 (QA round 1). Always `[]` for a consultant persona — the route never renders the
@@ -161,6 +194,8 @@ interface CraListScreenProps {
   /** Item 4 (QA round 2), same "always present, manager-only controls" shape as the two above. */
   readonly year: number | undefined;
   readonly month: number | undefined;
+  readonly page: number;
+  readonly pageSize: number;
 }
 
 /**
@@ -175,6 +210,8 @@ export function CraListScreen({
   statuses,
   year,
   month,
+  page,
+  pageSize,
 }: CraListScreenProps): ReactElement {
   // `exactOptionalPropertyTypes` refuses an explicit `year: undefined`/`month: undefined` — the
   // spread omits the key entirely when there is no value, matching `CraListFilters`'s own
@@ -184,8 +221,11 @@ export function CraListScreen({
     statuses,
     ...(year === undefined ? {} : { year }),
     ...(month === undefined ? {} : { month }),
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
   };
   const query = useCraList(filters);
+  const navigate = useNavigate();
   const filtersActive =
     consultantIds.length > 0 || statuses.length > 0 || year !== undefined || month !== undefined;
 
@@ -203,6 +243,7 @@ export function CraListScreen({
         <ErrorState
           title={headingFor(error.problem)}
           body={sentenceFor(error.problem)}
+          onRetry={() => void query.refetch()}
           {...(error.problem.correlationId === undefined
             ? {}
             : { correlationId: error.problem.correlationId })}
@@ -211,12 +252,32 @@ export function CraListScreen({
     }
 
     return (
-      <ErrorState title={LABELS.problem.heading.internal} body={LABELS.shell.unexpectedErrorBody} />
+      <ErrorState
+        title={LABELS.problem.heading.internal}
+        body={LABELS.shell.unexpectedErrorBody}
+        onRetry={() => void query.refetch()}
+      />
     );
   }
 
   const rows = query.data.cras;
   const hasAnyCra = rows.length > 0;
+  const emptyState = (
+    <EmptyState
+      icon={CalendarIcon}
+      title={filtersActive ? LABELS.cra.filters.emptyTitle : LABELS.cra.emptyList}
+      body={filtersActive ? LABELS.cra.filters.emptyBody : LABELS.cra.emptyListHint}
+      {...(!hasAnyCra && !filtersActive && role === 'consultant'
+        ? {
+            action: {
+              label: LABELS.cra.show,
+              to: '/cra/$period',
+              params: { period: currentPeriod() },
+            },
+          }
+        : {})}
+    />
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -238,25 +299,50 @@ export function CraListScreen({
         />
       )}
 
-      <DataTable
-        columns={columnsFor(role)}
-        data={rows}
-        getRowId={(row) => row.id}
-        emptyState={
-          <EmptyState
-            icon={CalendarIcon}
-            title={filtersActive ? LABELS.cra.filters.emptyTitle : LABELS.cra.emptyList}
-            body={filtersActive ? LABELS.cra.filters.emptyBody : LABELS.cra.emptyListHint}
-            {...(!hasAnyCra && !filtersActive && role === 'consultant'
-              ? {
-                  action: {
-                    label: LABELS.cra.show,
-                    to: '/cra/$period',
-                    params: { period: currentPeriod() },
-                  },
-                }
-              : {})}
-          />
+      {role === 'consultant' ? (
+        <>
+          {hasAnyCra ? (
+            <ConsultantCraCards rows={rows} />
+          ) : (
+            <div className="sm:hidden">{emptyState}</div>
+          )}
+          <div className="hidden sm:block">
+            <DataTable
+              columns={columnsFor(role)}
+              data={rows}
+              getRowId={(row) => row.id}
+              numericColumns={['recordedQuarterDays']}
+              emptyState={emptyState}
+            />
+          </div>
+        </>
+      ) : (
+        <DataTable
+          columns={columnsFor(role)}
+          data={rows}
+          getRowId={(row) => row.id}
+          numericColumns={['recordedQuarterDays']}
+          emptyState={emptyState}
+        />
+      )}
+      <PaginationControls
+        total={query.data.total}
+        limit={query.data.limit}
+        offset={query.data.offset}
+        onPageChange={(offset) =>
+          void navigate({
+            to: '/cra',
+            search: (previous) => ({
+              ...previous,
+              page: Math.floor(offset / pageSize) + 1,
+            }),
+          })
+        }
+        onPageSizeChange={(limit) =>
+          void navigate({
+            to: '/cra',
+            search: (previous) => ({ ...previous, page: 1, pageSize: limit }),
+          })
         }
       />
     </div>
@@ -342,7 +428,11 @@ function CraListFilters({
       to: '/cra',
       search: (prev) => {
         const updated = applyDiff(prev.consultantIds ?? [], diff);
-        return { ...prev, consultantIds: updated.length === 0 ? undefined : [...updated] };
+        return {
+          ...prev,
+          page: 1,
+          consultantIds: updated.length === 0 ? undefined : [...updated],
+        };
       },
     });
   }
@@ -353,7 +443,11 @@ function CraListFilters({
       to: '/cra',
       search: (prev) => {
         const updated = applyDiff(prev.statuses ?? [], diff);
-        return { ...prev, statuses: updated.length === 0 ? undefined : (updated as CraStatus[]) };
+        return {
+          ...prev,
+          page: 1,
+          statuses: updated.length === 0 ? undefined : (updated as CraStatus[]),
+        };
       },
     });
   }
@@ -367,7 +461,7 @@ function CraListFilters({
     const parsed = next === FILTER_ALL ? undefined : Number.parseInt(next, 10);
     void navigate({
       to: '/cra',
-      search: (prev) => ({ ...prev, year: parsed }),
+      search: (prev) => ({ ...prev, year: parsed, page: 1 }),
     });
   }
 
@@ -375,7 +469,7 @@ function CraListFilters({
     const parsed = next === FILTER_ALL ? undefined : Number.parseInt(next, 10);
     void navigate({
       to: '/cra',
-      search: (prev) => ({ ...prev, month: parsed }),
+      search: (prev) => ({ ...prev, month: parsed, page: 1 }),
     });
   }
 
@@ -436,6 +530,7 @@ function CraListFilters({
           ))}
         </SelectContent>
       </Select>
+      <CopyLinkButton />
     </div>
   );
 }

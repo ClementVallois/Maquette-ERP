@@ -241,6 +241,9 @@ describe('GET /api/v1/dashboard — consultant', () => {
       recordedQuarterDays: 20,
       remainingWorkableDays: 17,
       refusedPeriods: [],
+      // Alice's only Cra is a draft: no submission, refusal or validation ever set
+      // `statusChangedAt` on it, so there is nothing to show yet.
+      recentActivity: [],
     });
   });
 
@@ -276,6 +279,29 @@ describe('GET /api/v1/dashboard — manager', () => {
       billableCents: 0,
       // Both Cras are unvalidated in a month the clock has closed (ADR-0054).
       lateCras: 2,
+      awaitingDecision: [
+        {
+          craId: CRA_CHLOE,
+          consultantId: CHLOE,
+          consultantName: 'Chloé Nguyen',
+          period: '2026-06',
+          statusChangedAt: '2026-07-01T09:00:00.000Z',
+        },
+      ],
+      // The one Cra with a `statusChangedAt` — Alice's is still a draft. `at` is the fixture's
+      // own literal `submitted_at`, not a clock read at request time.
+      recentActivity: [
+        {
+          key: CRA_CHLOE,
+          kind: 'cra',
+          recordId: CRA_CHLOE,
+          status: 'submitted',
+          period: '2026-06',
+          name: 'Chloé Nguyen',
+          at: '2026-07-01T09:00:00.000Z',
+          consultantId: CHLOE,
+        },
+      ],
     });
   });
 
@@ -292,6 +318,21 @@ describe('GET /api/v1/dashboard — manager', () => {
       // 22 days × 800 € = 17 600 € HT.
       billableCents: 1_760_000,
       lateCras: 1,
+      awaitingDecision: [],
+      // Same Cra, now validated: `statusChangedAt` moves to `NOW`, the fixed clock
+      // `validateChloeJune()`'s own request runs under — deterministic, not a wall-clock read.
+      recentActivity: [
+        {
+          key: CRA_CHLOE,
+          kind: 'cra',
+          recordId: CRA_CHLOE,
+          status: 'validated',
+          period: '2026-06',
+          name: 'Chloé Nguyen',
+          at: NOW.toISOString(),
+          consultantId: CHLOE,
+        },
+      ],
     });
   });
 
@@ -324,13 +365,33 @@ describe('GET /api/v1/dashboard — billing', () => {
     const response = await dashboard('billing-paris');
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toStrictEqual({
+    const body = response.json<{
+      readonly draftInvoices: number;
+      readonly issuedInvoices: number;
+      readonly totalTtcIssuedCents: number;
+      readonly oldestDrafts: readonly {
+        readonly billedToName: string;
+        readonly supplyPeriod: string;
+        readonly totalTtcCents: number;
+      }[];
+    }>();
+    expect(body).toMatchObject({
       period: '2026-06',
       role: 'billing',
       draftInvoices: 1,
       issuedInvoices: 0,
       totalTtcIssuedCents: 0,
     });
+    // Chloé's draft: HT is 22 days × 800 € = 17 600 €, TTC at 20% is 21 120 € — computed from the
+    // lines, not stored, since a draft's totals are provisional (Rank B1).
+    expect(body.oldestDrafts).toStrictEqual([
+      {
+        invoiceId: expect.any(String),
+        billedToName: 'Banque Nationale de Test',
+        supplyPeriod: '2026-06',
+        totalTtcCents: 2_112_000,
+      },
+    ]);
   });
 
   it('moves the invoice from draft to issued, and sums its TTC total', async () => {
@@ -362,6 +423,22 @@ describe('GET /api/v1/dashboard — billing', () => {
       issuedInvoices: 1,
       // 17 600 € HT × 1,20 = 21 120 € TTC.
       totalTtcIssuedCents: 2_112_000,
+      oldestDrafts: [],
+      // `invoiceId` above is the only non-deterministic value here — `uuidv7`, not the fixed
+      // clock — so it is read back rather than hard-coded; `at` is `issueDate`, derived from
+      // `NOW` in the firm's own time zone (UTC+2 in July), which is why it is a bare date and not
+      // a full instant.
+      recentActivity: [
+        {
+          key: invoiceId,
+          kind: 'invoice',
+          recordId: invoiceId,
+          status: 'issued',
+          period: '2026-06',
+          name: 'Banque Nationale de Test',
+          at: '2026-07-02',
+        },
+      ],
     });
   });
 });

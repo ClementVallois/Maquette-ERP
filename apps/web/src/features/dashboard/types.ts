@@ -38,6 +38,17 @@
  */
 export type DashboardCraStatus = 'draft' | 'submitted' | 'validated' | 'refused';
 
+export interface DashboardActivity {
+  readonly key: string;
+  readonly kind: 'cra' | 'invoice';
+  readonly recordId: string;
+  readonly status: DashboardCraStatus | 'issued' | 'cancelledByCreditNote';
+  readonly period: string;
+  readonly name: string | null;
+  readonly at: string;
+  readonly consultantId?: string;
+}
+
 export interface ConsultantDashboard {
   readonly period: string;
   readonly role: 'consultant';
@@ -51,6 +62,17 @@ export interface ConsultantDashboard {
    * `period` itself too (when this month's own refusal is what `myMonthStatus` already reports).
    */
   readonly refusedPeriods: readonly string[];
+  readonly recentActivity: readonly DashboardActivity[];
+}
+
+/** One row of a manager's "à faire maintenant" queue — a submitted Cra awaiting a decision. */
+export interface ManagerQueueRow {
+  readonly craId: string;
+  readonly consultantId: string;
+  readonly consultantName: string;
+  readonly period: string;
+  /** ISO timestamp of the submission this row is queued on, or `null` for a legacy row without one. */
+  readonly statusChangedAt: string | null;
 }
 
 export interface ManagerDashboard {
@@ -59,6 +81,20 @@ export interface ManagerDashboard {
   readonly pendingDecisions: number;
   readonly billableCents: number;
   readonly lateCras: number;
+  /**
+   * Every `submitted` Cra across every period (ADR-0082's own scope), oldest first — the work
+   * queue `pendingDecisions` counts but did not, until this field, let a manager reach directly.
+   */
+  readonly awaitingDecision: readonly ManagerQueueRow[];
+  readonly recentActivity: readonly DashboardActivity[];
+}
+
+/** One row of billing's "à faire maintenant" queue — a draft ready to issue. */
+export interface BillingQueueRow {
+  readonly invoiceId: string;
+  readonly billedToName: string;
+  readonly supplyPeriod: string;
+  readonly totalTtcCents: number;
 }
 
 export interface BillingDashboard {
@@ -67,6 +103,9 @@ export interface BillingDashboard {
   readonly draftInvoices: number;
   readonly issuedInvoices: number;
   readonly totalTtcIssuedCents: number;
+  /** Every draft across every period, oldest supply period first. */
+  readonly oldestDrafts: readonly BillingQueueRow[];
+  readonly recentActivity: readonly DashboardActivity[];
 }
 
 export type DashboardResponse = ConsultantDashboard | ManagerDashboard | BillingDashboard;

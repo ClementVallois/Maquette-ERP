@@ -21,8 +21,19 @@ import { defineConfig } from 'vite';
 // `/problems/not-found` page instead of the SPA shell. Both SSR routes are always `/:id`-suffixed
 // (`apps/api/src/web/routes.ts`) and never reached bare, so the trailing slash costs nothing on
 // the paths that are supposed to match.
+//
+// `/assets/style.` is the same prefix-match hazard, deliberately narrowed: the SSR shell
+// (`apps/api/src/web/shell.ts`) links the API's one stylesheet at `/assets/style.<hash>.css`
+// (`apps/api/src/web/assets.ts`), which a full navigation to `/facture/:id` or `/releve/:id`
+// requests from whichever origin served that page — Vite in dev. Bare `/assets/` was rejected on
+// purpose: it would proxy every future asset this route ever serves, sight unseen, and repeats
+// the exact prefix-match mistake this comment already tells the story of. `/assets/style.`
+// matches only the one file this API ships and nothing the SPA's own dev server could ever mount
+// there. Unproxied, the request fell through to Vite's SPA fallback and got `index.html` back
+// with `Content-Type: text/html` instead of the stylesheet — no error, no console warning, the
+// printable page just rendered unstyled.
 const API_ORIGIN = 'http://127.0.0.1:3000';
-const PROXIED_PATHS = ['/api', '/facture/', '/releve/', '/healthz', '/readyz'];
+const PROXIED_PATHS = ['/api', '/facture/', '/releve/', '/assets/style.', '/healthz', '/readyz'];
 
 export default defineConfig({
   // Tailwind v4 is CSS-first (no tailwind.config.*): the plugin reads `@import "tailwindcss"`

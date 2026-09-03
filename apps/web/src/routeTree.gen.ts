@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShellRouteImport } from './routes/_shell'
+import { Route as ShellAffectationsRouteImport } from './routes/_shell/affectations'
 import { Route as ShellPreFacturierRouteImport } from './routes/_shell/pre-facturier'
 import { Route as ShellTableauDeBordRouteImport } from './routes/_shell/tableau-de-bord'
 import { Route as DevComposantsRouteImport } from './routes/dev.composants'
@@ -30,6 +31,11 @@ const IndexRoute = IndexRouteImport.update({
 const ShellRoute = ShellRouteImport.update({
   id: '/_shell',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ShellAffectationsRoute = ShellAffectationsRouteImport.update({
+  id: '/affectations',
+  path: '/affectations',
+  getParentRoute: () => ShellRoute,
 } as any)
 const ShellPreFacturierRoute = ShellPreFacturierRouteImport.update({
   id: '/pre-facturier',
@@ -85,6 +91,7 @@ const ShellCraPeriodConsultantIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/affectations': typeof ShellAffectationsRoute
   '/pre-facturier': typeof ShellPreFacturierRoute
   '/tableau-de-bord': typeof ShellTableauDeBordRoute
   '/dev/composants': typeof DevComposantsRoute
@@ -98,6 +105,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/affectations': typeof ShellAffectationsRoute
   '/pre-facturier': typeof ShellPreFacturierRoute
   '/tableau-de-bord': typeof ShellTableauDeBordRoute
   '/dev/composants': typeof DevComposantsRoute
@@ -112,6 +120,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_shell': typeof ShellRouteWithChildren
+  '/_shell/affectations': typeof ShellAffectationsRoute
   '/_shell/pre-facturier': typeof ShellPreFacturierRoute
   '/_shell/tableau-de-bord': typeof ShellTableauDeBordRoute
   '/dev/composants': typeof DevComposantsRoute
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/affectations'
     | '/pre-facturier'
     | '/tableau-de-bord'
     | '/dev/composants'
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/affectations'
     | '/pre-facturier'
     | '/tableau-de-bord'
     | '/dev/composants'
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_shell'
+    | '/_shell/affectations'
     | '/_shell/pre-facturier'
     | '/_shell/tableau-de-bord'
     | '/dev/composants'
@@ -186,6 +198,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof ShellRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_shell/affectations': {
+      id: '/_shell/affectations'
+      path: '/affectations'
+      fullPath: '/affectations'
+      preLoaderRoute: typeof ShellAffectationsRouteImport
+      parentRoute: typeof ShellRoute
     }
     '/_shell/pre-facturier': {
       id: '/_shell/pre-facturier'
@@ -275,6 +294,7 @@ const ShellCraPeriodRouteWithChildren = ShellCraPeriodRoute._addFileChildren(
 )
 
 interface ShellRouteChildren {
+  ShellAffectationsRoute: typeof ShellAffectationsRoute
   ShellPreFacturierRoute: typeof ShellPreFacturierRoute
   ShellTableauDeBordRoute: typeof ShellTableauDeBordRoute
   ShellCraPeriodRoute: typeof ShellCraPeriodRouteWithChildren
@@ -285,6 +305,7 @@ interface ShellRouteChildren {
 }
 
 const ShellRouteChildren: ShellRouteChildren = {
+  ShellAffectationsRoute: ShellAffectationsRoute,
   ShellPreFacturierRoute: ShellPreFacturierRoute,
   ShellTableauDeBordRoute: ShellTableauDeBordRoute,
   ShellCraPeriodRoute: ShellCraPeriodRouteWithChildren,

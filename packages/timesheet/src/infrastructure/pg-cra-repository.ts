@@ -98,7 +98,8 @@ export class PgCraRepository implements CraRepository {
       // (consultantIds) and `$7` (statuses) are ANDed onto it, never substituted for it, so
       // neither can widen what the actor may see, only narrow it further (item 7, QA round 1).
       `SELECT c.id, c.consultant_id, c.office_id, c.period, c.status,
-              COALESCE(SUM(l.quarter_days), 0)::int AS recorded_quarter_days
+              COALESCE(SUM(l.quarter_days), 0)::int AS recorded_quarter_days,
+              COALESCE(c.validated_at, c.refusal_at, c.submitted_at) AS status_changed_at
        FROM timesheet.cras c
        LEFT JOIN timesheet.cra_lines l ON l.cra_id = c.id
        WHERE c.office_id = $1
@@ -108,7 +109,8 @@ export class PgCraRepository implements CraRepository {
          AND ($7::text[] IS NULL OR c.status = ANY($7))
          AND ($8::text IS NULL OR left(c.period, 4) = $8)
          AND ($9::text IS NULL OR right(c.period, 2) = $9)
-       GROUP BY c.id, c.consultant_id, c.office_id, c.period, c.status
+       GROUP BY c.id, c.consultant_id, c.office_id, c.period, c.status,
+                c.validated_at, c.refusal_at, c.submitted_at
        ORDER BY c.period DESC, c.consultant_id
        LIMIT $3 OFFSET $4`,
       [
@@ -141,7 +143,60 @@ export class PgCraRepository implements CraRepository {
       // quarter-days cannot approach the 32-bit bound, and `quarterDays` refuses anything that is
       // not a whole non-negative count if the cast ever stops holding.
       recordedQuarterDays: quarterDays(row.recorded_quarter_days),
+      statusChangedAt: row.status_changed_at === null ? null : row.status_changed_at.toISOString(),
     }));
+  }
+
+  /** Rank A12: `list`'s own `WHERE`, minus the join/aggregation a count does not need. */
+  async count(query: Omit<CraListQuery, 'limit' | 'offset'>): Promise<number> {
+    const { actor } = query;
+    const scope = readScope(actor, 'cra');
+
+    if (scope === 'none') return 0;
+
+    const { rows } = await this.#client.query<{ count: string }>(
+      `SELECT COUNT(*) AS count
+       FROM timesheet.cras c
+       WHERE c.office_id = $1
+         AND ($2::text IS NULL OR c.consultant_id = $2)
+         AND ($3::text IS NULL OR c.period = $3)
+         AND ($4::text[] IS NULL OR c.consultant_id = ANY($4))
+         AND ($5::text[] IS NULL OR c.status = ANY($5))
+         AND ($6::text IS NULL OR left(c.period, 4) = $6)
+         AND ($7::text IS NULL OR right(c.period, 2) = $7)`,
+      [
+        actor.officeId,
+        scope === 'own' ? actor.consultantId : null,
+        query.period ?? null,
+        query.consultantIds !== undefined && query.consultantIds.length > 0
+          ? query.consultantIds
+          : null,
+        query.statuses !== undefined && query.statuses.length > 0 ? query.statuses : null,
+        query.year === undefined ? null : String(query.year),
+        query.month === undefined ? null : String(query.month).padStart(2, '0'),
+      ],
+    );
+
+    // `COUNT(*)` is `bigint`, and `pg` hands that back as a string — an office's Cra count cannot
+    // approach the 32-bit bound, so a plain parse is safe (same reasoning `recordedQuarterDays`'s
+    // own comment gives for its `::int` cast, without the cast: `COUNT` has no `::int` overload).
+    return Number.parseInt(rows[0]!.count, 10);
+  }
+
+  async listPeriods(actor: Actor): Promise<readonly string[]> {
+    const scope = readScope(actor, 'cra');
+    if (scope === 'none') return [];
+
+    const { rows } = await this.#client.query<{ period: string }>(
+      `SELECT DISTINCT c.period
+       FROM timesheet.cras c
+       WHERE c.office_id = $1
+         AND ($2::text IS NULL OR c.consultant_id = $2)
+       ORDER BY c.period DESC`,
+      [actor.officeId, scope === 'own' ? actor.consultantId : null],
+    );
+
+    return rows.map((row) => row.period);
   }
 
   async save(cra: Cra): Promise<void> {
@@ -259,6 +314,7 @@ interface CraListRow {
   period: string;
   status: string;
   recorded_quarter_days: number;
+  status_changed_at: Date | null;
 }
 
 interface CraLineRow {

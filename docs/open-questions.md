@@ -3686,3 +3686,199 @@ prints six, and two documents it advertises "en français comme ce README" are E
 this branch's doing; all of it arrived with the front-end merge of 28/08/2026. It is Phase 9's job by
 name (`docs/BUILD-PLAN.md`, the documentation review pass), and the row above dated 01/09/2026 says
 so with that phase named.
+
+---
+
+## A session outside the phases — 02/09/2026
+
+`docs/BUILD-PLAN.md` is **paused by Clement's decision of 02/09/2026**, at least for the day. The
+reason is not a defect: two weeks of work have produced a complete CRA-to-invoice chain behind a thin
+visible surface. `apps/web/src/config/navigation.ts` gives the `consultant` role exactly two nav
+entries, so the persona a reader opens first reaches **three screens**, two of which are lists — and
+the landing screen of all three personas is three `StatCard`s and one action card.
+
+The triage of what to build instead is **`docs/plan-densification.md`**, written today from
+`docs/audit-produit-ui-ux.md` (01/09) plus four findings measured against a live seeded database on
+02/09. It sorts every identifier of that audit into kept / optional / dropped, and — the reason it is
+named here rather than left to itself — it binds each dropped row to one of this file's four
+outcomes, so nothing in it is a deferral pretending to be a record.
+
+**Three rows it opens that are architectural arbitrations, and therefore Clement's:**
+
+- an ADR for a **historical chart** on the dashboards. `apps/web/src/features/dashboard/components/dashboard-screen.tsx`
+  refuses one in a header comment whose stated premise — "the seed holds one period" — died with item
+  6 of QA round 1. The seed now holds 8 Cra periods and 6 invoice years. The rule the premise served
+  (never a curve on one point) still binds the choice of series.
+- an ADR for a **non-contractual amount preview on a draft invoice**. `total_ttc_cents` is `NULL` for
+  54 of the 66 seeded invoices, so the TTC column is blank on most rows of both tabular screens, and
+  `issuance-dialog.tsx` asks to irreversibly freeze a document without ever showing its amount. The
+  preview sits next to a rule written verbatim in the route (`totals is null until issued`) and does
+  not get to slip in beside it silently.
+- the **pré-facturier month-selector cap**, already recorded here on 31/08/2026: an ADR, or a rewrite
+  of the README's "Pagination du pré-facturier au-delà d'une page" row. Re-measured today, per
+  office: Paris and Lyon offer 3 months where Bordeaux offers all 8.
+
+**One claim corrected in the writing, recorded because the wrong version is the plausible one.** A
+first pass concluded the invoice list hid 16 of 66 invoices behind its `?limit=50` cap, simulating
+the page in SQL with no actor predicate. `PgInvoiceRepository.list` carries `WHERE office_id = $1`:
+the list is office-scoped for every role, and no office exceeds 29 invoices. Nothing is hidden and
+the status counters are right. What is true is narrower and was found only by re-measuring: the cap
+is a near miss that nothing will announce when it is crossed, and the 2016–2024 history is reachable
+but buried under twenty look-alike 2026 drafts in a table with no sort, no search and no year filter.
+
+**Three decisions Clement took the same day, after the first version of that document was written,
+recorded here because two of them reverse what it recommended.**
+
+- **The phone is supported, for the consultant chain only.** The first version proposed writing
+  "desktop and tablet only" into the README's "Ce que je ne construis pas", with the reopening
+  threshold "if the mockup has to be opened from a phone". Clement named that use case the same
+  day — a consultant filling a Cra on the métro — so the threshold was crossed before the row was
+  written and **no README row goes out**. Scope is `persona picker → dashboard → Mes CRA → grid and
+entry → submit`; manager decisions and invoice issuance stay desk work. Measured cost:
+  `grid-cols-3` hardcoded in nine places with no breakpoint prefix, 29 responsive utilities in the
+  whole SPA, and a matrix of 31 day-columns at `min-w-[2.75rem]` — about 3.5 screens of horizontal
+  scroll per row at 390px. The one thing already right: every cell is a native five-option
+  `<select>` (ADR-0068), so the OS picker handles touch entry and only the matrix width is broken.
+  Still open, and it is a UI arbitration: a **day view** (the phone-native slice of a model that is
+  already missions × days) or a **week view**. The day view is not a free choice: checked against
+  ADR-0070, it is **that ADR's own rejected option n° 2** — "a day-detail panel: click a day, edit
+  its four quarters in a side sheet" — turned down because it trades a scannable surface for 31 round
+  trips and hides which days are still not full. An ADR is therefore mandatory, and what it has to
+  establish is narrow: the first objection assumes a viewport where the matrix _is_ scannable, and at
+  390px it is not (3.5 screens of horizontal scroll per row), so the ADR bounds ADR-0070 to a
+  viewport rather than reversing it — the phone was never in its scope. The second objection stands
+  and becomes a precondition: a "X/Y working days complete" progress indicator is the price of
+  admission for a day view, not a nicety. If that argument does not convince, the week view is the
+  only option left and its 7 columns at 390px have to be owned as tight. Playwright has no phone
+  project —
+  `mobile-shell` is 768×1024 on a _desktop_ device profile — so a real 390×844 project is part of
+  the work, not a follow-up.
+- **The fixed cap of 50 goes, replaced by real pagination.** The first version classed this
+  optional, because no office exceeds it yet (Paris is at 29 invoices). Clement's reading is the
+  better one: a cap that truncates **silently** is not a limit. **ADR-0081 names this exact
+  threshold itself** — "the day this screen gains a pagination control of its own" — and names the
+  design to build when it is crossed: the exact count it deferred for want of a pagination control
+  to serve. The cap lives in **seven** places (`MAX_PAGE_SIZE` in `routes/api.ts` and again in
+  `PgInvoiceRepository`, `CRA_LIST_MAX_PAGE_SIZE`, `DEFAULT_PAGE_SIZE`, the pré-facturier's
+  hardcoded single page, `MAX_MONTHS`, and the web client's `LIST_LIMIT` asking for exactly the
+  cap). The real defect is that nothing in a response distinguishes "there were exactly 50" from
+  "there were 300". The README's "Pagination du pré-facturier au-delà d'une page" row falls with it.
+- **Item 13 — several invoices to one client, one period, one amount — is coherent with ADR-0038,
+  and ADR-0038 never examined the case.** Measured: six invoices for "Banque Nationale de Test /
+  2026-06", five of them `17600.00` to the cent, one per validated Cra, and the same shape in July
+  and August. The code does exactly what ADR-0038 decided, and `idx_invoices_source_cra_client`
+  confirms the key is `(cra, client)`. But **every** option that ADR weighs concerns _one Cra
+  spanning several clients_ — as do both of its reconsideration thresholds. "One invoice per
+  `(client, period)`, accumulating lines as each Cra is validated" is neither chosen nor rejected
+  there: it is absent, so its absence is a blind spot rather than a decision with a threshold. The
+  real-world default runs the other way — a firm sends one June invoice covering six consultants,
+  not six documents and six numbers. Left open deliberately: keeping the key costs an ADR-0038
+  amendment plus a row discriminant; aggregating costs a draft that accumulates lines, the unique
+  index, and the idempotency guarantee ADR-0038 hands forward to itself. The row discriminant is
+  needed either way, so it is safe to build before the decision. The identical amounts are a
+  separate, certain consequence of the seed: `Tjm` is a **mission** rate (`grades` and
+  `grade_tjm_defaults` are in the README's "Écarté"), so everyone on a mission bills the same, and a
+  dense month gives everyone exactly 88 quarter-days. Varying days worked per consultant breaks the
+  collision more cheaply than varying rates, and does not touch the rejected grades decision.
+
+**Two more decisions, later the same day, and both are cheaper than the shape of the request
+suggested.**
+
+- **An invoice line will name the consultant who did the work.** Read in the database, a line today
+  is `Prestation Audit DORA — Banque Nationale — 2026-06`, 88 quarter-days, 200 €, 17 600 € — mission,
+  period, quantity, price, and **no person**. That is why two invoices to one client for one month
+  are indistinguishable **on the document itself**, not merely in a list. The fix is three lines and
+  touches no boundary: `designation` is a callback the composition root injects
+  (`apps/api/src/chain/validate-cra.ts:109`), `event.payload.consultantId` is already in that
+  closure's scope, and `PgReferenceReader.consultantNames()` already exists at
+  `reference-reader.ts:230` with no caller — `apps/api` reads `public.consultants` exactly as it
+  already reads `public.missions`, and `billing` never learns a consultant-name type. One trap,
+  verified: there are **two** designation callbacks, `validate-cra.ts:108` and **`scripts/seed.ts:951`**,
+  and they have to change together or seeded history and new invoices print two different formats.
+  No ADR — the reader's own comment calls the designation "presentation, not a rule". This does not
+  decide the aggregation question above, but it changes its stakes: six documents that each name
+  their consultant are a normal thing for a client to receive in régie; six identical ones are not.
+- **The mission-assignment screen is built** — reversing the refusal of 01/09/2026. Nothing in the
+  request changed; what changed is what is known about its cost. Three of the five stated reasons for
+  refusing turned out cheaper than assumed. The PASSI rule is **already written**:
+  `packages/timesheet/src/domain/reference.ts` carries `isAssigned` and `missingHabilitations`, both
+  dated, and the second returns _which_ habilitations are missing rather than a boolean, precisely so
+  a refusal can name them. **No README row has to be retracted**: "Renvoyé à l'ERP cible" names "plan
+  de charge et moteur de contraintes de staffing", not assignment itself — only the 01/09 decision
+  deferred this. And `public.assignments (consultant_id, mission_id, from_date, to_date)` already has
+  the shape. What is genuinely new is what the ADR must settle, and it is not the screen: (1) **who
+  owns the write** — `assignments` is `public.*` reference data read by both modules and written by
+  nothing but the seed, so the decision is making reference data mutable; a write path in `timesheet`
+  (which owns the rule that reads it) or a composition-level concern neither module owns; (2) **what
+  a retroactive edit does** — shortening a `to_date` below days already recorded leaves a validated
+  Cra untouched (ADR-0005) but can make a _submitted_ one unvalidatable and a _draft_ one
+  unsubmittable, so either the write refuses to orphan recorded days or the screen states the
+  consequence before the click; (3) no assignment starting after a `departure_date` (ADR-0079). Still
+  the largest item in the plan — but now the largest _known_ one.
+
+No phase is named for the rows in that document, and that is deliberate rather than an omission: it
+is not a deferral inside a phase, it is a decision to spend a session elsewhere. Rows still unspent
+when the session ends come back here with a phase and a date, as §4 of that document undertakes.
+
+---
+
+## The test harness of `feat/densification`, made green again — 03/09/2026
+
+Three deterministic failures and one intermittent, found by running every suite against a clean
+database before this branch merges. The three are fixed in the same change; the fourth is recorded
+here because it is neither a test defect nor a product defect.
+
+**Fixed, no decision needed.** (a) `shell.spec.ts` asserted a manager's four nav entries and there
+are five since `b4949e4` added `Affectations` — two `toStrictEqual`s, one tab-order loop, and two
+test titles that had become untrue. (b) `apps/web/src/lib/labels.test.ts` failed on six orphaned
+sentences: see the row below, it is not just a test edit. (c) The CRA grid's desktop month/week
+switcher was a Radix `Tabs` with no `TabsContent` anywhere, so every `TabsTrigger` carried an
+`aria-controls` pointing at a panel id that never existed — a **critical** axe
+`aria-valid-attr-value` on two `axe.spec.ts` screens, in both viewport projects. Replaced by
+`TogglePillGroup`, the exclusive-choice control this app already uses for the invoice-status and
+Cra-status filters, whose own accessibility rationale is written down in the component. Verified,
+rather than assumed, that the vendored `Tabs` is not itself at fault: on the kitchen sink, which
+does render panels, both triggers' `aria-controls` resolve.
+
+**A third family of problem types existed with nothing checking it.** The six
+`/problems/assignment-*` identifiers reached `apps/web/src/lib/labels.ts` and no test could see
+them. They are not `API_PROBLEM_TYPES` — every one is a fact about the business, which that table
+excludes by its own doc comment — and no module raises them either, because `assignments` is
+`public.*` reference data written from the composition layer, so the `packages/` source scan both
+label tests rely on cannot reach them. They now live in `@erp/contracts` as
+`STAFFING_PROBLEM_TYPES`, which is the one place `apps/web` may read and `apps/api` already
+imports; both directions of the SPA's table are held to them. The API's own SSR sentence table
+deliberately does **not** name them, and `problem.test.ts` now says why in place: `sendProblem`
+picks the representation from the path, every route that can raise one is under `/api/v1/`, so a
+sentence there could never be rendered.
+
+**Open — the Vite dev server intermittently never answers a module request.** Playwright's
+`desktop` + `mobile-shell` projects fail on roughly half of full runs, 1 to 4 tests, a different
+set each time, always with the same shape: the page at `/` stays blank until the test times out. A
+trace taken on a failing run names the cause exactly — `/src/lib/query-client.ts` and
+`/src/router.ts` were requested and **never answered** (status `-1`, time `-1`), while every other
+module on the page returned 200. Vite is 8.2.1, the Rolldown build. Reducing Playwright to 3
+workers lowers the rate without removing it; a server already warm from a previous run shows it far
+less, which fits a stall on first transform rather than load. Not a product defect and not a test
+defect: no assertion is involved, and the same tests pass in isolation in under three seconds.
+
+**It cannot happen in CI, and that is the whole reason it is only a row here.** The `web-e2e` job
+runs with `E2E_SERVED_BUILD=1` — `apps/web/dist` served by the API on 3000, one origin, no Vite dev
+server anywhere in the topology (`.github/workflows/ci.yml`, and `playwright.config.ts` on its own
+side). So this is a local-developer failure only, and the cost of leaving it is that a developer's
+own `pnpm exec playwright test` is unreliable while CI stays honest. The flip side is worth writing
+down: **nothing in CI will ever catch it if it gets worse**, because CI never exercises the code
+path. The two candidate directions are `server.warmup` on the client module graph, and running the
+local suite in the served-build topology too — neither is a guess this branch can validate, at
+roughly one failure in two runs and three minutes a run. **Phase 10.2** decides it: the cold read is
+the first time the suite is run by someone who has no reason to know it flakes.
+
+**Open — submitting a Cra unmounts the save-state bar before it can say "Soumis".** Named in a
+`journeys.spec.ts` comment written on this branch and nowhere else until now, which is the silent
+pass this file exists to prevent. The mutation's own `invalidateQueries` refetch lands first and
+flips `data.editable` to false, so the bar carrying `Soumis à {time}` is gone before the local
+`setLastWrite` update can render into it. The consultant therefore gets no confirmation from the
+control they just used; the timeline's "CRA soumis" entry and the immutability banner are what
+actually appear, and the journeys now wait on those. Small, real, and a UI-feedback decision rather
+than a defect with one obvious fix: the bar could survive the transition, or the submit action
+could own its own confirmation. **Phase 10.1** decides it, with the rest of the final checkpoint.

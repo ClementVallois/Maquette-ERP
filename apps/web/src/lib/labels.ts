@@ -33,11 +33,69 @@
  */
 export const LABELS = {
   appName: 'CRA → Facture',
+  glossary: {
+    open: 'Définition : {term}',
+    cra: {
+      label: 'CRA',
+      definition:
+        'Compte rendu d’activité mensuel : le relevé des jours travaillés d’un consultant.',
+    },
+    tjm: {
+      label: 'TJM',
+      definition:
+        'Taux journalier moyen convenu avec le client pour un consultant sur une mission. Il est daté.',
+    },
+    cjm: {
+      label: 'CJM',
+      definition:
+        'Coût journalier moyen du consultant pour l’entreprise. Cette donnée est réservée au management de son implantation.',
+    },
+    regie: {
+      label: 'Régie',
+      definition: 'Facturation des jours réellement travaillés, multipliés par le TJM applicable.',
+    },
+    forfait: {
+      label: 'Forfait',
+      definition:
+        'Montant convenu pour un livrable, indépendant des jours travaillés. Ce modèle n’est pas facturé dans cette maquette.',
+    },
+    preFacturier: {
+      label: 'Pré-facturier',
+      definition:
+        'Vue mensuelle de ce qui est facturable et, pour chaque jour qui ne l’est pas, de la raison qui bloque.',
+    },
+    habilitation: {
+      label: 'Habilitation',
+      definition:
+        'Qualification certifiée qu’un consultant doit détenir pour être affecté à certaines missions.',
+    },
+    intercontrat: {
+      label: 'Intercontrat',
+      definition:
+        'Période sans mission client, enregistrée ici sur une mission interne au forfait afin de conserver un CRA complet.',
+    },
+  },
   appTagline: 'Maquette d’un module ERP interne',
 
   nav: {
     skipToContent: 'Aller au contenu',
     main: 'Navigation principale',
+  },
+
+  pagination: {
+    range: '{first}–{last} sur {total} résultats',
+    perPage: 'Par page',
+    previous: 'Page précédente',
+    next: 'Page suivante',
+  },
+
+  timeline: {
+    heading: 'Chronologie métier',
+    submitted: 'CRA soumis',
+    refused: 'CRA refusé',
+    validated: 'CRA validé',
+    drafted: 'Brouillon de facture créé',
+    issued: 'Facture émise',
   },
 
   persona: {
@@ -109,6 +167,9 @@ export const LABELS = {
       // false the moment a pending Cra sits in another month.
       pendingSentenceNone: 'Aucun CRA n’attend votre décision.',
       open: 'Ouvrir le pré-facturier',
+      /** One work-queue row's action — opens that row's own period, not the one on screen
+       * (the bug the queue exists to fix: the counter used to point at the displayed month). */
+      decide: 'Décider',
     },
     billing: {
       draft: 'Factures en brouillon',
@@ -118,6 +179,38 @@ export const LABELS = {
       draftSentenceMany: '{count} factures en brouillon, prêtes à émettre.',
       draftSentenceNone: 'Aucune facture en brouillon ce mois.',
       open: 'Voir les factures',
+    },
+    /** Rank A1/A5: the three tiers every role's dashboard now shares — an actionable queue first,
+     * the former `StatCard` trio demoted under it, then recent activity. */
+    queue: {
+      now: 'À faire maintenant',
+      nowEmpty: 'Rien n’attend une action.',
+      thisMonth: 'Ce mois',
+      recentActivity: 'Activité récente',
+      recentActivityEmpty: 'Aucune activité récente.',
+      /** `{days}` interpolated, 0 reading as "aujourd’hui" at the call site. */
+      ageToday: 'Aujourd’hui',
+      ageOneDay: 'Depuis 1 jour',
+      ageManyDays: 'Depuis {days} jours',
+      emptyMonthNotice:
+        'Ce mois ne contient aucune donnée : c’est un mois en cours, pas un défaut.',
+      seeMonthsWithData: 'Voir un mois avec des données',
+    },
+    /** Rank A2 — manager/billing only. Two honest series, never a twelve-month curve (the header
+     * comment of `invoice-history-chart.tsx` explains why a chart was refused until now). */
+    history: {
+      heading: 'Historique des factures',
+      byYearTitle: 'Factures par année et par statut',
+      byYearCaption:
+        'Six années où cette implantation a eu au moins une facture — les années sans barre n’ont eu aucune facture, ce n’est pas une donnée manquante.',
+      byYearAxisLabel: 'Nombre de factures',
+      denseMonthsTitle: 'Facturable — juin, juillet, août 2026',
+      denseMonthsCaption:
+        'Trois mois, pas une tendance : le jeu de données ne couvre densément que ces trois mois de 2026.',
+      denseMonthsAxisLabel: 'Facturable HT',
+      tableCaption: 'Les mêmes chiffres, en tableau.',
+      year: 'Année',
+      total: 'Total',
     },
   },
 
@@ -140,8 +233,8 @@ export const LABELS = {
      * (Phase 6.2's "deux totaux, lus du même état local"). */
     dayTotal: 'Total du jour',
     monthTotal: 'Total du mois',
-    totalsAsOf:
-      'Totaux calculés côté serveur, à jour du dernier enregistrement — pas à chaque frappe (ADR-0050).',
+    weekTotal: 'Total semaine',
+    totalsAsOf: 'Totaux à jour du dernier enregistrement.',
     /**
      * The SPA's own note, distinct from `totalsAsOf` above: that sentence describes the
      * server-rendered screen (ADR-0009/ADR-0050), which has no client script and genuinely cannot
@@ -154,8 +247,15 @@ export const LABELS = {
     // dans format.ts (frenchDays). Un en-tête « Demi-journées » au-dessus d'une valeur « 21 j »
     // était la contradiction — la colonne s'intitule comme celle du pré-facturier.
     recorded: 'Jours saisis',
-    savedToast: 'Enregistré',
     submittedToast: 'Soumis',
+    saveState: {
+      dirty: 'Modifications non enregistrées',
+      saving: 'Enregistrement…',
+      saved: 'Enregistré à {time}',
+      submitted: 'Soumis à {time}',
+      failed: 'Échec de l’enregistrement — réessayez.',
+      unchanged: 'Aucune modification en attente',
+    },
     nothing: '—',
     absence: 'Absence',
     flagged: 'Signalé',
@@ -195,7 +295,7 @@ export const LABELS = {
     openAnotherMonthHint:
       'Choisissez un mois à venir pour commencer sa saisie à partir d’une grille vide.',
     openAnotherMonthPlaceholder: 'Choisir un mois…',
-    noOtherMonthToOpen: 'Le calendrier ouvré ne couvre aucun autre mois pour l’instant (ADR-0004).',
+    noOtherMonthToOpen: 'Aucun autre mois n’est disponible dans le calendrier.',
     nonWorkable: {
       weekend: 'Week-end',
       publicHoliday: 'Férié',
@@ -223,6 +323,9 @@ export const LABELS = {
       caption: 'CRA — {month}',
       previousMonth: 'Mois précédent',
       nextMonth: 'Mois suivant',
+      previousWeek: 'Semaine précédente',
+      nextWeek: 'Semaine suivante',
+      weekPosition: 'Semaine {current} sur {count}',
       fillEmptyWorkdays: 'Remplir les jours ouvrés vides',
       clearRow: 'Vider la ligne',
       removeRow: 'Retirer la ligne',
@@ -255,6 +358,38 @@ export const LABELS = {
       },
       unsavedChangesConfirm:
         'Des modifications ne sont pas enregistrées sur ce mois. Changer de mois maintenant les perdra. Continuer ?',
+      /** A9's progress bar — `{completed}`/`{total}` interpolated, counted over workable days only
+       * (`isDayComplete`, `matrix.ts`). */
+      workdaysComplete: '{completed}/{total} jours ouvrés complets',
+      /** A9's post-refusal action: focuses the earliest day named by `/problems/cra-incomplete`
+       * (`missingDaysFrom`, `missing-days.ts`). Shown only once that set is non-empty. */
+      goToFirstIncompleteDay: 'Aller au premier jour incomplet',
+      /** A9's collapsible legend — trigger text and the swatch sentences below reuse the existing
+       * `nonWorkable` / `dayOverbooked*` / `dayIncomplete*` / `flagged` strings, so only the
+       * heading and the toggle need their own key. */
+      legendToggle: 'Légende',
+      /** A9's desktop month/week toggle — reuses A11's own `compact` slicing (`calendarWeeks`,
+       * `WeekNavigator`), so only the two labels and the group's own name are new. */
+      viewLabel: 'Affichage du tableau',
+      viewMonth: 'Mois',
+      viewWeek: 'Semaine',
+      /** O7: single-level undo on the row tools' own "remplir"/"vider" — the button reads
+       * "{undo} — {action}", `action` being `fillEmptyWorkdays`/`clearRow` re-used verbatim with
+       * the row's name appended, so this key stays the one bare word. */
+      undo: 'Annuler',
+      /** O6 — "Copier le mois précédent", with a preview (`copy-previous-month-dialog.tsx`): never
+       * overwrites a cell already carrying something, built on the row tools' own
+       * `fillEmptyWorkdays`. */
+      copyPreviousMonth: 'Copier le mois précédent',
+      copyPreviousMonthDialog: {
+        title: 'Copier le mois précédent',
+        lead: 'Les missions qui portaient du temps saisi en {month} sont proposées ci-dessous, sur les jours ouvrés encore vides de ce mois-ci. Rien d’existant n’est remplacé.',
+        loadError: 'Le mois précédent n’a pas pu être chargé.',
+        empty: 'Rien à copier depuis le mois précédent.',
+        daysToFill: '{days} j',
+        confirm: 'Copier',
+        cancel: 'Annuler',
+      },
     },
     /** ADR-0071 — a manager's read-only view of a named consultant's month. `{name}` interpolated. */
     managerView: {
@@ -285,7 +420,7 @@ export const LABELS = {
       'Jours saisis alors que le calendrier ne les dit pas ouvrés. Ils ne sont pas refusés : le manager les a acceptés en validant.',
     signature: 'Bon pour accord',
     signatureNote:
-      'Ce relevé couvre le mois entier du consultant, missions confondues (ADR-0056). Le nom du signataire n’est pas pré-imprimé : il dépend du destinataire, pas du relevé.',
+      'Ce relevé couvre le mois entier du consultant, missions confondues. Le nom du signataire n’est pas pré-imprimé : il dépend du destinataire, pas du relevé.',
     signatureName: 'Nom et qualité',
     signatureDate: 'Date',
     signatureMark: 'Signature',
@@ -296,7 +431,7 @@ export const LABELS = {
   preFacturier: {
     heading: 'Pré-facturier',
     nav: 'Pré-facturier',
-    lead: 'Ce qui est facturable sur le mois, et pour tout le reste la raison qui bloque. Rien ne se décide ici : l’écran ne fait qu’assembler ce que les deux modules savent (ADR-0053).',
+    lead: 'Ce qui est facturable sur le mois, et pour tout le reste la raison qui bloque. Rien ne se décide ici : l’écran ne fait qu’assembler ce que les deux modules savent.',
     noPeriod: 'Aucun CRA dans cette implantation, sur aucun mois.',
     noPeriodHint:
       'Ce n’est pas un refus : la liste est bien celle de votre implantation, elle est vide.',
@@ -309,6 +444,12 @@ export const LABELS = {
     totalExcludingVat: 'Total HT',
     totalIncludingVat: 'Total TTC',
     notNumberedYet: '—',
+    /** Rank A7: the discriminant that tells two drafts to the same client apart. */
+    invoiceConsultant: 'Consultant',
+    invoiceMissions: 'Mission(s)',
+    invoiceLines: 'Lignes',
+    invoiceCreatedAt: 'Créée le',
+    invoiceOpen: 'Ouvrir',
     cras: 'Les CRA du mois',
     consultant: 'Consultant',
     craStatus: 'Statut du CRA',
@@ -332,7 +473,7 @@ export const LABELS = {
     summaryLate: 'Jours en retard',
     summaryCras: 'CRA du mois',
     lateNote:
-      'Jours saisis sur un mois clos dont le CRA n’est pas encore validé (ADR-0054). Le mois en cours affiche zéro : rien n’y est en retard, puisque rien n’y est encore dû.',
+      'Jours saisis sur un mois clos dont le CRA n’est pas encore validé. Le mois en cours affiche zéro : rien n’y est en retard, puisque rien n’y est encore dû.',
     lateNoneYet: 'Mois en cours — rien n’est encore dû.',
     lateTag: 'En retard',
     awaitingManager: 'En attente de validation par le manager',
@@ -349,6 +490,12 @@ export const LABELS = {
       unknownClient: 'Client inconnu',
     },
     period: 'Mois',
+    searchConsultant: 'Rechercher un consultant',
+    searchConsultantPlaceholder: 'Nom du consultant…',
+    search: 'Rechercher',
+    clearSearch: 'Effacer',
+    searchEmpty: 'Aucun résultat pour ce consultant',
+    searchEmptyBody: 'Effacez la recherche pour retrouver tous les CRA et factures du mois.',
     /** task 7.2's result dialog — drafted invoices **and** declined days, French reasons, and the
      * `replayed: true` case rendered as information rather than as a second success. */
     validateDialog: {
@@ -363,6 +510,24 @@ export const LABELS = {
     },
     validateSuccessToast: 'CRA validé.',
     validateReplayedToast: 'Ce CRA était déjà validé : résultat d’origine affiché.',
+    /** O4: a récapitulatif before the (otherwise instant) "Valider" — never a second confirmation
+     * of an already-reversible action past this point, only of one that immediately drafts an
+     * invoice per client. `{name}` interpolated; the recap lines themselves are built by each
+     * caller from what it already has on hand (`ValidateConfirmDialog`'s own `facts` prop) rather
+     * than a fixed schema this key would have to describe. */
+    validateConfirmDialog: {
+      title: 'Valider le CRA de {name} ?',
+      lead: 'Cette action est immédiate et fige le mois : plus aucune saisie n’est possible après, et un brouillon de facture est créé pour chaque client concerné.',
+      confirm: 'Valider',
+      cancel: 'Annuler',
+      periodFactLabel: 'Période',
+      flaggedDaysFactLabel: 'Jours signalés',
+      clientsFactLabel: 'Clients avec du temps saisi ce mois',
+      recordedDaysFactLabel: 'Jours saisis',
+      lateFactLabel: 'Signalé en retard',
+      yes: 'Oui',
+      no: 'Non',
+    },
     /** task 7.3 — the reason is mandatory (1-500 chars, `POST /api/v1/cras/:id/refusal`); the
      * client-side "empty" message reuses the domain's own sentence
      * (`problem.sentences['/problems/refusal-reason-required']`) rather than a second wording for
@@ -410,6 +575,7 @@ export const LABELS = {
     totalExcludingVat: 'Total HT',
     totalVat: 'Total TVA',
     totalIncludingVat: 'Total TTC',
+    provisionalTotals: 'Montants provisoires — figés à l’émission.',
     mentions: 'Mentions obligatoires',
     latePayment:
       'En cas de retard de paiement, application d’intérêts de retard au taux annuel de {rate}, exigibles sans rappel.',
@@ -427,11 +593,23 @@ export const LABELS = {
     originLine: 'CRA {cra} — {period} — {mission}',
     originNote:
       'Chaque ligne porte le CRA dont elle vient : c’est ce lien, et non une déclaration, qui matérialise la piste d’audit fiable (art. 289-VII du CGI).',
+    lineage: {
+      heading: 'Filiation des montants',
+      lead: 'Dépliez une ligne pour suivre son calcul depuis les jours saisis jusqu’au total de la facture.',
+      line: 'Ligne {number}',
+      cra: 'Jours du CRA',
+      mission: 'Mission',
+      quantityAndRate: 'Quantité × TJM daté',
+      lineExcludingVat: 'Ligne HT',
+      vatGroup: 'Groupe de TVA',
+      invoiceIncludingVat: 'Facture TTC',
+      unavailable: 'Groupe indisponible',
+    },
     validatedBy: 'Validé par',
     notCharged: 'Non soumis à TVA',
     issue: 'Émettre la facture',
     issueNote:
-      'L’émission alloue un numéro dans une série sans trou et fige le document : rien n’y bouge ensuite. Le formulaire porte sa clé d’idempotence, pour qu’un renvoi ne brûle pas un second numéro (ADR-0059).',
+      'L’émission alloue un numéro dans une série sans trou et fige le document : rien n’y bouge ensuite. Le formulaire porte sa clé d’idempotence, pour qu’un renvoi ne brûle pas un second numéro.',
     cannotIssue:
       'Cette facture est déjà émise : elle porte un numéro et une date, et une facture émise ne se modifie pas.',
 
@@ -449,6 +627,12 @@ export const LABELS = {
       issued: 'Émises',
       cancelledByCreditNote: 'Annulées',
     },
+    search: 'Rechercher',
+    searchPlaceholder: 'Client ou numéro de facture…',
+    searchAction: 'Rechercher',
+    year: 'Année',
+    allYears: 'Toutes',
+    clearFilters: 'Effacer les filtres',
     emptyTitle: 'Aucune facture',
     emptyBody:
       'Cette implantation n’a encore validé aucun CRA facturable : une facture apparaît ici dès qu’un manager valide un mois en régie (task 7.2).',
@@ -465,6 +649,7 @@ export const LABELS = {
      * from the route as a finding for whichever phase first needed it, not an invitation to
      * recompute it client-side. */
     printable: 'Version imprimable',
+    backToList: 'Retour à la liste',
     paymentTerms: 'Conditions',
     terms: {
       net: 'Net à {days} jours',
@@ -482,6 +667,40 @@ export const LABELS = {
     issueReplayedToast: 'Cette facture était déjà émise : numéro d’origine affiché.',
   },
 
+  assignment: {
+    nav: 'Affectations',
+    current: 'Affectations en cours',
+    upcoming: 'À venir',
+    consultants: 'Consultants',
+    new: 'Nouvelle affectation',
+    edit: 'Modifier les dates',
+    formLead:
+      'Le périmètre, les dates de mission et les habilitations sont vérifiés à l’enregistrement.',
+    consultant: 'Consultant',
+    mission: 'Mission',
+    from: 'Du',
+    to: 'Au',
+    chooseConsultant: 'Choisir un consultant…',
+    chooseMission: 'Choisir une mission…',
+    create: 'Affecter',
+    save: 'Enregistrer',
+    cancelEdit: 'Annuler la modification',
+    noHabilitation: 'Cette mission ne demande aucune habilitation particulière.',
+    requiredHabilitations: 'Habilitations requises : {names}.',
+    createdToast: 'Affectation créée.',
+    updatedToast: 'Affectation mise à jour.',
+    list: 'Affectations de l’implantation',
+    listLead: 'Les affectations passées restent visibles dans l’historique.',
+    filters: { current: 'En cours', all: 'Toutes' },
+    empty: 'Aucune affectation dans cette vue',
+    emptyBody: 'Créez une affectation ou affichez l’historique complet.',
+    currentBadge: 'En cours',
+    upcomingBadge: 'À venir',
+    endedBadge: 'Terminée',
+    openEnded: 'sans date de fin',
+    editFor: 'Modifier l’affectation de {name}',
+  },
+
   margin: {
     heading: 'Marge',
     lead: 'Ces trois valeurs ne figurent dans aucune liste. Elles ne s’obtiennent que par cette lecture, et chaque ouverture est journalisée : qui a lu, quels champs, sur qui.',
@@ -497,6 +716,20 @@ export const LABELS = {
     noMissionTitle: 'Aucune mission facturée ce mois',
     noMission:
       'Aucune mission en régie sur ce mois : une mission au forfait n’a pas de TJM daté, et elle est écartée plutôt que comptée à zéro.',
+    /** O2 — the one "Pourquoi ce résultat ?" surface built (marge only, per the plan's own note
+     * that it recoupe A3/A4 elsewhere): the formula, the reference date and the applied rule,
+     * read straight off `apps/api/src/economics/consultant-economics.ts` rather than restated
+     * from memory. `{date}` interpolated with the last day of the period (ADR-0034: both dated
+     * rates resolve there). */
+    whyResult: {
+      trigger: 'Pourquoi ces montants ?',
+      title: 'Comment ces montants sont calculés',
+      revenueFormula: 'Chiffre d’affaires = somme, par mission, de (jours travaillés × TJM daté)',
+      costFormula: 'Coût = jours travaillés (toutes missions) × CJM daté',
+      marginFormula: 'Marge = Chiffre d’affaires − Coût',
+      referenceDate:
+        'Date de référence : {date}, le dernier jour du mois — c’est la date à laquelle le TJM et le CJM en vigueur sont recherchés.',
+    },
   },
 
   problem: {
@@ -537,6 +770,18 @@ export const LABELS = {
       '/problems/database-unavailable': 'La base de données ne répond pas.',
       '/problems/internal':
         'L’action n’a pas pu aboutir. Citez l’identifiant de corrélation ci-dessous.',
+      '/problems/assignment-invalid-range':
+        'La date de fin doit être postérieure ou égale à la date de début.',
+      '/problems/assignment-after-departure':
+        'Cette affectation atteint ou dépasse la date de départ du consultant.',
+      '/problems/assignment-outside-mission':
+        'Les dates choisies sortent de la période de la mission.',
+      '/problems/assignment-missing-habilitation':
+        'Le consultant ne possède pas toutes les habilitations requises pendant cette affectation.',
+      '/problems/assignment-overlap':
+        'Une affectation à cette mission couvre déjà tout ou partie de ces dates.',
+      '/problems/assignment-recorded-days':
+        'Cette modification laisserait hors affectation des jours déjà enregistrés dans un CRA.',
 
       // Client-originated (lib/api-client.ts's `CLIENT_PROBLEM_TYPES`), never sent by the API —
       // synthesized here because a proxy error page or a `fetch()` rejection never reached a
@@ -563,7 +808,7 @@ export const LABELS = {
       '/problems/day-overbooked':
         'Une journée compte quatre quarts de journée : celle-ci est déjà complète.',
       '/problems/validated-cra-is-immutable':
-        'Ce CRA est validé : un relevé de temps validé ne se modifie plus (ADR-0005).',
+        'Ce CRA est validé : un relevé de temps validé ne se modifie plus.',
       '/problems/cra-transition-not-allowed':
         'Le CRA n’est pas dans un état qui permet cette action.',
       '/problems/mission-not-running': 'La mission ne tourne pas à cette date.',
@@ -571,11 +816,11 @@ export const LABELS = {
       '/problems/missing-habilitation':
         'La mission exige une habilitation que le consultant ne détenait pas ce jour-là.',
       '/problems/cra-incomplete': 'Le mois n’est pas complet au regard du calendrier ouvré.',
-      '/problems/cra-after-departure': 'Ce mois commence après le départ du consultant (ADR-0079).',
+      '/problems/cra-after-departure': 'Ce mois commence après le départ du consultant.',
       '/problems/self-validation-forbidden':
-        'Qui saisit un CRA ne le juge pas — ni pour le valider, ni pour le refuser : c’est la première règle de séparation des tâches (ADR-0006).',
+        'Qui saisit un CRA ne le juge pas — ni pour le valider, ni pour le refuser : c’est la première règle de séparation des tâches.',
       '/problems/not-the-manager':
-        'Le CRA d’un mois se répond — validation comme refus — par le manager de ce mois-là, pas par un autre (ADR-0034).',
+        'Le CRA d’un mois se répond — validation comme refus — par le manager de ce mois-là, pas par un autre.',
 
       // @erp/billing
       '/problems/payment-terms-too-long':
@@ -591,10 +836,10 @@ export const LABELS = {
       '/problems/document-does-not-add-up':
         'Le document ne s’additionne pas : totaux et lignes divergent, il ne part pas.',
       '/problems/cra-already-processed':
-        'Ce CRA a déjà produit une facture pour ce client : il n’en produira pas une seconde (ADR-0021).',
+        'Ce CRA a déjà produit une facture pour ce client : il n’en produira pas une seconde.',
       '/problems/not-an-issued-invoice': 'Seule une facture émise peut être corrigée par un avoir.',
       '/problems/validator-cannot-issue':
-        'Qui valide un CRA n’émet pas la facture qui en découle : c’est la seconde règle de séparation des tâches (ADR-0006).',
+        'Qui valide un CRA n’émet pas la facture qui en découle : c’est la seconde règle de séparation des tâches.',
     },
 
     deniedBy: 'Règle qui a refusé',
@@ -603,6 +848,12 @@ export const LABELS = {
     correlationHint:
       'À citer en cas de signalement : il relie cette page à la ligne de journal qui la décrit.',
     back: 'Revenir à l’accueil',
+    /** O11: a concrete way out of an `ErrorState`, alongside the existing `action` link —
+     * `retry` re-runs the query that failed, `copyCorrelationId` puts the id on the clipboard so
+     * it can be pasted into a report without retyping it. */
+    retry: 'Réessayer',
+    copyCorrelationId: 'Copier l’identifiant',
+    correlationIdCopied: 'Identifiant copié',
   },
 
   action: {
@@ -621,12 +872,17 @@ export const LABELS = {
      * visible verb (`LABELS.cra.show`, …), so the header only needs to be named for a screen reader
      * walking column headers, not repeated visibly over every row's button. */
     tableActions: 'Actions',
+    /** O9 (`components/copy-link-button.tsx`): the filters already live in the URL — this copies
+     * `window.location.href` verbatim, nothing serialized here. */
+    copyLink: 'Copier le lien de cette vue',
+    linkCopied: 'Lien copié',
+    linkCopyFailed: 'Impossible de copier le lien.',
   },
 
   /**
    * The shell itself (frontend-plan.md Phase 4, tasks 4.2-4.4): the sidebar's collapse control,
    * the mobile `Sheet` trigger, the "à venir" placeholder every Phase 6-8 route renders until its
-   * own phase builds it, the styled 404, and the invalidated-session copy (ADR-0074).
+   * own phase builds it, the styled 404, and the invalidated-session copy.
    */
   shell: {
     collapse: 'Réduire la navigation',

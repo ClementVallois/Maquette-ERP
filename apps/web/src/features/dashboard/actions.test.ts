@@ -10,6 +10,7 @@ const consultant = (overrides: Partial<ConsultantDashboard> = {}): ConsultantDas
   recordedQuarterDays: 0,
   remainingWorkableDays: 21,
   refusedPeriods: [],
+  recentActivity: [],
   ...overrides,
 });
 
@@ -19,6 +20,8 @@ const manager = (overrides: Partial<ManagerDashboard> = {}): ManagerDashboard =>
   pendingDecisions: 0,
   billableCents: 0,
   lateCras: 0,
+  awaitingDecision: [],
+  recentActivity: [],
   ...overrides,
 });
 
@@ -28,6 +31,8 @@ const billing = (overrides: Partial<BillingDashboard> = {}): BillingDashboard =>
   draftInvoices: 0,
   issuedInvoices: 0,
   totalTtcIssuedCents: 0,
+  oldestDrafts: [],
+  recentActivity: [],
   ...overrides,
 });
 

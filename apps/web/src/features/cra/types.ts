@@ -31,10 +31,15 @@ export interface CraListItem {
   readonly period: string;
   readonly status: CraStatus;
   readonly recordedQuarterDays: number;
+  /** When the current status was reached; `null` for a `draft` never submitted. */
+  readonly statusChangedAt: string | null;
 }
 
 export interface CraListResponse {
   readonly cras: readonly CraListItem[];
+  readonly total: number;
+  readonly limit: number;
+  readonly offset: number;
 }
 
 /** `GET /api/v1/consultants` (item 7, QA round 1) — a manager's own office roster, consultants
@@ -136,10 +141,16 @@ export interface CraGridResponse {
   readonly missions: readonly GridMission[];
   readonly lines: readonly CraLine[];
   readonly flags: readonly CraFlag[];
-  readonly refusal: { readonly reason: string } | null;
+  readonly refusal: { readonly reason: string; readonly at: string; readonly by: string } | null;
   /** The domain's own answer (ADR-0065): never re-derived from `status` in this SPA. */
   readonly editable: boolean;
   readonly validatedBy: string | null;
+  readonly timeline: readonly {
+    readonly kind: 'submitted' | 'refused' | 'validated';
+    readonly at: string;
+    readonly actorName: string;
+    readonly detail?: string;
+  }[];
 }
 
 /**

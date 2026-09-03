@@ -12,6 +12,14 @@ import { InvoiceListScreen } from '@/features/factures/components/invoice-list-s
  */
 const FacturesSearch = z.object({
   status: z.enum(['draft', 'issued', 'cancelledByCreditNote']).optional(),
+  year: z.coerce.number().int().min(2000).max(2100).optional().catch(undefined),
+  search: z.string().trim().max(100).optional().catch(undefined),
+  page: z.coerce.number().int().min(1).default(1).catch(1),
+  pageSize: z.coerce
+    .number()
+    .pipe(z.union([z.literal(10), z.literal(20), z.literal(50)]))
+    .default(20)
+    .catch(20),
 });
 
 export const Route = createFileRoute('/_shell/factures/')({
@@ -20,8 +28,17 @@ export const Route = createFileRoute('/_shell/factures/')({
 });
 
 function FacturesRoute(): ReactElement {
-  const { status } = Route.useSearch();
+  const { status, year, search, page, pageSize } = Route.useSearch();
   const { persona } = Route.useRouteContext();
 
-  return <InvoiceListScreen status={status ?? 'all'} role={persona.role} />;
+  return (
+    <InvoiceListScreen
+      status={status ?? 'all'}
+      role={persona.role}
+      year={year}
+      search={search ?? ''}
+      page={page}
+      pageSize={pageSize}
+    />
+  );
 }

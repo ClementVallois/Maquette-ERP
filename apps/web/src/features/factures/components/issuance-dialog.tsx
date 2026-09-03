@@ -78,20 +78,32 @@ export function IssuanceDialog({ invoice, onClose }: IssuanceDialogProps): React
         {issued === null ? (
           <div className="flex flex-col gap-2 py-1 text-sm">
             <div className="flex justify-between gap-4">
+              <span className="text-muted-foreground">{LABELS.invoice.client}</span>
+              <span className="text-foreground">{invoice.billedTo.name}</span>
+            </div>
+            <div className="flex justify-between gap-4">
               <span className="text-muted-foreground">{LABELS.invoice.supplyPeriod}</span>
               <span className="text-foreground">{frenchMonth(invoice.supplyPeriod)}</span>
             </div>
-            {invoice.totals !== null && (
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">{LABELS.invoice.totalIncludingVat}</span>
-                <span className="font-medium text-foreground">
-                  {frenchEuros(invoice.totals.totalIncludingVatCents)}
-                </span>
-              </div>
-            )}
             <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">Idempotency-Key</span>
-              <span className="font-mono text-[0.75rem] text-foreground">{idempotencyKey}</span>
+              <span className="text-muted-foreground">{LABELS.invoice.lines}</span>
+              <span className="text-foreground">{invoice.lines.length}</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-muted-foreground">{LABELS.invoice.totalExcludingVat}</span>
+              <span className="text-foreground">
+                {frenchEuros(invoice.totals.totalExcludingVatCents)}
+              </span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-muted-foreground">{LABELS.invoice.totalVat}</span>
+              <span className="text-foreground">{frenchEuros(invoice.totals.vatTotalCents)}</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-muted-foreground">{LABELS.invoice.totalIncludingVat}</span>
+              <span className="font-medium text-foreground">
+                {frenchEuros(invoice.totals.totalIncludingVatCents)}
+              </span>
             </div>
             {mutationProblem !== null && (
               <p className="text-sm text-destructive">{sentenceFor(mutationProblem)}</p>

@@ -1,5 +1,14 @@
-import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table';
+import {
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type ColumnDef,
+  type SortingState,
+} from '@tanstack/react-table';
+import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
+import { useState } from 'react';
 
 import {
   Table,
@@ -9,6 +18,27 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
+
+/**
+ * `header.column.columnDef.meta.headerAdornment`: a column whose header itself carries an
+ * interactive affordance (a glossary term's Popover trigger, e.g. `features/marge`'s `tjm`
+ * column) cannot be `flexRender`ed inside this component's own sort `<button>` — axe's
+ * `nested-interactive` rule (WCAG 4.1.2) forbids a control inside a control, and a screen reader
+ * cannot announce the inner one reliably either. `header` stays the plain sortable label (what
+ * every other column already passes); `headerAdornment` renders as that label's sibling, next to
+ * the sort button rather than inside it, so both affordances — sort, and the term's own
+ * definition — stay reachable.
+ */
+declare module '@tanstack/react-table' {
+  // `TData`/`TValue` are required, unused, by TypeScript's own declaration-merging rule (TS2428:
+  // every declaration of an interface must repeat identical type parameters) — table-core's own
+  // `ColumnMeta<TData extends RowData, TValue>` names them, so this merge must too.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData, TValue> {
+    readonly headerAdornment?: ReactNode;
+  }
+}
 
 /**
  * The generic table `docs/frontend-plan.md` §3 names (`components/data-table/`), headless via
@@ -24,6 +54,7 @@ interface DataTableProps<TData> {
   readonly getRowId: (row: TData) => string;
   /** Rendered instead of the table body when `data` is empty — the caller's own `EmptyState`. */
   readonly emptyState: ReactNode;
+  readonly numericColumns?: readonly string[];
 }
 
 export function DataTable<TData>({
@@ -31,7 +62,10 @@ export function DataTable<TData>({
   data,
   getRowId,
   emptyState,
+  numericColumns = [],
 }: DataTableProps<TData>): ReactElement {
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const numericColumnIds = new Set(numericColumns);
   // `react-hooks/incompatible-library` flags `useReactTable` by name for every caller, React
   // Compiler or not: it is one of three libraries the rule hardcodes (React Hook Form's
   // `useForm`, TanStack Table's `useReactTable`, TanStack Virtual's `useVirtualizer`) because each
@@ -46,7 +80,10 @@ export function DataTable<TData>({
     data: data as TData[],
     columns: columns as ColumnDef<TData>[],
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
     getRowId,
+    state: { sorting },
+    onSortingChange: setSorting,
   });
 
   if (data.length === 0) return <>{emptyState}</>;
@@ -57,13 +94,68 @@ export function DataTable<TData>({
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="hover:bg-transparent">
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                </TableHead>
-              ))}
+              {headerGroup.headers.map((header) => {
+                const sorted = header.column.getIsSorted();
+                const headerContent = header.isPlaceholder
+                  ? null
+                  : flexRender(header.column.columnDef.header, header.getContext());
+                const headerAdornment = header.column.columnDef.meta?.headerAdornment;
+                const sortIcon =
+                  sorted === 'asc' ? (
+                    <ArrowUpIcon className="size-3.5" aria-hidden="true" />
+                  ) : sorted === 'desc' ? (
+                    <ArrowDownIcon className="size-3.5" aria-hidden="true" />
+                  ) : (
+                    <ArrowUpDownIcon className="size-3.5 opacity-50" aria-hidden="true" />
+                  );
+                const sortButton = (
+                  <button
+                    type="button"
+                    className={cn(
+                      'inline-flex items-center gap-1 hover:text-foreground',
+                      // The `ml-auto` that right-aligns a numeric column's sort button moves to
+                      // the wrapping `<div>` below when a `headerAdornment` sits beside it —
+                      // otherwise it stays here, unchanged from before this column ever had one.
+                      numericColumnIds.has(header.column.id) && !headerAdornment && 'ml-auto',
+                    )}
+                    onClick={header.column.getToggleSortingHandler()}
+                  >
+                    {headerContent}
+                    {sortIcon}
+                  </button>
+                );
+
+                return (
+                  <TableHead
+                    key={header.id}
+                    className={cn(numericColumnIds.has(header.column.id) && 'text-right')}
+                    aria-sort={
+                      sorted === false ? undefined : sorted === 'asc' ? 'ascending' : 'descending'
+                    }
+                  >
+                    {header.column.getCanSort() ? (
+                      headerAdornment ? (
+                        <div
+                          className={cn(
+                            'inline-flex items-center gap-1',
+                            numericColumnIds.has(header.column.id) && 'ml-auto',
+                          )}
+                        >
+                          {sortButton}
+                          {headerAdornment}
+                        </div>
+                      ) : (
+                        sortButton
+                      )
+                    ) : (
+                      <>
+                        {headerContent}
+                        {headerAdornment}
+                      </>
+                    )}
+                  </TableHead>
+                );
+              })}
             </TableRow>
           ))}
         </TableHeader>
@@ -71,7 +163,10 @@ export function DataTable<TData>({
           {table.getRowModel().rows.map((row) => (
             <TableRow key={row.id}>
               {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id}>
+                <TableCell
+                  key={cell.id}
+                  className={cn(numericColumnIds.has(cell.column.id) && 'text-right')}
+                >
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </TableCell>
               ))}

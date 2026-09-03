@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { API_PROBLEM_TYPES } from '@erp/contracts';
+import { API_PROBLEM_TYPES, STAFFING_PROBLEM_TYPES } from '@erp/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { CLIENT_PROBLEM_TYPES } from './api-client.ts';
@@ -78,6 +78,20 @@ describe('LABELS.problem.sentences', () => {
     expect(missing).toStrictEqual([]);
   });
 
+  it('names every refusal staffing can raise', () => {
+    // The third family, and the one that had six sentences in this table with nothing checking
+    // them until it was moved into `@erp/contracts`: an assignment refusal is a business fact, so
+    // it is not in `API_PROBLEM_TYPES`, but no module raises it either — `assignments` is
+    // `public.*` reference data written from the composition layer, so the `packages/` scan above
+    // cannot see it. It reaches the SPA on the wire like any other `type`, so the SPA owes it a
+    // sentence like any other.
+    const missing = Object.values(STAFFING_PROBLEM_TYPES).filter(
+      (type) => sentences[type] === undefined,
+    );
+
+    expect(missing).toStrictEqual([]);
+  });
+
   it('names the two client-originated sentinels of lib/api-client.ts', () => {
     const missing = Object.values(CLIENT_PROBLEM_TYPES).filter(
       (type) => sentences[type] === undefined,
@@ -90,6 +104,7 @@ describe('LABELS.problem.sentences', () => {
     const known = new Set<string>([
       ...declared.map(({ type }) => type),
       ...Object.values(API_PROBLEM_TYPES),
+      ...Object.values(STAFFING_PROBLEM_TYPES),
       ...Object.values(CLIENT_PROBLEM_TYPES),
     ]);
     const orphaned = Object.keys(LABELS.problem.sentences).filter((type) => !known.has(type));

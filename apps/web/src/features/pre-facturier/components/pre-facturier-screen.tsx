@@ -1,17 +1,21 @@
 import { Link, useNavigate } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import { FileTextIcon, ReceiptTextIcon } from 'lucide-react';
-import type { ReactElement } from 'react';
+import type { ReactElement, SyntheticEvent } from 'react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { CopyLinkButton } from '@/components/copy-link-button';
 import { DataTable } from '@/components/data-table/data-table';
+import { PaginationControls } from '@/components/data-table/pagination-controls';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
+import { GlossaryTerm } from '@/components/glossary-term';
 import { StatCard } from '@/components/stat-card';
 import { StatusBadge, type StatusBadgeVariant } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -21,12 +25,16 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RefuseDialog } from '@/features/cra/components/refuse-dialog';
+import {
+  ValidateConfirmDialog,
+  type ValidateConfirmFact,
+} from '@/features/cra/components/validate-confirm-dialog';
 import { ValidateResultDialog } from '@/features/cra/components/validate-result-dialog';
-import { useCraList, useValidateCra } from '@/features/cra/hooks';
+import { useValidateCra } from '@/features/cra/hooks';
 import type { CraStatus, ValidationResponse } from '@/features/cra/types';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
-import { frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
+import { frenchDate, frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
@@ -68,16 +76,6 @@ function TableSkeleton(): ReactElement {
   );
 }
 
-/** Sorted-descending, deduplicated periods — the same rule the server's own `offeredPeriods`
- * (`apps/api/src/composition/pre-facturier.ts`) applies, ported here because the JSON route
- * (unlike the SSR page) does not put that list on the wire (`docs/open-questions.md`, row dated
- * 2026-08-26). Derived from `GET /api/v1/cras`, already scoped server-side the same way the
- * pré-facturier itself is (office for a manager, office for billing — verified against
- * `pg-cra-repository.ts`'s `list()`). */
-function offeredPeriods(periods: readonly string[]): string[] {
-  return [...new Set(periods)].sort((left, right) => right.localeCompare(left));
-}
-
 interface PeriodSelectorProps {
   readonly period: string;
   readonly offered: readonly string[];
@@ -112,10 +110,11 @@ function PeriodSelector({ period, offered }: PeriodSelectorProps): ReactElement 
   );
 }
 
-function invoiceColumns(): ColumnDef<PreFacturierInvoiceRow>[] {
+function invoiceColumns(returnTo: string): ColumnDef<PreFacturierInvoiceRow>[] {
   return [
     {
       id: 'client',
+      accessorFn: (row) => row.billedToName,
       header: LABELS.preFacturier.client,
       cell: ({ row }) => (
         <span className="font-medium text-foreground">{row.original.billedToName}</span>
@@ -123,11 +122,44 @@ function invoiceColumns(): ColumnDef<PreFacturierInvoiceRow>[] {
     },
     {
       id: 'status',
+      accessorFn: (row) => row.status,
       header: LABELS.preFacturier.invoiceStatus,
       cell: ({ row }) => <StatusBadge variant={INVOICE_STATUS_VARIANT[row.original.status]} />,
     },
     {
+      // Rank A7: what tells two drafts to the same client, same month, apart — without this,
+      // several rows above were the client's name and nothing else.
+      id: 'consultant',
+      accessorFn: (row) => row.consultantName,
+      header: LABELS.preFacturier.invoiceConsultant,
+      cell: ({ row }) => row.original.consultantName,
+    },
+    {
+      id: 'missions',
+      accessorFn: (row) => row.missionNames.join(', '),
+      header: LABELS.preFacturier.invoiceMissions,
+      cell: ({ row }) => row.original.missionNames.join(', '),
+    },
+    {
+      id: 'lineCount',
+      accessorFn: (row) => row.lineCount,
+      header: LABELS.preFacturier.invoiceLines,
+      cell: ({ row }) => <span className="tabular-nums">{row.original.lineCount}</span>,
+    },
+    {
+      id: 'createdAt',
+      accessorFn: (row) => row.createdAt ?? '',
+      header: LABELS.preFacturier.invoiceCreatedAt,
+      cell: ({ row }) =>
+        row.original.createdAt === null ? (
+          LABELS.preFacturier.notNumberedYet
+        ) : (
+          <span className="tabular-nums">{frenchDate(row.original.createdAt.slice(0, 10))}</span>
+        ),
+    },
+    {
       id: 'invoiceNumber',
+      accessorFn: (row) => row.invoiceNumber ?? '',
       header: LABELS.preFacturier.invoiceNumber,
       cell: ({ row }) => (
         <span className="font-mono text-[0.8125rem] tabular-nums">
@@ -137,14 +169,73 @@ function invoiceColumns(): ColumnDef<PreFacturierInvoiceRow>[] {
     },
     {
       id: 'totalTtc',
+      accessorFn: (row) => row.totalTtcCents ?? -1,
       header: LABELS.preFacturier.totalIncludingVat,
       cell: ({ row }) => (
+        // ADR-0061 (l. 44): no `title` here — it was the only channel carrying "provisional", and
+        // a `title` is never exposed on touch and unreliable via keyboard/screen reader anyway.
+        // The `*` stays a decorative, `aria-hidden` glyph; the `sr-only` span carries the same
+        // sentence the removed `title` did, read out with the amount. The visible explanation
+        // lives once, in the legend below the table (`LABELS.invoice.provisionalTotals`).
         <span className="tabular-nums">
           {row.original.totalTtcCents === null
             ? LABELS.preFacturier.notNumberedYet
             : frenchEuros(row.original.totalTtcCents)}
+          {row.original.totalsAreProvisional && (
+            <>
+              <span aria-hidden="true" className="text-muted-foreground">
+                {' '}
+                *
+              </span>
+              <span className="sr-only"> {LABELS.invoice.provisionalTotals}</span>
+            </>
+          )}
         </span>
       ),
+    },
+    {
+      id: 'open',
+      enableSorting: false,
+      header: () => <span className="sr-only">{LABELS.action.tableActions}</span>,
+      cell: ({ row }) => (
+        <Link
+          to="/factures/$id"
+          params={{ id: row.original.id }}
+          search={{
+            client: row.original.billedToName,
+            period: row.original.supplyPeriod,
+            from: returnTo,
+          }}
+          className="ml-auto block w-fit text-sm text-primary hover:underline"
+        >
+          {LABELS.preFacturier.invoiceOpen}
+        </Link>
+      ),
+    },
+  ];
+}
+
+/**
+ * O4's recap for this screen: `PreFacturierCraRow` carries no mission/client breakdown (unlike
+ * `ManagerCraGridResponse`, whose own `ValidateConfirmDialog` caller in
+ * `manager-cra-grid-screen.tsx` lists clients) — this dialog shows what the row already has
+ * instead of inventing a number it would have to fetch a second payload for.
+ */
+function validateFactsFor(row: PreFacturierCraRow, period: string): ValidateConfirmFact[] {
+  return [
+    {
+      label: LABELS.preFacturier.validateConfirmDialog.periodFactLabel,
+      value: frenchMonth(period),
+    },
+    {
+      label: LABELS.preFacturier.validateConfirmDialog.recordedDaysFactLabel,
+      value: frenchDays(row.recordedQuarterDays),
+    },
+    {
+      label: LABELS.preFacturier.validateConfirmDialog.lateFactLabel,
+      value: row.late
+        ? LABELS.preFacturier.validateConfirmDialog.yes
+        : LABELS.preFacturier.validateConfirmDialog.no,
     },
   ];
 }
@@ -162,6 +253,7 @@ function craColumns(
   const columns: ColumnDef<PreFacturierCraRow>[] = [
     {
       id: 'consultant',
+      accessorFn: (row) => row.consultantName,
       header: LABELS.preFacturier.consultant,
       cell: ({ row }) => (
         <span className="font-medium text-foreground">{row.original.consultantName}</span>
@@ -169,6 +261,7 @@ function craColumns(
     },
     {
       id: 'status',
+      accessorFn: (row) => row.status,
       header: LABELS.preFacturier.craStatus,
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
@@ -179,6 +272,7 @@ function craColumns(
     },
     {
       id: 'recorded',
+      accessorFn: (row) => row.recordedQuarterDays,
       header: LABELS.preFacturier.recorded,
       cell: ({ row }) => (
         <span className="tabular-nums">{frenchDays(row.original.recordedQuarterDays)}</span>
@@ -186,6 +280,7 @@ function craColumns(
     },
     {
       id: 'blocking',
+      enableSorting: false,
       header: LABELS.preFacturier.blocking,
       cell: ({ row }) =>
         row.original.blockingReasons.length === 0 ? (
@@ -213,6 +308,7 @@ function craColumns(
     // already applies to `billing`.
     {
       id: 'marge',
+      enableSorting: false,
       header: () => <span className="sr-only">{LABELS.margin.heading}</span>,
       cell: ({ row }) => (
         <Link
@@ -234,6 +330,7 @@ function craColumns(
     // role check client-side would be a second copy of the same rule, not a second control.
     {
       id: 'actions',
+      enableSorting: false,
       header: () => <span className="sr-only">{LABELS.action.tableActions}</span>,
       // Item 3 (QA round 1): a manager used to have to leave the pré-facturier through the CRA
       // menu (`cra-list-screen.tsx`'s own `Link` to this same route) to look at a row before
@@ -286,6 +383,10 @@ function craColumns(
 interface PreFacturierScreenProps {
   readonly period: string;
   readonly role: Role;
+  readonly craPage: number;
+  readonly invoicePage: number;
+  readonly pageSize: number;
+  readonly consultantSearch: string;
 }
 
 /**
@@ -295,23 +396,52 @@ interface PreFacturierScreenProps {
  * never had one" (`data.period === null`, reachable only if every office Cra vanished between the
  * redirect and this render, kept as a defensive branch rather than an assumed-unreachable one).
  */
-export function PreFacturierScreen({ period, role }: PreFacturierScreenProps): ReactElement {
-  const query = usePreFacturier(period);
-  const craList = useCraList();
+export function PreFacturierScreen({
+  period,
+  role,
+  craPage,
+  invoicePage,
+  pageSize,
+  consultantSearch,
+}: PreFacturierScreenProps): ReactElement {
+  const query = usePreFacturier(period, {
+    craPage,
+    invoicePage,
+    pageSize,
+    consultantSearch,
+  });
+  const navigate = useNavigate();
   const validateMutation = useValidateCra(period);
   const [validationResult, setValidationResult] = useState<{
     readonly cra: PreFacturierCraRow;
     readonly data: ValidationResponse;
   } | null>(null);
   const [refusing, setRefusing] = useState<PreFacturierCraRow | null>(null);
+  // O4: "Valider" opens this recap instead of acting instantly — confirmed here.
+  const [confirmingValidate, setConfirmingValidate] = useState<PreFacturierCraRow | null>(null);
+
+  function submitConsultantSearch(event: SyntheticEvent<HTMLFormElement, SubmitEvent>): void {
+    event.preventDefault();
+    const entry = new FormData(event.currentTarget).get('consultant-search');
+    const search = typeof entry === 'string' ? entry.trim() : '';
+    void navigate({
+      to: '/pre-facturier',
+      search: (previous) => ({
+        ...previous,
+        consultantSearch: search === '' ? undefined : search,
+        craPage: 1,
+        invoicePage: 1,
+      }),
+    });
+  }
 
   /**
-   * Validation has no separate confirm step (unlike refusal, it needs no reason and is not
-   * destructive) — clicking "Valider" performs the action immediately and the dialog shows its
-   * result, exactly as task 7.2 describes it. `replayed: true` is still success (ADR-0021: 200,
-   * never 409), so it gets an informational toast rather than the ordinary success one, and the
-   * result dialog shows the **original** invoices/declined days either way — "résultat d'origine
-   * affiché" is a fact about which toast appears, not about whether the dialog opens.
+   * O4: "Valider" opens `ValidateConfirmDialog` first — `craColumns`'s own `onValidate` below sets
+   * `confirmingValidate`, this function only runs once that dialog's own confirm button calls it.
+   * `replayed: true` is still success (ADR-0021: 200, never 409), so it gets an informational toast
+   * rather than the ordinary success one, and the result dialog shows the **original**
+   * invoices/declined days either way — "résultat d'origine affiché" is a fact about which toast
+   * appears, not about whether the dialog opens.
    */
   async function handleValidate(row: PreFacturierCraRow): Promise<void> {
     try {
@@ -345,6 +475,7 @@ export function PreFacturierScreen({ period, role }: PreFacturierScreenProps): R
         <ErrorState
           title={headingFor(error.problem)}
           body={sentenceFor(error.problem)}
+          onRetry={() => void query.refetch()}
           {...(error.problem.correlationId === undefined
             ? {}
             : { correlationId: error.problem.correlationId })}
@@ -353,12 +484,23 @@ export function PreFacturierScreen({ period, role }: PreFacturierScreenProps): R
     }
 
     return (
-      <ErrorState title={LABELS.problem.heading.internal} body={LABELS.shell.unexpectedErrorBody} />
+      <ErrorState
+        title={LABELS.problem.heading.internal}
+        body={LABELS.shell.unexpectedErrorBody}
+        onRetry={() => void query.refetch()}
+      />
     );
   }
 
   const data = query.data;
-  const offered = offeredPeriods([...(craList.data?.cras.map((cra) => cra.period) ?? []), period]);
+  const returnParams = new URLSearchParams({
+    period,
+    craPage: String(craPage),
+    invoicePage: String(invoicePage),
+    pageSize: String(pageSize),
+  });
+  if (consultantSearch !== '') returnParams.set('consultantSearch', consultantSearch);
+  const returnTo = `/pre-facturier?${returnParams.toString()}`;
 
   if (data.period === null) {
     return (
@@ -372,7 +514,51 @@ export function PreFacturierScreen({ period, role }: PreFacturierScreenProps): R
 
   return (
     <div className="flex flex-col gap-4">
-      <PeriodSelector period={period} offered={offered} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PeriodSelector period={period} offered={data.offeredPeriods} />
+        <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <GlossaryTerm term="preFacturier" />
+          <GlossaryTerm term="regie" />
+          <GlossaryTerm term="forfait" />
+          <GlossaryTerm term="intercontrat" />
+        </p>
+        <CopyLinkButton />
+      </div>
+
+      <form className="flex max-w-xl items-end gap-2" onSubmit={submitConsultantSearch}>
+        <label className="flex flex-1 flex-col gap-1 text-sm font-medium">
+          {LABELS.preFacturier.searchConsultant}
+          <Input
+            key={consultantSearch}
+            type="search"
+            name="consultant-search"
+            defaultValue={consultantSearch}
+            placeholder={LABELS.preFacturier.searchConsultantPlaceholder}
+          />
+        </label>
+        <Button type="submit" variant="outline">
+          {LABELS.preFacturier.search}
+        </Button>
+        {consultantSearch !== '' && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              void navigate({
+                to: '/pre-facturier',
+                search: (previous) => ({
+                  ...previous,
+                  consultantSearch: undefined,
+                  craPage: 1,
+                  invoicePage: 1,
+                }),
+              });
+            }}
+          >
+            {LABELS.preFacturier.clearSearch}
+          </Button>
+        )}
+      </form>
 
       <div className="grid grid-cols-3 gap-4">
         <StatCard
@@ -390,15 +576,50 @@ export function PreFacturierScreen({ period, role }: PreFacturierScreenProps): R
       <section className="flex flex-col gap-2">
         <h2 className="text-card-title">{LABELS.preFacturier.billable}</h2>
         <DataTable
-          columns={invoiceColumns()}
+          columns={invoiceColumns(returnTo)}
           data={data.invoices}
           getRowId={(row) => row.id}
+          numericColumns={['lineCount', 'totalTtc']}
           emptyState={
             <EmptyState
               icon={ReceiptTextIcon}
-              title={LABELS.preFacturier.billableEmpty}
-              body={LABELS.preFacturier.nothingBlocking}
+              title={
+                consultantSearch === ''
+                  ? LABELS.preFacturier.billableEmpty
+                  : LABELS.preFacturier.searchEmpty
+              }
+              body={
+                consultantSearch === ''
+                  ? LABELS.preFacturier.nothingBlocking
+                  : LABELS.preFacturier.searchEmptyBody
+              }
             />
+          }
+        />
+        {data.invoices.some((invoice) => invoice.totalsAreProvisional) && (
+          <p className="text-xs text-muted-foreground">* {LABELS.invoice.provisionalTotals}</p>
+        )}
+        <PaginationControls
+          {...data.pagination.invoices}
+          onPageChange={(offset) =>
+            void navigate({
+              to: '/pre-facturier',
+              search: (previous) => ({
+                ...previous,
+                invoicePage: Math.floor(offset / pageSize) + 1,
+              }),
+            })
+          }
+          onPageSizeChange={(limit) =>
+            void navigate({
+              to: '/pre-facturier',
+              search: (previous) => ({
+                ...previous,
+                craPage: 1,
+                invoicePage: 1,
+                pageSize: limit,
+              }),
+            })
           }
         />
       </section>
@@ -409,26 +630,66 @@ export function PreFacturierScreen({ period, role }: PreFacturierScreenProps): R
           <p className="text-sm text-muted-foreground">{LABELS.preFacturier.revealNote}</p>
         )}
         <DataTable
-          columns={craColumns(
-            role,
-            period,
-            (row) => {
-              void handleValidate(row);
-            },
-            setRefusing,
-          )}
+          columns={craColumns(role, period, setConfirmingValidate, setRefusing)}
           data={data.cras}
           getRowId={(row) => row.craId}
+          numericColumns={['recorded']}
           emptyState={
             <EmptyState
               icon={FileTextIcon}
-              title={LABELS.preFacturier.crasEmpty}
-              body={LABELS.preFacturier.crasEmptyHint}
+              title={
+                consultantSearch === ''
+                  ? LABELS.preFacturier.crasEmpty
+                  : LABELS.preFacturier.searchEmpty
+              }
+              body={
+                consultantSearch === ''
+                  ? LABELS.preFacturier.crasEmptyHint
+                  : LABELS.preFacturier.searchEmptyBody
+              }
             />
+          }
+        />
+        <PaginationControls
+          {...data.pagination.cras}
+          onPageChange={(offset) =>
+            void navigate({
+              to: '/pre-facturier',
+              search: (previous) => ({
+                ...previous,
+                craPage: Math.floor(offset / pageSize) + 1,
+              }),
+            })
+          }
+          onPageSizeChange={(limit) =>
+            void navigate({
+              to: '/pre-facturier',
+              search: (previous) => ({
+                ...previous,
+                craPage: 1,
+                invoicePage: 1,
+                pageSize: limit,
+              }),
+            })
           }
         />
       </section>
 
+      {confirmingValidate !== null && (
+        <ValidateConfirmDialog
+          consultantName={confirmingValidate.consultantName}
+          facts={validateFactsFor(confirmingValidate, period)}
+          pending={validateMutation.isPending}
+          onCancel={() => {
+            setConfirmingValidate(null);
+          }}
+          onConfirm={() => {
+            const row = confirmingValidate;
+            setConfirmingValidate(null);
+            void handleValidate(row);
+          }}
+        />
+      )}
       {validationResult !== null && (
         <ValidateResultDialog
           cra={validationResult.cra}

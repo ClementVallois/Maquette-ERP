@@ -525,6 +525,7 @@ describe('PgCraRepository', () => {
       // took, and the only way to take it is to come and write the new name down.
       'recordedQuarterDays',
       'status',
+      'statusChangedAt',
     ]);
   });
 

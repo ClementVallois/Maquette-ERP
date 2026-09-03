@@ -35,6 +35,12 @@ const CraListSearch = z.object({
   // this schema and land on a 400, which is exactly what the paragraph above says must not happen.
   year: z.coerce.number().int().min(2000).max(2100).optional().catch(undefined),
   month: z.coerce.number().int().min(1).max(12).optional().catch(undefined),
+  page: z.coerce.number().int().min(1).default(1).catch(1),
+  pageSize: z.coerce
+    .number()
+    .pipe(z.union([z.literal(10), z.literal(20), z.literal(50)]))
+    .default(20)
+    .catch(20),
 });
 
 /**
@@ -49,7 +55,7 @@ export const Route = createFileRoute('/_shell/cra/')({
 
 function CraListRoute(): ReactElement {
   const { persona } = Route.useRouteContext();
-  const { consultantIds, statuses, year, month } = Route.useSearch();
+  const { consultantIds, statuses, year, month, page, pageSize } = Route.useSearch();
 
   return (
     <div className="flex flex-col gap-4">
@@ -60,6 +66,8 @@ function CraListRoute(): ReactElement {
         statuses={statuses ?? []}
         year={year}
         month={month}
+        page={page}
+        pageSize={pageSize}
       />
     </div>
   );

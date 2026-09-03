@@ -168,7 +168,7 @@ interface GridBody {
     readonly quarterDays: number;
   }[];
   readonly flags: readonly { readonly day: string; readonly reason: string }[];
-  readonly refusal: { readonly reason: string } | null;
+  readonly refusal: { readonly reason: string; readonly at: string; readonly by: string } | null;
   readonly editable: boolean;
   readonly validatedBy: string | null;
 }
@@ -324,7 +324,15 @@ describe('GET /api/v1/cras/:period/grid', () => {
     expect(body.craId).toBe(CRA_MAY);
     expect(body.status).toBe('refused');
     expect(body.editable).toBe(true);
-    expect(body.refusal).toStrictEqual({ reason: 'jours incomplets' });
+    // `refusal_by`, `refusal_at` and `refusal_reason` are literal fixture values inserted above
+    // (never a Clock read at request time), so `at` and `by` are as deterministic as `reason` —
+    // `by` resolves through `consultantNames()`, which is why it reads a display name and not the
+    // raw `ALICE` id the fixture inserted.
+    expect(body.refusal).toStrictEqual({
+      reason: 'jours incomplets',
+      at: '2026-06-01T09:00:00.000Z',
+      by: 'Alice Martin',
+    });
   });
 
   it('refuses a manager: the role does not carry this action', async () => {

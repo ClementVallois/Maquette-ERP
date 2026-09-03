@@ -1,7 +1,9 @@
-import { AlertTriangleIcon, CircleDashedIcon } from 'lucide-react';
+import { AlertTriangleIcon, ChevronDownIcon, CircleDashedIcon } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 import { useRef } from 'react';
 
+import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { frenchDate, frenchDays, frenchMonth, frenchWeekday } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { cn } from '@/lib/utils';
@@ -49,6 +51,10 @@ interface CraMatrixTableProps {
   readonly missingDays?: ReadonlySet<string> | undefined;
   readonly onChangeCell?: ((rowKey: string, day: string, value: CellQuantity) => void) | undefined;
   readonly renderRowTools?: ((row: MatrixRowMeta) => ReactNode) | undefined;
+  /** A seven-day viewport: narrower labels and a total for the visible week, not the month. */
+  readonly compact?: boolean;
+  readonly totalLabel?: string;
+  readonly cellIdPrefix?: string;
 }
 
 function dayHeaderLabel(date: string): string {
@@ -171,6 +177,9 @@ export function CraMatrixTable({
   missingDays,
   onChangeCell,
   renderRowTools,
+  compact = false,
+  totalLabel = LABELS.cra.monthTotal,
+  cellIdPrefix = 'month',
 }: CraMatrixTableProps): ReactElement {
   const refs = useRef(new Map<string, HTMLSelectElement>());
 
@@ -232,7 +241,10 @@ export function CraMatrixTable({
         </caption>
         <thead>
           <tr className="border-b border-border">
-            <th scope="col" className="sticky left-0 z-10 bg-card px-4 py-1" />
+            <th
+              scope="col"
+              className={cn('sticky left-0 z-10 bg-card py-1', compact ? 'px-2' : 'px-4')}
+            />
             {weeks.map((group) => (
               <th
                 // Within one month, ISO week numbers only ever increase — no two groups in `weeks`
@@ -247,7 +259,13 @@ export function CraMatrixTable({
             ))}
           </tr>
           <tr className="border-b border-border">
-            <th scope="col" className="sticky left-0 z-10 bg-card px-4 py-2 text-left">
+            <th
+              scope="col"
+              className={cn(
+                'sticky left-0 z-10 bg-card py-2 text-left',
+                compact ? 'w-28 min-w-28 px-2' : 'px-4',
+              )}
+            >
               {LABELS.cra.activity}
             </th>
             {days.map((day) => {
@@ -258,7 +276,8 @@ export function CraMatrixTable({
                   key={day.date}
                   scope="col"
                   className={cn(
-                    'min-w-[2.75rem] border-l border-border px-1 py-2 text-center font-medium whitespace-nowrap',
+                    'border-l border-border px-1 py-2 text-center font-medium whitespace-nowrap',
+                    compact ? 'min-w-9' : 'min-w-[2.75rem]',
                     total === null ? dayTint(day) : TOTAL_TONES[total].headerClass,
                     total === null && day.nonWorkable !== null && 'text-muted-foreground',
                   )}
@@ -296,8 +315,11 @@ export function CraMatrixTable({
                 </th>
               );
             })}
-            <th scope="col" className="border-l border-border px-3 py-2 text-right">
-              {LABELS.cra.monthTotal}
+            <th
+              scope="col"
+              className="sticky right-0 z-10 border-l border-border bg-card px-3 py-2 text-right"
+            >
+              {totalLabel}
             </th>
           </tr>
         </thead>
@@ -314,7 +336,10 @@ export function CraMatrixTable({
               <tr key={row.key} className="border-b border-border last:border-b-0">
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 bg-card px-4 py-2 text-left align-middle"
+                  className={cn(
+                    'sticky left-0 z-10 bg-card py-2 text-left align-middle',
+                    compact ? 'w-28 min-w-28 px-2' : 'px-4',
+                  )}
                 >
                   <div className="flex items-center gap-2">
                     <span
@@ -324,7 +349,14 @@ export function CraMatrixTable({
                         tone === null ? 'bg-absence-dot' : tone.dotClass,
                       )}
                     />
-                    <span className="font-medium text-foreground">{row.label}</span>
+                    <span
+                      className={cn(
+                        'font-medium text-foreground',
+                        compact && 'max-w-20 truncate text-xs',
+                      )}
+                    >
+                      {row.label}
+                    </span>
                     {renderRowTools !== undefined && (
                       <span className="ml-auto flex items-center gap-1">{renderRowTools(row)}</span>
                     )}
@@ -345,7 +377,7 @@ export function CraMatrixTable({
                       )}
                     >
                       <CraQuantityCell
-                        rowKey={row.key}
+                        rowKey={`${cellIdPrefix}-${row.key}`}
                         activityLabel={row.label}
                         day={day.date}
                         dayLabel={frenchDate(day.date)}
@@ -363,11 +395,12 @@ export function CraMatrixTable({
                           if (element) refs.current.set(key, element);
                           else refs.current.delete(key);
                         }}
+                        dayDataAttribute={day.date}
                       />
                     </td>
                   );
                 })}
-                <td className="border-l border-border px-3 py-2 text-right font-medium tabular-nums">
+                <td className="sticky right-0 z-10 border-l border-border bg-card px-3 py-2 text-right font-medium tabular-nums">
                   {frenchDays(total)}
                 </td>
               </tr>
@@ -376,7 +409,13 @@ export function CraMatrixTable({
         </tbody>
         <tfoot>
           <tr className="border-t-2 border-border font-medium">
-            <th scope="row" className="sticky left-0 z-10 bg-card px-4 py-2 text-left">
+            <th
+              scope="row"
+              className={cn(
+                'sticky left-0 z-10 bg-card py-2 text-left',
+                compact ? 'w-28 min-w-28 px-2 text-xs' : 'px-4',
+              )}
+            >
               {LABELS.cra.dayTotal}
             </th>
             {days.map((day) => {
@@ -401,12 +440,64 @@ export function CraMatrixTable({
                 </td>
               );
             })}
-            <td className="border-l border-border px-3 py-2 text-right tabular-nums">
+            <td className="sticky right-0 z-10 border-l border-border bg-card px-3 py-2 text-right tabular-nums">
               {frenchDays(days.reduce((total, day) => total + dayTotal(matrix, day.date), 0))}
             </td>
           </tr>
         </tfoot>
       </table>
     </div>
+  );
+}
+
+/**
+ * A9's compact, escapable legend for the two colours and the one word the grid draws directly on
+ * cells (`TOTAL_TONES` above, plus `LABELS.cra.flagged`) — collapsed by default, so a reader who
+ * already knows the grid pays nothing for it.
+ */
+export function CraLegend(): ReactElement {
+  const swatches: { readonly key: string; readonly className: string; readonly label: string }[] = [
+    { key: 'weekend', className: 'bg-flag-weekend-bg', label: LABELS.cra.nonWorkable.weekend },
+    {
+      key: 'holiday',
+      className: 'bg-flag-holiday-bg',
+      label: LABELS.cra.nonWorkable.publicHoliday,
+    },
+    {
+      key: 'incomplete',
+      className: TOTAL_TONES.incomplete.headerClass,
+      label: LABELS.cra.matrix.dayIncomplete,
+    },
+    {
+      key: 'overbooked',
+      className: TOTAL_TONES.overbooked.headerClass,
+      label: LABELS.cra.matrix.dayOverbooked,
+    },
+  ];
+
+  return (
+    <Collapsible>
+      <CollapsibleTrigger asChild>
+        <Button type="button" variant="ghost" size="sm" className="group -ml-2.5 gap-1">
+          {LABELS.cra.matrix.legendToggle}
+          <ChevronDownIcon
+            aria-hidden="true"
+            className="size-3.5 transition-transform group-data-[state=open]:rotate-180"
+          />
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="flex flex-wrap gap-x-4 gap-y-1.5 px-1 pt-2 text-xs text-muted-foreground">
+        {swatches.map((swatch) => (
+          <span key={swatch.key} className="flex items-center gap-1.5">
+            <span aria-hidden="true" className={cn('size-3 shrink-0 rounded', swatch.className)} />
+            {swatch.label}
+          </span>
+        ))}
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden="true" className="size-3 shrink-0 rounded-full bg-status-late-dot" />
+          {LABELS.cra.flagged}
+        </span>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
