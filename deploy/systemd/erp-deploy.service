@@ -1,0 +1,11 @@
+[Unit]
+Description=Maquette ERP - pull-based redeploy (ADR-0029)
+After=docker.service network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/erp-maquette/environment
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/erp-maquette/repo/deploy
+EnvironmentFile=/etc/erp-maquette/environment
+ExecStart=/opt/erp-maquette/repo/deploy/pull-and-redeploy.sh
