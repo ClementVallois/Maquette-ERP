@@ -74,24 +74,42 @@ async function fetchGrid(page: Page, period: string): Promise<GridResponseForAss
  * `<span>` when not). `[aria-label="…"]` rather than `getByRole('combobox', …)`/`getByText(…)`:
  * one selector that finds the cell whichever of the two it is, which is what a test spanning both
  * a read-only month and an editable one needs. `day` is `DD/MM/YYYY` (`frenchDate`'s own output).
+ *
+ * `:visible` (Playwright's own pseudo-class, not CSS): the mobile week, desktop month and desktop
+ * week matrices are deliberately mounted together on an editable grid (`cra-grid-screen.tsx:323`),
+ * each carrying the same aria-label for the same cell, so the bare attribute selector resolves to
+ * more than one element the moment an action (not a read-only assertion) requires exactly one —
+ * `axe.spec.ts`'s `select:visible` fix is the same trap, same fix.
  */
 function cell(page: Page, activityLabel: string, day: string): Locator {
-  return page.locator(`[aria-label="${activityLabel} — ${day}"]`);
+  return page.locator(`[aria-label="${activityLabel} — ${day}"]:visible`);
 }
 
 /**
  * A `StatCard`'s value span, located via its own label span's exact text, then the next sibling
  * span `StatCard` renders it as (`components/stat-card.tsx` — one `<div>`, two `<span>` children
- * in a fixed order, no `data-testid` to hook). `following-sibling::span[1]`, not the parent
- * `<div>`: the parent's own text is the concatenation of both spans ("CJM200,00 €"), which
- * `toHaveText` compares whole, so scoping to the parent asserts the label and the value at once
- * rather than the value alone — this needs only the value. Scoping starts from the *label*'s exact
- * text (not `getByText(value)`) so a label that also appears as a table column header
- * (`Chiffre d’affaires`/`Coût`/`Marge` all repeat as `MISSION_COLUMNS` headers on the same screen)
- * still resolves to the one `StatCard` and nothing else.
+ * in a fixed order, no `data-testid` to hook). Not the parent `<div>`: the parent's own text is
+ * the concatenation of both spans ("CJM200,00 €"), which `toHaveText` compares whole, so scoping
+ * to the parent asserts the label and the value at once rather than the value alone — this needs
+ * only the value. Scoping starts from the *label*'s exact text (not `getByText(value)`) so a
+ * label that also appears as a table column header (`Chiffre d’affaires`/`Coût`/`Marge` all
+ * repeat as `MISSION_COLUMNS` headers on the same screen) still resolves to the one `StatCard`
+ * and nothing else.
+ *
+ * `ancestor-or-self::span[contains(@class,'text-label')]`, not a bare `following-sibling::span[1]`
+ * off the exact-text match: `CJM`'s own label is now a `GlossaryTerm` button
+ * (`marge-screen.tsx`), so `getByText('CJM', { exact: true })` resolves to that `<button>` — the
+ * innermost element carrying the exact text — not to the `<span class="text-label">` wrapping it.
+ * A bare `following-sibling::span[1]` off the button finds nothing: the button has no sibling
+ * span of its own, only the label `<span>` around it does. Walking up to the nearest
+ * `text-label` span first (`ancestor-or-self` also matches when the label is already a bare
+ * span, the other `StatCard`s on this screen) restores the same sibling relationship either way.
  */
 function statCardValue(page: Page, label: string): Locator {
-  return page.getByText(label, { exact: true }).locator('xpath=following-sibling::span[1]');
+  return page
+    .getByText(label, { exact: true })
+    .locator("xpath=ancestor-or-self::span[contains(@class,'text-label')][1]")
+    .locator('xpath=following-sibling::span[1]');
 }
 
 async function choosePersona(page: Page, personaKey: string): Promise<void> {
@@ -365,13 +383,29 @@ test.describe('item 3 — a manager opens and decides a CRA from the pré-factur
     await page.getByRole('button', { name: 'Enregistrer' }).click();
     await page.getByText(/^Enregistré à /u).waitFor({ state: 'visible' });
     await page.getByRole('button', { name: 'Soumettre au manager' }).click();
-    await page.getByText('Soumis', { exact: true }).waitFor({ state: 'visible' });
+    // Not `Soumis à {time}`: submitting flips `data.editable` to false as soon as the mutation's
+    // own `invalidateQueries` refetch lands (`hooks.ts`), which unmounts the save-state bar that
+    // string lives in before the local `setLastWrite` update ever has a chance to render it — a
+    // real regression, reported rather than fixed here. The timeline's own "CRA soumis" entry is
+    // what actually appears; scoped to `listitem` because the immutability banner carries the
+    // same substring (the same ambiguity `axe.spec.ts`'s "CRA validé" locator had).
+    await page
+      .getByRole('listitem')
+      .filter({ hasText: 'CRA soumis' })
+      .waitFor({ state: 'visible' });
 
     await switchPersonaViaUi(page, 'manager-paris');
     await page.goto(`/pre-facturier?period=${period}`);
     await page.getByRole('heading', { name: 'Les CRA du mois' }).waitFor({ state: 'visible' });
 
-    const aliceRow = page.getByRole('row').filter({ hasText: 'Alice Martin' });
+    // Scoped to the Cra table's own section, not the whole page: the invoices table above it
+    // (`LABELS.preFacturier.billable`) carries a `consultantName` column too, and once this test
+    // validates below, the invoice it drafts for Alice puts her name in that table as well — a
+    // bare `page.getByRole('row')` would then match a row in each table.
+    const craSection = page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: 'Les CRA du mois' }) });
+    const aliceRow = craSection.getByRole('row').filter({ hasText: 'Alice Martin' });
     await aliceRow.getByRole('link', { name: 'Ouvrir' }).click();
     await page.waitForURL(new RegExp(`/cra/${period}/.+`));
 
@@ -381,6 +415,14 @@ test.describe('item 3 — a manager opens and decides a CRA from the pré-factur
     const validateButton = page.getByRole('button', { name: 'Valider' });
     await expect(validateButton).toBeVisible();
     await validateButton.click();
+
+    // O4: "Valider" opens a recap before acting (`validate-confirm-dialog.tsx`) — confirmed here,
+    // rather than validating instantly the way this journey used to.
+    const confirmDialog = page.getByRole('dialog');
+    await confirmDialog.getByText('Valider le CRA de Alice Martin ?').waitFor({
+      state: 'visible',
+    });
+    await confirmDialog.getByRole('button', { name: 'Valider' }).click();
 
     const validateDialog = page.getByRole('dialog');
     await validateDialog.getByText('Validation du CRA de Alice Martin').waitFor({
@@ -400,7 +442,13 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     await choosePersona(page, 'consultant-paris');
     await page.goto('/cra/2026-06');
 
-    await page.getByText('CRA validé', { exact: false }).waitFor({ state: 'visible' });
+    // Not a bare `getByText('CRA validé', { exact: false })`: it matches both the timeline's own
+    // "CRA validé" entry and the immutability banner's sentence, which carries the same substring
+    // (`axe.spec.ts`'s identical fix explains why `listitem` rather than `exact: true`).
+    await page
+      .getByRole('listitem')
+      .filter({ hasText: 'CRA validé' })
+      .waitFor({ state: 'visible' });
     await expect(page.getByText('Validé par Bruno Leroy', { exact: false })).toBeVisible();
 
     // Three activity rows: two missions that carry data, plus Absence — never one row per day.
@@ -478,7 +526,8 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     // A prefix match, not an exact one: a day total out of range appends the reason to its own
     // accessible name (`TOTAL_TONES[…].sentence`, `cra-matrix-table.tsx`) so a screen reader hears
     // *why* the figure is flagged, and ¼ of a day makes this very cell incomplete two steps below.
-    const firstDayTotal = page.locator('[aria-label^="Total du jour — 03/09/2026"]');
+    // `:visible`: same triple-mount as `cell()`'s own locator, above.
+    const firstDayTotal = page.locator('[aria-label^="Total du jour — 03/09/2026"]:visible');
 
     // Keyboard-focus evidence (task 6.2).
     const firstDay = cell(page, DORA, '03/09/2026');
@@ -534,9 +583,16 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     expect(reread.status).toBe('draft');
 
     await page.getByRole('button', { name: 'Soumettre au manager' }).click();
-    await page.getByText('Soumis', { exact: true }).waitFor({ state: 'visible' });
-
-    await page.getByText('CRA soumis', { exact: false }).waitFor({ state: 'visible' });
+    // Not `Soumis à {time}`: see the same comment where this pattern first appears, above. The
+    // readiness wait right below already proves submission landed, so there is nothing to add
+    // here rather than replace — a second wait on the same fact would be redundant, not safer.
+    // `exact: false` alone is ambiguous here too: the immutability banner and the timeline's own
+    // "CRA soumis" entry both carry the substring (`axe.spec.ts`'s "CRA validé" had the same
+    // trap) — scoped to the banner's own role (`Alert` renders `role="alert"`) so the two cannot
+    // collide.
+    await page.getByRole('alert').getByText('CRA soumis', { exact: false }).waitFor({
+      state: 'visible',
+    });
     await expect(page.locator('select')).toHaveCount(0);
     await page.screenshot({
       animations: 'disabled',
@@ -574,8 +630,12 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     await page.getByText('Ce CRA a été refusé par le manager', { exact: false }).waitFor({
       state: 'visible',
     });
-    await expect(page.getByText(reason)).toBeVisible();
-    await expect(page.locator('select').first()).toBeVisible();
+    // Scoped to the banner: the timeline's own entry repeats the same reason as its `detail`
+    // (`business-timeline.tsx`), which the bare `getByText(reason)` this used to be also matched.
+    await expect(page.getByRole('alert').getByText(reason)).toBeVisible();
+    // `:visible`: the triple-mounted matrices share this selector (`cell()`'s own comment above);
+    // a bare `.first()` picks DOM order, which is the mobile, CSS-hidden one on this viewport.
+    await expect(page.locator('select:visible').first()).toBeVisible();
 
     await page.screenshot({
       animations: 'disabled',
@@ -618,6 +678,14 @@ test.describe('items 4/5 — a manager sees consultants, picks one, opens a read
   }) => {
     await choosePersona(page, 'manager-paris');
     await page.goto('/cra');
+
+    // Item 6 (QA round 1) densified the seed to 68 rows on this list, paginated 20 to a page —
+    // Alice's June is not on the first page by default, so this narrows to her own rows first
+    // (same "Consultants" filter `item 7`'s own test exercises below) rather than paginating.
+    await page.getByRole('button', { name: 'Consultants' }).click();
+    await page.getByPlaceholder('Rechercher un consultant…').fill('Alice');
+    await page.locator('[data-slot="popover-content"]').getByText('Alice Martin').click();
+    await page.keyboard.press('Escape');
 
     const aliceJune = page
       .getByRole('row')
@@ -1029,6 +1097,14 @@ test.describe('J2 — manager-paris (Bruno): validates Claire’s submitted June
     const claireRow = page.getByRole('row').filter({ hasText: 'Claire Dubois' });
     await claireRow.getByRole('button', { name: 'Valider' }).click();
 
+    // O4: "Valider" opens a recap before acting (`validate-confirm-dialog.tsx`) — confirmed here,
+    // rather than validating instantly the way this journey used to.
+    const confirmDialog = page.getByRole('dialog');
+    await confirmDialog.getByText('Valider le CRA de Claire Dubois ?').waitFor({
+      state: 'visible',
+    });
+    await confirmDialog.getByRole('button', { name: 'Valider' }).click();
+
     const validateDialog = page.getByRole('dialog');
     await validateDialog.getByText('Validation du CRA de Claire Dubois').waitFor({
       state: 'visible',
@@ -1113,6 +1189,12 @@ test.describe('J4 — billing-paris (Henri): issues the draft J2 created, with a
     await choosePersona(page, 'billing-paris');
     await page.goto('/factures');
 
+    // Item 6 (QA round 1) also densified this list to 31 rows, paginated 20 to a page — Claire's
+    // June Réunion invoice is not on the first page by default, so the search field narrows to
+    // the client first (its own three rows, well inside one page) rather than paginating.
+    await page.getByLabel('Rechercher').fill('Réunion');
+    await page.getByRole('button', { name: 'Rechercher', exact: true }).click();
+
     const reunionRow = page
       .getByRole('row')
       .filter({ hasText: 'Réunion Cyber Services' })
@@ -1121,24 +1203,29 @@ test.describe('J4 — billing-paris (Henri): issues the draft J2 created, with a
     await reunionRow.getByRole('link', { name: 'Ouvrir la facture' }).click();
     await page.waitForURL(/\/factures\/.+/u);
 
-    await page.getByRole('button', { name: 'Émettre la facture' }).click();
+    // `.first()`: the page header's own "Émettre" and the sticky recap bar's copy of the same
+    // action (`invoice-detail-screen.tsx`, kept there on purpose — B1's own split of jobs between
+    // the two bars) both carry this exact label; either one opens the same dialog.
+    await page.getByRole('button', { name: 'Émettre la facture' }).first().click();
     const dialog = page.getByRole('dialog');
     await dialog
       .getByText('Émettre la facture de Réunion Cyber Services')
       .waitFor({ state: 'visible' });
 
-    // The same key the confirm click is about to send — read off the DOM before confirming, the
-    // only way this test can reuse it afterwards: `IssuanceDialog` generates it once per open
-    // (`useState`'s initializer) and never exposes it any other way.
-    const idempotencyKey = await dialog
-      .getByText('Idempotency-Key', { exact: true })
-      .locator('xpath=following-sibling::span[1]')
-      .textContent();
-    if (idempotencyKey === null || idempotencyKey.length === 0) {
-      throw new FixtureAssumptionError('Expected the dialog to render its own Idempotency-Key.');
+    // The same key the confirm click is about to send — `IssuanceDialog` generates it once per
+    // open (`useState`'s initializer) but no longer renders it anywhere (it used to, in an
+    // "Idempotency-Key" row this dialog dropped); the request itself, intercepted before the
+    // click that fires it, is the only place left to read the real value from
+    // (`api.ts`'s `postIssuance` sends it as the lower-case `idempotency-key` header).
+    const issuanceRequest = page.waitForRequest(
+      (request) => request.url().includes('/issuance') && request.method() === 'POST',
+    );
+    await dialog.getByRole('button', { name: 'Émettre', exact: true }).click();
+    const idempotencyKey = (await issuanceRequest).headers()['idempotency-key'];
+    if (idempotencyKey === undefined || idempotencyKey.length === 0) {
+      throw new FixtureAssumptionError('Expected the issuance request to carry its own key.');
     }
 
-    await dialog.getByRole('button', { name: 'Émettre', exact: true }).click();
     const numberLocator = dialog.locator('.font-mono.font-medium');
     await numberLocator.waitFor({ state: 'visible' });
     const invoiceNumber = await numberLocator.textContent();
@@ -1263,7 +1350,15 @@ test.describe('J3 — manager-paris (Bruno): refuses the month Alice submitted i
       .getByText('Ce CRA a été refusé par le manager', { exact: false })
       .waitFor({ state: 'visible' });
     await page.getByRole('button', { name: 'Soumettre au manager' }).click();
-    await page.getByText('Soumis', { exact: true }).waitFor({ state: 'visible' });
+    // Not `Soumis à {time}`: see the same comment where this pattern first appears, above.
+    // `.first()`: this Cra was already submitted once in J1 before being refused, so the
+    // timeline now carries two "CRA soumis" entries once this resubmission lands — either one
+    // proves the same fact, and `.waitFor()` enforces strict mode the same as any other locator.
+    await page
+      .getByRole('listitem')
+      .filter({ hasText: 'CRA soumis' })
+      .first()
+      .waitFor({ state: 'visible' });
 
     await switchPersonaViaUi(page, 'manager-paris');
     await page.goto(`/pre-facturier?period=${EDIT_PERIOD}`);
@@ -1291,7 +1386,9 @@ test.describe('J3 — manager-paris (Bruno): refuses the month Alice submitted i
     await page
       .getByText('Ce CRA a été refusé par le manager', { exact: false })
       .waitFor({ state: 'visible' });
-    await expect(page.getByText(reason)).toBeVisible();
+    // Scoped to the banner: see the same comment where this pattern first appears, above (the
+    // timeline's own entry repeats the same reason as its `detail`).
+    await expect(page.getByRole('alert').getByText(reason)).toBeVisible();
   });
 });
 
@@ -1307,11 +1404,16 @@ test.describe('item 5 — the consultant dashboard names a refusal from another 
     await choosePersona(page, 'consultant-paris');
     await page.goto('/tableau-de-bord?period=2026-06');
 
-    await page
-      .getByText('Le CRA de septembre 2026 a été refusé', { exact: false })
-      .waitFor({ state: 'visible' });
+    // Scoped to the Alert, not a bare `getByText`/`getByRole('link')`: the same refusal also
+    // repeats as its own `WorkQueue` row (`dashboard-screen.tsx`'s `consultantQueue`), each with
+    // its own "Ouvrir ce CRA" link to the same route — the same "two legitimate copies of one
+    // fact" shape this file's other refusal/submission banners already carry.
+    const refusalAlert = page
+      .getByRole('alert')
+      .filter({ hasText: 'Le CRA de septembre 2026 a été refusé' });
+    await refusalAlert.waitFor({ state: 'visible' });
 
-    await page.getByRole('link', { name: 'Ouvrir ce CRA' }).click();
+    await refusalAlert.getByRole('link', { name: 'Ouvrir ce CRA' }).click();
     await page.waitForURL(`/cra/${EDIT_PERIOD}`);
   });
 });
