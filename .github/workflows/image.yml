@@ -102,6 +102,50 @@ jobs:
       - name: pull-and-redeploy.sh --dry-run does none of the five things ADR-0029 forbids it
         run: bash deploy/test/dry-run.sh
 
+      # --dry-run returns before its first `compose` call, so the job above never parses
+      # compose.prod.yml — until this step, no CI job loaded that file at all and a typo in it
+      # would have reached the host unchallenged. It also turns ADR-0030's credential split from
+      # a claim in a comment into an assertion: the app service must carry DATABASE_URL and must
+      # NOT carry MIGRATION_DATABASE_URL, which only the one-shot migrate and seed services hold.
+      - name: compose.prod.yml parses, and the app service holds no schema-owner credential
+        env:
+          IMAGE_REF: ghcr.io/clementvallois/maquette-erp@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          POSTGRES_DB: erp
+          POSTGRES_USER: erp_migration
+          POSTGRES_PASSWORD: ci-parse-only
+          APP_DB_USER: erp_app
+          APP_DB_PASSWORD: ci-parse-only
+          DATABASE_URL: postgres://erp_app:ci-parse-only@postgres:5432/erp
+          MIGRATION_DATABASE_URL: postgres://erp_migration:ci-parse-only@postgres:5432/erp
+          API_PUBLIC_ORIGIN: https://erp.clementvallois.fr
+          SESSION_SIGNING_KEY: ci-compose-parse-placeholder-key
+        run: |
+          docker compose -f deploy/compose.prod.yml config >/tmp/compose.resolved.yml
+
+          app_env="$(docker compose -f deploy/compose.prod.yml config --format json \
+            | jq -r '.services.app.environment | keys[]')"
+          echo "$app_env" | grep -qx DATABASE_URL
+          if echo "$app_env" | grep -qx MIGRATION_DATABASE_URL; then
+            echo "app service carries the schema-owner credential — ADR-0030 forbids it" >&2
+            exit 1
+          fi
+
+          # The other half of the same split: the one-shot services must actually have it.
+          # `--profile one-shot` is required to see them at all — without it `config` omits every
+          # service behind a profile, and an assertion on a service compose never emitted would
+          # pass by looking at nothing.
+          for one_shot in migrate seed; do
+            docker compose --profile one-shot -f deploy/compose.prod.yml config --format json \
+              | jq -e ".services.${one_shot}.environment.MIGRATION_DATABASE_URL" >/dev/null
+          done
+
+          # ADR-0030: the database publishes no port at all, not even on loopback.
+          if docker compose -f deploy/compose.prod.yml config --format json \
+            | jq -e '.services.postgres.ports' >/dev/null 2>&1; then
+            echo "postgres publishes a port — ADR-0030 says it publishes none" >&2
+            exit 1
+          fi
+
   publish:
     name: Publish the signed digest
     if: ${{ github.event_name == 'push' }}
