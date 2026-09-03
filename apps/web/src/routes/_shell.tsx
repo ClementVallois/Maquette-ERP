@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect, useRouterState } from '@tanstack/rea
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 
+import { DemoNotice } from '@/components/demo-notice';
 import type { PageHeaderParentCrumb } from '@/components/shell/page-header';
 import { Sidebar } from '@/components/shell/sidebar';
 import { Topbar } from '@/components/shell/topbar';
@@ -167,6 +168,7 @@ function ShellLayout(): ReactElement {
         />
         <main id="main-content" className="flex-1 overflow-y-auto">
           <div className="mx-auto flex max-w-[1360px] flex-col gap-6 px-3 py-4 sm:px-6 sm:py-6">
+            <DemoNotice />
             <Outlet />
           </div>
         </main>

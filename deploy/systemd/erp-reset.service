@@ -1,0 +1,10 @@
+[Unit]
+Description=Maquette ERP - nightly reset to the deterministic seed (ADR-0032)
+After=docker.service
+ConditionPathExists=/etc/erp-maquette/environment
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/erp-maquette/repo/deploy
+EnvironmentFile=/etc/erp-maquette/environment
+ExecStart=/opt/erp-maquette/repo/deploy/nightly-reset.sh

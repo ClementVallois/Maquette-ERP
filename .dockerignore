@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+node_modules
+**/node_modules
+coverage
+reports
+.stryker-tmp
+apps/web/.playwright-cache
+apps/web/tests/visual/report
+apps/web/tests/visual/test-results
+**/*.log

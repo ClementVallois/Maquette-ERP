@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
+import { DemoNotice } from '@/components/demo-notice';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
 import { RoleBadge } from '@/components/role-badge';
@@ -56,6 +57,8 @@ function PersonaSelectorPage(): ReactElement {
         </p>
         <h1 className="text-page-title">{LABELS.persona.heading}</h1>
       </header>
+
+      <DemoNotice />
 
       {/* Alert spreads props after its default role, so this explicit status role wins. ADR-0074. */}
       {session === 'invalidated' && (

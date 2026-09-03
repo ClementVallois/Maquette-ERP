@@ -1,0 +1,118 @@
+# The host-side composition (task 8.6). Two obligations ADR-0030 states plainly: nothing here
+# gets a capability merely because a neighbouring compose project on this host already has it, and
+# the schema-owner credential never reaches the long-running `app` service.
+#
+# `IMAGE_REF` is `ghcr.io/clementvallois/maquette-erp@sha256:…` — an immutable digest, never the
+# moving `:main` tag (ADR-0029). `pull-and-redeploy.sh` is the only writer of that variable; it is
+# not defaulted here on purpose, so a stray `docker compose up` with no digest chosen refuses to
+# start rather than silently resolving `:main` again.
+#
+# The `../docker/postgres/init` mount is the same two-role bootstrap the local `compose.yml` uses,
+# and it is the one bind mount ADR-0030's prohibition does not cover (ADR-0085). It is relative to
+# this file, so the deploy/ directory must stay inside the checkout for compose to resolve it.
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in /etc/erp-maquette/environment}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in /etc/erp-maquette/environment}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in /etc/erp-maquette/environment}
+      APP_DB_USER: ${APP_DB_USER:?set APP_DB_USER in /etc/erp-maquette/environment}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD in /etc/erp-maquette/environment}
+      TZ: UTC
+      PGTZ: UTC
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - erp-internal
+    # No `ports:` at all — not even loopback. The database has no consumer outside this compose
+    # project (ADR-0030); the host's own neighbouring services publish to loopback, and matching
+    # that convention here would buy connectivity nothing already needs.
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  app:
+    image: ${IMAGE_REF:?pull-and-redeploy.sh sets IMAGE_REF to an image digest before this runs}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - erp-internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # System nginx is the only public caller (ADR-0030); the app itself never faces the internet.
+      - '127.0.0.1:${APP_PORT:-3000}:3000'
+    environment:
+      # The least-privilege role only. MIGRATION_DATABASE_URL is never listed here — it exists
+      # solely in the `migrate` and `seed` one-shot services below.
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in /etc/erp-maquette/environment}
+      API_HOST: 0.0.0.0
+      API_PORT: 3000
+      API_PUBLIC_ORIGIN: ${API_PUBLIC_ORIGIN:?set API_PUBLIC_ORIGIN in /etc/erp-maquette/environment}
+      SESSION_SIGNING_KEY: ${SESSION_SIGNING_KEY:?set SESSION_SIGNING_KEY in /etc/erp-maquette/environment}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    # HEALTHCHECK is inherited from the image (Dockerfile); Compose reads it, so `--wait` on this
+    # service and `condition: service_healthy` elsewhere both work without redeclaring it here.
+
+  # One-shot containers, kept out of `docker compose up -d` by a profile no unit or script ever
+  # activates — they are started only by `compose run --rm <service>` (deploy/pull-and-redeploy.sh,
+  # deploy/nightly-reset.sh), which starts a named service regardless of active profiles. Both hold
+  # the schema-owner credential and nothing else the app service has.
+  migrate:
+    image: ${IMAGE_REF:?pull-and-redeploy.sh sets IMAGE_REF to an image digest before this runs}
+    profiles: ['one-shot']
+    networks:
+      - erp-internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:?set MIGRATION_DATABASE_URL in /etc/erp-maquette/environment}
+    command: ['node', 'scripts/migrate.ts']
+
+  seed:
+    image: ${IMAGE_REF:?pull-and-redeploy.sh sets IMAGE_REF to an image digest before this runs}
+    profiles: ['one-shot']
+    networks:
+      - erp-internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:?set MIGRATION_DATABASE_URL in /etc/erp-maquette/environment}
+    command: ['node', 'scripts/seed.ts']
+
+volumes:
+  postgres-data:
+
+networks:
+  erp-internal:

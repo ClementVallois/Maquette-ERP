@@ -1,0 +1,15 @@
+# Narrow sudoers rule for the `erp-deploy` Unix user (ADR-0030). Installed by
+# deploy/provision-host.sh at /etc/sudoers.d/erp-deploy, mode 0440, root-owned, validated with
+# `visudo -cf` before it is put in place — a syntax error here is a lockout, not a warning.
+#
+# Names only the five commands `erp-deploy` may run, and nothing else: it is not in the `docker`
+# group (docker group membership is root-equivalent on this host) and cannot edit these units, the
+# compose file or the secrets file it starts them with.
+Cmnd_Alias ERP_DEPLOY_UNITS = /usr/bin/systemctl start erp-deploy.service, \
+                               /usr/bin/systemctl start erp-deploy-rollback.service, \
+                               /usr/bin/systemctl start erp-reset.service, \
+                               /usr/bin/systemctl status erp-deploy.service, \
+                               /usr/bin/systemctl status erp-deploy-rollback.service, \
+                               /usr/bin/systemctl status erp-reset.service
+
+erp-deploy ALL=(root) NOPASSWD: ERP_DEPLOY_UNITS

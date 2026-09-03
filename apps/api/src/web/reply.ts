@@ -68,6 +68,8 @@ export function registerSecurityHeaders(app: FastifyInstance): void {
       // the CSRF control is unchanged and no referrer still leaves this instance.
       'referrer-policy': 'same-origin',
       'x-frame-options': 'DENY',
+      // ADR-0032: even printable synthetic invoices are demonstrator output, not search results.
+      'x-robots-tag': 'noindex, nofollow',
     });
     done(null, payload);
   });

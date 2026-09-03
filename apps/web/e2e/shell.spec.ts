@@ -63,6 +63,15 @@ async function navLabels(page: Page): Promise<string[]> {
 }
 
 test.describe('nav shows exactly the entries of the session role', () => {
+  test('the nightly reset remains visible after persona selection', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'one viewport is enough for this contract');
+
+    await choosePersona(page, 'consultant-paris');
+
+    await expect(page.getByRole('note')).toContainText('Données de démonstration');
+    await expect(page.getByRole('note')).toContainText('réinitialisée chaque nuit');
+  });
+
   test('consultant (Alice, consultant-paris): Tableau de bord, Mes CRA — nothing else', async ({
     page,
   }, testInfo) => {

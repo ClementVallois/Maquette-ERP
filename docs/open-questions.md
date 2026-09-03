@@ -45,6 +45,11 @@ moves down to "Settled" with its answer, so the record shows it was known rather
 | 28/08/2026 | **The vulnerability-management procedure (`docs/vulnerability-management.md`) has never been exercised**: its exception table is empty because `pnpm audit --audit-level=high` has never gone red since Phase 0, so the four-step decision it documents has no real precedent behind it. | If a real exception is ever needed, the procedure could turn out to be missing a case its author did not anticipate — the ordinary gap between a designed process and a used one. | **Half answered on 31/08/2026, three days after this row was written, on this phase's own pull request.** The `dependencies` job went red — not on `pnpm audit`, which passed, but on **osv-scanner, which has no severity floor**, over GHSA-q8mj-m7cp-5q26 (`qs` 6.15.1, CVSS 6.3, moderate) reaching the graph through **Stryker, the dependency this very phase added**. Two things came out of it. The first is that the procedure **described its own gate wrongly** — "a severity the audit tool itself already filtered for" was true of one of the job's two steps and false of the other; corrected in place, with the README's gate-table row, per the ADR-0045 rule that a description of the code is brought into line with the code. The second is that **step 2 (a fix is available: take it) is now exercised end to end**: `typed-rest-client@2.3.1` pins `qs` exactly, so the fix is a version-qualified `overrides` entry in `pnpm-workspace.yaml`, verified with the job's own digest-pinned scanner locally (`No issues found`). No severity floor was added — turning the gate green by lowering it is what the gate table refuses by name. **Still open**: step 3, the exception path, and the shape of the exception table, which stays correctly empty because a fix taken is not an exception. Same terms as before — no phase named, reopen the day an advisory arrives with no fix available. |
 | 31/08/2026 | **README's own reconsideration threshold for the pré-facturier's month picker (`Pagination du pré-facturier au-delà d'une page`) was reached by this branch's own seed, not by a hypothetical office.** `composition/pre-facturier.ts`'s `unit.cras.list({ actor, limit: MAX_MONTHS, offset: 0 })` (`MAX_MONTHS = 50`) is the query the month selector reads (`offeredPeriods`), ordered `period DESC`. Item 6 (QA round 1) gave Paris and Lyon dense June/July/August 2026 across 19 active consultants each (`select count(*) filter (where departure_date is null) from public.consultants where office_id = …`) — roughly three months' worth of rows per office before a single historical row is reached, enough alone to fill the fifty-row page before the query ever gets there. Verified against the live seed (`docker exec maquette-postgres-1 psql`): a fresh `db:reset && seed` gives Paris eight distinct periods (`2016-06`, `2018-06`, `2020-06`, `2022-06`, `2024-06`, `2026-06`, `2026-07`, `2026-08` — the dev database also carries a leftover `2026-09` row from an e2e run, `journeys.spec.ts`'s own fixture, not seed output, excluded from this count), and the top fifty rows by `period DESC` stop inside `2026-06` — the five historical veteran periods do not appear in `offeredPeriods` at all, for either office. | The picker's degradation is the one the README already names as expected in the ordinary case ("il peut donc omettre un mois ancien, jamais un mois récent") — nothing is broken in the sense of showing wrong data — but the README's own threshold for revisiting this ("une implantation dont les CRA dépassent une page") is now literally true for two of the four offices, and the prescribed fix (a dedicated query for the selector, plus visible pagination — not a higher cap) is unbuilt. This is a **discoverability** gap, not a reachability one: `preFacturierComposition` honors an explicit `requestedPeriod` regardless of `offeredPeriods` (`pre-facturier.ts`, the query is validated then passed straight through, and the composition's own comment says so — "the month asked for is offered even when this office has no Cra in it"), so `GET /api/v1/pre-facturier?period=2016-06` and the SPA's own `/pre-facturier?period=2016-06` both resolve correctly today. A manager or billing persona at Paris or Lyon who does not already know a historical period's exact value has no way to discover it from the picker; one who has it (a shared link, a support ticket, a direct read of `GET /api/v1/cras`) reaches it exactly as before. The manager dashboard's own use of this composition is unaffected: its default period is `offeredPeriods(recent)[0]`, always the most recent, and its `pendingDecisions`/`lateCras` reads are period-filtered at each office's current-month row count, well under the cap. | Not fixed here: item 6's own brief was seed volume plus `/api/v1/cras`'s own page cap (ADR-0081), a REST route with its own pagination contract — this is a different composition (`pre-facturier.ts`'s `MAX_MONTHS`, unaffected by ADR-0081) backing a screen with no visible pagination control at all, and the README's own prescribed fix is sized as a feature (dedicated selector query + visible pagination), not a constant bump. Resolve in the next phase that touches the pré-facturier screen: build the dedicated month-selector query (all distinct periods for the office, not a byproduct of a capped row page) named as the fix here and in the README's own threshold row, which now points back at this row. **Update, 01/09/2026 (item 5, QA round 2, ADR-0082): this row's own closing sentence is now stale, corrected here rather than rewritten in place — the manager dashboard's `pendingDecisions`/`lateCras` are exactly what ADR-0082 stopped period-filtering.** They no longer inherit this composition's cap silently — ADR-0082 reads them from `unit.cras.list` directly, capped at `CRA_LIST_MAX_PAGE_SIZE = 200` (ADR-0081's own number, not this row's `MAX_MONTHS = 50`), so the two figures are unaffected by the gap this row names. What ADR-0082 does **not** fix, and what this row's own subject now also blocks: the dashboard's "Ouvrir le pré-facturier" button still opens the _requested_ period specifically (default: now), so a manager whose pending item sits in an old period this row's picker cannot list has no click that reaches it — only a shared link or a direct `?period=` guess. Still resolved by the same fix this row already names (a dedicated month-selector query with visible pagination); no new phase to add. |
 | 01/09/2026 | **The README's front matter describes an application that no longer exists, and its quickstart 404s.** Four statements, all of them true before the front-end merge of 28/08/2026 and none of them since: « Où en est cette maquette » says the interactive React SPA is unwritten (it ships, and `apps/api/src/web/routes.ts` now registers two server-rendered pages, not seven); « Démarrer » gives `pnpm run setup` then `pnpm run api` and sends the reader to `http://127.0.0.1:3000/`, but never says to build the SPA, and `apps/api/src/web/spa.ts` serves the ordinary 404 when `apps/web/dist/index.html` is absent — which it is on every fresh clone, `dist/` being gitignored; « Cinq paquets » lists five where the README's own `pnpm run boundaries` prints six; and `docs/frontend-plan.md` and `docs/direction-visuelle.md` are advertised « en français comme ce README » while both are English. Found by the `cold-reader` pass of 01/09/2026, whose walk stalled on the 404 before it could read anything else. | The first instruction a stranger follows does not work, on the repository whose stated requirement is that it explains itself to a reader with no brief. A reader who gets a 404 on the URL the README calls the entry point concludes the mockup is broken; nothing on the page lets them diagnose otherwise. | **Open — Phase 9 (`docs/BUILD-PLAN.md`, the documentation review pass), before the repository link goes out.** Not fixed on `fix/qa-round-1` on purpose: the README's front matter is the narrative Clement authors, and rewriting it inside a QA-fix merge would put an unreviewed rewrite of the repo's showcase behind a batch of bug fixes. The build step in « Démarrer » is the one line of it that is a defect rather than a narrative choice, and Phase 9 takes it first. |
+| 03/09/2026 | **Nothing task 8.7 gathers into `deploy/provision-host.sh` has run against a real host.** The DNS propagation loop, the certbot webroot flow against the stub then real vhost, creating the `erp-deploy` Unix user, installing and validating the sudoers rule under a real `sudo` (only `visudo -cf` ran here), the `docker login ghcr.io` step, and both systemd timers actually firing on schedule — none of it is exercised, because there is no host reachable from this session. What **is** verified, for real, on this machine: every script's syntax (`bash -n`, shellcheck clean), the sudoers file (`visudo -cf`), the five systemd units (`systemd-analyze verify` — passes up to the host-only path `/opt/erp-maquette/repo` not existing here, which is expected), `deploy/compose.prod.yml` brought up end to end against a real PostgreSQL (two-role init, migrate, seed, the app reaching `/readyz` on the least-privilege credential only, `MIGRATION_DATABASE_URL` confirmed absent from the app container's own environment, and the postgres container confirmed to publish no port at all), the `nightly-reset.sh` `pg_dump` line producing a real, `pg_restore --list`-valid archive against that same seeded database, and `pull-and-redeploy.sh`'s three control-flow branches (readiness failure leading to an automatic rollback, a second failure terminating without looping; the first-ever-deploy bootstrap seeding; `--rollback` redeploying the recorded digest without touching the registry or reseeding) driven for real against a recording stub and a real local HTTP server standing in for `/readyz`. | A script that parses and a control-flow branch that behaves correctly in isolation are not the same claim as "the host provisioning actually works" — DNS, certbot, sudo enforcement and systemd's own scheduler are exactly the parts a syntax check cannot see. | **No phase named — the event is the first real deploy, which `docs/BUILD-PLAN.md`'s own Phase 8 checkpoint sentence already names as following the PR to `main`** ("PR to `main`, then the first real deploy"). Whoever runs `deploy/provision-host.sh` on the real VPS is the proof; nothing scheduled in this plan re-runs it for them. |
+| 03/09/2026 | **`pull-and-redeploy.sh` treats an empty `$STATE_DIR/current-digest` as "this is the very first deployment ever" and seeds accordingly (ADR-0032's bootstrap case) — but the file being empty and the deployment being first are two different facts, and only one of them is checked.** If `$STATE_DIR` (root-only, `/var/lib/erp-deploy`) is ever lost or reset independently of the Postgres data volume — a disk issue, an operator `rm -rf` while debugging, a host migration that forgets one of the two paths — the next tick of `erp-deploy.timer` reads that same absence and reseeds a database that was never actually empty. | A visitor's demonstration and the current day's data disappear outside the nightly 03:30 Europe/Paris window ADR-0032 names, on a trigger that is not "the first real user, the first non-synthetic datum, or a scheduled reset" — it is an unrelated state-directory accident treated as a first-deploy signal. Bounded by ADR-0032 itself (synthetic data only, no durability promised), but still a wider blast radius than the ADR's own reconsideration list anticipates. | **No phase named — nothing currently owns hardening "first deployment" detection beyond state-file presence.** A stronger signal exists (query `schema_migrations`, or a marker table, through the already-open migration connection instead of trusting a host file) but is a real design change to `pull-and-redeploy.sh`, not a one-line fix invented here to close the row. Reopen at the first time `$STATE_DIR` is actually lost, or the next phase that touches this script for another reason. |
+| 03/09/2026 | **`nightly-reset.sh`'s `pg_dump` step has no timeout, and it is the first thing the reset does under `set -e`.** `compose exec -T postgres pg_dump … >"$dump_file.tmp"` runs with no time budget of its own and no `TimeoutStartSec=` on `erp-reset.service`, so systemd's default (`DefaultTimeoutStartSec`, 90s on a stock Debian) is what actually bounds it — a number nobody in this phase chose. It also holds the blocking `flock` on `$STATE_DIR/deploy.lock` for its whole duration, which `pull-and-redeploy.sh` waits on. | A dump slow enough to hit that unchosen budget kills the unit before `migrate` and `seed` ever run, so the nightly reset of ADR-0032 silently does not happen, and `erp-deploy.timer`'s next tick blocks behind the lock until the same kill releases it. The only trace is `journalctl -u erp-reset`, which nothing surfaces to a human who is not already looking. | **No phase named — the trigger is measurable only on a live instance.** Reopen the first time a real reset run is slow enough to matter, or the first time `erp-reset.service` reports a failure. The dataset is the deterministic seed and its dump takes well under a second locally (188 `pg_restore --list` TOC entries), so choosing a timeout now would be picking a second unmeasured number to bound the first. |
+| 03/09/2026 | **`erp-deploy.timer`'s 5-minute poll and `pull-and-redeploy.sh`'s 30 × 2s readiness budget are both picked, not measured.** Nothing in this phase profiled how long this application takes to reach `/readyz` under a real VPS's I/O, as opposed to a laptop's Docker daemon; `READY_RETRIES=30` / `READY_INTERVAL=2` gives 60 seconds, and the local evidence behind it is a container a few hundred milliseconds from its database. | The failure is not a slow deploy, it is a **false rollback**: a healthy new digest that needs 70 seconds on the host is declared failed, `deploy_digest` redeploys the digest it displaced, and the timer re-attempts the same doomed transition every 5 minutes — an outage caused by the recovery path, not by the release. | **No phase named — the number cannot be chosen without the host it describes.** Reopen the first time a real deploy is rolled back automatically, and set both figures from the measured `/readyz` time rather than a second guess. Both are already environment overrides (`READY_RETRIES`, `READY_INTERVAL`, and the timer's `OnUnitActiveSec`), so the correction is a value change on the host, not a code change. |
+| 03/09/2026 | **The host's GHCR read token lands in `/root/.docker/config.json`, which is wider than the sentence ADR-0030 wrote for it.** `deploy/provision-host.sh`'s stage 6 runs `docker login ghcr.io` as root, and root's docker config is read by every rootful `docker` invocation on this box — including the neighbouring services ADR-0030 exists to be isolated from. ADR-0030 § Credential split says the token "exists only where image resolution and pull need it". Base64 in that file is encoding, not encryption. A second, unverified assumption sits under it: the wizard instructs a fine-grained PAT "scoped to this repository only", and whether GitHub's Packages read permission is genuinely repository-scoped rather than account-scoped was not confirmed — if it is account-scoped, the isolation claim is weaker than the instruction implies. | A read-only token for one private package is a small prize, but it is a credential placed in a shared location by a phase whose central argument is that no credential is placed where it is not needed. The choice of storage was made inside a `fix` commit with no ADR and no reconsideration threshold, which is the part that does not match how this repository decides things. | **Clement's decision, and the first one this phase leaves open rather than settles.** Three ways out, in rising cost: make the GHCR _package_ public (its visibility is separate from the repository's, so this removes the credential entirely and is the only option that ends the question); keep the login and write the ADR that records the location, its blast radius and the threshold at which it moves; or give the pull its own credential store away from root's config. Reopen before the first deploy — this is on the go-live path, not after it. |
 ---
 
 ## Front-end Phase 1 checkpoint — `feat/web`, 24/08/2026
@@ -3882,3 +3887,212 @@ control they just used; the timeline's "CRA soumis" entry and the immutability b
 actually appear, and the journeys now wait on those. Small, real, and a UI-feedback decision rather
 than a defect with one obvious fix: the bar could survive the transition, or the submit action
 could own its own confirmation. **Phase 10.1** decides it, with the rest of the final checkpoint.
+
+## Phase 8 checkpoint — `feat/deploy`, 03/09/2026
+
+The two questions `CLAUDE.md` and `docs/BUILD-PLAN.md`'s "Conventions that apply to every phase"
+require, asked of the whole phase: 8.1–8.4 (the four ADRs, done and committed before this session
+started), 8.5 (the image, found broken and fixed this session), 8.6 (the host composition, the
+redeploy script, the nightly reset, the CI dry-run) and 8.7 (the guided wizard).
+
+### Which tasks ran
+
+8.5 was written but uncommitted and unverified at the start of this session; it is now built,
+booted under CI's exact restrictions, fixed (see the first point below) and committed. 8.6 and 8.7
+are both fully written and committed. 8.8 (the README saying plainly what is and is not deployed)
+ran as a small, targeted edit — see the evidence section.
+
+### 1. Where am I least confident in what I just produced
+
+1. **`apps/web/dist` was silently absent from the deployed image, and `/healthz` could not have
+   caught it.** `pnpm deploy --legacy` copies package contents the way `pnpm pack` would, which
+   honours `.gitignore` — `dist/` is gitignored as a build artifact everywhere else in this
+   repository too (the README's own quickstart hit the identical class of bug, row of 01/09/2026
+   above). `/healthz` deliberately probes nothing (`apps/api/src/routes/ops.ts`), so the CI `verify`
+   job the previous agent wrote would have gone green on an image that served no SPA at all. →
+   **fix now**: the Dockerfile copies `apps/web/dist` explicitly after `pnpm deploy`, and
+   `.github/workflows/image.yml`'s `verify` job now asserts the SPA shell and a scraped asset both
+   answer 200 through the same hardened container — the assertion that would have caught it, not
+   only that the process is alive. Commits `a15ffec`, `c49f8e1`.
+2. **The wizard's first draft never provisioned a GHCR read credential**, although ADR-0029 says in
+   as many words that "the GHCR read credential, while the package is private, exists on the host
+   only" — this repository is private, so its published image is too, and without that credential
+   the very first `docker buildx imagetools inspect` on the host refuses. Caught by this same
+   checkpoint discipline before being reported, not by an external reviewer. → **fix now**: a stage
+   added to `deploy/provision-host.sh` (`docker login ghcr.io` as root, persisted for every
+   systemd oneshot unit that already runs as root). Commit `274b05c`.
+3. **Whether reusing `docker/postgres/init/01-roles.sh` as a read-only bind mount contradicts
+   ADR-0030's "no host bind mount"**, considered and decided rather than left implicit:
+   ADR-0030's sentence sits in the "Container privilege" bullet, about the _data_ path — "Postgres
+   uses its vendor non-root process and a named data volume, with no host bind mount" — not about
+   a root-owned, read-only, few-line SQL bootstrap script, and `docs/BUILD-PLAN.md`'s own 8.6 text
+   already says the Phase 3 two-role split "holds in production". → **fix now, not a new ADR**: the
+   reasoning is written where the mount is declared (`deploy/compose.prod.yml`'s header comment)
+   and restated in the commit message (`cdc0a43`), rather than left for a reader to reconstruct.
+   Verified empirically, not just argued: the real bind mount, against a real Postgres, produced
+   both roles correctly (`\du`).
+4. **Nothing in `deploy/` has run against a real host** — DNS, the certificate, the `erp-deploy`
+   user, the sudoers rule under real `sudo`, both systemd timers actually firing, the registry
+   login. → **a row in `docs/open-questions.md`** (added above, 03/09/2026): no phase is named,
+   because the event that closes it is the first real deploy, which `docs/BUILD-PLAN.md`'s own
+   Phase 8 checkpoint sentence already names ("PR to `main`, then the first real deploy").
+5. **`pull-and-redeploy.sh` infers "this is the first deployment ever" from one fact — the state
+   directory is empty — that can also be true for a different reason: the state directory was
+   lost while the database was not.** A real design question (a stronger signal exists — reading
+   `schema_migrations` through the migration connection instead of trusting a host file — but
+   implementing it here would be inventing a fix for a risk this checkpoint exists to name, not to
+   silently absorb). → **a row in `docs/open-questions.md`** (added above, 03/09/2026): no phase
+   named, reopen at the first time the state directory is actually lost, or the next phase that
+   touches this script.
+6. **The three control-flow branches of `pull-and-redeploy.sh` (auto-rollback on a failed
+   readiness check, the first-deploy seed, `--rollback`) were driven against a recording stub and
+   a real local HTTP server, not against real containers going genuinely unhealthy.** The
+   individual mechanics each branch calls (`compose run --rm migrate`, `compose run --rm seed`,
+   `compose up -d --no-deps app`, `/readyz`) were separately verified for real in the previous
+   commit's e2e pass; the branch logic that decides _which_ of them runs, and in what order, was
+   verified only against the stub. → **fix now, already done**: this is the reason the stub tests
+   exist at all rather than reading the script and trusting it — see the evidence section for the
+   three transcripts.
+
+### 2. In three months, what breaks if I leave it as it is
+
+- **The nightly reset's `pg_dump` step assumes `docker compose exec -T postgres pg_dump` always
+  succeeds fast enough inside the timer's own timeout budget.** No timeout is set on that step in
+  `nightly-reset.sh`; a stalled dump (a lock, a very large future dataset) blocks migrate and seed
+  behind it under `set -e`, and the failure is visible only in `journalctl`, not surfaced anywhere
+  a human would look without being told to. → **a row in `docs/open-questions.md`**: no phase
+  named — reopen the first time a real reset run is slow enough to matter, which needs a live
+  instance to observe.
+- **The `erp-deploy.timer`'s 5-minute poll interval and the readiness wait's 30×2s budget are both
+  picked, not measured** — nothing in this phase profiled how long this application actually takes
+  to become ready under real host I/O, as opposed to a laptop's Docker daemon a few hundred
+  milliseconds from the containers it drives. → **a row in `docs/open-questions.md`**: no phase
+  named, reopen the first time a real deploy times out before `/readyz` answers.
+- **The nginx vhost templates were never checked with a real `nginx -t`** — nginx is not installed
+  in this environment. Syntax was written carefully against standard, well-documented directives
+  (rate-limit zones, the certbot-issued cert paths, security headers) but that is a claim about
+  care, not a claim this repository can verify the way it verifies everything else. → already
+  named in the row above (point 4) as part of "nothing has run against a real host"; not
+  duplicated as a second row.
+
+### Which tasks did not run, and why
+
+**Every sub-task that requires a real, internet-reachable host with DNS control did not run, and
+could not have**: the DNS record itself, `certbot certonly --webroot`, creating the `erp-deploy`
+Unix account and exercising its sudoers rule under real `sudo`, installing and enabling the
+systemd units against a real `systemd --system` instance, either timer's schedule actually firing,
+and `docker login ghcr.io` / `docker buildx imagetools inspect` against the real, private GHCR
+registry (the image has never been published — that only happens on a merge to `main`, per
+ADR-0029, and this branch was deliberately not merged or pushed). `deploy/provision-host.sh` was
+traced by hand and never executed, per the wizard skill's own instruction and this task's
+instruction that nothing may run against a real host from here.
+
+**Everything that could be verified without a real host ran, and was verified empirically rather
+than by reading**: the image build and CI boot recipe (found and fixed the `apps/web/dist`
+regression), `deploy/compose.prod.yml` brought up for real against a real PostgreSQL through the
+full migrate → seed → app → `/readyz` sequence, the credential split and the zero-published-ports
+claim both confirmed by inspecting the running containers rather than trusting the YAML,
+`nightly-reset.sh`'s `pg_dump` line producing a real restorable archive, all five systemd units'
+syntax, the sudoers file's syntax, and the three control-flow branches of the redeploy script.
+
+### Evidence
+
+- Dockerfile fix and CI `verify` job's SPA assertions: commits `a15ffec`, `c49f8e1`.
+- `deploy/compose.prod.yml` end to end: `docker compose -f deploy/compose.prod.yml up -d --wait
+postgres` (roles confirmed via `\du`), `run --rm migrate` (12 migrations applied), `run --rm
+seed` (full dataset, `48` consultants, `147` validated CRAs, `66` invoices), `up -d --no-deps
+app` reaching `{"status":"ready"}` on `/readyz`, `docker exec app env | grep -i migration`
+  returning nothing, `docker port` on the postgres container returning nothing. Commit `cdc0a43`.
+- `nightly-reset.sh`'s dump line: `pg_dump --format=custom` against that same seeded database,
+  confirmed with `pg_restore --list` (188 TOC entries, real archive, not an empty or truncated
+  file). Commit `8945026`.
+- `pull-and-redeploy.sh`'s three branches, against `DOCKER` stubbed to a recording script and
+  `READY_URL` pointed at a real local HTTP server: (1) a deploy to a new digest whose readiness
+  never succeeds triggers exactly one auto-rollback attempt to the displaced digest, and a second
+  failure there terminates with "manual intervention required" rather than recursing again; (2)
+  an empty state directory triggers the seed one-shot before the app comes up, and records no
+  previous digest; (3) `--rollback` redeploys the recorded previous digest without ever calling
+  `buildx imagetools inspect` (the registry is never touched) and without reseeding, and swaps the
+  current/previous digest files symmetrically. Commit `39d56e6`.
+- `deploy/test/dry-run.sh` (the CI-exercised dry-run assertion): passes against
+  `deploy/test/fake-docker.sh`, checking ADR-0029's five listed absences individually rather than
+  only the exit code. Commit `8ad6ffd`.
+- **Corrected 03/09/2026 (review pass), because this line was never true**: it read "shellcheck
+  clean on every `.sh` file this phase added". No shellcheck binary exists in this environment, so
+  the check did not run, and when it was actually run — through a digest-pinned container — it was
+  not clean: two SC2034s, an unused `RED` in the wizard and a counter variable in
+  `wait_for_ready`. Both are now fixed, and the check is a CI job (`.github/workflows/ci.yml`,
+  `shell`) rather than a claim about what someone ran locally, because this phase gave bash more
+  privilege than anything else in the repository and semgrep does not read it. `visudo -cf` clean
+  on `deploy/erp-deploy.sudoers`,
+  `systemd-analyze verify` clean on all five units up to the host-only path not existing here
+  (expected), `docker compose -f deploy/compose.prod.yml config` clean, `pnpm exec prettier
+--check` clean on every YAML file touched.
+- README: the "pas encore" paragraph now says the deployment files exist and are locally verified,
+  and states explicitly that nothing has run on the real host yet — no claim of a live instance.
+
+### Correction, 03/09/2026 — `nightly-reset.sh` would have died on its first host run
+
+Found by `advisor()`, checked empirically before believing it. `deploy/compose.prod.yml` declares
+`image: ${IMAGE_REF:?…}` on `app`, `migrate` and `seed`, and Compose interpolates every `${VAR}` in
+the file on **any** subcommand — `exec` and `ps` included, not only `up`/`run`. The `pg_dump` line
+was the one compose call in this phase with no `IMAGE_REF` set, because on the real host `IMAGE_REF`
+lives in neither the shell environment nor `/etc/erp-maquette/environment` — the wizard deliberately
+never writes it, since `pull-and-redeploy.sh` supplies it per invocation. Reproduced first:
+`docker compose -f deploy/compose.prod.yml --env-file <a file with none of the keys the wizard never
+writes, i.e. no IMAGE_REF> ps` refuses to interpolate at all. This session's own earlier evidence for
+this script rested on env files that happened to carry `IMAGE_REF` — more generous than what the
+host actually provides, which is exactly how the gap passed unnoticed.
+
+**Fixed now**: `nightly-reset.sh` reads `current_digest` (already required before the dump runs)
+and `export`s `IMAGE_REF="$IMAGE@$current_digest"` once, before the dump — not only prefixing the
+`migrate`/`seed` calls that come after it, the way the previous version did. Re-verified for real,
+end to end, against an env file holding exactly the keys `deploy/provision-host.sh` writes (no
+`IMAGE_REF` anywhere): `compose ... up -d --wait postgres`, `run --rm migrate`, `run --rm seed` to
+seed a starting dataset, then a full `nightly-reset.sh` run — dump (`pg_restore --list`-valid, 188
+TOC entries), migrate (correctly a no-op the second time), reseed (full dataset again) — all
+succeeding with `IMAGE_REF` absent from the script's own env file and present only via the `export`
+this fix adds. Commit follows this one.
+
+### Review pass, 03/09/2026 — what a second reader found after this checkpoint was written
+
+`f141c9b` set the precedent that a defect found after the checkpoint is appended here rather than
+edited into the record above. Six more were found by a review pass over the whole phase — a
+`rules-auditor` run on the diff, which `CLAUDE.md` requires before a merge to `main`, plus an
+independent rebuild and boot of the image. They are listed because the pattern across them matters
+more than any single one: **every defect below is on a path that no test and no gate ever
+executes**, which is exactly where this phase's own point 4 said its confidence was lowest.
+
+1. **The wizard would have died on its first real run with both plaintext database passwords left
+   in `/tmp`** (`99cbf9a`). Nothing created `/etc/erp-maquette`, `install` does not create leading
+   directories, and `set -e` skipped the cleanup on the way out. Reproduced before fixing.
+2. **The wizard promised persistence it did not have** (`99cbf9a`): the banner said re-running
+   remembers saved values, and no stage ever called `write_env`.
+3. **nginx silently overrode the app's referrer policy** (`c906d1a`), detailed in its own commit.
+4. **The checkpoint's shellcheck evidence was untrue** (`49d95d9`), and the check is now a CI job
+   (`837aab9`) rather than a claim — it found two real warnings on its first run.
+5. **No CI job parsed `deploy/compose.prod.yml` at all** (`c9af0de`). ADR-0030's credential split
+   rested on one manual `docker exec … env` in a commit message; it is now asserted, along with
+   the parse itself and the no-published-port rule.
+6. **Two dead `gh secret set` helpers** sat in the wizard of the phase whose ADR-0029 is that CI
+   holds no credential (`f56e78a`).
+
+Two findings are **not** fixed here because they are Clement's to decide, not the agent's:
+
+- **The GHCR token's storage location** — new row above, dated today, on the go-live path.
+- **`deploy/compose.prod.yml`'s bind mount of `../docker/postgres/init` against ADR-0030's "no
+  host bind mount".** Point 3 of this checkpoint resolved it "fix now, not a new ADR" and wrote
+  five lines of reasoning into the compose file's header. The audit's objection is exact and
+  stands: reasoning of that kind belongs in an ADR by this repository's own comment rule, and
+  reading ADR-0030's sentence as covering only the _data_ path narrows what that ADR permits —
+  which is a decision moving, and ADR-0045 sends a moved decision to a new ADR. Either the
+  narrowing is written down as one, or the mount goes and the init script is baked into the image.
+  Left open deliberately: the code is safe as it stands, and this is an authorship question about
+  where a decision lives.
+
+One finding is recorded and **cannot** be fixed: the phase's commits put implementation before
+test in the two places where the split makes the order visible (`39d56e6` before `8ad6ffd`,
+`a15ffec` before `c49f8e1`). `docs/BUILD-PLAN.md` § "What the history shows about test-first"
+already says this repository cannot prove test-first from its history; this phase is the first
+place the history actively shows the reverse. Rewriting the commits to hide that would be worse
+than the record.

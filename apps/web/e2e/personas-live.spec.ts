@@ -60,6 +60,9 @@ test('the four seed personas render, fetched live through the dev proxy', async 
 
   await page.goto('/');
 
+  await expect(page.getByRole('note')).toContainText('Données de démonstration');
+  await expect(page.getByRole('note')).toContainText('réinitialisée chaque nuit');
+
   // Waits on state, never on a delay or on `networkidle` (frontend-plan.md rule 0bis.9):
   // `networkidle` would pass just as well on an empty list rendered before the fetch settles.
   const alice = page.locator('[data-persona-key="consultant-paris"]');

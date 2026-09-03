@@ -319,6 +319,14 @@ describe('security headers', () => {
     expect(response.headers['referrer-policy']).toBe('same-origin');
   });
 
+  it('keeps every representation out of search indexes', async () => {
+    for (const url of [STYLESHEET.path, '/api/v1/personas', '/api/v1/nope']) {
+      const response = await app.inject({ method: 'GET', url });
+
+      expect(response.headers['x-robots-tag']).toBe('noindex, nofollow');
+    }
+  });
+
   /**
    * The regression guard for 23/08/2026, when `no-referrer` made every screen unusable.
    *

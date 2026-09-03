@@ -141,6 +141,23 @@ pnpm workspaces · a persona selector instead of authentication, announced as su
 Elasticsearch, Terraform, Kubernetes, microservices, any ORM, any decimal library, any job queue,
 Vue, PDF generation, OpenTelemetry, Testcontainers.
 
+## Deployment
+
+- The public mockup is one OCI image at `erp.clementvallois.fr`. Deployment controls are part of
+  this repository now that the mockup is hosted (**ADR-0028**); sovereign or certified hosting for
+  a target ERP is not claimed.
+- Build and deploy are separate authorities. CI may build, attest and publish an image after a
+  merge to `main`; it never connects to the host and holds no SSH key, VPS token, production
+  database credential or runtime secret. GitHub's ephemeral, repository-scoped token may publish
+  to GHCR. The host pulls by immutable digest (**ADR-0029**).
+- Host isolation is a rule, not an operator convention: a dedicated unprivileged Unix user, narrow
+  systemd permissions, an unpublished database network, a hardened non-root container, a dedicated
+  nginx vhost and host-only secret files (**ADR-0030**).
+- DNS, certificates, Unix users, sudoers and files under `/etc` are human-operated host changes.
+  The repository documents and validates their reproducible inputs; CI never applies them.
+- The public instance contains synthetic data only. Its lifecycle and reset policy are decided by
+  ADR-0032 before host-side deployment is implemented.
+
 ## Working discipline
 
 - **Do not add a dependency.** Propose one, with the evaluation grid (maintainers, activity,
