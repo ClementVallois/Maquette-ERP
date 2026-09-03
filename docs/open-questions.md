@@ -4090,6 +4090,23 @@ Two findings are **not** fixed here because they are Clement's to decide, not th
   Left open deliberately: the code is safe as it stands, and this is an authorship question about
   where a decision lives.
 
+**A seventh, found on 03/09/2026 by deploying the published image for real.** Once the GHCR
+package was made public, the whole chain was run end to end from this machine against the real
+registry — `pull-and-redeploy.sh` resolving a digest from GHCR (its own `awk` parse, not a stub),
+migrations and seed as one-shot containers, the app reaching `/readyz`, and `nightly-reset.sh`
+producing a `pg_restore`-valid dump — all against `ghcr.io/clementvallois/maquette-erp@sha256:ca4480…`
+rather than a locally built image. Everything held except one thing, and only because a port
+collision produced it by accident: a deploy that fails **after** creating the app container leaves
+one whose configuration has not changed, so the next attempt's `compose up -d --no-deps app`
+**started the wreckage instead of replacing it**. The container came up healthy, attached to no
+network, unable to resolve `postgres`, and failed readiness for a reason that had nothing to do
+with the digest being deployed — on the recovery path, which is the one path where a misleading
+cause costs the most. Fixed with `--force-recreate`, and verified by reproducing the broken state
+deliberately (detaching the running container from its network, confirming `/readyz` 503) and
+watching the redeploy replace it with a new container id and a 200. This is the third defect this
+phase found by _running_ something rather than reading it, and all three were on paths no test
+reaches.
+
 One finding is recorded and **cannot** be fixed: the phase's commits put implementation before
 test in the two places where the split makes the order visible (`39d56e6` before `8ad6ffd`,
 `a15ffec` before `c49f8e1`). `docs/BUILD-PLAN.md` § "What the history shows about test-first"
