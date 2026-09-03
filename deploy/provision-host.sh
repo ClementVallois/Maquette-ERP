@@ -166,7 +166,7 @@ finish() {
 # Replace the example below. Set TOTAL_STAGES to match the stages you write.
 # ──────────────────────────────────────────────────────────────────────────
 
-TOTAL_STAGES=7
+TOTAL_STAGES=8
 
 # This wizard never persists an answer into the repository's own `.env` — that file is app
 # configuration (`.env.example`), not host secrets. `ask`'s reuse-on-rerun cache, when used below,
@@ -180,6 +180,7 @@ STATE_DIR="/var/lib/erp-deploy"
 BACKUP_DIR="/var/backups/erp-maquette"
 SECRETS_DIR="/etc/erp-maquette"
 SECRETS_FILE="$SECRETS_DIR/environment"
+IMAGE_TAG_REF="ghcr.io/clementvallois/maquette-erp:main" # what pull-and-redeploy.sh resolves
 
 # run "description" cmd [args...] — print the exact command, then execute it only after an
 # explicit yes. A "no" records the step as skipped (shown in the closing summary) instead of
@@ -225,7 +226,25 @@ else
   done
 fi
 
-# ── Stage 2 — the erp-deploy user ───────────────────────────────────────────────────────────────
+# ── Stage 2 — the GHCR package is public ────────────────────────────────────────────────────────
+stage "The GHCR package's visibility"
+say "ADR-0084: the package is public, so this host pulls anonymously and stores no registry"
+say "credential. A package's visibility is separate from its repository's and does NOT follow it,"
+say "so making the repository public did not do this — and GitHub exposes no API for it, which is"
+say "why it is a step here rather than a line of script."
+step "Open the package's settings, scroll to \"Danger Zone\" → \"Change package visibility\","
+step "choose Public, and confirm by typing the package name."
+open_url "https://github.com/users/ClementVallois/packages/container/maquette-erp/settings"
+pause "Done? Press Enter to verify it from this host."
+if docker buildx imagetools inspect "$IMAGE_TAG_REF" >/dev/null 2>&1; then
+  say "the host resolves $IMAGE_TAG_REF anonymously — the deploy timer will be able to pull."
+else
+  warn "still cannot resolve $IMAGE_TAG_REF anonymously."
+  warn "Until this is public, every erp-deploy.timer tick will fail to resolve a digest."
+  SKIPPED+=("GHCR package visibility — set it to Public before the first deploy")
+fi
+
+# ── Stage 3 — the erp-deploy user ───────────────────────────────────────────────────────────────
 stage "The erp-deploy Unix user (ADR-0030)"
 say "System account, no login shell, no home directory, and — deliberately — not in the docker"
 say "group: docker group membership is root-equivalent on a host that also holds unrelated data."
@@ -236,7 +255,7 @@ else
     useradd --system --no-create-home --shell /usr/sbin/nologin erp-deploy
 fi
 
-# ── Stage 3 — sudoers ────────────────────────────────────────────────────────────────────────────
+# ── Stage 4 — sudoers ────────────────────────────────────────────────────────────────────────────
 stage "The narrow sudoers entry"
 say "Lets erp-deploy start exactly the deploy, rollback and reset units — nothing broader."
 if [[ -f "$DEPLOY_DIR/erp-deploy.sudoers" ]]; then
@@ -248,7 +267,7 @@ else
   warn "run this wizard again once the repository is in place."
 fi
 
-# ── Stage 4 — repository checkout and systemd units ─────────────────────────────────────────────
+# ── Stage 5 — repository checkout and systemd units ─────────────────────────────────────────────
 stage "The repository checkout and systemd units"
 say "The units in deploy/systemd/ point at $DEPLOY_DIR — that path is what gets installed, not"
 say "wherever this script happens to be running from."
@@ -268,7 +287,7 @@ else
   warn "$DEPLOY_DIR/systemd not found — the checkout above did not complete as expected."
 fi
 
-# ── Stage 5 — production secrets ─────────────────────────────────────────────────────────────────
+# ── Stage 6 — production secrets ─────────────────────────────────────────────────────────────────
 stage "The production secrets file"
 say "Written once, root-owned, mode 0600 — the app container never sees the whole file (ADR-0030):"
 say "compose.prod.yml lists only the variables each service actually needs."
@@ -332,7 +351,7 @@ fi
 # anonymously and stores nothing. A `docker login` here would be the one long-lived credential on
 # this box, guarding an image whose whole content is this repository's synthetic demonstrator.
 
-# ── Stage 6 — TLS certificate ────────────────────────────────────────────────────────────────────
+# ── Stage 7 — TLS certificate ────────────────────────────────────────────────────────────────────
 stage "The TLS certificate"
 say "/etc/letsencrypt/live currently holds only the apex domain — this issues a separate"
 say "certificate for erp.clementvallois.fr, obtained before the real vhost can reference it."
@@ -356,7 +375,7 @@ else
     -d erp.clementvallois.fr
 fi
 
-# ── Stage 7 — the real nginx vhost, and going live ──────────────────────────────────────────────
+# ── Stage 8 — the real nginx vhost, and going live ──────────────────────────────────────────────
 stage "The real nginx vhost, and starting the timers"
 say "Replaces the stub with the full vhost: security headers, a rate limit, X-Robots-Tag on"
 say "everything nginx itself answers, proxying to the app's loopback port only (ADR-0030)."
