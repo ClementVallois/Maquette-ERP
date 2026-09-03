@@ -10,6 +10,10 @@
 # The `../docker/postgres/init` mount is the same two-role bootstrap the local `compose.yml` uses,
 # and it is the one bind mount ADR-0030's prohibition does not cover (ADR-0085). It is relative to
 # this file, so the deploy/ directory must stay inside the checkout for compose to resolve it.
+# Without this, Compose derives the project name from the directory, which is literally `deploy` —
+# a name with no owner on a host that already runs other compose projects side by side.
+name: erp-maquette
+
 services:
   postgres:
     image: postgres:18-alpine

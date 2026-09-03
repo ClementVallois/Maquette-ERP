@@ -351,28 +351,22 @@ fi
 # anonymously and stores nothing. A `docker login` here would be the one long-lived credential on
 # this box, guarding an image whose whole content is this repository's synthetic demonstrator.
 
-# ── Stage 7 — TLS certificate ────────────────────────────────────────────────────────────────────
+# ── Stage 7 — the TLS certificate (verified, never issued) ──────────────────────────────────────
 stage "The TLS certificate"
-say "/etc/letsencrypt/live currently holds only the apex domain — this issues a separate"
-say "certificate for erp.clementvallois.fr, obtained before the real vhost can reference it."
-if [[ -d /etc/letsencrypt/live/erp.clementvallois.fr ]]; then
-  say "A certificate for erp.clementvallois.fr already exists — nothing to do."
+say "ADR-0087: this vhost uses the host's existing WILDCARD certificate and issues none of its own."
+say "A certificate named for this hostname would publish it in Certificate Transparency logs — the"
+say "very thing the catch-all default server on this box exists to prevent. So this stage checks,"
+say "and refuses to pretend, but never runs certbot."
+cert="/etc/letsencrypt/live/clementvallois.fr/fullchain.pem"
+if sudo test -f "$cert" && sudo openssl x509 -in "$cert" -noout -checkend 0 >/dev/null 2>&1 &&
+   sudo openssl x509 -in "$cert" -noout -text 2>/dev/null | grep -q "DNS:\*\.clementvallois\.fr"; then
+  say "wildcard certificate found, covering *.clementvallois.fr."
+  note "expires: $(sudo openssl x509 -in "$cert" -noout -enddate 2>/dev/null | cut -d= -f2)"
 else
-  run "Create the ACME webroot" install -d -o www-data -g www-data -m 0755 /var/www/erp-certbot
-  if [[ -f "$DEPLOY_DIR/nginx/erp.clementvallois.fr.acme-stub.conf" ]]; then
-    run "Install the temporary HTTP-only stub vhost" \
-      install -m 0644 "$DEPLOY_DIR/nginx/erp.clementvallois.fr.acme-stub.conf" \
-      /etc/nginx/sites-available/erp.clementvallois.fr
-    run "Enable the stub vhost" \
-      ln -sf /etc/nginx/sites-available/erp.clementvallois.fr \
-      /etc/nginx/sites-enabled/erp.clementvallois.fr
-    run "Test the nginx configuration" nginx -t
-    run "Reload nginx" systemctl reload nginx
-  else
-    warn "$DEPLOY_DIR/nginx/erp.clementvallois.fr.acme-stub.conf not found — run stage 4 first."
-  fi
-  run "Request the certificate" certbot certonly --webroot -w /var/www/erp-certbot \
-    -d erp.clementvallois.fr
+  warn "no valid wildcard certificate covering *.clementvallois.fr at $cert."
+  warn "The vhost in the next stage references it, so nginx will refuse to load without it."
+  warn "Fix the host's own certificate first — do NOT issue one for this hostname (ADR-0087)."
+  SKIPPED+=("TLS certificate — the host's wildcard is missing or expired; the vhost cannot load")
 fi
 
 # ── Stage 8 — the real nginx vhost, and going live ──────────────────────────────────────────────

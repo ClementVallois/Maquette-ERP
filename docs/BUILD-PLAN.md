@@ -767,8 +767,9 @@ role never could.
 
 ### 8.7 — Human steps, gathered in one place
 
-Not agent tasks, and named as such: the DNS `A` record for `erp.clementvallois.fr` · the Let's Encrypt
-certificate (`/etc/letsencrypt/live` currently holds only the apex domain) · creating the `erp-deploy`
+Not agent tasks, and named as such: the DNS `A` record for `erp.clementvallois.fr` · the TLS certificate — **verified, not issued**: the host already holds a wildcard
+covering this name, and ADR-0087 explains why issuing a named one would be wrong (this sentence
+used to say `/etc/letsencrypt/live` held only the apex domain; reading the host disproved it) · creating the `erp-deploy`
 user and its sudoers entry · installing the systemd units · writing the production secrets file.
 Delivered as a single guided script so the sequence is reproducible rather than remembered.
 
