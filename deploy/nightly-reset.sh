@@ -32,6 +32,12 @@ if [ -z "$current_digest" ]; then
   exit 1
 fi
 
+# Compose interpolates every `${VAR}` in compose.prod.yml on ANY subcommand, including `exec`
+# targeting only postgres — not just the services a given call touches. app/migrate/seed all
+# declare `image: ${IMAGE_REF:?…}`, so exporting it once here (rather than prefixing only the
+# `run --rm` calls below) is what keeps the `pg_dump` line below from refusing to start at all.
+export IMAGE_REF="$IMAGE@$current_digest"
+
 # Seven daily rotations (ADR-0032), keyed by ISO weekday (1 Monday .. 7 Sunday) so each week
 # overwrites its own slot instead of growing without bound.
 install -d -m 0700 "$BACKUP_DIR"
@@ -42,9 +48,9 @@ compose exec -T postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=
 mv "$dump_file.tmp" "$dump_file" # atomic: a failed pg_dump never overwrites a good rotation slot.
 
 echo "migrating"
-IMAGE_REF="$IMAGE@$current_digest" compose run --rm migrate
+compose run --rm migrate
 
 echo "reseeding"
-IMAGE_REF="$IMAGE@$current_digest" compose run --rm seed
+compose run --rm seed
 
 echo "reset complete against $current_digest"
