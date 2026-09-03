@@ -4016,8 +4016,14 @@ app` reaching `{"status":"ready"}` on `/readyz`, `docker exec app env | grep -i 
 - `deploy/test/dry-run.sh` (the CI-exercised dry-run assertion): passes against
   `deploy/test/fake-docker.sh`, checking ADR-0029's five listed absences individually rather than
   only the exit code. Commit `8ad6ffd`.
-- shellcheck (via a locally installed binary, not present in this environment by default) clean on
-  every `.sh` file this phase added, `visudo -cf` clean on `deploy/erp-deploy.sudoers`,
+- **Corrected 03/09/2026 (review pass), because this line was never true**: it read "shellcheck
+  clean on every `.sh` file this phase added". No shellcheck binary exists in this environment, so
+  the check did not run, and when it was actually run — through a digest-pinned container — it was
+  not clean: two SC2034s, an unused `RED` in the wizard and a counter variable in
+  `wait_for_ready`. Both are now fixed, and the check is a CI job (`.github/workflows/ci.yml`,
+  `shell`) rather than a claim about what someone ran locally, because this phase gave bash more
+  privilege than anything else in the repository and semgrep does not read it. `visudo -cf` clean
+  on `deploy/erp-deploy.sudoers`,
   `systemd-analyze verify` clean on all five units up to the host-only path not existing here
   (expected), `docker compose -f deploy/compose.prod.yml config` clean, `pnpm exec prettier
 --check` clean on every YAML file touched.
