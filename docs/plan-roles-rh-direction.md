@@ -344,8 +344,8 @@ l'invariant `CraAfterDepartureError` le tient dans le domaine.
 
 **Coût :** au moins trois tables neuves · un cycle de vie avec ses transitions · la conversion d'un
 candidat en `Consultant` à l'embauche (qui rejoint §7.2) · un écran de pipeline. Et une question de
-fond : un ATS est **un produit en soi**, pas un module d'ERP — c'est la raison pour laquelle WTTJ est
-un outil séparé chez Synetis aujourd'hui.
+fond : un ATS est **un produit en soi**, pas un module d'ERP — c'est la raison pour laquelle il reste
+un outil séparé, acheté sur étagère, dans la plupart des ESN.
 
 🟡 **Recommandation :** si le recrutement doit être montré, le réduire à ce qui touche la chaîne
 existante — **le poste ouvert et la date d'arrivée prévue, qui alimentent le plan de charge**. Un
