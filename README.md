@@ -56,9 +56,13 @@ dessous. **Le point d'entrée est `http://127.0.0.1:3000/`**, le sélecteur de p
 s'atteint en cliquant depuis là. La section « Démarrer » dit comment lancer l'instance, et la même
 chaîne se voit en HTTP ou à l'écran, au choix.
 
-Ce qui n'existe **pas encore** : l'instance hébergée (phase 8), la passe de relecture
-documentaire (phase 9) et le gel (phase 10). La phase 0 —
-outillage, CI, règles d'écriture — précède les autres et est faite.
+Ce qui n'existe **pas encore** : l'instance hébergée elle-même. Les fichiers de déploiement
+(`deploy/` : image, composition hôte, script de redéploiement pull-based, minuteurs systemd, reset
+nocturne, script humain guidé) sont dans le dépôt depuis la phase 8 et vérifiés en local — build
+réel de l'image, `compose.prod.yml` monté avec un vrai PostgreSQL, migration et seed rejoués —
+mais **rien n'a encore tourné sur l'hôte réel** : ni DNS, ni certificat, ni utilisateur système, ni
+minuteur, ni premier déploiement. Restent aussi la passe de relecture documentaire (phase 9) et le
+gel (phase 10). La phase 0 — outillage, CI, règles d'écriture — précède les autres et est faite.
 
 N'existe pas encore non plus, et c'est la décision du 24/08/2026 : **l'interface interactive en
 SPA React**, dont aucune ligne n'est écrite. Elle a son propre plan de construction
