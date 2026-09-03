@@ -1,8 +1,14 @@
 name: CI
 
 on:
+  # `main` only. Every other branch is covered by its pull request, which branch protection now
+  # requires anyway (ADR-0086). Until 03/09/2026 this was `'**'`, and a shared concurrency group
+  # was supposed to stop a branch push and its pull request running twice. It did not: both runs
+  # start, one is cancelled, and a cancelled run still reports a conclusion under the same check
+  # name. Once the gates became blocking, that made the latest result for eleven required checks
+  # `cancelled` and left a fully green pull request unmergeable.
   push:
-    branches: ['**']
+    branches: [main]
   # `main` alone: `develop` was merged and deleted in Phase 0, and a trigger naming a branch that
   # cannot exist is a rule nobody will notice has stopped applying.
   pull_request:
@@ -10,8 +16,6 @@ on:
 
 permissions: {}
 
-# `head_ref` on a pull request, `ref_name` on a push: a PR and a push on the same branch share
-# a group and do not run twice.
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
