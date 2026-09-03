@@ -26,7 +26,7 @@ At every step, record friction the moment you feel it:
 - A question you were left holding — what is this, how do I run it, what should I look at first,
   what is finished and what is not — with the exact point in the text where the answer should have
   been and wasn't.
-- Anything that needed the brief: if understanding a sentence required knowing about Synetis, the
+- Anything that needed the brief: if understanding a sentence required knowing the client, the
   demo, the calendar, or any conversation outside the repo, the sentence fails.
 
 The audience is French-speaking for `README.md` and English for everything else; judge each
