@@ -3861,11 +3861,17 @@ module on the page returned 200. Vite is 8.2.1, the Rolldown build. Reducing Pla
 workers lowers the rate without removing it; a server already warm from a previous run shows it far
 less, which fits a stall on first transform rather than load. Not a product defect and not a test
 defect: no assertion is involved, and the same tests pass in isolation in under three seconds.
-Nothing is changed for it here — CI carries `retries: 2` for exactly this class of failure, and the
-two candidate directions both cost more than the branch is worth stopping for: `server.warmup` on
-the client module graph, or running e2e against the served build the config already supports
-(`E2E_SERVED_BUILD=1`), which has no dev server in it at all. **Phase 10.2** decides it — the cold
-read is the first time the suite is run by someone who has no reason to know it flakes.
+
+**It cannot happen in CI, and that is the whole reason it is only a row here.** The `web-e2e` job
+runs with `E2E_SERVED_BUILD=1` — `apps/web/dist` served by the API on 3000, one origin, no Vite dev
+server anywhere in the topology (`.github/workflows/ci.yml`, and `playwright.config.ts` on its own
+side). So this is a local-developer failure only, and the cost of leaving it is that a developer's
+own `pnpm exec playwright test` is unreliable while CI stays honest. The flip side is worth writing
+down: **nothing in CI will ever catch it if it gets worse**, because CI never exercises the code
+path. The two candidate directions are `server.warmup` on the client module graph, and running the
+local suite in the served-build topology too — neither is a guess this branch can validate, at
+roughly one failure in two runs and three minutes a run. **Phase 10.2** decides it: the cold read is
+the first time the suite is run by someone who has no reason to know it flakes.
 
 **Open — submitting a Cra unmounts the save-state bar before it can say "Soumis".** Named in a
 `journeys.spec.ts` comment written on this branch and nowhere else until now, which is the silent
