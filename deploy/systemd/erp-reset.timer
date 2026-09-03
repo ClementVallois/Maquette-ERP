@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly reset to the deterministic seed, Europe/Paris (ADR-0032)
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 Europe/Paris
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
