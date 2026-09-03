@@ -166,7 +166,7 @@ finish() {
 # Replace the example below. Set TOTAL_STAGES to match the stages you write.
 # ──────────────────────────────────────────────────────────────────────────
 
-TOTAL_STAGES=8
+TOTAL_STAGES=7
 
 # This wizard never persists an answer into the repository's own `.env` — that file is app
 # configuration (`.env.example`), not host secrets. `ask`'s reuse-on-rerun cache, when used below,
@@ -328,32 +328,11 @@ if [[ "$regenerate_secrets" -eq 1 ]]; then
   trap - EXIT
 fi
 
-# ── Stage 6 — GHCR read access ───────────────────────────────────────────────────────────────────
-stage "GHCR read access"
-say "The repository is private, so the image it publishes is too (ADR-0029: \"the GHCR read"
-say "credential, while the package is private, exists on the host only\") — without this, every"
-say "\`docker buildx imagetools inspect\` and every pull that pull-and-redeploy.sh runs refuses."
-say "Logging in as root persists the credential in root's docker config, which every systemd"
-say "oneshot unit here already runs as (ADR-0030) — nothing below repeats it per invocation."
-if grep -q ghcr.io /root/.docker/config.json 2>/dev/null; then
-  say "root already has a stored ghcr.io credential — nothing to do."
-else
-  step "Create a token: https://github.com/settings/tokens?type=beta — a fine-grained PAT scoped"
-  step "to this repository only, with \"Read\" access to Packages, and nothing else."
-  open_url "https://github.com/settings/tokens?type=beta"
-  ask GHCR_USERNAME "Your GitHub username:"
-  ask_secret GHCR_TOKEN "Paste the token (read:packages only):"
-  # Not routed through run(): it echoes its command verbatim, which would print the token.
-  printf '  %s$ docker login ghcr.io -u %s --password-stdin%s\n' "$DIM" "$GHCR_USERNAME" "$RESET"
-  if confirm "Log in to ghcr.io as root now?"; then
-    printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-  else
-    SKIPPED+=("ghcr.io login (docker login ghcr.io -u $GHCR_USERNAME --password-stdin)")
-    warn "skipped — log in yourself before the first deploy, or every pull will refuse."
-  fi
-fi
+# No registry-credential stage: the GHCR package is public (ADR-0084), so the host pulls
+# anonymously and stores nothing. A `docker login` here would be the one long-lived credential on
+# this box, guarding an image whose whole content is this repository's synthetic demonstrator.
 
-# ── Stage 7 — TLS certificate ────────────────────────────────────────────────────────────────────
+# ── Stage 6 — TLS certificate ────────────────────────────────────────────────────────────────────
 stage "The TLS certificate"
 say "/etc/letsencrypt/live currently holds only the apex domain — this issues a separate"
 say "certificate for erp.clementvallois.fr, obtained before the real vhost can reference it."
@@ -377,7 +356,7 @@ else
     -d erp.clementvallois.fr
 fi
 
-# ── Stage 8 — the real nginx vhost, and going live ──────────────────────────────────────────────
+# ── Stage 7 — the real nginx vhost, and going live ──────────────────────────────────────────────
 stage "The real nginx vhost, and starting the timers"
 say "Replaces the stub with the full vhost: security headers, a rate limit, X-Robots-Tag on"
 say "everything nginx itself answers, proxying to the app's loopback port only (ADR-0030)."

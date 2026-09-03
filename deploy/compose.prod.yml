@@ -7,12 +7,9 @@
 # not defaulted here on purpose, so a stray `docker compose up` with no digest chosen refuses to
 # start rather than silently resolving `:main` again.
 #
-# `../docker/postgres/init` is this repository's existing two-role bootstrap script
-# (`docker/postgres/init/01-roles.sh`), read-only bind-mounted the same way the local dev
-# `compose.yml` at the repository root already does. ADR-0030's "no host bind mount" targets the
-# *data* path — Postgres keeps a named volume, never a host directory for `PGDATA` — not a
-# root-owned, read-only, few-line SQL bootstrap script; reusing it is one source for the two-role
-# split instead of a second copy to keep in sync.
+# The `../docker/postgres/init` mount is the same two-role bootstrap the local `compose.yml` uses,
+# and it is the one bind mount ADR-0030's prohibition does not cover (ADR-0085). It is relative to
+# this file, so the deploy/ directory must stay inside the checkout for compose to resolve it.
 services:
   postgres:
     image: postgres:18-alpine

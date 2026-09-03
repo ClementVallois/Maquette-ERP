@@ -71,6 +71,8 @@ retouched, so what was decided stays visible next to what replaced it.
 | [0029](./0029-pull-based-deploy-no-inbound-credential.md)                                    | Deployment is pull-based, with no inbound host credential in CI                                                                                    | accepted   |
 | [0030](./0030-isolation-from-the-rest-of-the-host.md)                                        | The deployment is isolated from the rest of the host                                                                                               | accepted   |
 | [0032](./0032-the-public-instance-is-a-resettable-demo.md)                                   | The public instance contains synthetic data and resets to the deterministic seed nightly                                                           | accepted   |
+| [0084](./0084-the-image-is-a-public-package.md)                                              | The image is a public package, so the host holds no registry credential                                                                            | accepted   |
+| [0085](./0085-the-role-bootstrap-is-not-the-data-path.md)                                    | ADR-0030's "no host bind mount" governs the data path, not the role bootstrap                                                                      | accepted   |
 | [0023](./0023-persona-selector-instead-of-authentication.md)                                 | A persona selector instead of authentication, and where authorization is decided                                                                   | accepted   |
 | [0043](./0043-economics-is-read-at-the-composition-root.md)                                  | Margin is read at the composition root, because it belongs to neither module                                                                       | accepted   |
 | [0044](./0044-idempotency-key-is-stored-not-merely-required.md)                              | `Idempotency-Key` is stored, not merely required                                                                                                   | accepted   |
@@ -333,7 +335,8 @@ between clicks, two `onChange` handlers in the same tick both computed their nex
 the same stale array, and the second overwrote the first. The filter now replays each toggle as a
 diff against whatever the current value turns out to be.
 
-0084 is not written yet. The QA rounds themselves — what each item asked for, and which shipped —
+0084 and 0085 are Phase 8's, not this round's: the public GHCR package and the one bind mount ADR-0030's
+prohibition does not cover, both decided on 03/09/2026 by the review pass over `feat/deploy`. The QA rounds themselves — what each item asked for, and which shipped —
 are `docs/qa-rounds.md`; the ADRs above record only the decisions those items forced.
 
 ## Identified, not yet decided
