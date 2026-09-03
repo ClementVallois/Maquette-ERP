@@ -33,6 +33,10 @@
  */
 export const LABELS = {
   appName: 'CRA → Facture',
+  demo: {
+    title: 'Données de démonstration',
+    body: 'Toutes les données sont synthétiques. Cette instance est réinitialisée chaque nuit : toute modification sera effacée.',
+  },
   glossary: {
     open: 'Définition : {term}',
     cra: {
