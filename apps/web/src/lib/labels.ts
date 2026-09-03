@@ -369,7 +369,8 @@ export const LABELS = {
        * heading and the toggle need their own key. */
       legendToggle: 'Légende',
       /** A9's desktop month/week toggle — reuses A11's own `compact` slicing (`calendarWeeks`,
-       * `WeekNavigator`), so only the two tab labels are new. */
+       * `WeekNavigator`), so only the two labels and the group's own name are new. */
+      viewLabel: 'Affichage du tableau',
       viewMonth: 'Mois',
       viewWeek: 'Semaine',
       /** O7: single-level undo on the row tools' own "remplir"/"vider" — the button reads

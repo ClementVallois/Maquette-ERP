@@ -13,6 +13,7 @@ import { useMemo, useState } from 'react';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { ErrorState } from '@/components/feedback/error-state';
 import { GlossaryTerm } from '@/components/glossary-term';
+import { TogglePillGroup } from '@/components/toggle-pill-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,7 +24,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
@@ -418,17 +418,26 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
       </div>
 
       <div className="hidden flex-col gap-2 md:flex">
-        <Tabs
-          value={desktopView}
-          onValueChange={(value) => {
+        {/* `TogglePillGroup`, not `Tabs`: Radix's `TabsTrigger` always emits `aria-controls`
+            pointing at the id of a `TabsContent` panel, and this switcher has none — it changes
+            the day range of the one table below it rather than swapping two panels. The attribute
+            therefore referenced an element that never existed, which axe reports as a *critical*
+            `aria-valid-attr-value` (the kitchen sink's own `Tabs`, which does render panels,
+            resolves both triggers — verified — so the fault was this call site, not the vendored
+            component). The exclusive pill group is the control this app already uses for
+            "exactly one of these", with its own accessibility rationale written down. */}
+        <TogglePillGroup
+          label={LABELS.cra.matrix.viewLabel}
+          options={[
+            { value: 'month', label: LABELS.cra.matrix.viewMonth },
+            { value: 'week', label: LABELS.cra.matrix.viewWeek },
+          ]}
+          selected={[desktopView]}
+          exclusive
+          onChange={([value]) => {
             if (value === 'month' || value === 'week') setDesktopView(value);
           }}
-        >
-          <TabsList>
-            <TabsTrigger value="month">{LABELS.cra.matrix.viewMonth}</TabsTrigger>
-            <TabsTrigger value="week">{LABELS.cra.matrix.viewWeek}</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        />
 
         {desktopView === 'week' && (
           <WeekNavigator
