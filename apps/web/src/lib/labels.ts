@@ -272,6 +272,10 @@ export const LABELS = {
     notStartedYet: 'Ce mois n’a pas encore été commencé. Remplissez-le, puis enregistrez.',
     nothingRecorded: 'Rien n’est encore saisi sur ce mois.',
     refused: 'Ce CRA a été refusé par le manager. Corrigez-le, puis soumettez-le à nouveau.',
+    /** Item 31, QA round 3: prefixes the manager's free-text refusal reason wherever it is shown
+     * verbatim (the consultant's own CRA, and the manager's read of it), so the reason reads as a
+     * labelled field rather than an unattributed sentence. */
+    refusalReasonPrefix: 'Motif : ',
     emptyList: 'Aucun CRA sur cette période.',
     emptyListHint:
       'Ce n’est pas un refus : la liste est bien la vôtre, elle ne contient simplement rien pour ce mois.',

@@ -791,7 +791,12 @@ function StatusBanner({ data }: { readonly data: CraGridResponse }): ReactElemen
         <AlertTitle>{LABELS.cra.statuses.refused}</AlertTitle>
         <AlertDescription>
           {LABELS.cra.refused}
-          {data.refusal !== null && <p className="mt-1 font-medium">{data.refusal.reason}</p>}
+          {data.refusal !== null && (
+            <p className="mt-1 font-medium">
+              {LABELS.cra.refusalReasonPrefix}
+              {data.refusal.reason}
+            </p>
+          )}
         </AlertDescription>
       </Alert>
     );

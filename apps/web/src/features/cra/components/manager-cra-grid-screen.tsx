@@ -274,7 +274,10 @@ function ManagerCraGridBody({
 
       {data.status === 'refused' && data.refusal !== null && (
         <Alert variant="destructive">
-          <AlertDescription>{data.refusal.reason}</AlertDescription>
+          <AlertDescription>
+            {LABELS.cra.refusalReasonPrefix}
+            {data.refusal.reason}
+          </AlertDescription>
         </Alert>
       )}
 
