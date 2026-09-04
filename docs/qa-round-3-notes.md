@@ -31,6 +31,19 @@ sandbox) — `pg-cra-repository.int.test.ts` already exercises `year`/`month` na
 its existing calls pass `beforePeriod`, so nothing there should break, but the new clause itself
 has no test of its own yet.
 
+## Item 18 — new `GET /api/v1/team`, no existing endpoint covered it
+
+Checked first, per the brief: `GET /api/v1/consultants` (ADR-0077) gives an office roster, not who
+reports to whom. `PgReferenceReader.hierarchy()` already existed but was write-side only
+(`refuse-cra.ts`/`validate-cra.ts`, deciding who accepts a Cra) — no route exposed it. Added
+`GET /api/v1/team`, `forRoles('consultant', 'manager')`, reusing `hierarchy()` (for "who manages
+me today") and `consultantsOfOffice()` (for a manager's direct reports, inverting the hierarchy
+against that office's current non-departed roster) rather than new SQL. Both consultant (N+1) and
+manager (N+1 + N-1) sides are implemented and committed together — the brief's "implement the
+smaller side and note the rest" escape hatch was not needed. Billing has no place in this org
+chart in the seed data (the one billing persona, Henri, is the *director* every manager reports
+to) so the panel does not render for that role, matching the item's own two described cases.
+
 ## Item 25 — could not reproduce the alphabetical sort, fixed it defensively anyway
 
 Searched every period-bearing Select/column in `apps/web` (the CRA table's year/month filters,

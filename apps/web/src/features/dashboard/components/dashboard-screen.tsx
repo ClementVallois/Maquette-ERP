@@ -28,6 +28,7 @@ import type {
 } from '../types';
 
 import { InvoiceHistoryChart } from './invoice-history-chart';
+import { TeamPanel } from './team-panel';
 
 /** The dense months the seed actually fills — A5's escape hatch off a genuinely blank one. */
 const MONTHS_WITH_DATA = ['2026-06', '2026-07', '2026-08'] as const;
@@ -515,6 +516,8 @@ export function DashboardScreen({ role, period }: DashboardScreenProps): ReactEl
       </section>
 
       {(data.role === 'manager' || data.role === 'billing') && <HistorySection />}
+
+      {(data.role === 'consultant' || data.role === 'manager') && <TeamPanel />}
 
       <RecentActivity data={data} />
     </div>

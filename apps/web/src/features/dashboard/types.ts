@@ -109,3 +109,25 @@ export interface BillingDashboard {
 }
 
 export type DashboardResponse = ConsultantDashboard | ManagerDashboard | BillingDashboard;
+
+/** Item 18, QA round 3 — `GET /api/v1/team`. One org-chart neighbour. */
+export interface TeamMember {
+  readonly id: string;
+  readonly displayName: string;
+}
+
+/** A consultant's own manager (N+1) — `null` when nobody is currently attached (a legacy or
+ * data gap this UI has to render, not assume away). */
+export interface ConsultantTeam {
+  readonly role: 'consultant';
+  readonly manager: TeamMember | null;
+}
+
+/** A manager's direct reports (N-1) and their own manager (N+1, "the director" in this dataset). */
+export interface ManagerTeam {
+  readonly role: 'manager';
+  readonly manager: TeamMember | null;
+  readonly reports: readonly TeamMember[];
+}
+
+export type TeamResponse = ConsultantTeam | ManagerTeam;

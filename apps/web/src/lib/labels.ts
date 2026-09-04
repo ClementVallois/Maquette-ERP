@@ -219,6 +219,16 @@ export const LABELS = {
       year: 'Année',
       total: 'Total',
     },
+    /** Item 18, QA round 3: the dashboard's "team" panel, consultant and manager only — billing
+     * has no place in this org chart in the seed (the one billing persona is the director every
+     * manager reports to, not a subject of this read). */
+    team: {
+      heading: 'Mon équipe',
+      manager: 'Manager',
+      noManager: 'Aucun manager renseigné.',
+      reports: 'Équipe ({count})',
+      noReports: 'Aucun rattachement direct.',
+    },
   },
 
   cra: {

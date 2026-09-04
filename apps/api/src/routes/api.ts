@@ -442,6 +442,48 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
     }));
   });
 
+  /**
+   * Item 18, QA round 3: the dashboard's "team" panel — a consultant's own manager (N+1), or a
+   * manager's direct reports (N-1) plus their own manager (N+1). No existing route exposed this:
+   * `PgReferenceReader.hierarchy()` was write-side only until now (`refuse-cra.ts`,
+   * `validate-cra.ts`, deciding who accepts a Cra) — reused here rather than adding new SQL, since
+   * it already loads every `manager_attachments` row and answers "who manages X today" from it.
+   * A manager's reports are found by inverting it against `consultantsOfOffice` (item 7's own
+   * reader method, ADR-0077), which already excludes a departed consultant (ADR-0079) — no
+   * separate exclusion needed here. `billing` has no place in this org chart in the seed (Henri,
+   * the one billing persona, is the *director* every manager reports to, not a subject of this
+   * read) — `forRoles` below omits it, the same reasoning `/api/v1/consultants` gives for the
+   * same role.
+   */
+  app.get(
+    '/api/v1/team',
+    { config: { access: forRoles('consultant', 'manager') } },
+    async (request) => {
+      const actor = requireActor(request);
+      const today = isoDateInFirmTimeZone(dependencies.clock.now());
+
+      return dependencies.transactionally(async (unit) => {
+        const reader = new PgReferenceReader(unit.client);
+        const [chain, names] = await Promise.all([reader.hierarchy(), reader.consultantNames()]);
+
+        const managerId = chain.managerOn(actor.consultantId, today);
+        const manager =
+          managerId === null
+            ? null
+            : { id: managerId, displayName: names.get(managerId) ?? managerId };
+
+        if (actor.role === 'consultant') return { role: 'consultant' as const, manager };
+
+        const officeRoster = await reader.consultantsOfOffice(actor.officeId);
+        const reports = officeRoster.filter(
+          (consultant) => chain.managerOn(consultant.id, today) === actor.consultantId,
+        );
+
+        return { role: 'manager' as const, manager, reports };
+      });
+    },
+  );
+
   app.get(
     '/api/v1/cras/:id',
     { config: { access: forRoles('consultant', 'manager', 'billing') } },
