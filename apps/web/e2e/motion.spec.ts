@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 /** Typed rather than a bare `new Error()` — this repository's own rule (`no-restricted-syntax`)
  * applies uniformly, including to its own test suite. */
@@ -159,5 +159,63 @@ test.describe('prefers-reduced-motion — a Radix open transition (Select)', () 
 
     const duration = await content.evaluate((el) => getComputedStyle(el).animationDuration);
     expect(duration).toBe(REDUCED);
+  });
+});
+
+/**
+ * Item 17, QA round 3 added the one animated thing in this app the stylesheet cannot reach: the
+ * company-news carousel rotates on a `requestAnimationFrame` loop, not a CSS animation, so
+ * `globals.css`'s `@media (prefers-reduced-motion: reduce)` block has nothing to collapse.
+ * `lib/use-reduced-motion.ts` reads the query in JS instead and `rotating` gates the loop on it.
+ *
+ * This file's own opening claim — "the one test that proves the rule actually reaches a real
+ * animated element" — stopped being true when that landed, which is why this describe exists. It
+ * is the only one here that needs a persona and a live API: the kitchen sink has no carousel.
+ *
+ * The assertion is the timer bar's existence, not its duration. Under the preference the RAF loop
+ * never starts, `rotating` is false, and the bar is not rendered at all — so "it exists and is
+ * filling" versus "it is not there" is the same paired positive/negative this file uses
+ * throughout, read off the element the loop actually drives.
+ */
+test.describe('prefers-reduced-motion — a JS rotation (company-news carousel)', () => {
+  const PROGRESS = '[data-slot="news-progress"]';
+
+  async function openDashboard(page: Page): Promise<void> {
+    await page.goto('/');
+    await page.locator('[data-persona-key="manager-paris"] button').click();
+    await page.waitForURL('/tableau-de-bord');
+  }
+
+  test('the timer bar fills with no preference emulated', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'one viewport is enough for this contract');
+
+    await openDashboard(page);
+
+    const bar = page.locator(PROGRESS);
+    await bar.waitFor({ state: 'visible' });
+
+    // The bar's own child carries the width the loop writes. `toPass`, not a sleep: the first
+    // frame quantizes to 0, and how many frames it takes to clear the 2% step is the machine's
+    // business, not this test's.
+    await expect(async () => {
+      const width = await bar
+        .locator('div')
+        .first()
+        .evaluate((el) => el.getBoundingClientRect().width);
+      expect(width).toBeGreaterThan(0);
+    }).toPass({ timeout: 5_000 });
+  });
+
+  test('the timer bar is not rendered at all once prefers-reduced-motion: reduce is emulated', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'one viewport is enough for this contract');
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openDashboard(page);
+
+    // The panel itself is there — this is the carousel not rotating, not the module being hidden.
+    await expect(page.getByRole('heading', { name: /Informations CSE/u })).toBeVisible();
+    await expect(page.locator(PROGRESS)).toHaveCount(0);
   });
 });
