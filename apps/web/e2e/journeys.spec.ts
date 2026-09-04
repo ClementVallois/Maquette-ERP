@@ -1426,16 +1426,17 @@ test.describe('item 5 — the consultant dashboard names a refusal from another 
     await choosePersona(page, 'consultant-paris');
     await page.goto('/tableau-de-bord?period=2026-06');
 
-    // Scoped to the Alert, not a bare `getByText`/`getByRole('link')`: the same refusal also
-    // repeats as its own `WorkQueue` row (`dashboard-screen.tsx`'s `consultantQueue`), each with
-    // its own "Ouvrir ce CRA" link to the same route — the same "two legitimate copies of one
-    // fact" shape this file's other refusal/submission banners already carry.
-    const refusalAlert = page
-      .getByRole('alert')
+    // Item 2, QA round 5 (ADR-0097): this used to also repeat as a destructive `Alert`
+    // (`RefusedElsewhereNotices`), the same fact and the same "Ouvrir ce CRA" link twice on one
+    // screen — removed, so the `WorkQueue` row (`dashboard-screen.tsx`'s `consultantQueue`) is now
+    // the only surface, scoped here by `listitem` rather than a bare `getByText`/`getByRole('link')`
+    // for the same reason this file's other single-copy banners already are.
+    const refusalRow = page
+      .getByRole('listitem')
       .filter({ hasText: 'Le CRA de septembre 2026 a été refusé' });
-    await refusalAlert.waitFor({ state: 'visible' });
+    await refusalRow.waitFor({ state: 'visible' });
 
-    await refusalAlert.getByRole('link', { name: 'Ouvrir ce CRA' }).click();
+    await refusalRow.getByRole('link', { name: 'Ouvrir ce CRA' }).click();
     await page.waitForURL(`/cra/${EDIT_PERIOD}`);
   });
 });
