@@ -41,7 +41,7 @@ me today") and `consultantsOfOffice()` (for a manager's direct reports, invertin
 against that office's current non-departed roster) rather than new SQL. Both consultant (N+1) and
 manager (N+1 + N-1) sides are implemented and committed together — the brief's "implement the
 smaller side and note the rest" escape hatch was not needed. Billing has no place in this org
-chart in the seed data (the one billing persona, Henri, is the *director* every manager reports
+chart in the seed data (the one billing persona, Henri, is the _director_ every manager reports
 to) so the panel does not render for that role, matching the item's own two described cases.
 
 ## Item 28 — the pré-facturier's own "Valider" dialog does not get the warning

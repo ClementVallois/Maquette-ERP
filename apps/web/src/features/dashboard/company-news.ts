@@ -62,7 +62,10 @@ const MESSAGES: readonly CompanyNewsMessage[] = [
     publishedAt: '2026-08-22',
     author: 'Direction des ressources humaines',
     imageSrc: newsFormation,
-    attachment: { label: 'Catalogue-formations-S2-2026.pdf', href: '/documents/catalogue-formations-s2-2026.pdf' },
+    attachment: {
+      label: 'Catalogue-formations-S2-2026.pdf',
+      href: '/documents/catalogue-formations-s2-2026.pdf',
+    },
   },
   {
     id: 'mutuelle-nouvelle-offre',
@@ -71,7 +74,10 @@ const MESSAGES: readonly CompanyNewsMessage[] = [
     publishedAt: '2026-08-18',
     author: 'Direction des ressources humaines',
     imageSrc: null,
-    attachment: { label: 'Grille-garanties-2027.pdf', href: '/documents/grille-garanties-2027.pdf' },
+    attachment: {
+      label: 'Grille-garanties-2027.pdf',
+      href: '/documents/grille-garanties-2027.pdf',
+    },
   },
   {
     id: 'seminaire-annuel',

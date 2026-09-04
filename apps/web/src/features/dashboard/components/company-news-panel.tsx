@@ -41,7 +41,9 @@ export function CompanyNewsPanel({ personaKey }: { readonly personaKey: string }
   const key = hiddenKey(personaKey);
   const newestId = messages[0]?.id ?? null;
 
-  const [visible, setVisible] = useState(() => newestId === null || readLocalPreference(key) !== newestId);
+  const [visible, setVisible] = useState(
+    () => newestId === null || readLocalPreference(key) !== newestId,
+  );
   const [index, setIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -204,10 +206,7 @@ export function CompanyNewsPanel({ personaKey }: { readonly personaKey: string }
               directly from the RAF loop above, no CSS animation to fight `prefers-reduced-motion`
               with (the loop itself never starts under that setting, so this simply stays at 0). */}
           {rotating && (
-            <div
-              className="h-0.5 w-full overflow-hidden rounded-full bg-border"
-              aria-hidden="true"
-            >
+            <div className="h-0.5 w-full overflow-hidden rounded-full bg-border" aria-hidden="true">
               <div
                 className="h-full rounded-full bg-primary"
                 style={{ width: `${String(progress * 100)}%` }}

@@ -62,8 +62,7 @@ export const Route = createFileRoute('/_shell/cra/')({
 
 function CraListRoute(): ReactElement {
   const { persona } = Route.useRouteContext();
-  const { consultantIds, statuses, year, month, beforePeriod, page, pageSize } =
-    Route.useSearch();
+  const { consultantIds, statuses, year, month, beforePeriod, page, pageSize } = Route.useSearch();
 
   return (
     <div className="flex flex-col gap-4">
