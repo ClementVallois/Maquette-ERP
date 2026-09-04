@@ -88,6 +88,11 @@ export default tseslint.config(
       // single-path ignore rather than a directory glob — `apps/web/src/routes/**` (hand-written)
       // stays linted in full.
       'apps/web/src/routeTree.gen.ts',
+      // Agent worktrees (`.claude/worktrees/<id>/`, gitignored by `.claude/*`) are full
+      // checkouts of this same repository. Without this, `eslint .` lints every file twice
+      // and reports the second copy under a path that does not exist in a clone — which made
+      // `pnpm run check` red locally and green in CI, the worst way for a gate to fail.
+      '.claude/worktrees/**',
     ],
   },
 
