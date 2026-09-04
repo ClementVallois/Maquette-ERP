@@ -32,7 +32,7 @@
  * screens' hand-written renderer does, but the typographic choice is the API copy's and is kept.
  */
 export const LABELS = {
-  appName: 'CRA → Facture',
+  appName: 'Maquette ERP',
   demo: {
     title: 'Données de démonstration',
     body: 'Toutes les données sont synthétiques. Cette instance est réinitialisée chaque nuit : toute modification sera effacée.',

@@ -1,4 +1,4 @@
-# CRA → facture : maquette d'un module d'ERP interne
+# Maquette ERP : la chaîne CRA → facture d'un module d'ERP interne
 
 > ⚠️ Ossature initialisée le 07/08/2026. Ce README se remplit **au fil de la construction**, pas à
 > la fin : une section décrit ce qui existe le jour où elle est écrite, et une section absente est

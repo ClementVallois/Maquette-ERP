@@ -14,7 +14,7 @@
  * in the one file whose job is to be read.
  */
 export const LABELS = {
-  appName: 'CRA → Facture',
+  appName: 'Maquette ERP',
   appTagline: 'Maquette d’un module ERP interne',
 
   nav: {
