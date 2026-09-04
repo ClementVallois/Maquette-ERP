@@ -172,8 +172,11 @@ export const LABELS = {
       pendingSentenceNone: 'Aucun CRA n’attend votre décision.',
       open: 'Ouvrir le pré-facturier',
       /** One work-queue row's action — opens that row's own period, not the one on screen
-       * (the bug the queue exists to fix: the counter used to point at the displayed month). */
-      decide: 'Décider',
+       * (the bug the queue exists to fix: the counter used to point at the displayed month).
+       * Item 21, QA round 3: renamed from "Décider" and now opens the consultant's CRA directly
+       * (`/cra/$period/$consultantId`) instead of the pré-facturier — a manager reads the month
+       * before deciding, "Vérifier" names that first step. */
+      decide: 'Vérifier',
     },
     billing: {
       draft: 'Factures en brouillon',

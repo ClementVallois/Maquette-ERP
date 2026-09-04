@@ -253,7 +253,14 @@ function managerQueue(data: ManagerDashboard): readonly QueueItem[] {
       ...(age === undefined ? {} : { secondary: age }),
       // Rank A1's own fix: this used to open the pré-facturier for the *displayed* period, not
       // the row's own — a counter naming work and a button leading nowhere near it.
-      action: { label: labels.decide, to: '/pre-facturier', search: { period: row.period } },
+      // Item 21, QA round 3: now opens the consultant's own CRA directly (the row's period, not
+      // the displayed one — same reasoning as the pré-facturier link it replaces) rather than the
+      // pré-facturier list the manager then had to search again.
+      action: {
+        label: labels.decide,
+        to: '/cra/$period/$consultantId',
+        params: { period: row.period, consultantId: row.consultantId },
+      },
     };
   });
 }
