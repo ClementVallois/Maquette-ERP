@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" role="img" aria-label="Illustration : vie d’équipe">
+  <!-- Item 17, QA round 3: an illustrative graphic for the company-news module, not a photo —
+       flat shapes in the app's own palette (accent background, primary figures). Three simple
+       silhouettes stand for "team/seminar" news. -->
+  <rect width="200" height="120" rx="10" fill="#eaf1f8" />
+  <g fill="#1f4d7a">
+    <circle cx="62" cy="52" r="14" />
+    <path d="M32 96c0-18 13-30 30-30s30 12 30 30Z" />
+  </g>
+  <g fill="#2f6ea8">
+    <circle cx="112" cy="46" r="16" />
+    <path d="M78 98c0-20 15-34 34-34s34 14 34 34Z" />
+  </g>
+  <g fill="#1f4d7a" opacity="0.75">
+    <circle cx="158" cy="54" r="12" />
+    <path d="M132 96c0-16 12-26 26-26s26 10 26 26Z" />
+  </g>
+</svg>

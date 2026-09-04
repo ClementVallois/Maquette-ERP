@@ -50,6 +50,17 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    // Item 17, QA round 3: `src/assets/news-*.svg` (the company-news module's illustrations) are
+    // each well under Vite's default 4KB inline threshold, so a plain import would inline them as
+    // a `data:` URI in the built JS — `img-src 'self'` (`apps/api/src/web/reply.ts`'s CSP)
+    // refuses a `data:` image, same reasoning `apps/web/index.html`'s own favicon comment gives
+    // for staying same-origin. An explicit `?url` import suffix is the documented way to force
+    // Vite to never inline one specific import, but did not stop these three from being inlined
+    // here (verified against the actual `dist/` output, not assumed) — this size-based override
+    // is the mechanism that measurably works, so it is what ships.
+    assetsInlineLimit: (filePath) => (/\/news-[^/]+\.svg$/u.test(filePath) ? false : undefined),
+  },
   server: {
     host: '127.0.0.1',
     port: 5173,

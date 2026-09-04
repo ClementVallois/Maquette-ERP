@@ -222,6 +222,20 @@ export const LABELS = {
       hide: 'Masquer les graphiques',
       show: 'Afficher les graphiques',
     },
+    /** Item 17, QA round 3: the dashboard's "informations CSE / vie de l’entreprise" module — a
+     * small rotating carousel of authored company-news messages, every role. */
+    companyNews: {
+      heading: 'Informations CSE / vie de l’entreprise',
+      hide: 'Masquer les informations CSE',
+      show: 'Afficher les informations CSE',
+      previous: 'Message précédent',
+      next: 'Message suivant',
+      /** `{index}`/`{total}` interpolated — a dot's own accessible name. */
+      goToMessage: 'Aller au message {index} sur {total}',
+      /** `{title}` interpolated — the attachment link's accessible name, so "Ouvrir le
+       * document" alone (repeated five times across a carousel) never has to be the whole name. */
+      attachment: 'Pièce jointe : {title}',
+    },
     /** Item 18, QA round 3: the dashboard's "team" panel, consultant and manager only — billing
      * has no place in this org chart in the seed (the one billing persona is the director every
      * manager reports to, not a subject of this read). */

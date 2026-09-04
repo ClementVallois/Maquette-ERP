@@ -30,6 +30,7 @@ import type {
   ManagerDashboard,
 } from '../types';
 
+import { CompanyNewsPanel } from './company-news-panel';
 import { InvoiceHistoryChart } from './invoice-history-chart';
 import { TeamPanel } from './team-panel';
 
@@ -549,6 +550,8 @@ export function DashboardScreen({ role, period, personaKey }: DashboardScreenPro
         {data.role === 'manager' && <ManagerCards data={data} />}
         {data.role === 'billing' && <BillingCards data={data} />}
       </section>
+
+      <CompanyNewsPanel personaKey={personaKey} />
 
       {(data.role === 'manager' || data.role === 'billing') && (
         <HistorySection personaKey={personaKey} />

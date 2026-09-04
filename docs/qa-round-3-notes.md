@@ -58,6 +58,21 @@ and paginated. Left that path without the warning rather than fake the count or 
 pré-facturier page load heavier without Clement deciding that trade-off. Flagging for an ADR if he
 wants it added properly (compute it once, cache it, or accept the per-row cost).
 
+## Item 17 — `?url` did not stop Vite inlining the illustrations; assetsInlineLimit does
+
+The three company-news illustrations (`src/assets/news-*.svg`, ~1KB each) are well under Vite's
+default 4KB inline threshold. A plain `import` inlines them as a `data:` URI in the built JS,
+which the production CSP's `img-src 'self'` refuses. The documented fix — an explicit `?url`
+import suffix, which is supposed to force a real emitted file regardless of size — did **not**
+work here: verified against the actual `dist/` output (not assumed), all three still ended up
+base64/URL-encoded inside `tableau-de-bord-*.js`. What did work: `vite.config.ts`'s
+`build.assetsInlineLimit` as a function, returning `false` for any path matching `news-*.svg` and
+`undefined` (default behaviour) for everything else — confirmed by rebuilding and finding three
+real, content-hashed `.svg` files under `dist/assets/`. Left the `?url` mystery unexplained
+(possibly an interaction between the `@` alias and query-suffixed specifiers in this Vite
+version) — worth a look if it recurs elsewhere, but the size-based override is scoped tightly
+enough (one regex, one file-name pattern) that it does not need to be understood to be trusted.
+
 ## Item 25 — could not reproduce the alphabetical sort, fixed it defensively anyway
 
 Searched every period-bearing Select/column in `apps/web` (the CRA table's year/month filters,
