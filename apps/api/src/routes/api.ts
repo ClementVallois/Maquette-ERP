@@ -33,6 +33,7 @@ import {
   type AssignmentWriteOutcome,
   updateAssignment,
 } from '../staffing/assignment-admin.ts';
+import { managerStaffingSnapshot } from '../staffing/staffing-snapshot.ts';
 import { malformed, parseInput } from '../validation.ts';
 
 /**
@@ -967,8 +968,8 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         // state. `pendingDecisions`/`lateCras` no longer come from it (ADR-0082): a Cra awaiting a
         // decision or already late does not stop being either just because the requested period
         // changed, so both are read across every period the manager may see instead.
-        const { composition, allCras, consultantNames } = await dependencies.transactionally(
-          async (unit) => ({
+        const { composition, allCras, consultantNames, staffing } =
+          await dependencies.transactionally(async (unit) => ({
             composition: await preFacturierComposition(unit, {
               actor,
               requestedPeriod: query.value.period,
@@ -980,8 +981,10 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
               offset: 0,
             }),
             consultantNames: await new PgReferenceReader(unit.client).consultantNames(),
-          }),
-        );
+            // Item 3, QA round 5 (ADR-0098): "as of today", not the requested period — see that
+            // function's own header for why a staffing snapshot is not a monthly figure.
+            staffing: await managerStaffingSnapshot(unit.client, actor.officeId, today),
+          }));
 
         const actionable = allCras.filter((row) => row.status !== 'validated');
 
@@ -1010,6 +1013,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           // excludes `validated`, so only the closed-period test is left to apply.
           lateCras: actionable.filter((row) => lastDayOf(periodFromIso(row.period)) < today).length,
           awaitingDecision,
+          staffing,
           recentActivity: allCras
             .filter(
               (row): row is typeof row & { statusChangedAt: string } =>

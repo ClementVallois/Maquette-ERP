@@ -14,7 +14,8 @@
  *   ADR-0082), `billableCents` (the requested period's own total — the same aggregate
  *   `/pre-facturier` shows in full for that period, ADR-0053/ADR-0065, so the two screens cannot
  *   disagree on it), `lateCras` (closed-period, non-`validated` Cras, across every period —
- *   ADR-0082 again).
+ *   ADR-0082 again), `staffing` (the office's on-mission/`Intercontrat` split, as of today —
+ *   ADR-0098).
  * - billing: `draftInvoices`, `issuedInvoices`, `totalTtcIssuedCents` — the one branch the Phase 3
  *   placeholder already had right.
  *
@@ -75,6 +76,16 @@ export interface ManagerQueueRow {
   readonly statusChangedAt: string | null;
 }
 
+/**
+ * Item 3, QA round 5 (ADR-0098): how many of the manager's own office's current consultants are
+ * staffed on a client mission versus sitting in `Intercontrat` **today** — not scoped to `period`
+ * above, which is why it is its own field rather than folded into the figures that are.
+ */
+export interface ManagerStaffing {
+  readonly onMission: number;
+  readonly intercontrat: number;
+}
+
 export interface ManagerDashboard {
   readonly period: string;
   readonly role: 'manager';
@@ -86,6 +97,7 @@ export interface ManagerDashboard {
    * queue `pendingDecisions` counts but did not, until this field, let a manager reach directly.
    */
   readonly awaitingDecision: readonly ManagerQueueRow[];
+  readonly staffing: ManagerStaffing;
   readonly recentActivity: readonly DashboardActivity[];
 }
 
