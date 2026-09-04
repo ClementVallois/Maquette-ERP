@@ -4185,6 +4185,33 @@ verbatim rather than guessed at.
 - **No mutation-testing run.** Stryker is nightly on `domain/` (ADR-0027) and nothing in this round
   touched `domain/` except `CraListQuery`, which is an interface.
 
+### What this round cannot claim, and the record is the record
+
+**The history shows implementation and test in different commits, twice — provably.**
+`docs/BUILD-PLAN.md` § "What the history shows about test-first" narrows the claim this repository
+makes to "the test is written first, **the commit carries both**". This round does not meet even
+that narrowed form in two places, and the audit was right to say so:
+
+- `beforePeriod`'s SQL landed in `2a446ad` with its own commit message saying it was "not verified
+  (no Postgres in this sandbox)". Its integration test arrived eight commits later, in `0153c78`.
+- `GET /api/v1/org-chart` and its authorization landed in `35d5202`; `org-chart.int.test.ts` arrived
+  six commits later, in `b5a63fb`. `CLAUDE.md`'s proof point 3 was therefore unproven on this branch
+  for six commits.
+
+The cause is stated at the top of this checkpoint — the coding pass was deliberately told to skip
+tests, and this session wrote them — and stating it is **not an exemption**. `docs/BUILD-RULES.md`'s
+own preamble is explicit that nothing there is relaxed for convenience: a rule that blocks you is
+either right, or it needs an ADR. No ADR in this range grants that carve-out, and none is asked for
+here, because the rule is right and the split was a scheduling choice.
+
+The same applies to ADRs 0089–0092, all dated 04/09/2026 and all written after the commits they
+describe, against "one structural decision = one ADR, written **at the time**".
+
+Rewriting the branch to hide either would be worse than the record — the same conclusion Phase 8's
+own checkpoint reached about its two implementation-before-test pairs. What the record is for is
+that the next round can be planned differently: if a pass is going to be split for speed again, the
+test belongs in the pass that writes the code, not in the one that reviews it.
+
 ### The mutations that were run, since three tests claim to be discriminating
 
 Each was applied to the real code, the suite re-run, and the code restored:
