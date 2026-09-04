@@ -368,6 +368,19 @@ export const LABELS = {
       dayIncompleteColumn: 'À compléter',
       dayIncomplete:
         'Ce jour ouvré n’atteint pas une journée complète : le mois ne pourra pas être soumis tant qu’il y manque quelque chose.',
+      /** Item 28, QA round 3: a consultant-side warning, never a block — time entered on a
+       * weekend or un jour férié happens in this business (the manager's own `flagged`/
+       * `nonWorkable` markers exist for exactly this) and the submission still goes through.
+       * `{count}` interpolated, singular/plural chosen at the call site. */
+      nonWorkableEnteredOne:
+        '1 jour saisi tombe un week-end ou un jour férié — la soumission reste possible, mais votre manager le verra signalé.',
+      nonWorkableEnteredMany:
+        '{count} jours saisis tombent un week-end ou un jour férié — la soumission reste possible, mais votre manager les verra signalés.',
+      /** Same fact, read by the manager instead of the consultant who entered it — the read-only
+       * CRA detail view (`manager-cra-grid-screen.tsx`), not only the validate dialog. */
+      nonWorkableEnteredManagerOne: '1 jour de ce mois tombe un week-end ou un jour férié.',
+      nonWorkableEnteredManagerMany:
+        '{count} jours de ce mois tombent un week-end ou un jour férié.',
       /** Accessible names for the five-option `<select>` a cell is (ADR-0068, ADR-0070) — never
        * the raw fraction glyph alone, which reads as nothing to a screen reader. */
       quantityOptions: {
@@ -542,7 +555,15 @@ export const LABELS = {
       confirm: 'Valider',
       cancel: 'Annuler',
       periodFactLabel: 'Période',
-      flaggedDaysFactLabel: 'Jours signalés',
+      /** Item 28, QA round 3: a weekend/holiday entry made visually loud (a banner, not a plain
+       * `<dl>` row a manager could validate past without reading) — `{count}` interpolated,
+       * singular/plural chosen at the call site. Shown only where the count is known
+       * (`manager-cra-grid-screen.tsx`'s own `data.flags`); the pré-facturier's own row-level
+       * "Valider" does not have this data (see `docs/qa-round-3-notes.md`). */
+      flaggedDaysWarningOne:
+        '1 jour de ce mois tombe un week-end ou un jour férié — vérifiez-le avant de valider.',
+      flaggedDaysWarningMany:
+        '{count} jours de ce mois tombent un week-end ou un jour férié — vérifiez-les avant de valider.',
       clientsFactLabel: 'Clients avec du temps saisi ce mois',
       recordedDaysFactLabel: 'Jours saisis',
       lateFactLabel: 'Signalé en retard',

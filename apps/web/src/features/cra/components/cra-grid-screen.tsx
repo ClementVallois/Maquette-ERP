@@ -36,6 +36,7 @@ import {
   ABSENCE_ROW_KEY,
   addRow,
   clearRow,
+  dayTotal,
   entriesFromMatrix,
   fillEmptyWorkdays,
   initMatrix,
@@ -306,6 +307,14 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   // reads them. `missingDaysFrom` yields an empty set for every other refusal, so the grid carries
   // server-side flags only for the one that produced them.
   const missingDays = missingDaysFrom(mutationProblem);
+  // Item 28, QA round 3: a warning, never a block — the domain's own submission check
+  // (`runSubmissionChecks`, `CraFlag`) computes exactly this server-side once submitted ("a day
+  // that was recorded although the calendar says it is not workable... not a refusal"). Mirrored
+  // here from data the grid already holds (`data.days[].nonWorkable`, the same calendar read that
+  // colours the column headers) so the consultant sees it before submitting, not only after.
+  const enteredNonWorkableDays = data.days.filter(
+    (day) => day.nonWorkable !== null && dayTotal(matrix, day.date) > 0,
+  );
   const weeks = calendarWeeks(data.days);
   const mobileDays = weeks[mobileWeekIndex] ?? weeks[0] ?? [];
   const desktopDays = weeks[desktopWeekIndex] ?? weeks[0] ?? [];
@@ -526,6 +535,20 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
             )}
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* Item 28, QA round 3: amber, the same tone `cra-matrix-table.tsx`'s "Signalé" column
+          marker already uses for a flagged day — a warning, never a block, so this stays a plain
+          informational banner rather than `Alert`'s `destructive` variant. */}
+      {enteredNonWorkableDays.length > 0 && (
+        <div className="rounded-xl bg-status-late-fill p-3 text-sm text-status-late-text ring-1 ring-status-late-dot/30">
+          {enteredNonWorkableDays.length === 1
+            ? LABELS.cra.matrix.nonWorkableEnteredOne
+            : LABELS.cra.matrix.nonWorkableEnteredMany.replace(
+                '{count}',
+                String(enteredNonWorkableDays.length),
+              )}
+        </div>
       )}
 
       {data.editable && (

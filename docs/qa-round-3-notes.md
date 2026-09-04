@@ -44,6 +44,20 @@ smaller side and note the rest" escape hatch was not needed. Billing has no plac
 chart in the seed data (the one billing persona, Henri, is the *director* every manager reports
 to) so the panel does not render for that role, matching the item's own two described cases.
 
+## Item 28 — the pré-facturier's own "Valider" dialog does not get the warning
+
+`ValidateConfirmDialog` (`validate-confirm-dialog.tsx`) has two callers: `manager-cra-grid-
+screen.tsx` (the CRA detail view, item 21's now-primary path via "Vérifier") and `pre-facturier-
+screen.tsx` (the pré-facturier table's own row-level "Valider" button, unchanged this round).
+Implemented the new `flaggedDaysCount` warning banner for the first — `data.flags` is already on
+that screen's payload, zero backend cost. The second has no such data: `PreFacturierCraRow`
+(`apps/api/src/composition/pre-facturier.ts`) never calls `runSubmissionChecks`/computes `CraFlag`
+per row — it is a lightweight list summary by design, and adding this would mean loading every
+listed CRA's lines and calendar just to answer a warning, a real cost on a page that can be large
+and paginated. Left that path without the warning rather than fake the count or make every
+pré-facturier page load heavier without Clement deciding that trade-off. Flagging for an ADR if he
+wants it added properly (compute it once, cache it, or accept the per-row cost).
+
 ## Item 25 — could not reproduce the alphabetical sort, fixed it defensively anyway
 
 Searched every period-bearing Select/column in `apps/web` (the CRA table's year/month filters,
