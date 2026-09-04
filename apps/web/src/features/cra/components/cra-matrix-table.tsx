@@ -487,7 +487,13 @@ export function CraLegend(): ReactElement {
           />
         </Button>
       </CollapsibleTrigger>
-      <CollapsibleContent className="flex flex-wrap gap-x-4 gap-y-1.5 px-1 pt-2 text-xs text-muted-foreground">
+      {/* Item 6, QA round 5: `bg-card` (a token, not a hard-coded `#fff`) — expanded, this used to
+          sit directly on the page background, and `--flag-weekend-bg` is the exact same colour as
+          `--background` (`styles/globals.css`), so the weekend swatch was invisible. This app has
+          no dark theme (`direction-visuelle.md` §10), so `bg-card` alone covers every real theme
+          this repository ships; it is still the token rather than a literal so the fix survives if
+          that decision is ever revisited. */}
+      <CollapsibleContent className="flex flex-wrap gap-x-4 gap-y-1.5 rounded-lg bg-card p-3 text-xs text-muted-foreground ring-1 ring-border">
         {swatches.map((swatch) => (
           <span key={swatch.key} className="flex items-center gap-1.5">
             <span aria-hidden="true" className={cn('size-3 shrink-0 rounded', swatch.className)} />
