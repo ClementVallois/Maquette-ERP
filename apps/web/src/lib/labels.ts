@@ -218,6 +218,9 @@ export const LABELS = {
       tableCaption: 'Les mêmes chiffres, en tableau.',
       year: 'Année',
       total: 'Total',
+      /** Item 23, QA round 3 — the eye/eye-off affordance (`VisibilityToggle`) on this section. */
+      hide: 'Masquer les graphiques',
+      show: 'Afficher les graphiques',
     },
     /** Item 18, QA round 3: the dashboard's "team" panel, consultant and manager only — billing
      * has no place in this org chart in the seed (the one billing persona is the director every

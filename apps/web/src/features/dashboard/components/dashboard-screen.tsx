@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import type { ReactElement, ReactNode } from 'react';
+import { useState } from 'react';
 
 import { linkOf, type ActionLink } from '@/components/action-link';
 import { DeniedState } from '@/components/feedback/denied-state';
@@ -8,11 +9,13 @@ import { StatCard } from '@/components/stat-card';
 import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { VisibilityToggle } from '@/components/visibility-toggle';
 import { useInvoiceHistory } from '@/features/factures/hooks';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
 import { frenchDate, frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
+import { readLocalPreference, writeLocalPreference } from '@/lib/local-preference';
 import { currentPeriod } from '@/lib/period';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
@@ -420,17 +423,46 @@ function BillingCards({ data }: { readonly data: BillingDashboard }): ReactEleme
  * carries the same gate. A consultant has no invoice visibility anywhere in this application, so
  * this section renders nothing for that role rather than a 403 nobody asked for.
  */
-function HistorySection(): ReactElement | null {
+function chartsVisibleKey(personaKey: string): string {
+  return `erp:dashboard-charts-visible:${personaKey}`;
+}
+
+/**
+ * Item 23, QA round 3: the same eye/eye-off affordance as item 17's company-news module,
+ * `VisibilityToggle`, persisted in `localStorage` keyed by persona (`lib/local-preference.ts`'s
+ * own header explains why an unscoped key would leak). Shown by default, same as item 17 —
+ * `readLocalPreference` returning `null` (nothing stored yet) reads as visible.
+ */
+function HistorySection({ personaKey }: { readonly personaKey: string }): ReactElement | null {
+  const key = chartsVisibleKey(personaKey);
+  const [visible, setVisible] = useState(() => readLocalPreference(key) !== 'false');
   const query = useInvoiceHistory();
 
-  if (query.isPending) {
-    return <Skeleton className="h-64 w-full" />;
-  }
-  if (query.isError) {
-    return null;
-  }
+  if (query.isError) return null;
 
-  return <InvoiceHistoryChart data={query.data} />;
+  return (
+    <section className="flex flex-col gap-6 rounded-xl bg-card p-5 shadow-card ring-1 ring-border">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-card-title">{LABELS.dashboard.history.heading}</h2>
+        <VisibilityToggle
+          visible={visible}
+          hideLabel={LABELS.dashboard.history.hide}
+          showLabel={LABELS.dashboard.history.show}
+          onToggle={() => {
+            const next = !visible;
+            setVisible(next);
+            writeLocalPreference(key, String(next));
+          }}
+        />
+      </div>
+      {visible &&
+        (query.isPending ? (
+          <Skeleton className="h-64 w-full" />
+        ) : (
+          <InvoiceHistoryChart data={query.data} />
+        ))}
+    </section>
+  );
 }
 
 /** Whether this role's month reads as genuinely empty — the A5 trigger for `SeeMonthsWithData`. */
@@ -454,6 +486,9 @@ function isEmpty(data: DashboardResponse): boolean {
 interface DashboardScreenProps {
   readonly role: Role;
   readonly period: string;
+  /** Items 17/23, QA round 3: scopes the two collapsible panels' localStorage preference —
+   * `lib/local-preference.ts`'s own header explains why an unscoped key would leak. */
+  readonly personaKey: string;
 }
 
 /**
@@ -463,7 +498,7 @@ interface DashboardScreenProps {
  * shape); this component picks the card set matching it. Rank A1 adds the three tiers and rank A3
  * fills recent activity from persisted lifecycle timestamps.
  */
-export function DashboardScreen({ role, period }: DashboardScreenProps): ReactElement {
+export function DashboardScreen({ role, period, personaKey }: DashboardScreenProps): ReactElement {
   const query = useDashboard(period);
 
   if (query.isPending) return <DashboardSkeleton />;
@@ -515,7 +550,9 @@ export function DashboardScreen({ role, period }: DashboardScreenProps): ReactEl
         {data.role === 'billing' && <BillingCards data={data} />}
       </section>
 
-      {(data.role === 'manager' || data.role === 'billing') && <HistorySection />}
+      {(data.role === 'manager' || data.role === 'billing') && (
+        <HistorySection personaKey={personaKey} />
+      )}
 
       {(data.role === 'consultant' || data.role === 'manager') && <TeamPanel />}
 

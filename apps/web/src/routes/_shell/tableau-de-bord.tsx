@@ -31,5 +31,11 @@ function DashboardRoute(): ReactElement {
   const { persona } = Route.useRouteContext();
   const { period } = Route.useSearch();
 
-  return <DashboardScreen role={persona.role} period={period ?? currentPeriod()} />;
+  return (
+    <DashboardScreen
+      role={persona.role}
+      period={period ?? currentPeriod()}
+      personaKey={persona.key}
+    />
+  );
 }
