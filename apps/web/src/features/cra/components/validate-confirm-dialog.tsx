@@ -26,8 +26,11 @@ interface ValidateConfirmDialogProps {
   /** Item 28, QA round 3: a weekend/holiday entry is a fact worth more visual weight than a plain
    * `<dl>` row — this used to be one of `facts` above, indistinguishable from "période" or
    * "clients", and the whole reason for the warning is to make it hard to validate past by
-   * accident. `0`/`undefined` renders nothing. */
-  readonly flaggedDaysCount?: number;
+   * accident. Required and nullable since QA round 4, deliberately: a caller must say whether it
+   * computed the flag at all, rather than silently inheriting "no warning" through an optional
+   * prop. `> 0` is the loud warning; `0` renders nothing, same as before; `null` — the count was
+   * never computed — renders a muted advisory instead of nothing. */
+  readonly flaggedDaysCount: number | null;
   readonly pending: boolean;
   readonly onConfirm: () => void;
   readonly onCancel: () => void;
@@ -65,7 +68,7 @@ export function ValidateConfirmDialog({
 
           {/* Item 28, QA round 3: same amber tone the CRA grid's own flagged-day marker uses — a
               warning, never a block, so validation is still one click away below. */}
-          {flaggedDaysCount !== undefined && flaggedDaysCount > 0 && (
+          {flaggedDaysCount !== null && flaggedDaysCount > 0 && (
             <div className="mt-1 rounded-lg bg-status-late-fill p-2.5 text-sm text-status-late-text ring-1 ring-status-late-dot/30">
               {flaggedDaysCount === 1
                 ? LABELS.preFacturier.validateConfirmDialog.flaggedDaysWarningOne
@@ -74,6 +77,17 @@ export function ValidateConfirmDialog({
                     String(flaggedDaysCount),
                   )}
             </div>
+          )}
+
+          {/* QA round 4: `null` means the caller never computed the flag (the pré-facturier's own
+              row-level "Valider" — item 28's asymmetry above) — muted, not the loud warning
+              styling, because it is not known to be a problem, only unchecked. Plain text, no
+              link: a navigation link here would discard this dialog's state mid-decision, and the
+              pré-facturier row already links to the CRA detail view. */}
+          {flaggedDaysCount === null && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {LABELS.preFacturier.validateConfirmDialog.flaggedDaysNotComputed}
+            </p>
           )}
 
           {facts.length > 0 && (

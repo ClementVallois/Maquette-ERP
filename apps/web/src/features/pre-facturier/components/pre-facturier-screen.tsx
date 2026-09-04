@@ -679,6 +679,10 @@ export function PreFacturierScreen({
         <ValidateConfirmDialog
           consultantName={confirmingValidate.consultantName}
           facts={validateFactsFor(confirmingValidate, period)}
+          // `PreFacturierCraRow` computes no `CraFlag` (item 28's own asymmetry) — `null`, not a
+          // count, so the dialog shows the muted "not computed" advisory rather than silently
+          // inheriting "no warning".
+          flaggedDaysCount={null}
           pending={validateMutation.isPending}
           onCancel={() => {
             setConfirmingValidate(null);
