@@ -450,3 +450,55 @@ mot pour mot, pour que la demande survive à sa réponse.
 To do général :
 
 37. Il faut revoir la page d'affectation des missions pour avoir une barre de recherche d'un consultant,
+
+---
+
+## Round 5 — travaillé le 04/09/2026, branche `fix/qa-round-5`
+
+38. Module « Informations CSE / vie de l'entreprise » : une vraie illustration pour l'alerte
+    sécurité ; les flèches précédent/suivant doivent encadrer le texte à une position fixe au lieu
+    de suivre sa longueur ; un repli à définir sous 768px ; la barre de minuterie doit se remplir de
+    façon fluide, pas par blocs visibles ; une transition douce entre deux messages ; la pause doit
+    couvrir tout le module (titre et bouton œil compris), pas seulement le texte du message. ✅ FAIT
+    — commit `2a814ff`, ADR-0096. `security-alert.webp` importé, `news-securite.svg` maintenant
+    orphelin (non supprimé). Flèches en `md:flex` sur les bords, ancrées à un décalage **fixe en
+    pixels** depuis le haut de la ligne (`top-[1.625rem]`, jamais un pourcentage de sa hauteur
+    variable ni un `-translate-y-1/2` — celui-ci entre en conflit avec le propre
+    `active:translate-y-px` de `Button`, ce qui faisait sauter la flèche au clic ; les deux défauts
+    remontés en cours de session). Sous `md`, la rangée d'origine reste le repli. Barre de minuterie
+    en animation CSS nommée (`news-progress-fill`), mise en pause via `animation-play-state` sans
+    perdre la progression. Transition en fondu (`animate-in fade-in-0`, `tw-animate-css`). Pause
+    déplacée sur la carte entière.
+
+39. Une seule action « Ouvrir ce CRA » sur le tableau de bord consultant — un mois courant validé
+    plus un mois antérieur refusé affichait trois relances qui se chevauchent. ✅ FAIT — commit
+    `9559c7f`, test `journeys.spec.ts` mis à jour, ADR-0097. `RefusedElsewhereNotices` (l'alerte
+    destructive qui doublait la ligne de la file « à faire maintenant ») supprimée ; la ligne de
+    file reste la seule surface. `ActionCard` (résumé du mois affiché) inchangé.
+
+40. Les graphiques du tableau de bord, par rôle : ne pas supprimer ceux qui existent, mais ils ne
+    sont plus pertinents pour un manager — les remplacer par quelque chose qui l'est (répartition
+    mission / intercontrat) ; côté facturation, un état vide assumé plutôt qu'un trou. ✅ FAIT —
+    commit `dbf6548`, ADR-0098. `managerStaffingSnapshot` (nouvelle route API, scopée par office,
+    lue « aujourd'hui » et non sur la période affichée) distingue une mission `Intercontrat` de
+    toute autre mission `Forfait` par son **nom**, pas son `billing_model` — deux tests
+    d'intégration le prouvent (non exécutés, Postgres requis). `InvoiceHistoryChart` et
+    `useInvoiceHistory` restent dans le dépôt, plus appelés par aucun écran.
+
+41. La top bar en mobile sur la page CRA affiche « Mes CRA — septembre », trop long, le mois est
+    coupé en deux. Garder seulement « Mes CRA » sous le seuil `md`, desktop inchangé. ✅ FAIT —
+    commit `149b587`. Deuxième bande à l'intérieur de ce que l'item 33 (round 3) laissait déjà
+    affiché (le `<h1>` nu) — le mécanisme anti-débordement (`truncate`, fil d'Ariane caché sous
+    `lg`) n'a pas changé, seul le texte affiché sous `md` change.
+
+42. « Choisir une mission… » devient « Ajouter une mission… ». ✅ FAIT — commit `1350f6c`. Seul
+    `addActivityPlaceholder` (le contrôle qui ajoute une ligne d'activité au CRA) est concerné ;
+    `assignment.chooseMission` (le champ mission du formulaire Affectations) reste inchangé, c'est
+    un vrai choix, pas un ajout.
+
+43. La légende du CRA (dépliée) a des pastilles de couleur invisibles sur le fond de la page. ✅
+    FAIT — commit `0e84c5d`. `--flag-weekend-bg` est exactement la même valeur que `--background`
+    (`styles/globals.css`) — fond `bg-card` (jeton, pas un `#fff` en dur) sur le contenu déplié.
+
+Index des ADR mis à jour (0096-0098) : commit `e4c9ef9`. Double checkpoint de la session →
+`docs/open-questions.md`, section « QA round 5 checkpoint ».
