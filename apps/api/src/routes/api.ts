@@ -443,7 +443,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
   });
 
   /**
-   * Item 18, QA round 3: the dashboard's "team" panel — a consultant's own manager (N+1), or a
+   * Item 18, QA round 3: the dashboard's org-chart panel — a consultant's own manager (N+1), or a
    * manager's direct reports (N-1) plus their own manager (N+1). No existing route exposed this:
    * `PgReferenceReader.hierarchy()` was write-side only until now (`refuse-cra.ts`,
    * `validate-cra.ts`, deciding who accepts a Cra) — reused here rather than adding new SQL, since
@@ -456,7 +456,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
    * same role.
    */
   app.get(
-    '/api/v1/team',
+    '/api/v1/org-chart',
     { config: { access: forRoles('consultant', 'manager') } },
     async (request) => {
       const actor = requireActor(request);

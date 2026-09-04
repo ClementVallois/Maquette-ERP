@@ -431,7 +431,14 @@ describe('GET /api/v1/cras — beforePeriod (item 22, QA round 3)', () => {
     );
   }
 
-  async function periodsBefore(bound: string): Promise<string[]> {
+  /**
+   * Returns the periods **and** the pagination total, because they come from two different SQL
+   * statements — `PgCraRepository.list` and `.count`, each with its own `beforePeriod` clause.
+   * Reading only `cras` would leave `count`'s clause deletable with the suite still green, and the
+   * footer would then read "3 CRA" over a list showing one: item 22's own defect, one level down
+   * inside item 22's fix.
+   */
+  async function before(bound: string): Promise<{ periods: string[]; total: number }> {
     const response = await app.inject({
       method: 'GET',
       url: `/api/v1/cras?beforePeriod=${bound}`,
@@ -440,18 +447,20 @@ describe('GET /api/v1/cras — beforePeriod (item 22, QA round 3)', () => {
 
     expect(response.statusCode).toBe(200);
 
-    return response
-      .json<{ cras: { period: string }[] }>()
-      .cras.map((cra) => cra.period)
-      .sort();
+    const body = response.json<{ cras: { period: string }[]; total: number }>();
+
+    return { periods: body.cras.map((cra) => cra.period).sort(), total: body.total };
   }
 
   it('is strictly before: the bound month itself is excluded, the one before it is not', async () => {
     await seedMay();
 
-    expect(await periodsBefore('2026-06')).toStrictEqual(['2026-05']);
-    expect(await periodsBefore('2026-07')).toStrictEqual(['2026-05', '2026-06', '2026-06']);
-    expect(await periodsBefore('2026-05')).toStrictEqual([]);
+    expect(await before('2026-06')).toStrictEqual({ periods: ['2026-05'], total: 1 });
+    expect(await before('2026-07')).toStrictEqual({
+      periods: ['2026-05', '2026-06', '2026-06'],
+      total: 3,
+    });
+    expect(await before('2026-05')).toStrictEqual({ periods: [], total: 0 });
   });
 
   it('crosses a year boundary on the text order, not on the digits of the month', async () => {
@@ -463,7 +472,7 @@ describe('GET /api/v1/cras — beforePeriod (item 22, QA round 3)', () => {
       [ALICE, PARIS],
     );
 
-    expect(await periodsBefore('2026-01')).toStrictEqual(['2025-12']);
+    expect(await before('2026-01')).toStrictEqual({ periods: ['2025-12'], total: 1 });
   });
 
   it('is ANDed with statuses, like every other filter here', async () => {
@@ -501,8 +510,11 @@ describe('GET /api/v1/cras — beforePeriod (item 22, QA round 3)', () => {
     });
     expect(listed.statusCode).toBe(200);
 
+    const body = listed.json<{ cras: unknown[]; total: number }>();
     expect(lateCras).toBe(3);
-    expect(listed.json<{ cras: unknown[] }>().cras).toHaveLength(lateCras);
+    expect(body.cras).toHaveLength(lateCras);
+    // And the footer the list renders under itself, which `count` answers separately.
+    expect(body.total).toBe(lateCras);
   });
 
   it('refuses a malformed bound rather than silently ignoring it', async () => {

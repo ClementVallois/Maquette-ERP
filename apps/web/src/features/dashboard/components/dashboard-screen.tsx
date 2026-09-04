@@ -32,7 +32,7 @@ import type {
 
 import { CompanyNewsPanel } from './company-news-panel';
 import { InvoiceHistoryChart } from './invoice-history-chart';
-import { TeamPanel } from './team-panel';
+import { OrgChartPanel } from './org-chart-panel';
 
 /** The dense months the seed actually fills — A5's escape hatch off a genuinely blank one. */
 const MONTHS_WITH_DATA = ['2026-06', '2026-07', '2026-08'] as const;
@@ -557,7 +557,7 @@ export function DashboardScreen({ role, period, personaKey }: DashboardScreenPro
         <HistorySection personaKey={personaKey} />
       )}
 
-      {(data.role === 'consultant' || data.role === 'manager') && <TeamPanel />}
+      {(data.role === 'consultant' || data.role === 'manager') && <OrgChartPanel />}
 
       <RecentActivity data={data} />
     </div>

@@ -68,7 +68,14 @@ const WIDTHS = [375, 768, 1024, 1440] as const;
 const ROUTES: readonly (readonly [persona: string, routes: readonly string[]])[] = [
   [
     'consultant-paris',
-    ['/tableau-de-bord', '/cra', '/cra/2026-06', '/mes-informations', '/mes-notes-de-frais'],
+    [
+      '/tableau-de-bord',
+      '/cra',
+      '/cra/2026-06',
+      '/mes-informations',
+      '/mes-notes-de-frais',
+      '/mes-absences',
+    ],
   ],
   ['manager-paris', ['/tableau-de-bord', '/cra', '/pre-facturier', '/affectations', '/factures']],
   ['billing-paris', ['/tableau-de-bord', '/factures', '/pre-facturier']],

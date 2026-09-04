@@ -4121,7 +4121,7 @@ than the record.
 ## QA round 3 checkpoint — `fix/qa-round-3-mobile`, 04/09/2026
 
 Items 14–36, in two batches. The coding pass on 14–31 and 32–33 was deliberately told to go fast:
-no new tests, no ADRs, a note in `docs/qa-round-3-notes.md` instead. This session finished items
+no new tests, no ADRs, a running notes file instead. This session finished items
 34–36, wrote the tests and the ADRs that pass owed, and reviewed what it shipped. Item 13 was never
 assigned and stays open; item 37 in `docs/todo.md` is a sentence that stops mid-clause and was left
 verbatim rather than guessed at.
@@ -4146,7 +4146,7 @@ verbatim rather than guessed at.
    authorization test, which is the only reason it surfaced at all.
 5. **The pré-facturier's "Valider" dialog warns about nothing while the detail view's warns.** →
    **a row in `docs/open-questions.md`**, dated today, decided by 30/09/2026. Raised by the coding
-   pass itself, in `docs/qa-round-3-notes.md`, and left for a decision rather than guessed.
+   pass itself, in its notes, and left for a decision rather than guessed.
 6. **Three nav entries now open a "à venir" page for modules the README lists as not built.** → **a
    row in the README's "Ce que je ne construis pas"**, written as a paragraph after the
    "Hors périmètre par construction" list: they are placeholders on purpose, and the README says so
@@ -4197,3 +4197,87 @@ Each was applied to the real code, the suite re-run, and the code restored:
 | `c.period < $10` relaxed to `<=`                            | 1 of 60 `api.int.test.ts` fail       |
 | `relative` removed from `<main>`                            | 17 of 20 `responsive.spec.ts` fail   |
 | `relative` removed from the CRA scrollport                  | 3 of 20 fail, and not the same three |
+
+### What the two review subagents found, and where each finding went
+
+`CLAUDE.md` requires `rules-auditor` and `cold-reader` before a merge to `main`. Both ran against
+this branch, in clean contexts, and both earned their keep — between them they found one hole in a
+test written this session, one dead link on every persona's landing page, and a README that
+contradicts the repository's own headline claim. Every finding resolves to one of the four
+outcomes, and nothing was reported back as "acknowledged":
+
+**Fixed now, because they were defects:**
+
+- **`PgCraRepository.count`'s `beforePeriod` clause was asserted by nothing.** The five tests
+  written this session all read `.cras` and none read `total`, so deleting the clause from `count`
+  left the suite green — and the pagination footer would then have read "3 CRA" over a list showing
+  one. Item 22's own defect, reproduced one level down inside item 22's fix. The helper now returns
+  both, and neutering the clause fails two tests.
+- **Three attachment links on the dashboard pointed at `/documents/…pdf`, which nothing serves.**
+  A browser navigation there carries an `html` representation, so the SPA fallback answers
+  `index.html` with 200 and the application silently reboots on its own not-found screen — the first
+  clickable thing a cold reader meets. An attachment is now an inert file name that says so.
+- **`Team` is on `CONTEXT.md`'s _Avoid_ list twice**, for `Roster` and for `ManagerAttachment`, and
+  the item-18 code used it for a route, a test, four types, a hook and a component. Renamed to
+  `OrgChart` throughout — which is what ADR-0090's own title already called it — and `CONTEXT.md`
+  gains the entry, plus one for `CSE`, which the dashboard displays and the glossary did not carry.
+- **ADR-0089 cited `CLAUDE.md` for a rule `CLAUDE.md` does not state.** Neither does
+  `docs/direction-visuelle.md`. The rule was an unwritten convention three components independently
+  obeyed, which is why it broke; the ADR now says that, and establishes it rather than citing it.
+- **ADR-0090 described an office boundary the N+1 half does not honour.** `managerOn` is not
+  office-filtered, so a cross-office consultant is told their manager's name. That is deliberate —
+  it is the person who accepts their `Cra` — but it was undocumented and untested in either
+  direction. Both directions are now asserted on the same pair of people.
+- **The `ComingSoon` title promised "une prochaine phase"** that no remaining phase delivers, while
+  the README's new paragraph calls the three screens deliberate placeholders. The screen now says
+  what the README says.
+- **`/mes-absences` was the one new route the responsive sweep did not cover**, and the favicon test
+  had just been narrowed to `[type="image/svg+xml"]` — correctly, so it kept testing the file it
+  names, but that left item 15's two new hand-rasterised icons asserted by nothing. Both closed.
+- **`use-reduced-motion.ts` named the wrong mechanism** (`setInterval` for a `requestAnimationFrame`
+  loop) in a comment whose whole job is to state a mechanical fact.
+- **The README claimed the repository is private and that no check is required on `main`.** Both
+  false since 03/09/2026, and it is the repository's own headline claim — fourteen checks are
+  required, `enforce_admins` included. `docs/BUILD-RULES.md` carried the same stale sentence about
+  ADR-0040. Corrected against `gh api …/branches/main/protection`, not from memory. The 28/08/2026
+  reservation on `Cold setup (migrate + seed)` is lifted too: it has run green on every pull request
+  since.
+- **`docs/qa-rounds.md` had no round 3**, while claiming in its own second paragraph to be what
+  every "item N, QA round 3" citation resolves to — and a dozen new ADRs and comments make exactly
+  that citation. Round 3's twenty-three items are now in it. Its round-2 item 8 also still read
+  "Declined … nothing left in the branch" for the assignment screen, which shipped the next day
+  (`b4949e4`, 02/09/2026) and has been in the application since.
+- **`docs/qa-round-3-notes.md` was an agent-to-owner memo**, addressed to Clement by name, already
+  contradicted by the ADRs shipped beside it ("no ADR seemed warranted" for `beforePeriod`; ADR-0091
+  exists), and carrying two judgment calls that had never resolved to anything. Both are resolved —
+  item 25's browser check was done and is recorded against the item, item 27's punctuation call is
+  written down as an arbitration for Clement to confirm — and the file is deleted rather than
+  merged to `main`.
+
+**New ADR:**
+
+- **A handler compares a role** in `/api/v1/org-chart` — `BUILD-RULES.md` forbids that flatly, and
+  two instances of the same shape have been on `main` since Phase 5 with no ADR. **ADR-0093** narrows
+  the rule to what it is actually about (authorization) under two checkable conditions, names the
+  rejected option (split the endpoint, which moves the branch into the caller), and says out loud
+  what it costs: the rule stops being a grep and becomes a reviewing obligation. `BUILD-RULES.md` is
+  amended, per its own preamble.
+
+**Recorded, not fixed, because they are not this branch's to fix:**
+
+- **The README's screen inventory describes an application that no longer exists** — "sept pages
+  rendues par le serveur", a landing on the pré-facturier — where the running app is a React SPA
+  landing on a dashboard the README never names. Pre-existing, and a rewrite of a section in the
+  owner's own French prose rather than a factual correction. Named here so it is not rediscovered
+  blind.
+- **`/affectations` is unmentioned in every scope section**, as are the company-news and org-chart
+  panels. The record is now at least consistent (see `qa-rounds.md` above); the README's scope
+  sections are still silent on all three.
+- **The README's recount invitation is 20% off** — it names 511 unit / 167 integration at
+  22/08/2026; `pnpm run test` reports 611 today. Honest by its own rule, stale in practice.
+- **`docs/` holds seven files the README does not account for**, two of which (`plan-densification.md`,
+  `plan-roles-rh-direction.md`) reference an interview brief a cold reader has no access to. That is
+  a question about what belongs in a public repository, and it is Clement's.
+- **`main`'s own last CI run is red** on `Dependency scan` (`pnpm audit`, run 33861522765). The same
+  job passed on this branch's pull request minutes later against an untouched lockfile, so it reads
+  as the registry flake the previous session already saw once — worth a re-run rather than a fix.

@@ -160,18 +160,15 @@ export function CompanyNewsPanel({ personaKey }: { readonly personaKey: string }
                 {current.author} · {frenchDate(current.publishedAt)}
               </p>
               <p className="text-sm text-foreground">{current.body}</p>
-              {current.attachment !== null && (
-                <a
-                  href={current.attachment.href}
-                  className="mt-1 inline-flex w-fit items-center gap-1.5 text-sm text-primary underline underline-offset-2 hover:text-primary-hover"
-                >
+              {current.attachmentName !== null && (
+                // A `<span>`, not an `<a>`: see `company-news.ts`'s own field comment. Nothing
+                // serves a document here, and a link that answers the SPA shell with 200 reboots
+                // the app on its not-found screen instead of failing visibly.
+                <span className="mt-1 inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground">
                   <PaperclipIcon aria-hidden="true" className="size-3.5 shrink-0" />
-                  {current.attachment.label}
-                  <span className="sr-only">
-                    {' '}
-                    {labels.attachment.replace('{title}', current.title)}
-                  </span>
-                </a>
+                  {current.attachmentName}
+                  <span className="text-xs">{labels.attachmentNotProvided}</span>
+                </span>
               )}
             </div>
           </div>
@@ -193,9 +190,10 @@ export function CompanyNewsPanel({ personaKey }: { readonly personaKey: string }
               <div className="flex items-center">
                 {messages.map((message, dotIndex) => (
                   // `size-6` (24px): the visible dot stays `size-1.5`, but the button itself — the
-                  // actual touch target — does not shrink to match it. A future axe run with
-                  // WCAG 2.2's `target-size` enabled (off by default in this repo's axe-core
-                  // version — `docs/qa-round-3-notes.md`) would flag anything smaller.
+                  // actual touch target — does not shrink to match it. `target-size` (WCAG 2.2) is
+                  // `enabled: false` in this repository's axe-core version, so the bare `.analyze()`
+                  // call `assertAccessible` makes would not have caught a 6px target. Sized for the
+                  // rule rather than for the gate that does not yet run it.
                   <button
                     key={message.id}
                     type="button"

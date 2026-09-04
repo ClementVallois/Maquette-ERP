@@ -112,6 +112,25 @@ _Avoid_: Active flag, Termination, Offboarding, Deletion
 The set of `Consultant`s a `Manager` may read: their own `Office`'s consultants, excluding the manager asking and anyone whose `Departure` has passed (`GET /api/v1/consultants`, ADR-0077). It is a read, never a stored list — the membership is derived from `office_id` and `departure_date` every time, so there is nothing to keep in step. It names an office's people, not a project's: who is staffed on a `Mission` is an `Assignment`.
 _Avoid_: Team, Headcount, Directory, Staff list
 
+**OrgChart** (displayed as _Mon équipe_):
+The people immediately around one `Consultant` in the reporting hierarchy, as one read
+(`GET /api/v1/org-chart`, ADR-0090): their own manager (N+1), and — for a `Manager` — the reports
+they may act on (N-1). Not a synonym for `Roster`, which is an `Office`'s whole consultant list
+regardless of who manages whom, nor for `ManagerAttachment`, which is one dated link between two
+people. It is the **intersection** of the two, narrowed once more by `Departure`: an office's
+current consultants who report to the asker today. Derived on every read, never stored. Both
+`Roster` and `ManagerAttachment` list _Team_ under their own _Avoid_, and this entry is why the
+concept has its own word instead of borrowing that one.
+_Avoid_: Team, Reporting line, Hierarchy view, Direct reports (as a noun for the whole read)
+
+**CSE** (🇫🇷 kept — _comité social et économique_):
+The French works council, whose notices are one of the message kinds the dashboard's company-news
+module carries (`features/dashboard/company-news.ts`). Statutory, and untranslatable without loss:
+"works council" names a different body under a different law. It is demonstration content only —
+nothing in the domain reads it, there is no editor, and the messages are a fixed list in the
+front-end.
+_Avoid_: Works council, Staff committee, Intranet news
+
 **Veteran**:
 A `Consultant` seeded with a sparse `Cra` history reaching back to 2016, as opposed to one holding only the dense recent months (`HISTORICAL_VETERANS`, `scripts/lib/seed-data.ts`). A fixture term, not a business one: the firm grants a veteran nothing, and no rule anywhere reads it. It exists so the dataset can exercise a decade of periods, an extended `Mission` and a `Departure` without inventing a second client base (ADR-0080).
 _Avoid_: Senior (a `Grade`), Historical consultant, Legacy consultant

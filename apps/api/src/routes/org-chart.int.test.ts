@@ -11,7 +11,7 @@ import { buildServer } from '../server.ts';
 import { savepointTransactionally } from '../testing/transaction.ts';
 
 /**
- * `GET /api/v1/team` (item 18, QA round 3 — the dashboard's team panel), which is a **new read
+ * `GET /api/v1/org-chart` (item 18, QA round 3 — the dashboard's org-chart panel), which is a **new read
  * path over people**, so it is held to CLAUDE.md's proof point 3: authorization by role *and* by
  * scope, with a test.
  *
@@ -23,7 +23,7 @@ import { savepointTransactionally } from '../testing/transaction.ts';
  *   manager. That row is not invented for this test: `scripts/lib/seed-data.ts` carries two of
  *   exactly this shape (Gabrielle/Bordeaux → Bruno/Paris, François/Rennes → Emma/Lyon), written
  *   before offices scoped anything. Bruno must not read her name — every other read in this app
- *   is bounded by `actor.officeId`, and a team panel that reached past it would be the one screen
+ *   is bounded by `actor.officeId`, and an org-chart panel that reached past it would be the one screen
  *   that leaks a name the rest of the API refuses to show. `docs/open-questions.md` carries the
  *   consequence for the *write* side, which this endpoint does not decide.
  * - **Hierarchy.** `Diane` works in Lyon and reports to Emma. She is in Emma's office *and* in
@@ -105,6 +105,17 @@ const personas: readonly Persona[] = [
     officeName: 'Paris',
     displayName: 'Henri Laurent',
   },
+  // Not one of the four personas the application ships (ADR-0023 pins that list at four) — this
+  // one exists so the cross-office consultant can be the one *asking*, which is the only way to
+  // reach the N+1 half of ADR-0090 from the side the office boundary does not govern.
+  {
+    key: 'consultant-lyon',
+    role: 'consultant',
+    consultantId: GABY,
+    officeId: LYON,
+    officeName: 'Lyon',
+    displayName: 'Gaby Petit',
+  },
 ];
 
 function as(key: string): { cookie: string } {
@@ -182,13 +193,13 @@ afterEach(async () => {
   await app.close();
 });
 
-async function team(persona: string): Promise<Awaited<ReturnType<typeof app.inject>>> {
-  return app.inject({ method: 'GET', url: '/api/v1/team', headers: as(persona) });
+async function orgChart(persona: string): Promise<Awaited<ReturnType<typeof app.inject>>> {
+  return app.inject({ method: 'GET', url: '/api/v1/org-chart', headers: as(persona) });
 }
 
-describe('GET /api/v1/team — by role', () => {
+describe('GET /api/v1/org-chart — by role', () => {
   it('a consultant reads their own manager, and no roster at all', async () => {
-    const response = await team('consultant-paris');
+    const response = await orgChart('consultant-paris');
 
     expect(response.statusCode).toBe(200);
     // `toStrictEqual`, not `toMatchObject`: the point is that no `reports` key reaches a
@@ -200,22 +211,22 @@ describe('GET /api/v1/team — by role', () => {
   });
 
   it('billing is refused — the director is the top of this chart, not a subject of it', async () => {
-    const response = await team('billing-paris');
+    const response = await orgChart('billing-paris');
 
     expect(response.statusCode).toBe(403);
     expect(response.json()).toMatchObject({ type: '/problems/insufficient-role' });
   });
 
   it('no persona at all is refused before any role is considered', async () => {
-    const response = await app.inject({ method: 'GET', url: '/api/v1/team' });
+    const response = await app.inject({ method: 'GET', url: '/api/v1/org-chart' });
 
     expect(response.statusCode).toBe(401);
   });
 });
 
-describe('GET /api/v1/team — by scope', () => {
+describe('GET /api/v1/org-chart — by scope', () => {
   it('a manager reads their own office only: Gaby reports to Bruno on paper and Bruno cannot see her', async () => {
-    const response = await team('manager-paris');
+    const response = await orgChart('manager-paris');
 
     expect(response.statusCode).toBe(200);
     const body = response.json<{ reports: { id: string; displayName: string }[] }>();
@@ -232,7 +243,7 @@ describe('GET /api/v1/team — by scope', () => {
   });
 
   it('the other office reads its own roster, and the two do not overlap', async () => {
-    const response = await team('manager-lyon');
+    const response = await orgChart('manager-lyon');
 
     expect(response.statusCode).toBe(200);
     const body = response.json<{ reports: { id: string }[] }>();
@@ -244,9 +255,32 @@ describe('GET /api/v1/team — by scope', () => {
   });
 });
 
-describe('GET /api/v1/team — a consultant who has left (ADR-0079)', () => {
+describe('GET /api/v1/org-chart — the N+1 half crosses the office on purpose (ADR-0090)', () => {
+  it('tells a consultant who their manager is even when he works in another office', async () => {
+    const response = await orgChart('consultant-lyon');
+
+    expect(response.statusCode).toBe(200);
+    // Gaby is in Lyon and Bruno manages Paris. He is still the person who accepts her Cra, so
+    // withholding his name would be a lie of omission on the one fact this panel states.
+    expect(response.json()).toStrictEqual({
+      role: 'consultant',
+      manager: { id: BRUNO, displayName: 'Bruno Leroy' },
+    });
+  });
+
+  it('and the same pair, read the other way, still stops at the office', async () => {
+    // The asymmetry stated as a pair rather than as two unrelated tests: one name upward, no list
+    // downward, for the very same two people.
+    const response = await orgChart('manager-paris');
+    const { reports } = response.json<{ reports: { id: string }[] }>();
+
+    expect(reports.map((report) => report.id)).not.toContain(GABY);
+  });
+});
+
+describe('GET /api/v1/org-chart — a consultant who has left (ADR-0079)', () => {
   it('is absent from her manager’s current roster', async () => {
-    const response = await team('manager-paris');
+    const response = await orgChart('manager-paris');
     const { reports } = response.json<{ reports: { id: string }[] }>();
 
     expect(reports.map((report) => report.id)).not.toContain(MARINE);

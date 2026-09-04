@@ -111,7 +111,10 @@ ADR and moves to the README's "Ce que je ne construis pas" — never a silent om
   three loci and they answer different questions — the route **declares** which roles carry the
   action, as data on the route and never as a comparison in a handler body; the repository decides
   which of the records that exist this actor may see; the domain decides whether an actor may act
-  given who acted before them (**ADR-0006**). One decision each, and no handler compares a role.
+  given who acted before them (**ADR-0006**). One decision each, and no handler compares a role
+  **to authorize**. A handler may compare one to pick which shape of a role-discriminated
+  response it returns, under **ADR-0093**'s two conditions: the route declares every role that
+  reaches it, and every branch returns rather than refusing or narrowing a query.
 - Three roles × `Office` scope. A manager reads their own office, never another's.
 - Separation of duties, two rules only: whoever records a Cra does not validate it; whoever
   validates does not issue the invoice.
@@ -206,7 +209,7 @@ Vue, PDF generation, OpenTelemetry, Testcontainers.
 
 ## Claimed out loud, and not claimed
 
-Claimed: **YAGNI** (the sorting criterion), the CI-enforced boundary — meaning the job **fails**, not that the merge button locks: branch protection is unavailable on this plan and **ADR-0040** says so out loud — exact monetary arithmetic,
+Claimed: **YAGNI** (the sorting criterion), the CI-enforced boundary — meaning the job **fails** **and** the merge button locks: the repository was made public on 03/09/2026, branch protection is enabled on `main` with every job required, and **ADR-0086** says so out loud (superseding ADR-0040, which had to say the gates were advisory while protection was unavailable) — exact monetary arithmetic,
 authorization by role and scope, the CRA → line → invoice trail **as** the _piste d'audit fiable_.
 
 Not claimed: **SOLID** (only two of five have teeth here, and they already have other names), DDD

@@ -149,11 +149,12 @@ Périmètre volontairement étroit : deux modules, et **une seule flèche qui fr
    `allowed` est ce qui fait échouer aussi une flèche que personne n'a pensé à interdire — et
    [`tests/boundary-rule.test.ts`](tests/boundary-rule.test.ts) prouve, sur des fichiers de violation
    délibérée, qu'elle **rejette**. La CI lance les deux, dans deux étapes séparées.
-   ⚠️ « Échouer » veut dire que le job passe au rouge, **pas** que le bouton de merge se verrouille :
-   la protection de branche GitHub n'est pas disponible sur ce plan, aucune porte n'est donc
-   exigée sur `main`, et c'est écrit ici plutôt que 110 lignes plus bas
-   (**[ADR-0040](docs/adr/0040-ci-gates-are-advisory-while-the-repository-is-private.md)**, et la
-   section « Tests et portes de CI » y revient en détail).
+   ✅ « Échouer » veut dire que le job passe au rouge **et** que le bouton de merge se verrouille :
+   le dépôt est public depuis le 03/09/2026, la protection de branche est active sur `main`,
+   **quatorze** checks y sont exigés (administrateurs compris) et le merge en rouge est impossible
+   — pas tenu par l'auteur, tenu par la plateforme
+   (**[ADR-0086](docs/adr/0086-the-gates-become-blocking-on-a-public-repository.md)**, qui
+   remplace l'ADR-0040 ; la section « Tests et portes de CI » y revient en détail).
 2. **Des invariants métier tenus par le code, pas par la discipline**
    - un CRA validé est **immuable** ;
    - les montants sont des **entiers en centimes** — jamais de flottant sur une valeur monétaire ;
@@ -490,23 +491,27 @@ sert ici deux fois, pour deux choses différentes, et il vaut mieux les séparer
 
 1. **Une règle qui reste verte sur une violation** — le `warn` de dependency-cruiser au lieu de son
    `error`. C'est le sens du mot en tête de ce README (« casser la frontière fait échouer le job,
-   pas produire un warning »), et **ce piège-là est fermé** : les dix jobs ci-dessous
-   échouent réellement, et `tests/boundary-rule.test.ts` le prouve sur des violations délibérées.
-2. **Une porte qui échoue sans rien empêcher.** C'est le sens de la phrase d'ouverture, et
-   **c'est l'état actuel des dix** — écrit ici plutôt que sous-entendu.
+   pas produire un warning »), et **ce piège-là est fermé** : les jobs ci-dessous échouent
+   réellement, et `tests/boundary-rule.test.ts` le prouve sur des violations délibérées.
+2. **Une porte qui échoue sans rien empêcher.** C'était l'état de ce dépôt jusqu'au 03/09/2026, et
+   **ce piège-là est fermé aussi** — écrit ici plutôt que sous-entendu.
 
-Elles tournent sur chaque push et sur chaque pull request, et elles passent au rouge. Mais la seule
-chose capable de désactiver le bouton de merge — la _protection de branche_ GitHub — exige un compte
-**Pro** ou un dépôt **public** ; celui-ci est privé sur le plan gratuit. **Aucun check n'est donc
-exigé sur `main`** : la règle « rien ne merge en rouge » est tenue par l'auteur, pas par la
-plateforme. Ce README a affirmé le contraire — « cinq sont exigées » — depuis la phase 0, et
-c'était faux : la bascule n'était pas en attente, elle était indisponible. Décision, option écartée
-et seuil → **[ADR-0040](docs/adr/0040-ci-gates-are-advisory-while-the-repository-is-private.md)**.
-La bascule est gratuite le jour où le dépôt devient public, et coûte alors une case à cocher par
-job (`sed -n '/^jobs:/,$p' .github/workflows/ci.yml | grep -E '^  [a-z0-9-]+:$'` les liste ; dix au
-28/08/2026 — la borne `/^jobs:/` compte, sans elle `on: push:` s'ajoute à la liste, et la classe de
-caractères doit admettre un chiffre : `web-e2e` en contient un, et une classe `[a-z-]` sans lui
-l'aurait fait disparaître de la liste sans erreur).
+Elles tournent sur chaque push et sur chaque pull request, elles passent au rouge, **et depuis le
+03/09/2026 un rouge verrouille le merge**. La seule chose capable de désactiver le bouton — la
+_protection de branche_ GitHub — exige un compte **Pro** ou un dépôt **public** ; celui-ci est
+devenu public, et la bascule a été faite le jour même. **Quatorze checks sont exigés sur `main`**,
+`enforce_admins` compris, donc la règle « rien ne merge en rouge » ne repose plus sur l'auteur.
+Décision, option écartée et seuil →
+**[ADR-0086](docs/adr/0086-the-gates-become-blocking-on-a-public-repository.md)**, qui remplace
+l'**[ADR-0040](docs/adr/0040-ci-gates-are-advisory-while-the-repository-is-private.md)** — laquelle
+disait l'état antérieur, et disait aussi que ce README avait affirmé le contraire (« cinq sont
+exigées ») depuis la phase 0 alors que la bascule n'était pas en attente mais indisponible.
+
+Les quatorze se lisent avec
+`gh api repos/ClementVallois/Maquette-ERP/branches/main/protection --jq '.required_status_checks.contexts'`.
+Le tableau ci-dessous décrit les **dix** que porte `ci.yml` ; les quatre autres viennent des trois
+autres workflows du dépôt — `Analyze` (CodeQL, `codeql.yml`), `Shell scripts` et
+`Build and boot the image` / `Deploy script --dry-run` (`image.yml`, arrivés avec la phase 8).
 
 | Porte (job CI)                  | Commande                                                                            | Ce qu'elle fait passer au rouge                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | ------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -531,15 +536,15 @@ l'aurait fait disparaître de la liste sans erreur).
 > `Playwright (apps/web)` arrive avec la phase 9.6 du plan front-end. Historique complet →
 > `docs/open-questions.md`.
 >
-> ⚠️ Une réserve datée du 28/08/2026, sur une seule des dix : `Cold setup (migrate + seed)` vient
-> d'être réécrite pour lancer le composite réel, et cette version-là **n'a pas encore tourné sur un
-> runner GitHub** — la branche qui la porte ne peut pas déclencher sa propre pull request. Elle est
-> vérifiée en local et recoupée avec la liste logicielle documentée d'`ubuntu-latest`, pas
-> observée verte sur la plateforme. La ligne est ouverte dans `docs/open-questions.md`.
+> ✅ La réserve du 28/08/2026 sur `Cold setup (migrate + seed)` est levée. Le job venait d'être
+> réécrit pour lancer le composite réel, et cette version-là **n'avait jamais tourné sur un runner
+> GitHub** : la branche qui la portait ne pouvait pas déclencher sa propre pull request. Elle a
+> tourné verte sur chaque pull request depuis. Elle n'est donc plus seulement recoupée avec la
+> liste logicielle documentée d'`ubuntu-latest`, elle est observée verte sur la plateforme.
 >
-> ⚠️ Aucune de ces dix n'empêche un merge aujourd'hui, pour la raison donnée plus haut : la
-> protection de branche n'est pas disponible sur ce plan. C'est une limite assumée et datée
-> (ADR-0040), pas une case oubliée.
+> ✅ Depuis le 03/09/2026, chacune de ces dix empêche un merge — elles font partie des quatorze
+> checks exigés sur `main`, `enforce_admins` compris (ADR-0086). La réserve qui figurait ici, « aucune
+> de ces dix n'empêche un merge », décrivait l'état antérieur et n'est plus vraie.
 
 Les hooks locaux (lefthook) rejouent une partie de ces portes **avant** le commit et le push — et
 depuis ADR-0040 ils ne les doublent plus, ils sont **le seul arrêt mécanique** qui précède un merge,

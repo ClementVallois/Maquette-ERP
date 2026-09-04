@@ -110,24 +110,24 @@ export interface BillingDashboard {
 
 export type DashboardResponse = ConsultantDashboard | ManagerDashboard | BillingDashboard;
 
-/** Item 18, QA round 3 — `GET /api/v1/team`. One org-chart neighbour. */
-export interface TeamMember {
+/** Item 18, QA round 3 — `GET /api/v1/org-chart`. One org-chart neighbour. */
+export interface OrgChartMember {
   readonly id: string;
   readonly displayName: string;
 }
 
 /** A consultant's own manager (N+1) — `null` when nobody is currently attached (a legacy or
  * data gap this UI has to render, not assume away). */
-export interface ConsultantTeam {
+export interface ConsultantOrgChart {
   readonly role: 'consultant';
-  readonly manager: TeamMember | null;
+  readonly manager: OrgChartMember | null;
 }
 
 /** A manager's direct reports (N-1) and their own manager (N+1, "the director" in this dataset). */
-export interface ManagerTeam {
+export interface ManagerOrgChart {
   readonly role: 'manager';
-  readonly manager: TeamMember | null;
-  readonly reports: readonly TeamMember[];
+  readonly manager: OrgChartMember | null;
+  readonly reports: readonly OrgChartMember[];
 }
 
-export type TeamResponse = ConsultantTeam | ManagerTeam;
+export type OrgChartResponse = ConsultantOrgChart | ManagerOrgChart;

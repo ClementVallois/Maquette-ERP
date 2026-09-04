@@ -3,13 +3,13 @@ import type { ReactElement } from 'react';
 
 import { LABELS } from '@/lib/labels';
 
-import { useTeam } from '../hooks';
-import type { TeamMember } from '../types';
+import { useOrgChart } from '../hooks';
+import type { OrgChartMember } from '../types';
 
 /**
- * Item 18, QA round 3: a small "team" panel — a consultant's own manager (N+1), or a manager's
+ * Item 18, QA round 3: a small org-chart panel — a consultant's own manager (N+1), or a manager's
  * direct reports (N-1) plus their own manager (N+1). Rendered only for those two roles
- * (`DashboardScreen`'s own call site) — `useTeam`'s `GET /api/v1/team` is `forRoles('consultant',
+ * (`DashboardScreen`'s own call site) — `useOrgChart`'s `GET /api/v1/org-chart` is `forRoles('consultant',
  * 'manager')` (see that route's own comment for why billing has no place in this read).
  *
  * Pending/error states render nothing rather than a skeleton or an error card: this panel is a
@@ -17,13 +17,13 @@ import type { TeamMember } from '../types';
  * screen's loading and error states — a second, competing error surface for one small panel would
  * be more noise than the panel is worth.
  */
-export function TeamPanel(): ReactElement | null {
-  const query = useTeam();
+export function OrgChartPanel(): ReactElement | null {
+  const query = useOrgChart();
 
   if (!query.isSuccess) return null;
 
   const data = query.data;
-  const labels = LABELS.dashboard.team;
+  const labels = LABELS.dashboard.orgChart;
 
   return (
     <div className="rounded-xl bg-card p-5 shadow-card ring-1 ring-border">
@@ -49,7 +49,7 @@ export function TeamPanel(): ReactElement | null {
               <p className="text-help pl-6">{labels.noReports}</p>
             ) : (
               <ul className="flex flex-wrap gap-1.5 pl-6">
-                {data.reports.map((report: TeamMember) => (
+                {data.reports.map((report: OrgChartMember) => (
                   <li
                     key={report.id}
                     className="rounded-full bg-accent px-2.5 py-1 text-xs text-accent-foreground"

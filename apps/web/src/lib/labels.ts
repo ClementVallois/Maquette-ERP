@@ -232,14 +232,14 @@ export const LABELS = {
       next: 'Message suivant',
       /** `{index}`/`{total}` interpolated — a dot's own accessible name. */
       goToMessage: 'Aller au message {index} sur {total}',
-      /** `{title}` interpolated — the attachment link's accessible name, so "Ouvrir le
-       * document" alone (repeated five times across a carousel) never has to be the whole name. */
-      attachment: 'Pièce jointe : {title}',
+      /** Said in the interface, not only in the README: the attachment is a file name, and this
+       * mockup has no document store to open it from. */
+      attachmentNotProvided: '(document non fourni dans la maquette)',
     },
-    /** Item 18, QA round 3: the dashboard's "team" panel, consultant and manager only — billing
+    /** Item 18, QA round 3: the dashboard's org-chart panel, consultant and manager only — billing
      * has no place in this org chart in the seed (the one billing persona is the director every
      * manager reports to, not a subject of this read). */
-    team: {
+    orgChart: {
       heading: 'Mon équipe',
       manager: 'Manager',
       noManager: 'Aucun manager renseigné.',
@@ -576,7 +576,8 @@ export const LABELS = {
        * `<dl>` row a manager could validate past without reading) — `{count}` interpolated,
        * singular/plural chosen at the call site. Shown only where the count is known
        * (`manager-cra-grid-screen.tsx`'s own `data.flags`); the pré-facturier's own row-level
-       * "Valider" does not have this data (see `docs/qa-round-3-notes.md`). */
+       * "Valider" does not have this data — `PreFacturierCraRow` computes no `CraFlag`, by design.
+       * That asymmetry is an open row in `docs/open-questions.md`, dated 04/09/2026. */
       flaggedDaysWarningOne:
         '1 jour de ce mois tombe un week-end ou un jour férié — vérifiez-le avant de valider.',
       flaggedDaysWarningMany:
@@ -948,7 +949,9 @@ export const LABELS = {
     openMenu: 'Ouvrir le menu',
     closeMenu: 'Fermer le menu',
     breadcrumbHome: 'Accueil',
-    comingSoonTitle: 'Cet écran arrive dans une prochaine phase',
+    /** Not "arrive dans une prochaine phase": no remaining phase of this build makes screens, and
+     * the README states these three as deliberate placeholders rather than unfinished work. */
+    comingSoonTitle: 'Cet écran n’est pas construit dans cette maquette',
     comingSoonBody:
       'Cette page n’est pas encore construite dans la maquette : elle existe dans la navigation pour montrer le périmètre complet, pas pour être ouverte aujourd’hui.',
     notFoundTitle: 'Page introuvable',

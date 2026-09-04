@@ -326,8 +326,12 @@ dev` tournant répond 200 `image/svg+xml` exactement sur le href déclaré ; le 
     initial n'était positionné — voir l'ADR-0089. L'assertion e2e correspondante a été **mise à
     jour, pas supprimée** : elle vérifie maintenant le nom accessible _et_ le contenu du `sr-only`.
 
-27. ✅ FAIT — commit `bb55ce6`. Message reformulé, avec le point final que portent toutes les autres
-    phrases du fichier (les deux fichiers de libellés).
+27. ✅ FAIT — commit `bb55ce6`. Message reformulé. ⚖️ **Un arbitrage à confirmer** : l'énoncé donnait
+    la phrase cible **sans** point final, et elle est livrée **avec**. Toutes les autres entrées de
+    `problem.sentences`, dans les deux fichiers de libellés, se terminent par un point, ses voisines
+    immédiates comprises — le point a été lu comme tombé par inadvertance à la rédaction de l'item,
+    pas comme une consigne de casser la convention du fichier. Si c'était bien une consigne, c'est un
+    caractère à retirer.
 
 28. ✅ FAIT (une moitié), ⚠️ **une moitié ouverte** — commit `0645aa5`. Le warning à la soumission
     et le repérage visuel côté manager sont faits, y compris dans la boîte de confirmation ouverte

@@ -33,7 +33,14 @@ export interface CompanyNewsMessage {
    * URL. `| null`, not optional: every caller has to handle the absence explicitly instead of an
    * easy-to-miss `undefined` check. */
   readonly imageSrc: string | null;
-  readonly attachment: { readonly label: string; readonly href: string } | null;
+  /**
+   * A file name, deliberately **not** a link. There is no document store in this mockup, and
+   * nothing serves `/documents/` — a browser navigation there carries an `html` representation, so
+   * the SPA fallback answers `index.html` with 200 and the app silently reboots on its own
+   * not-found screen. A named attachment that is visibly inert is the honest shape: the README's
+   * "Ce que je ne construis pas" says a document store is not built.
+   */
+  readonly attachmentName: string | null;
 }
 
 const MESSAGES: readonly CompanyNewsMessage[] = [
@@ -44,7 +51,7 @@ const MESSAGES: readonly CompanyNewsMessage[] = [
     publishedAt: '2026-09-01',
     author: 'Le CSE',
     imageSrc: null,
-    attachment: { label: 'CR-CSE-2026-08-27.pdf', href: '/documents/cr-cse-2026-08-27.pdf' },
+    attachmentName: 'CR-CSE-2026-08-27.pdf',
   },
   {
     id: 'securite-phishing',
@@ -53,7 +60,7 @@ const MESSAGES: readonly CompanyNewsMessage[] = [
     publishedAt: '2026-08-29',
     author: 'RSSI — Direction de la sécurité',
     imageSrc: newsSecurite,
-    attachment: null,
+    attachmentName: null,
   },
   {
     id: 'formation-catalogue',
@@ -62,10 +69,7 @@ const MESSAGES: readonly CompanyNewsMessage[] = [
     publishedAt: '2026-08-22',
     author: 'Direction des ressources humaines',
     imageSrc: newsFormation,
-    attachment: {
-      label: 'Catalogue-formations-S2-2026.pdf',
-      href: '/documents/catalogue-formations-s2-2026.pdf',
-    },
+    attachmentName: 'Catalogue-formations-S2-2026.pdf',
   },
   {
     id: 'mutuelle-nouvelle-offre',
@@ -74,10 +78,7 @@ const MESSAGES: readonly CompanyNewsMessage[] = [
     publishedAt: '2026-08-18',
     author: 'Direction des ressources humaines',
     imageSrc: null,
-    attachment: {
-      label: 'Grille-garanties-2027.pdf',
-      href: '/documents/grille-garanties-2027.pdf',
-    },
+    attachmentName: 'Grille-garanties-2027.pdf',
   },
   {
     id: 'seminaire-annuel',
@@ -86,7 +87,7 @@ const MESSAGES: readonly CompanyNewsMessage[] = [
     publishedAt: '2026-08-10',
     author: 'Direction générale',
     imageSrc: newsTeam,
-    attachment: null,
+    attachmentName: null,
   },
   {
     id: 'arrivees-ete',
@@ -95,7 +96,7 @@ const MESSAGES: readonly CompanyNewsMessage[] = [
     publishedAt: '2026-07-28',
     author: 'Direction des ressources humaines',
     imageSrc: null,
-    attachment: null,
+    attachmentName: null,
   },
 ] as const;
 

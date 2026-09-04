@@ -8,8 +8,14 @@
 The shell is one fixed-size box — `routes/_shell.tsx` renders `flex h-dvh overflow-hidden` around
 a `<main class="flex-1 overflow-y-auto">`. The document is therefore not supposed to scroll at all,
 on either axis, and anything wider than the viewport is supposed to scroll inside its own
-`overflow-x-auto` container: the CRA month grid, a `DataTable`. That is stated in `CLAUDE.md`'s own
-terms and it is what every screen was written against.
+`overflow-x-auto` container: the CRA month grid, a `DataTable`.
+
+That last part was a convention nothing had ever written down. `business-timeline.tsx` calls it
+"the rule every wide element in this app follows"; `components/ui/table.tsx` implements it;
+`cra-matrix-table.tsx` implements it. No ADR stated it and neither does
+`docs/direction-visuelle.md`, whose layout section stops at "sticky header inside a scroll area on
+the grid". An unwritten rule that three components independently obey is exactly the kind that
+breaks quietly, which is what happened.
 
 None of it held. Measured on `fix/qa-round-3-mobile` before this decision, on the real seeded
 database:
@@ -39,7 +45,8 @@ spans, and reopened it.
 
 ## Decision
 
-**Every element that establishes a scrollport is `position: relative`.** Concretely, in this
+The rule, now written down: **wide content scrolls inside its own container and the page never
+scrolls — so every element that establishes a scrollport is `position: relative`.** Concretely, in this
 codebase: `<main>` in `routes/_shell.tsx`, the CRA matrix's own region in `cra-matrix-table.tsx`,
 and `components/ui/table.tsx`'s wrapper, which already was.
 
