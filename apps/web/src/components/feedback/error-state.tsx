@@ -51,13 +51,20 @@ export function ErrorState({
       <h1 className="text-card-title">{title}</h1>
       <p className="text-sm text-muted-foreground">{body}</p>
       {correlationId !== undefined && (
-        <p className="flex items-center gap-1.5 font-mono text-[0.75rem] text-muted-foreground">
-          {LABELS.problem.correlationId} : {correlationId}
+        // Not `flex`: a flex row keeps the copy button pinned to the row's end even once the id
+        // wraps to a second or third line, leaving it visually orphaned next to nothing. `Button`
+        // is `inline-flex` (an inline-level box on its own), so plain inline text flow lets it
+        // wrap along with the id as a unit instead.
+        <p className="max-w-full text-[0.75rem] text-muted-foreground">
+          <span className="font-mono break-all">
+            {LABELS.problem.correlationId} : {correlationId}
+          </span>{' '}
           <Button
             type="button"
             variant="ghost"
             size="icon-xs"
             aria-label={LABELS.problem.copyCorrelationId}
+            className="align-middle"
             onClick={() => {
               void copyCorrelationId(correlationId);
             }}

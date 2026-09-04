@@ -4,7 +4,10 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 const alertVariants = cva(
-  "group/alert relative grid w-full gap-0.5 rounded-lg border px-2.5 py-2 text-left text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
+  // Item 29, QA round 3: `has-data-[slot=alert-action]:py-3` gives the action button (vertically
+  // centred by `AlertAction` below) room on both sides — `py-2` alone left it flush against the
+  // bottom edge whenever the alert's own text was shorter than the button.
+  "group/alert relative grid w-full gap-0.5 rounded-lg border px-2.5 py-2 text-left text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:py-3 has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -61,8 +64,15 @@ function AlertDescription({ className, ...props }: React.ComponentProps<'div'>) 
 }
 
 function AlertAction({ className, ...props }: React.ComponentProps<'div'>) {
+  // Item 29, QA round 3: `top-2` pinned the action to the alert's top edge — never centred
+  // against a single-line message, and the button could overflow the box's bottom edge on a
+  // short alert. `top-1/2 -translate-y-1/2` centres it against the alert's actual height instead.
   return (
-    <div data-slot="alert-action" className={cn('absolute top-2 right-2', className)} {...props} />
+    <div
+      data-slot="alert-action"
+      className={cn('absolute top-1/2 right-2 -translate-y-1/2', className)}
+      {...props}
+    />
   );
 }
 

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" role="img" aria-label="Illustration : formation">
+  <!-- Item 17, QA round 3: an open-book mark for "formation/montée en compétences" news, same
+       accent/primary palette as the other two illustrations in this module. -->
+  <rect width="200" height="120" rx="10" fill="#eaf1f8" />
+  <path
+    d="M100 40 C88 32 68 30 54 34 L54 84 C68 80 88 82 100 90 C112 82 132 80 146 84 L146 34 C132 30 112 32 100 40Z"
+    fill="#1f4d7a"
+  />
+  <path d="M100 40 L100 90" stroke="#eaf1f8" stroke-width="2.5" />
+  <path d="M60 46 L92 44" stroke="#eaf1f8" stroke-width="2.5" stroke-linecap="round" />
+  <path d="M60 58 L92 56" stroke="#eaf1f8" stroke-width="2.5" stroke-linecap="round" />
+  <path d="M108 44 L140 46" stroke="#eaf1f8" stroke-width="2.5" stroke-linecap="round" />
+  <path d="M108 56 L140 58" stroke="#eaf1f8" stroke-width="2.5" stroke-linecap="round" />
+</svg>

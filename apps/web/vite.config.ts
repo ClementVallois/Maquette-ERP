@@ -50,6 +50,13 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    // ADR-0092: an image the app references is served from its own origin, never inlined as a
+    // `data:` URI, which the production CSP's `img-src 'self'` refuses. The trap this guards is
+    // that it is invisible outside a production build — `pnpm run dev` sends no CSP — and that
+    // `?url`, the documented per-import opt-out, does not work in this project.
+    assetsInlineLimit: (filePath) => (/\/news-[^/]+\.svg$/u.test(filePath) ? false : undefined),
+  },
   server: {
     host: '127.0.0.1',
     port: 5173,

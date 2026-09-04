@@ -109,6 +109,7 @@ export class PgCraRepository implements CraRepository {
          AND ($7::text[] IS NULL OR c.status = ANY($7))
          AND ($8::text IS NULL OR left(c.period, 4) = $8)
          AND ($9::text IS NULL OR right(c.period, 2) = $9)
+         AND ($10::text IS NULL OR c.period < $10)
        GROUP BY c.id, c.consultant_id, c.office_id, c.period, c.status,
                 c.validated_at, c.refusal_at, c.submitted_at
        ORDER BY c.period DESC, c.consultant_id
@@ -129,6 +130,10 @@ export class PgCraRepository implements CraRepository {
         // itself always is, and an unpadded '6' would never match `right(c.period, 2)`'s '06'.
         query.year === undefined ? null : String(query.year),
         query.month === undefined ? null : String(query.month).padStart(2, '0'),
+        // Item 22, QA round 3: plain text comparison — `period` sorts lexically the same as
+        // chronologically for `YYYY-MM` text, same reasoning `routes/_shell/pre-facturier.tsx`'s
+        // own `localeCompare` on this column already relies on.
+        query.beforePeriod ?? null,
       ],
     );
 
@@ -163,7 +168,8 @@ export class PgCraRepository implements CraRepository {
          AND ($4::text[] IS NULL OR c.consultant_id = ANY($4))
          AND ($5::text[] IS NULL OR c.status = ANY($5))
          AND ($6::text IS NULL OR left(c.period, 4) = $6)
-         AND ($7::text IS NULL OR right(c.period, 2) = $7)`,
+         AND ($7::text IS NULL OR right(c.period, 2) = $7)
+         AND ($8::text IS NULL OR c.period < $8)`,
       [
         actor.officeId,
         scope === 'own' ? actor.consultantId : null,
@@ -174,6 +180,7 @@ export class PgCraRepository implements CraRepository {
         query.statuses !== undefined && query.statuses.length > 0 ? query.statuses : null,
         query.year === undefined ? null : String(query.year),
         query.month === undefined ? null : String(query.month).padStart(2, '0'),
+        query.beforePeriod ?? null,
       ],
     );
 

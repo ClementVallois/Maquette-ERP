@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ERP — Maquette</title>
+    <title>Maquette ERP</title>
     <!-- Item 5, QA round 1: a path under `src/`, not `public/` — Vite content-hashes this into
          `dist/assets/`, which `apps/api/src/web/spa.ts` already serves; a file dropped in
          `public/` would land at `dist/favicon.svg` and 404 in production (ADR-0063). CSP's
@@ -23,6 +23,11 @@
          (Chrome deprioritises an SVG icon of unstated intrinsic size against a same-size
          alternative) — not a fix for a reproduced bug, since none was reproduced. -->
     <link rel="icon" type="image/svg+xml" href="/src/assets/favicon.svg" sizes="any" />
+    <!-- Item 15, QA round 3: a PNG fallback and an apple-touch-icon, since some browsers
+         deprioritise (or simply skip) an SVG-only favicon. Same `src/assets/` placement as the
+         SVG above, for the same reason (see the comment on that link). -->
+    <link rel="icon" type="image/png" href="/src/assets/favicon-96.png" sizes="96x96" />
+    <link rel="apple-touch-icon" href="/src/assets/apple-touch-icon.png" />
   </head>
   <body>
     <div id="root"></div>

@@ -21,6 +21,10 @@ const BASE_URL = SERVED_BUILD ? API_URL : 'http://127.0.0.1:5173';
 
 const JOURNEYS_SPEC = '**/journeys.spec.ts';
 
+/** Drives its own viewport across four widths, so it belongs to exactly one project — see the
+ * `responsive` project below and the spec's own header. */
+const RESPONSIVE_SPEC = '**/responsive.spec.ts';
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -43,7 +47,7 @@ export default defineConfig({
       // file in its own worker, and the journeys share one seeded database in a fixed order
       // (Annexe B) — three simultaneous copies of J1 against one Cra would corrupt each other.
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
-      testIgnore: JOURNEYS_SPEC,
+      testIgnore: [JOURNEYS_SPEC, RESPONSIVE_SPEC],
     },
     {
       name: 'mobile-shell',
@@ -51,7 +55,16 @@ export default defineConfig({
       // not exercised by Phase 1's smoke test, which runs on both projects regardless. Same
       // exclusion as `desktop`, same reason.
       use: { ...devices['Desktop Chrome'], viewport: { width: 768, height: 1024 } },
-      testIgnore: JOURNEYS_SPEC,
+      testIgnore: [JOURNEYS_SPEC, RESPONSIVE_SPEC],
+    },
+    {
+      name: 'responsive',
+      // No viewport here on purpose: `responsive.spec.ts` sets its own, four of them, and the
+      // widths are part of what it asserts (375 / 768 / 1024 / 1440). Its own project so those
+      // four runs happen once, not once per project — and so the two projects above, which are
+      // pinned to a single width each, do not silently re-run it at the wrong one.
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: RESPONSIVE_SPEC,
     },
     {
       name: 'journeys',

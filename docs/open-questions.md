@@ -50,6 +50,8 @@ moves down to "Settled" with its answer, so the record shows it was known rather
 | 03/09/2026 | **`nightly-reset.sh`'s `pg_dump` step has no timeout, and it is the first thing the reset does under `set -e`.** `compose exec -T postgres pg_dump … >"$dump_file.tmp"` runs with no time budget of its own and no `TimeoutStartSec=` on `erp-reset.service`, so systemd's default (`DefaultTimeoutStartSec`, 90s on a stock Debian) is what actually bounds it — a number nobody in this phase chose. It also holds the blocking `flock` on `$STATE_DIR/deploy.lock` for its whole duration, which `pull-and-redeploy.sh` waits on. | A dump slow enough to hit that unchosen budget kills the unit before `migrate` and `seed` ever run, so the nightly reset of ADR-0032 silently does not happen, and `erp-deploy.timer`'s next tick blocks behind the lock until the same kill releases it. The only trace is `journalctl -u erp-reset`, which nothing surfaces to a human who is not already looking. | **No phase named — the trigger is measurable only on a live instance.** Reopen the first time a real reset run is slow enough to matter, or the first time `erp-reset.service` reports a failure. The dataset is the deterministic seed and its dump takes well under a second locally (188 `pg_restore --list` TOC entries), so choosing a timeout now would be picking a second unmeasured number to bound the first. |
 | 03/09/2026 | **`erp-deploy.timer`'s 5-minute poll and `pull-and-redeploy.sh`'s 30 × 2s readiness budget are both picked, not measured.** Nothing in this phase profiled how long this application takes to reach `/readyz` under a real VPS's I/O, as opposed to a laptop's Docker daemon; `READY_RETRIES=30` / `READY_INTERVAL=2` gives 60 seconds, and the local evidence behind it is a container a few hundred milliseconds from its database. | The failure is not a slow deploy, it is a **false rollback**: a healthy new digest that needs 70 seconds on the host is declared failed, `deploy_digest` redeploys the digest it displaced, and the timer re-attempts the same doomed transition every 5 minutes — an outage caused by the recovery path, not by the release. | **No phase named — the number cannot be chosen without the host it describes.** Reopen the first time a real deploy is rolled back automatically, and set both figures from the measured `/readyz` time rather than a second guess. Both are already environment overrides (`READY_RETRIES`, `READY_INTERVAL`, and the timer's `OnUnitActiveSec`), so the correction is a value change on the host, not a code change. |
 | 03/09/2026 | **The host's GHCR read token lands in `/root/.docker/config.json`, which is wider than the sentence ADR-0030 wrote for it.** `deploy/provision-host.sh`'s stage 6 runs `docker login ghcr.io` as root, and root's docker config is read by every rootful `docker` invocation on this box — including the neighbouring services ADR-0030 exists to be isolated from. ADR-0030 § Credential split says the token "exists only where image resolution and pull need it". Base64 in that file is encoding, not encryption. A second, unverified assumption sits under it: the wizard instructs a fine-grained PAT "scoped to this repository only", and whether GitHub's Packages read permission is genuinely repository-scoped rather than account-scoped was not confirmed — if it is account-scoped, the isolation claim is weaker than the instruction implies. | A read-only token for one private package is a small prize, but it is a credential placed in a shared location by a phase whose central argument is that no credential is placed where it is not needed. The choice of storage was made inside a `fix` commit with no ADR and no reconsideration threshold, which is the part that does not match how this repository decides things. | **Clement's decision, and the first one this phase leaves open rather than settles.** Three ways out, in rising cost: make the GHCR _package_ public (its visibility is separate from the repository's, so this removes the credential entirely and is the only option that ends the question); keep the login and write the ADR that records the location, its blast radius and the threshold at which it moves; or give the pull its own credential store away from root's config. Reopen before the first deploy — this is on the go-live path, not after it. |
+| 04/09/2026 | **A consultant can be attached to a manager in another office, and then no one can act on their Cra through the UI.** `scripts/lib/seed-data.ts` carries two such rows — Gabrielle (Bordeaux) reports to Bruno (Paris), François (Rennes) to Emma (Lyon) — written before offices scoped anything. `validate-cra.ts` asks the hierarchy who may accept a Cra, and answers Bruno; every read Bruno makes is bounded by `actor.officeId`, and so never shows him Gabrielle's Cra. ADR-0090 decided the _read_ side (the team panel stops at the office) and deliberately did not decide this. | Invisible today only because the seed pre-validates both of their Cras. The moment a cross-office consultant has a `submitted` Cra, it is unvalidatable through the interface and the only symptom is a Cra that sits there — no error, no refusal, no screen that names the problem. It is also the shape of a real modelling question (does authority follow the person or the office?), not a data typo. | **Open.** Decided in the QA round that follows this one, or by 30/09/2026 at the latest, in one of three ways: the seed stops crossing offices; `validate-cra.ts` stops asking the hierarchy and asks the office; or a manager's authority is modelled explicitly as spanning offices, which reopens ADR-0042. |
+| 04/09/2026 | **The pré-facturier's own row-level "Valider" button opens a confirmation dialog with no flagged-days warning, while the CRA detail view's does.** Item 28 added `flaggedDaysCount` to `ValidateConfirmDialog`; `manager-cra-grid-screen.tsx` has `data.flags` already and passes it, `pre-facturier-screen.tsx` has no such data. `PreFacturierCraRow` (`apps/api/src/composition/pre-facturier.ts`) never runs the submission checks per row — it is a lightweight paginated summary by design. | Two paths to the same irreversible act, one of which warns and one of which does not. A manager who validates from the list never learns a Saturday was worked; the same manager validating the same Cra from its detail page does. Silent asymmetry on a write that cannot be undone (a validated Cra is immutable). | **Open.** Decided in the QA round that follows this one, or by 30/09/2026, once the cost is measured rather than assumed: either compute the flag count per row (loading every listed Cra's lines and calendar — a real cost on a page that can be large), cache it, or remove the warning from the detail dialog so both paths agree in the other direction. |
 ---
 
 ## Front-end Phase 1 checkpoint — `feat/web`, 24/08/2026
@@ -4113,3 +4115,230 @@ test in the two places where the split makes the order visible (`39d56e6` before
 already says this repository cannot prove test-first from its history; this phase is the first
 place the history actively shows the reverse. Rewriting the commits to hide that would be worse
 than the record.
+
+---
+
+## QA round 3 checkpoint — `fix/qa-round-3-mobile`, 04/09/2026
+
+Items 14–36, in two batches. The coding pass on 14–31 and 32–33 was deliberately told to go fast:
+no new tests, no ADRs, a running notes file instead. This session finished items
+34–36, wrote the tests and the ADRs that pass owed, and reviewed what it shipped. Item 13 was never
+assigned and stays open; item 37 in `docs/todo.md` is a sentence that stops mid-clause and was left
+verbatim rather than guessed at.
+
+### Where I am least confident in what was produced
+
+1. **The two `relative` classes are one decision spread across two files, and only a test holds
+   them together.** → **new ADR** (0089). Removing either one leaves the app looking fine at the
+   width a reviewer is most likely to open — the symptom moves from the document to `<main>`, or
+   from 375px to 1024px. `responsive.spec.ts` is what makes that visible, and the ADR says so.
+2. **`position: relative` on a scrollport silently changes the containing block for anything
+   absolutely positioned added inside it later.** → **new ADR** (0089, its "Consequences" section
+   names it as the thing no test catches). No open row: it is a reviewing cost, not an undecided
+   question.
+3. **Item 34's real cause was introduced by item 26 of the same round.** → **fix now**, done, and
+   the mechanism is written into `cra-matrix-table.tsx` and `cra-quantity-cell.tsx` — the second of
+   which had described this exact trap since Phase 6 and stated "no ancestor here is positioned" as
+   a present fact that had just stopped being true. Corrected in the same commit rather than left to
+   rot.
+4. **A cross-office `manager_attachment` makes a Cra unvalidatable through the UI.** → **a row in
+   `docs/open-questions.md`**, dated today, decided by 30/09/2026. Found while building the item-18
+   authorization test, which is the only reason it surfaced at all.
+5. **The pré-facturier's "Valider" dialog warns about nothing while the detail view's warns.** →
+   **a row in `docs/open-questions.md`**, dated today, decided by 30/09/2026. Raised by the coding
+   pass itself, in its notes, and left for a decision rather than guessed.
+6. **Three nav entries now open a "à venir" page for modules the README lists as not built.** → **a
+   row in the README's "Ce que je ne construis pas"**, written as a paragraph after the
+   "Hors périmètre par construction" list: they are placeholders on purpose, and the README says so
+   rather than letting a cold reader find the contradiction.
+7. **`beforePeriod` reached the domain port with no ADR and no test.** → **new ADR** (0091) and
+   five integration tests, including the equality that the item exists for — the dashboard's
+   `lateCras` count and the list its card links to return the same number.
+8. **`build.assetsInlineLimit` is a rule enforced by nothing.** → **new ADR** (0092). A fourth
+   illustration not named `news-*.svg` will inline, pass every local check, and fail only under the
+   served-build topology, as an image that does not appear.
+
+### In three months, what breaks if this is left as it is
+
+- **The `?url` mystery.** ADR-0092 ships a size-based override because the documented per-import
+  opt-out observably did not work, and does not explain why. On a Vite upgrade someone will remove
+  the override as redundant without re-checking `dist/`. The ADR's reconsideration threshold names
+  that case; nothing enforces it.
+- **`CraListQuery` now carries five independent optional filters**, each an `IS NULL OR` clause in
+  the same statement. ADR-0091 says out loud that the query is readable at five and will not be at
+  ten, and names the successor. That is a deferral with a shape, not a date.
+- **`responsive.spec.ts` covers read-only routes only.** A screen reached only by writing — a
+  refusal dialog's aftermath, a freshly issued invoice — is not measured at any width. The mutating
+  journeys run in their own serial project at 1440 and assert nothing about overflow.
+
+### What did not run, and why
+
+- **The `journeys` Playwright project was not run locally.** It mutates the seeded database, and
+  this machine's Postgres is shared with another working copy; a `db:reset` would have destroyed
+  that session's state. It runs in CI against a service container, under the served-build topology
+  with the real CSP, which is the authoritative run for it. The `desktop`, `mobile-shell` and
+  `responsive` projects were run locally in full.
+- **One flake, recorded rather than chased**: `axe.spec.ts:69` ("the read-only, validated grid has
+  no critical/serious violation") failed once on `mobile-shell` at `--workers=2`, then passed on a
+  re-run at the same worker count and in isolation. No mechanism established; the report was
+  overwritten before it could be read. CI retries twice.
+- **No mutation-testing run.** Stryker is nightly on `domain/` (ADR-0027) and nothing in this round
+  touched `domain/` except `CraListQuery`, which is an interface.
+
+### What this round cannot claim, and the record is the record
+
+**The history shows implementation and test in different commits, twice — provably.**
+`docs/BUILD-PLAN.md` § "What the history shows about test-first" narrows the claim this repository
+makes to "the test is written first, **the commit carries both**". This round does not meet even
+that narrowed form in two places, and the audit was right to say so:
+
+- `beforePeriod`'s SQL landed in `2a446ad` with its own commit message saying it was "not verified
+  (no Postgres in this sandbox)". Its integration test arrived eight commits later, in `0153c78`.
+- `GET /api/v1/org-chart` and its authorization landed in `35d5202`; `org-chart.int.test.ts` arrived
+  six commits later, in `b5a63fb`. `CLAUDE.md`'s proof point 3 was therefore unproven on this branch
+  for six commits.
+
+The cause is stated at the top of this checkpoint — the coding pass was deliberately told to skip
+tests, and this session wrote them — and stating it is **not an exemption**. `docs/BUILD-RULES.md`'s
+own preamble is explicit that nothing there is relaxed for convenience: a rule that blocks you is
+either right, or it needs an ADR. No ADR in this range grants that carve-out, and none is asked for
+here, because the rule is right and the split was a scheduling choice.
+
+The same applies to ADRs 0089–0092, all dated 04/09/2026 and all written after the commits they
+describe, against "one structural decision = one ADR, written **at the time**".
+
+Rewriting the branch to hide either would be worse than the record — the same conclusion Phase 8's
+own checkpoint reached about its two implementation-before-test pairs. What the record is for is
+that the next round can be planned differently: if a pass is going to be split for speed again, the
+test belongs in the pass that writes the code, not in the one that reviews it.
+
+### The verification pass, and the two fixes that broke something of their own
+
+The rules audit was re-run against the commit that answered it, which is the half of "dispatch the
+reviewers" that is easy to skip. It confirmed nine findings resolved and found six more, two of them
+introduced by the fixes themselves:
+
+- **ADR-0093's second condition disqualified the very handlers ADR-0093 exists to permit.** As
+  drafted it forbade a branch that "changes which records are read" — but `/api/v1/dashboard`'s two
+  arms read entirely different sets, and that is the whole reason they are two arms. The threshold
+  would have fired on the day it was written. Rewritten to say what it means: a branch may read
+  _more_ for a richer response; what it may never do is narrow what the actor may see. A third
+  condition was added for protected fields, which the draft said nothing about — a role branch that
+  decides whether a payload carries a `Cjm` has made an authorization decision whatever it looks
+  like. `docs/BUILD-RULES.md`'s amended line inherited the same ambiguity and is corrected with it.
+- **The README contradicted itself ten lines after being corrected.** The paragraph on lefthook still
+  read "ils sont le seul arrêt mécanique qui précède un merge, puisque aucune des dix ne le bloque",
+  citing the superseded ADR-0040 — in the same section a reader opens specifically to learn whether
+  the gates block.
+- `CONTEXT.md`'s new `OrgChart` entry repeated the overstatement ADR-0090 had just been amended for,
+  calling the whole term an office-bounded intersection when only its N-1 half is.
+- The mutation table below named `team.int.test.ts` and `/api/v1/team`, which the same commit had
+  renamed away — the one table in this checkpoint that claims to be a reproducible record.
+- `use-reduced-motion.ts`'s comment was corrected in one clause and left wrong in the next ("skip
+  starting the interval" for a `requestAnimationFrame` loop).
+- The test fixture kept its `teamapi-` identifier namespace through the rename.
+
+And one the audit was right to raise that this checkpoint cannot resolve by editing: **ADR-0090's
+title still says "stops at the office boundary"**, which the amended body now holds for one half
+only. ADR-0045 forbids editing an ADR's own identity after the fact, and a title is that class of
+thing — so the residue is deliberate, and the route to changing it is a superseding ADR, not an
+edit. Named here so the cost is known rather than discovered.
+
+### The mutations that were run, since three tests claim to be discriminating
+
+Each was applied to the real code, the suite re-run, and the code restored:
+
+| Mutation                                                    | Result                                     |
+| ----------------------------------------------------------- | ------------------------------------------ |
+| `consultantsOfOffice` widened past the actor's office       | 2 of 9 `org-chart.int.test.ts` fail        |
+| the `managerOn` filter dropped from `/api/v1/org-chart`     | 1 of 9 fail                                |
+| `departure_date IS NULL` dropped from `consultantsOfOffice` | 2 of 9 fail                                |
+| `c.period < $10` relaxed to `<=` in `list`                  | 1 of 60 `api.int.test.ts` fail             |
+| the same clause neutered in `count`                         | 2 of 60 fail                               |
+| `!reducedMotion` dropped from the carousel's `rotating`     | the negative half of the motion pair fails |
+| `relative` removed from `<main>`                            | 17 of 20 `responsive.spec.ts` fail         |
+| `relative` removed from the CRA scrollport                  | 3 of 20 fail, and not the same three       |
+
+### What the two review subagents found, and where each finding went
+
+`CLAUDE.md` requires `rules-auditor` and `cold-reader` before a merge to `main`. Both ran against
+this branch, in clean contexts, and both earned their keep — between them they found one hole in a
+test written this session, one dead link on every persona's landing page, and a README that
+contradicts the repository's own headline claim. Every finding resolves to one of the four
+outcomes, and nothing was reported back as "acknowledged":
+
+**Fixed now, because they were defects:**
+
+- **`PgCraRepository.count`'s `beforePeriod` clause was asserted by nothing.** The five tests
+  written this session all read `.cras` and none read `total`, so deleting the clause from `count`
+  left the suite green — and the pagination footer would then have read "3 CRA" over a list showing
+  one. Item 22's own defect, reproduced one level down inside item 22's fix. The helper now returns
+  both, and neutering the clause fails two tests.
+- **Three attachment links on the dashboard pointed at `/documents/…pdf`, which nothing serves.**
+  A browser navigation there carries an `html` representation, so the SPA fallback answers
+  `index.html` with 200 and the application silently reboots on its own not-found screen — the first
+  clickable thing a cold reader meets. An attachment is now an inert file name that says so.
+- **`Team` is on `CONTEXT.md`'s _Avoid_ list twice**, for `Roster` and for `ManagerAttachment`, and
+  the item-18 code used it for a route, a test, four types, a hook and a component. Renamed to
+  `OrgChart` throughout — which is what ADR-0090's own title already called it — and `CONTEXT.md`
+  gains the entry, plus one for `CSE`, which the dashboard displays and the glossary did not carry.
+- **ADR-0089 cited `CLAUDE.md` for a rule `CLAUDE.md` does not state.** Neither does
+  `docs/direction-visuelle.md`. The rule was an unwritten convention three components independently
+  obeyed, which is why it broke; the ADR now says that, and establishes it rather than citing it.
+- **ADR-0090 described an office boundary the N+1 half does not honour.** `managerOn` is not
+  office-filtered, so a cross-office consultant is told their manager's name. That is deliberate —
+  it is the person who accepts their `Cra` — but it was undocumented and untested in either
+  direction. Both directions are now asserted on the same pair of people.
+- **The `ComingSoon` title promised "une prochaine phase"** that no remaining phase delivers, while
+  the README's new paragraph calls the three screens deliberate placeholders. The screen now says
+  what the README says.
+- **`/mes-absences` was the one new route the responsive sweep did not cover**, and the favicon test
+  had just been narrowed to `[type="image/svg+xml"]` — correctly, so it kept testing the file it
+  names, but that left item 15's two new hand-rasterised icons asserted by nothing. Both closed.
+- **`use-reduced-motion.ts` named the wrong mechanism** (`setInterval` for a `requestAnimationFrame`
+  loop) in a comment whose whole job is to state a mechanical fact.
+- **The README claimed the repository is private and that no check is required on `main`.** Both
+  false since 03/09/2026, and it is the repository's own headline claim — fourteen checks are
+  required, `enforce_admins` included. `docs/BUILD-RULES.md` carried the same stale sentence about
+  ADR-0040. Corrected against `gh api …/branches/main/protection`, not from memory. The 28/08/2026
+  reservation on `Cold setup (migrate + seed)` is lifted too: it has run green on every pull request
+  since.
+- **`docs/qa-rounds.md` had no round 3**, while claiming in its own second paragraph to be what
+  every "item N, QA round 3" citation resolves to — and a dozen new ADRs and comments make exactly
+  that citation. Round 3's twenty-three items are now in it. Its round-2 item 8 also still read
+  "Declined … nothing left in the branch" for the assignment screen, which shipped the next day
+  (`b4949e4`, 02/09/2026) and has been in the application since.
+- **`docs/qa-round-3-notes.md` was an agent-to-owner memo**, addressed to Clement by name, already
+  contradicted by the ADRs shipped beside it ("no ADR seemed warranted" for `beforePeriod`; ADR-0091
+  exists), and carrying two judgment calls that had never resolved to anything. Both are resolved —
+  item 25's browser check was done and is recorded against the item, item 27's punctuation call is
+  written down as an arbitration for Clement to confirm — and the file is deleted rather than
+  merged to `main`.
+
+**New ADR:**
+
+- **A handler compares a role** in `/api/v1/org-chart` — `BUILD-RULES.md` forbids that flatly, and
+  two instances of the same shape have been on `main` since Phase 5 with no ADR. **ADR-0093** narrows
+  the rule to what it is actually about (authorization) under two checkable conditions, names the
+  rejected option (split the endpoint, which moves the branch into the caller), and says out loud
+  what it costs: the rule stops being a grep and becomes a reviewing obligation. `BUILD-RULES.md` is
+  amended, per its own preamble.
+
+**Recorded, not fixed, because they are not this branch's to fix:**
+
+- **The README's screen inventory describes an application that no longer exists** — "sept pages
+  rendues par le serveur", a landing on the pré-facturier — where the running app is a React SPA
+  landing on a dashboard the README never names. Pre-existing, and a rewrite of a section in the
+  owner's own French prose rather than a factual correction. Named here so it is not rediscovered
+  blind.
+- **`/affectations` is unmentioned in every scope section**, as are the company-news and org-chart
+  panels. The record is now at least consistent (see `qa-rounds.md` above); the README's scope
+  sections are still silent on all three.
+- **The README's recount invitation is 20% off** — it names 511 unit / 167 integration at
+  22/08/2026; `pnpm run test` reports 611 today. Honest by its own rule, stale in practice.
+- **`docs/` holds seven files the README does not account for**, two of which (`plan-densification.md`,
+  `plan-roles-rh-direction.md`) reference an interview brief a cold reader has no access to. That is
+  a question about what belongs in a public repository, and it is Clement's.
+- **`main`'s own last CI run is red** on `Dependency scan` (`pnpm audit`, run 33861522765). The same
+  job passed on this branch's pull request minutes later against an untouched lockfile, so it reads
+  as the registry flake the previous session already saw once — worth a re-run rather than a fix.

@@ -130,11 +130,16 @@ export function AssignmentScreen(): ReactElement {
             void submit(event);
           }}
         >
-          <div className="flex flex-col gap-1.5">
+          {/* Item 34, QA round 3: `min-w-0` on the grid items, and `w-full min-w-0` on the two
+              `<select>`s below. A grid track is `minmax(auto, 1fr)`, and a `<select>`'s auto
+              minimum is the width of its widest `<option>` — "Banque Nationale de Test — Audit
+              DORA" here. Below `lg` this form is one column, so that one option stretched the
+              track to 466px inside a 351px page and the whole scrollport panned sideways. */}
+          <div className="flex min-w-0 flex-col gap-1.5">
             <Label htmlFor="assignment-consultant">{LABELS.assignment.consultant}</Label>
             <select
               id="assignment-consultant"
-              className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm"
+              className="h-8 w-full min-w-0 rounded-lg border border-input bg-background px-2.5 text-sm"
               value={form.consultantId}
               disabled={editingId !== null}
               required
@@ -154,11 +159,11 @@ export function AssignmentScreen(): ReactElement {
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex min-w-0 flex-col gap-1.5">
             <Label htmlFor="assignment-mission">{LABELS.assignment.mission}</Label>
             <select
               id="assignment-mission"
-              className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm"
+              className="h-8 w-full min-w-0 rounded-lg border border-input bg-background px-2.5 text-sm"
               value={form.missionId}
               disabled={editingId !== null}
               required
@@ -174,7 +179,7 @@ export function AssignmentScreen(): ReactElement {
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex min-w-0 flex-col gap-1.5">
             <Label htmlFor="assignment-from">{LABELS.assignment.from}</Label>
             <Input
               id="assignment-from"
@@ -186,7 +191,7 @@ export function AssignmentScreen(): ReactElement {
               }}
             />
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex min-w-0 flex-col gap-1.5">
             <Label htmlFor="assignment-to">{LABELS.assignment.to}</Label>
             <Input
               id="assignment-to"

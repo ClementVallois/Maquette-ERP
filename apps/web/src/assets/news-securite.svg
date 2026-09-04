@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" role="img" aria-label="Illustration : alerte sécurité">
+  <!-- Item 17, QA round 3: a shield-and-exclamation mark for an internal security alert — amber
+       (`--tone-amber-*`), the same tone this app already reserves for something needing
+       attention (the CRA grid's own flagged-day marker, item 28), not the accent blue the other
+       two illustrations use. -->
+  <rect width="200" height="120" rx="10" fill="#fdf4e0" />
+  <path
+    d="M100 22 L138 34 L138 62 C138 84 122 98 100 106 C78 98 62 84 62 62 L62 34Z"
+    fill="#a97d16"
+  />
+  <rect x="96" y="46" width="8" height="30" rx="4" fill="#fdf4e0" />
+  <rect x="96" y="82" width="8" height="8" rx="4" fill="#fdf4e0" />
+</svg>

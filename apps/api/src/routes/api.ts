@@ -152,6 +152,13 @@ const CraListParams = Pagination.extend({
   statuses: CommaSeparatedStatuses,
   year: YearQuery,
   month: MonthQuery,
+  // Item 22, QA round 3: the dashboard's "CRA en retard" deep link — every period strictly
+  // before this one, matching `lateCras`' own `lastDayOf(period) < today` (`CraListQuery`'s own
+  // doc comment, `packages/timesheet`, has the equivalence).
+  beforePeriod: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/u)
+    .optional(),
 });
 
 const InvoiceListParams = Pagination.extend({
@@ -388,6 +395,9 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           ...(query.value.statuses === undefined ? {} : { statuses: query.value.statuses }),
           ...(query.value.year === undefined ? {} : { year: query.value.year }),
           ...(query.value.month === undefined ? {} : { month: query.value.month }),
+          ...(query.value.beforePeriod === undefined
+            ? {}
+            : { beforePeriod: query.value.beforePeriod }),
         };
         const cras = await unit.cras.list({
           ...filters,
@@ -431,6 +441,48 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       consultants: await new PgReferenceReader(unit.client).consultantsOfOffice(actor.officeId),
     }));
   });
+
+  /**
+   * Item 18, QA round 3: the dashboard's org-chart panel — a consultant's own manager (N+1), or a
+   * manager's direct reports (N-1) plus their own manager (N+1). No existing route exposed this:
+   * `PgReferenceReader.hierarchy()` was write-side only until now (`refuse-cra.ts`,
+   * `validate-cra.ts`, deciding who accepts a Cra) — reused here rather than adding new SQL, since
+   * it already loads every `manager_attachments` row and answers "who manages X today" from it.
+   * A manager's reports are found by inverting it against `consultantsOfOffice` (item 7's own
+   * reader method, ADR-0077), which already excludes a departed consultant (ADR-0079) — no
+   * separate exclusion needed here. `billing` has no place in this org chart in the seed (Henri,
+   * the one billing persona, is the *director* every manager reports to, not a subject of this
+   * read) — `forRoles` below omits it, the same reasoning `/api/v1/consultants` gives for the
+   * same role.
+   */
+  app.get(
+    '/api/v1/org-chart',
+    { config: { access: forRoles('consultant', 'manager') } },
+    async (request) => {
+      const actor = requireActor(request);
+      const today = isoDateInFirmTimeZone(dependencies.clock.now());
+
+      return dependencies.transactionally(async (unit) => {
+        const reader = new PgReferenceReader(unit.client);
+        const [chain, names] = await Promise.all([reader.hierarchy(), reader.consultantNames()]);
+
+        const managerId = chain.managerOn(actor.consultantId, today);
+        const manager =
+          managerId === null
+            ? null
+            : { id: managerId, displayName: names.get(managerId) ?? managerId };
+
+        if (actor.role === 'consultant') return { role: 'consultant' as const, manager };
+
+        const officeRoster = await reader.consultantsOfOffice(actor.officeId);
+        const reports = officeRoster.filter(
+          (consultant) => chain.managerOn(consultant.id, today) === actor.consultantId,
+        );
+
+        return { role: 'manager' as const, manager, reports };
+      });
+    },
+  );
 
   app.get(
     '/api/v1/cras/:id',

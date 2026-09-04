@@ -19,7 +19,7 @@ import { useManagerCraGrid, useValidateCra } from '../hooks';
 import { ABSENCE_ROW_KEY, initMatrix } from '../matrix';
 import type { ManagerCraGridResponse, ValidationResponse } from '../types';
 
-import { CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
+import { CraLegend, CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
 import { CraTimeline } from './cra-timeline';
 import { RefuseDialog } from './refuse-dialog';
 import { ValidateConfirmDialog, type ValidateConfirmFact } from './validate-confirm-dialog';
@@ -169,14 +169,13 @@ function ManagerCraGridBody({
       ),
     ].sort((a, b) => a.localeCompare(b, 'fr'));
   }, [data.lines, data.missions]);
+  // Item 28, QA round 3: `flaggedDays` moved out of this plain fact list and into the dialog's
+  // own dedicated `flaggedDaysCount` prop, which renders it as a loud warning banner instead of a
+  // `<dl>` row indistinguishable from "période" or "clients".
   const validateFacts: ValidateConfirmFact[] = [
     {
       label: LABELS.preFacturier.validateConfirmDialog.periodFactLabel,
       value: frenchMonth(period),
-    },
-    {
-      label: LABELS.preFacturier.validateConfirmDialog.flaggedDaysFactLabel,
-      value: String(flaggedDays.size),
     },
     {
       label: LABELS.preFacturier.validateConfirmDialog.clientsFactLabel,
@@ -274,7 +273,10 @@ function ManagerCraGridBody({
 
       {data.status === 'refused' && data.refusal !== null && (
         <Alert variant="destructive">
-          <AlertDescription>{data.refusal.reason}</AlertDescription>
+          <AlertDescription>
+            {LABELS.cra.refusalReasonPrefix}
+            {data.refusal.reason}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -286,6 +288,20 @@ function ManagerCraGridBody({
 
       <CraTimeline timeline={data.timeline} />
 
+      {/* Item 28, QA round 3: the same fact the validate dialog now shows loudly, visible here
+          too — a manager reading the CRA before opening that dialog should not have to spot the
+          small per-column "Signalé" markers to know this month needs a look. */}
+      {flaggedDays.size > 0 && (
+        <div className="rounded-xl bg-status-late-fill p-3 text-sm text-status-late-text ring-1 ring-status-late-dot/30">
+          {flaggedDays.size === 1
+            ? LABELS.cra.matrix.nonWorkableEnteredManagerOne
+            : LABELS.cra.matrix.nonWorkableEnteredManagerMany.replace(
+                '{count}',
+                String(flaggedDays.size),
+              )}
+        </div>
+      )}
+
       <CraMatrixTable
         period={period}
         days={data.days}
@@ -294,6 +310,9 @@ function ManagerCraGridBody({
         editable={false}
         flaggedDays={flaggedDays}
       />
+      {/* Item 26, QA round 3: the manager's read-only grid uses the same colour-only weekend/
+          holiday header cells as the consultant's own grid, so it needs the same legend. */}
+      <CraLegend />
 
       {/* Both dialogs land the manager back on the pré-facturier once there is nothing left to
           decide on this row — item 3's "must land back somewhere sensible after validating". A
@@ -310,6 +329,7 @@ function ManagerCraGridBody({
         <ValidateConfirmDialog
           consultantName={data.consultantName}
           facts={validateFacts}
+          flaggedDaysCount={flaggedDays.size}
           pending={validateMutation.isPending}
           onCancel={() => {
             setConfirmingValidate(false);

@@ -36,11 +36,20 @@ import { IssuanceDialog } from './issuance-dialog';
 const INVOICE_PRINT_PATH = '/facture';
 const CRA_PRINT_PATH = '/releve';
 
+/** Item 30, QA round 3: the same dot colours `StatusBadge` reads — `validated` reuses the Cra
+ * status' own green (the same event, read from the invoice's side), `issued` shares it too
+ * (`--status-invoice-issued-dot`'s own token is the same green tone), `drafted` is neutral. */
+const TIMELINE_KIND_DOT_CLASS: Record<'validated' | 'drafted' | 'issued', string> = {
+  validated: 'bg-status-cra-validated-dot',
+  drafted: 'bg-status-invoice-draft-dot',
+  issued: 'bg-status-invoice-issued-dot',
+};
+
 function DetailSkeleton(): ReactElement {
   return (
     <div className="flex flex-col gap-4" aria-hidden="true">
       <Skeleton className="h-8 w-72" />
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-32 w-full" />
       </div>
@@ -67,11 +76,20 @@ function InfoBlock({ title, rows }: InfoBlockProps): ReactElement {
   return (
     <div className="flex flex-col gap-2 rounded-xl bg-card p-5 shadow-card ring-1 ring-border">
       <h3 className="text-card-title">{title}</h3>
-      <dl className="flex flex-col gap-1 text-sm">
+      <dl className="flex flex-col gap-2 text-sm sm:gap-1">
         {rows.map(([label, value]) => (
-          <div key={label} className="flex justify-between gap-4">
+          // Item 36, QA round 3: stacked below `sm`, label above value, the same shape
+          // `denied-state.tsx` settled on. Side by side, a label as long as "N° de TVA
+          // intracommunautaire" left barely a third of a 375px card for its value and the two
+          // halves wrapped independently of each other. `break-words` is not cosmetic: a VAT
+          // number is one unbroken token wider than the card, and without it the shell's own
+          // scrollport panned sideways.
+          <div
+            key={label}
+            className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4"
+          >
             <dt className="text-muted-foreground">{label}</dt>
-            <dd className="text-right text-foreground">{value}</dd>
+            <dd className="min-w-0 break-words text-foreground sm:text-right">{value}</dd>
           </div>
         ))}
       </dl>
@@ -320,7 +338,7 @@ export function InvoiceDetailScreen({
         </Alert>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <InfoBlock
           title={LABELS.invoice.seller}
           rows={[
@@ -369,6 +387,7 @@ export function InvoiceDetailScreen({
           title: LABELS.timeline[item.kind],
           at: item.at,
           actorName: item.actorName,
+          dotClassName: TIMELINE_KIND_DOT_CLASS[item.kind],
         }))}
       />
 

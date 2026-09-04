@@ -187,12 +187,39 @@ test.describe('item 5 — the favicon actually resolves', () => {
   test('the declared <link rel="icon"> answers 200 with an SVG content type', async ({ page }) => {
     await page.goto('/');
 
-    const href = await page.locator('link[rel="icon"]').getAttribute('href');
+    const href = await page.locator('link[rel="icon"][type="image/svg+xml"]').getAttribute('href');
     if (href === null) throw new MarkupAssumptionError('index.html always declares a favicon.');
 
     const response = await page.request.get(href);
 
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toContain('image/svg+xml');
+  });
+
+  /**
+   * Item 15, QA round 3 added a PNG fallback and an apple-touch-icon beside the SVG, and narrowed
+   * the assertion above to `[type="image/svg+xml"]` so it kept testing the file it names. That
+   * narrowing left the two new ones asserted by nothing — an icon that 404s is exactly the defect
+   * item 15 was raised for, and both were hand-rasterised in a sandbox with no image tooling.
+   * So: every icon link `index.html` declares, whatever its type, resolves.
+   */
+  test('every declared icon link resolves, not only the SVG', async ({ page }) => {
+    await page.goto('/');
+
+    const links = page.locator('link[rel="icon"], link[rel="apple-touch-icon"]');
+    const count = await links.count();
+    // Three today (SVG, PNG, apple-touch). Asserted as "more than one" rather than as an exact
+    // number: the point is that this test cannot silently degrade to covering only the SVG again.
+    expect(count).toBeGreaterThan(1);
+
+    for (let index = 0; index < count; index += 1) {
+      const href = await links.nth(index).getAttribute('href');
+      if (href === null) throw new MarkupAssumptionError('every icon link carries an href.');
+
+      const response = await page.request.get(href);
+
+      expect(response.status(), href).toBe(200);
+      expect(response.headers()['content-type'], href).toContain('image/');
+    }
   });
 });

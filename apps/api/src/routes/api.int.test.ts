@@ -410,6 +410,126 @@ describe('GET /api/v1/cras — year/month (item 4, QA round 2)', () => {
   });
 });
 
+/**
+ * Item 22, QA round 3. The dashboard's "CRA en retard" card deep-links to this list, and the two
+ * have to agree — a card reading 2 over a list showing 1 is the failure the item was raised for.
+ * `lateCras` is "not validated **and** the period has closed"; the list had no way to express the
+ * second half until `beforePeriod`, so the equivalence is asserted here rather than assumed.
+ *
+ * The fixture's own two Cras are both 2026-06 and both `submitted`, against a clock at
+ * 2026-07-02 — so June is closed, both are late, and one extra 2026-05 row below is what makes
+ * "strictly before" distinguishable from "the same month".
+ */
+describe('GET /api/v1/cras — beforePeriod (item 22, QA round 3)', () => {
+  const CRA_MAY = 'api-cra-may';
+
+  async function seedMay(): Promise<void> {
+    await transaction.client.query(
+      `INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+       VALUES ($1, $2, $3, '2026-05', 'draft')`,
+      [CRA_MAY, ALICE, PARIS],
+    );
+  }
+
+  /**
+   * Returns the periods **and** the pagination total, because they come from two different SQL
+   * statements — `PgCraRepository.list` and `.count`, each with its own `beforePeriod` clause.
+   * Reading only `cras` would leave `count`'s clause deletable with the suite still green, and the
+   * footer would then read "3 CRA" over a list showing one: item 22's own defect, one level down
+   * inside item 22's fix.
+   */
+  async function before(bound: string): Promise<{ periods: string[]; total: number }> {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/v1/cras?beforePeriod=${bound}`,
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    const body = response.json<{ cras: { period: string }[]; total: number }>();
+
+    return { periods: body.cras.map((cra) => cra.period).sort(), total: body.total };
+  }
+
+  it('is strictly before: the bound month itself is excluded, the one before it is not', async () => {
+    await seedMay();
+
+    expect(await before('2026-06')).toStrictEqual({ periods: ['2026-05'], total: 1 });
+    expect(await before('2026-07')).toStrictEqual({
+      periods: ['2026-05', '2026-06', '2026-06'],
+      total: 3,
+    });
+    expect(await before('2026-05')).toStrictEqual({ periods: [], total: 0 });
+  });
+
+  it('crosses a year boundary on the text order, not on the digits of the month', async () => {
+    // '2025-12' < '2026-01' lexically as well as chronologically, which is the whole reason the
+    // column can be compared as text. A month-only comparison would put December after January.
+    await transaction.client.query(
+      `INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+       VALUES ('api-cra-dec', $1, $2, '2025-12', 'draft')`,
+      [ALICE, PARIS],
+    );
+
+    expect(await before('2026-01')).toStrictEqual({ periods: ['2025-12'], total: 1 });
+  });
+
+  it('is ANDed with statuses, like every other filter here', async () => {
+    await seedMay();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?beforePeriod=2026-07&statuses=draft',
+      headers: as('manager-paris'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ cras: { id: string }[] }>().cras.map((cra) => cra.id)).toStrictEqual([
+      CRA_MAY,
+    ]);
+  });
+
+  it('answers exactly what the dashboard card counts as late', async () => {
+    await seedMay();
+
+    const dashboard = await app.inject({
+      method: 'GET',
+      url: '/api/v1/dashboard?period=2026-06',
+      headers: as('manager-paris'),
+    });
+    expect(dashboard.statusCode).toBe(200);
+    const { lateCras } = dashboard.json<{ lateCras: number }>();
+
+    // The card's own link, verbatim: every not-yet-validated status, every period before the
+    // current one (2026-07 by this test's clock).
+    const listed = await app.inject({
+      method: 'GET',
+      url: '/api/v1/cras?statuses=draft,submitted,refused&beforePeriod=2026-07',
+      headers: as('manager-paris'),
+    });
+    expect(listed.statusCode).toBe(200);
+
+    const body = listed.json<{ cras: unknown[]; total: number }>();
+    expect(lateCras).toBe(3);
+    expect(body.cras).toHaveLength(lateCras);
+    // And the footer the list renders under itself, which `count` answers separately.
+    expect(body.total).toBe(lateCras);
+  });
+
+  it('refuses a malformed bound rather than silently ignoring it', async () => {
+    for (const bound of ['2026-13', '2026', '2026-6', 'juin']) {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/cras?beforePeriod=${bound}`,
+        headers: as('manager-paris'),
+      });
+
+      expect(response.statusCode, bound).toBe(400);
+    }
+  });
+});
+
 describe('GET /api/v1/consultants (item 7, QA round 1)', () => {
   it("answers the manager's own office roster, consultants only", async () => {
     const response = await app.inject({

@@ -57,6 +57,16 @@ export interface CraListQuery {
    */
   readonly year?: number;
   readonly month?: number;
+  /**
+   * Item 22, QA round 3: "every period strictly before this one" (`period < beforePeriod`,
+   * exclusive) — what the dashboard's "CRA en retard" deep link needs. Distinct from `year`/
+   * `month`: those match one calendar unit, this is an open-ended range with no lower bound, the
+   * same shape the dashboard's own `lateCras` count already computes server-side
+   * (`lastDayOf(period) < today` — equivalent to `period < currentPeriod` for any `today` inside
+   * that current period, which is always true by construction). `undefined` means no upper bound,
+   * the same absence-reading every other optional field here uses.
+   */
+  readonly beforePeriod?: string;
 }
 
 export interface CraRepository {

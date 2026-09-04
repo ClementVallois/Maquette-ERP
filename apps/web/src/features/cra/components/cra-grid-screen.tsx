@@ -36,6 +36,7 @@ import {
   ABSENCE_ROW_KEY,
   addRow,
   clearRow,
+  dayTotal,
   entriesFromMatrix,
   fillEmptyWorkdays,
   initMatrix,
@@ -306,6 +307,14 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   // reads them. `missingDaysFrom` yields an empty set for every other refusal, so the grid carries
   // server-side flags only for the one that produced them.
   const missingDays = missingDaysFrom(mutationProblem);
+  // Item 28, QA round 3: a warning, never a block — the domain's own submission check
+  // (`runSubmissionChecks`, `CraFlag`) computes exactly this server-side once submitted ("a day
+  // that was recorded although the calendar says it is not workable... not a refusal"). Mirrored
+  // here from data the grid already holds (`data.days[].nonWorkable`, the same calendar read that
+  // colours the column headers) so the consultant sees it before submitting, not only after.
+  const enteredNonWorkableDays = data.days.filter(
+    (day) => day.nonWorkable !== null && dayTotal(matrix, day.date) > 0,
+  );
   const weeks = calendarWeeks(data.days);
   const mobileDays = weeks[mobileWeekIndex] ?? weeks[0] ?? [];
   const desktopDays = weeks[desktopWeekIndex] ?? weeks[0] ?? [];
@@ -528,6 +537,20 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
         </Alert>
       )}
 
+      {/* Item 28, QA round 3: amber, the same tone `cra-matrix-table.tsx`'s "Signalé" column
+          marker already uses for a flagged day — a warning, never a block, so this stays a plain
+          informational banner rather than `Alert`'s `destructive` variant. */}
+      {enteredNonWorkableDays.length > 0 && (
+        <div className="rounded-xl bg-status-late-fill p-3 text-sm text-status-late-text ring-1 ring-status-late-dot/30">
+          {enteredNonWorkableDays.length === 1
+            ? LABELS.cra.matrix.nonWorkableEnteredOne
+            : LABELS.cra.matrix.nonWorkableEnteredMany.replace(
+                '{count}',
+                String(enteredNonWorkableDays.length),
+              )}
+        </div>
+      )}
+
       {data.editable && (
         <div className="sticky bottom-0 z-20 -mx-3 flex flex-wrap items-center gap-2 border-t border-border bg-background/95 p-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
           <Button
@@ -600,7 +623,9 @@ function CraProgress({
         aria-valuemin={0}
         aria-valuemax={total}
         aria-label={label}
-        className="h-1.5 w-full max-w-64 shrink-0 overflow-hidden rounded-full bg-muted"
+        // No `shrink-0`: at 375px the bar's own 256px `max-w-64` plus the `text-nowrap` label
+        // beside it came to 424px inside a 351px page. The bar is the half that can give ground.
+        className="h-1.5 w-full max-w-64 overflow-hidden rounded-full bg-muted"
       >
         <div
           className="h-full rounded-full bg-primary transition-[width]"
@@ -791,7 +816,12 @@ function StatusBanner({ data }: { readonly data: CraGridResponse }): ReactElemen
         <AlertTitle>{LABELS.cra.statuses.refused}</AlertTitle>
         <AlertDescription>
           {LABELS.cra.refused}
-          {data.refusal !== null && <p className="mt-1 font-medium">{data.refusal.reason}</p>}
+          {data.refusal !== null && (
+            <p className="mt-1 font-medium">
+              {LABELS.cra.refusalReasonPrefix}
+              {data.refusal.reason}
+            </p>
+          )}
         </AlertDescription>
       </Alert>
     );

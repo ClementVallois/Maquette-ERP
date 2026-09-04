@@ -239,18 +239,21 @@ function DenseMonthsChart({
   );
 }
 
+/**
+ * Item 23, QA round 3: the heading and the surrounding card surface moved to the caller
+ * (`dashboard-screen.tsx`'s own `HistorySection`), which needs to keep rendering the heading
+ * (and its collapse toggle) even while this chart content itself is hidden — this component is
+ * now just the two charts, not the section chrome around them.
+ */
 export function InvoiceHistoryChart({
   data,
 }: {
   readonly data: InvoiceHistoryResponse;
 }): ReactElement {
   return (
-    <section className="flex flex-col gap-6 rounded-xl bg-card p-5 shadow-card ring-1 ring-border">
-      <h2 className="text-card-title">{LABELS.dashboard.history.heading}</h2>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <ByYearChart data={data.byYearAndStatus} />
-        <DenseMonthsChart data={data.denseMonths} />
-      </div>
-    </section>
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <ByYearChart data={data.byYearAndStatus} />
+      <DenseMonthsChart data={data.denseMonths} />
+    </div>
   );
 }

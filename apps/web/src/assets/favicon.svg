@@ -1,23 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" role="img" aria-label="Maquette ERP">
   <!--
-    Item 5, QA round 1: a shield (the firm sells cybersecurity consulting) holding a checkmark (an
-    audited, validated record — the CRA-to-invoice chain this mockup proves). One fill colour, so
-    it stays legible if a browser ever renders it monochrome, plus a white outline/stroke so the
-    shape reads on a dark tab bar as well as a light one — `--primary` alone (`#1f4d7a`) is close
-    enough to black at 16px that an unbordered fill on a dark bar loses its edges.
+    Item 15, QA round 3: a document with a folded corner (a CRA, a record) carrying a checkmark
+    (validated) — reads as "ERP document" rather than the previous shield's "security" cue. Same
+    palette as before: `--primary` (`#1f4d7a`) fill with a white outline/stroke so the shape holds
+    its edges on both a light and a dark tab bar at 16px. Sharp corners are deliberate — they hold
+    up better than rounded ones at this size. A PNG fallback (`favicon-96.png`) and an
+    `apple-touch-icon.png` sit next to this file and are wired from `index.html`, since some
+    browsers deprioritise an SVG-only favicon.
   -->
   <path
-    d="M8 0.6 13.9 2.7 13.9 7.4C13.9 11.3 11.4 14.1 8 15.4 4.6 14.1 2.1 11.3 2.1 7.4L2.1 2.7Z"
+    d="M3.2 1.2 10.2 1.2 13.0 4.0 13.0 14.6 3.2 14.6Z"
     fill="#1f4d7a"
     stroke="#ffffff"
-    stroke-width="0.9"
+    stroke-width="0.8"
     stroke-linejoin="round"
   />
   <path
-    d="M5.1 8.1 7.1 10.1 11 5.9"
+    d="M10.2 1.2 10.2 4.0 13.0 4.0"
     fill="none"
     stroke="#ffffff"
-    stroke-width="1.3"
+    stroke-width="0.6"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M5.3 9.3 7.4 11.3 11.2 6.6"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="1.4"
     stroke-linecap="round"
     stroke-linejoin="round"
   />

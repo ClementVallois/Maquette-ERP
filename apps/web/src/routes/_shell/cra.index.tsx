@@ -35,6 +35,13 @@ const CraListSearch = z.object({
   // this schema and land on a 400, which is exactly what the paragraph above says must not happen.
   year: z.coerce.number().int().min(2000).max(2100).optional().catch(undefined),
   month: z.coerce.number().int().min(1).max(12).optional().catch(undefined),
+  // Item 22, QA round 3: the dashboard's "CRA en retard" deep link — every period strictly
+  // before this one. `.catch(undefined)`, same degrade-to-no-filter reasoning as `year`/`month`.
+  beforePeriod: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/u)
+    .optional()
+    .catch(undefined),
   page: z.coerce.number().int().min(1).default(1).catch(1),
   pageSize: z.coerce
     .number()
@@ -55,7 +62,7 @@ export const Route = createFileRoute('/_shell/cra/')({
 
 function CraListRoute(): ReactElement {
   const { persona } = Route.useRouteContext();
-  const { consultantIds, statuses, year, month, page, pageSize } = Route.useSearch();
+  const { consultantIds, statuses, year, month, beforePeriod, page, pageSize } = Route.useSearch();
 
   return (
     <div className="flex flex-col gap-4">
@@ -66,6 +73,7 @@ function CraListRoute(): ReactElement {
         statuses={statuses ?? []}
         year={year}
         month={month}
+        beforePeriod={beforePeriod}
         page={page}
         pageSize={pageSize}
       />

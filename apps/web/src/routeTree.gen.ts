@@ -12,6 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShellRouteImport } from './routes/_shell'
 import { Route as ShellAffectationsRouteImport } from './routes/_shell/affectations'
+import { Route as ShellMesAbsencesRouteImport } from './routes/_shell/mes-absences'
+import { Route as ShellMesInformationsRouteImport } from './routes/_shell/mes-informations'
+import { Route as ShellMesNotesDeFraisRouteImport } from './routes/_shell/mes-notes-de-frais'
 import { Route as ShellPreFacturierRouteImport } from './routes/_shell/pre-facturier'
 import { Route as ShellTableauDeBordRouteImport } from './routes/_shell/tableau-de-bord'
 import { Route as DevComposantsRouteImport } from './routes/dev.composants'
@@ -35,6 +38,21 @@ const ShellRoute = ShellRouteImport.update({
 const ShellAffectationsRoute = ShellAffectationsRouteImport.update({
   id: '/affectations',
   path: '/affectations',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellMesAbsencesRoute = ShellMesAbsencesRouteImport.update({
+  id: '/mes-absences',
+  path: '/mes-absences',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellMesInformationsRoute = ShellMesInformationsRouteImport.update({
+  id: '/mes-informations',
+  path: '/mes-informations',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellMesNotesDeFraisRoute = ShellMesNotesDeFraisRouteImport.update({
+  id: '/mes-notes-de-frais',
+  path: '/mes-notes-de-frais',
   getParentRoute: () => ShellRoute,
 } as any)
 const ShellPreFacturierRoute = ShellPreFacturierRouteImport.update({
@@ -92,6 +110,9 @@ const ShellCraPeriodConsultantIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/affectations': typeof ShellAffectationsRoute
+  '/mes-absences': typeof ShellMesAbsencesRoute
+  '/mes-informations': typeof ShellMesInformationsRoute
+  '/mes-notes-de-frais': typeof ShellMesNotesDeFraisRoute
   '/pre-facturier': typeof ShellPreFacturierRoute
   '/tableau-de-bord': typeof ShellTableauDeBordRoute
   '/dev/composants': typeof DevComposantsRoute
@@ -106,6 +127,9 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/affectations': typeof ShellAffectationsRoute
+  '/mes-absences': typeof ShellMesAbsencesRoute
+  '/mes-informations': typeof ShellMesInformationsRoute
+  '/mes-notes-de-frais': typeof ShellMesNotesDeFraisRoute
   '/pre-facturier': typeof ShellPreFacturierRoute
   '/tableau-de-bord': typeof ShellTableauDeBordRoute
   '/dev/composants': typeof DevComposantsRoute
@@ -121,6 +145,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_shell': typeof ShellRouteWithChildren
   '/_shell/affectations': typeof ShellAffectationsRoute
+  '/_shell/mes-absences': typeof ShellMesAbsencesRoute
+  '/_shell/mes-informations': typeof ShellMesInformationsRoute
+  '/_shell/mes-notes-de-frais': typeof ShellMesNotesDeFraisRoute
   '/_shell/pre-facturier': typeof ShellPreFacturierRoute
   '/_shell/tableau-de-bord': typeof ShellTableauDeBordRoute
   '/dev/composants': typeof DevComposantsRoute
@@ -137,6 +164,9 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/affectations'
+    | '/mes-absences'
+    | '/mes-informations'
+    | '/mes-notes-de-frais'
     | '/pre-facturier'
     | '/tableau-de-bord'
     | '/dev/composants'
@@ -151,6 +181,9 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/affectations'
+    | '/mes-absences'
+    | '/mes-informations'
+    | '/mes-notes-de-frais'
     | '/pre-facturier'
     | '/tableau-de-bord'
     | '/dev/composants'
@@ -165,6 +198,9 @@ export interface FileRouteTypes {
     | '/'
     | '/_shell'
     | '/_shell/affectations'
+    | '/_shell/mes-absences'
+    | '/_shell/mes-informations'
+    | '/_shell/mes-notes-de-frais'
     | '/_shell/pre-facturier'
     | '/_shell/tableau-de-bord'
     | '/dev/composants'
@@ -204,6 +240,27 @@ declare module '@tanstack/react-router' {
       path: '/affectations'
       fullPath: '/affectations'
       preLoaderRoute: typeof ShellAffectationsRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/mes-absences': {
+      id: '/_shell/mes-absences'
+      path: '/mes-absences'
+      fullPath: '/mes-absences'
+      preLoaderRoute: typeof ShellMesAbsencesRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/mes-informations': {
+      id: '/_shell/mes-informations'
+      path: '/mes-informations'
+      fullPath: '/mes-informations'
+      preLoaderRoute: typeof ShellMesInformationsRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/mes-notes-de-frais': {
+      id: '/_shell/mes-notes-de-frais'
+      path: '/mes-notes-de-frais'
+      fullPath: '/mes-notes-de-frais'
+      preLoaderRoute: typeof ShellMesNotesDeFraisRouteImport
       parentRoute: typeof ShellRoute
     }
     '/_shell/pre-facturier': {
@@ -295,6 +352,9 @@ const ShellCraPeriodRouteWithChildren = ShellCraPeriodRoute._addFileChildren(
 
 interface ShellRouteChildren {
   ShellAffectationsRoute: typeof ShellAffectationsRoute
+  ShellMesAbsencesRoute: typeof ShellMesAbsencesRoute
+  ShellMesInformationsRoute: typeof ShellMesInformationsRoute
+  ShellMesNotesDeFraisRoute: typeof ShellMesNotesDeFraisRoute
   ShellPreFacturierRoute: typeof ShellPreFacturierRoute
   ShellTableauDeBordRoute: typeof ShellTableauDeBordRoute
   ShellCraPeriodRoute: typeof ShellCraPeriodRouteWithChildren
@@ -306,6 +366,9 @@ interface ShellRouteChildren {
 
 const ShellRouteChildren: ShellRouteChildren = {
   ShellAffectationsRoute: ShellAffectationsRoute,
+  ShellMesAbsencesRoute: ShellMesAbsencesRoute,
+  ShellMesInformationsRoute: ShellMesInformationsRoute,
+  ShellMesNotesDeFraisRoute: ShellMesNotesDeFraisRoute,
   ShellPreFacturierRoute: ShellPreFacturierRoute,
   ShellTableauDeBordRoute: ShellTableauDeBordRoute,
   ShellCraPeriodRoute: ShellCraPeriodRouteWithChildren,

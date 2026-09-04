@@ -45,30 +45,42 @@ export function PageHeader({ title, showBreadcrumb, parent }: PageHeaderProps): 
 
   return (
     <div className="flex flex-col gap-0.5">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
+      {/* Item 33 (QA round 3, mobile design): `hidden lg:block`, the same breakpoint
+          `topbar.tsx`'s own burger trigger and `sidebar.tsx` already treat as "mobile" in this
+          shell — below it, the `<h1>` below is the only page label shown. `display:none` removes
+          the trail from the accessibility tree entirely rather than leaving it there for
+          assistive tech to still announce (axe runs in CI, and a hidden-but-announced breadcrumb
+          would be worse than not rendering it here at all). */}
+      <Breadcrumb className="hidden lg:block">
+        {/* `flex-nowrap`, overriding the primitive's own `flex-wrap`: this row must stay one
+            line — wrapping would grow past the topbar's fixed height instead of the ellipsis
+            below. Every crumb but the last is `shrink-0` (short, fixed strings); the last one
+            (`title`, built from a client name and a month — the one crumb long enough to
+            threaten the row) is the only one allowed to shrink and carries `truncate`, so it is
+            the one that gives way first. */}
+        <BreadcrumbList className="flex-nowrap">
+          <BreadcrumbItem className="shrink-0">
             <BreadcrumbLink asChild>
               <Link to="/tableau-de-bord">{LABELS.shell.breadcrumbHome}</Link>
             </BreadcrumbLink>
           </BreadcrumbItem>
-          <BreadcrumbSeparator>
+          <BreadcrumbSeparator className="shrink-0">
             <ChevronRightIcon className="size-3.5" />
           </BreadcrumbSeparator>
           {parent !== undefined && (
             <>
-              <BreadcrumbItem>
+              <BreadcrumbItem className="shrink-0">
                 <BreadcrumbLink asChild>
                   <a href={parent.href}>{parent.label}</a>
                 </BreadcrumbLink>
               </BreadcrumbItem>
-              <BreadcrumbSeparator>
+              <BreadcrumbSeparator className="shrink-0">
                 <ChevronRightIcon className="size-3.5" />
               </BreadcrumbSeparator>
             </>
           )}
-          <BreadcrumbItem>
-            <BreadcrumbPage>{title}</BreadcrumbPage>
+          <BreadcrumbItem className="min-w-0 flex-1">
+            <BreadcrumbPage className="block min-w-0 truncate">{title}</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>

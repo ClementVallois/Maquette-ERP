@@ -1,4 +1,4 @@
-# CRA → facture : maquette d'un module d'ERP interne
+# Maquette ERP : la chaîne CRA → facture d'un module d'ERP interne
 
 > ⚠️ Ossature initialisée le 07/08/2026. Ce README se remplit **au fil de la construction**, pas à
 > la fin : une section décrit ce qui existe le jour où elle est écrite, et une section absente est
@@ -149,11 +149,12 @@ Périmètre volontairement étroit : deux modules, et **une seule flèche qui fr
    `allowed` est ce qui fait échouer aussi une flèche que personne n'a pensé à interdire — et
    [`tests/boundary-rule.test.ts`](tests/boundary-rule.test.ts) prouve, sur des fichiers de violation
    délibérée, qu'elle **rejette**. La CI lance les deux, dans deux étapes séparées.
-   ⚠️ « Échouer » veut dire que le job passe au rouge, **pas** que le bouton de merge se verrouille :
-   la protection de branche GitHub n'est pas disponible sur ce plan, aucune porte n'est donc
-   exigée sur `main`, et c'est écrit ici plutôt que 110 lignes plus bas
-   (**[ADR-0040](docs/adr/0040-ci-gates-are-advisory-while-the-repository-is-private.md)**, et la
-   section « Tests et portes de CI » y revient en détail).
+   ✅ « Échouer » veut dire que le job passe au rouge **et** que le bouton de merge se verrouille :
+   le dépôt est public depuis le 03/09/2026, la protection de branche est active sur `main`,
+   **quatorze** checks y sont exigés (administrateurs compris) et le merge en rouge est impossible
+   — pas tenu par l'auteur, tenu par la plateforme
+   (**[ADR-0086](docs/adr/0086-the-gates-become-blocking-on-a-public-repository.md)**, qui
+   remplace l'ADR-0040 ; la section « Tests et portes de CI » y revient en détail).
 2. **Des invariants métier tenus par le code, pas par la discipline**
    - un CRA validé est **immuable** ;
    - les montants sont des **entiers en centimes** — jamais de flottant sur une valeur monétaire ;
@@ -241,6 +242,14 @@ personnel ne revendique ni l'un ni l'autre, ADR-0028).
 - l'envoi réel des factures, la comptabilité, les règlements et les relances ;
 - la gestion des utilisateurs et l'authentification en production (sélecteur de persona assumé : il
   rend l'autorisation démontrable en trois clics là où un vrai IdP la rendrait invisible).
+
+Trois entrées de menu — **Mes informations**, **Mes notes de frais**, **Mes demandes d'absence** —
+existent pourtant dans la barre latérale de chaque rôle et ouvrent une page « à venir ». C'est
+volontaire : un ERP interne les porte toutes les trois, et les montrer à leur place situe la chaîne
+CRA → facture dans l'outil dont elle n'est qu'un module. Elles sont des **maquettes d'emplacement**,
+pas des écrans inachevés : aucune n'a de domaine, de table ni d'API derrière elle, et les deux
+dernières figurent au-dessus comme non construites. Une page qui affiche honnêtement qu'elle n'existe
+pas encore vaut mieux qu'un menu qui ment sur le périmètre de l'outil.
 
 > **« Pourquoi ne pas installer Odoo ? »** Odoo fait déjà « feuille de temps → facture en régie », et
 > c'est la bonne question. La réponse n'est pas fonctionnelle : ce sont les contraintes que l'outil du
@@ -482,23 +491,27 @@ sert ici deux fois, pour deux choses différentes, et il vaut mieux les séparer
 
 1. **Une règle qui reste verte sur une violation** — le `warn` de dependency-cruiser au lieu de son
    `error`. C'est le sens du mot en tête de ce README (« casser la frontière fait échouer le job,
-   pas produire un warning »), et **ce piège-là est fermé** : les dix jobs ci-dessous
-   échouent réellement, et `tests/boundary-rule.test.ts` le prouve sur des violations délibérées.
-2. **Une porte qui échoue sans rien empêcher.** C'est le sens de la phrase d'ouverture, et
-   **c'est l'état actuel des dix** — écrit ici plutôt que sous-entendu.
+   pas produire un warning »), et **ce piège-là est fermé** : les jobs ci-dessous échouent
+   réellement, et `tests/boundary-rule.test.ts` le prouve sur des violations délibérées.
+2. **Une porte qui échoue sans rien empêcher.** C'était l'état de ce dépôt jusqu'au 03/09/2026, et
+   **ce piège-là est fermé aussi** — écrit ici plutôt que sous-entendu.
 
-Elles tournent sur chaque push et sur chaque pull request, et elles passent au rouge. Mais la seule
-chose capable de désactiver le bouton de merge — la _protection de branche_ GitHub — exige un compte
-**Pro** ou un dépôt **public** ; celui-ci est privé sur le plan gratuit. **Aucun check n'est donc
-exigé sur `main`** : la règle « rien ne merge en rouge » est tenue par l'auteur, pas par la
-plateforme. Ce README a affirmé le contraire — « cinq sont exigées » — depuis la phase 0, et
-c'était faux : la bascule n'était pas en attente, elle était indisponible. Décision, option écartée
-et seuil → **[ADR-0040](docs/adr/0040-ci-gates-are-advisory-while-the-repository-is-private.md)**.
-La bascule est gratuite le jour où le dépôt devient public, et coûte alors une case à cocher par
-job (`sed -n '/^jobs:/,$p' .github/workflows/ci.yml | grep -E '^  [a-z0-9-]+:$'` les liste ; dix au
-28/08/2026 — la borne `/^jobs:/` compte, sans elle `on: push:` s'ajoute à la liste, et la classe de
-caractères doit admettre un chiffre : `web-e2e` en contient un, et une classe `[a-z-]` sans lui
-l'aurait fait disparaître de la liste sans erreur).
+Elles tournent sur chaque push et sur chaque pull request, elles passent au rouge, **et depuis le
+03/09/2026 un rouge verrouille le merge**. La seule chose capable de désactiver le bouton — la
+_protection de branche_ GitHub — exige un compte **Pro** ou un dépôt **public** ; celui-ci est
+devenu public, et la bascule a été faite le jour même. **Quatorze checks sont exigés sur `main`**,
+`enforce_admins` compris, donc la règle « rien ne merge en rouge » ne repose plus sur l'auteur.
+Décision, option écartée et seuil →
+**[ADR-0086](docs/adr/0086-the-gates-become-blocking-on-a-public-repository.md)**, qui remplace
+l'**[ADR-0040](docs/adr/0040-ci-gates-are-advisory-while-the-repository-is-private.md)** — laquelle
+disait l'état antérieur, et disait aussi que ce README avait affirmé le contraire (« cinq sont
+exigées ») depuis la phase 0 alors que la bascule n'était pas en attente mais indisponible.
+
+Les quatorze se lisent avec
+`gh api repos/ClementVallois/Maquette-ERP/branches/main/protection --jq '.required_status_checks.contexts'`.
+Le tableau ci-dessous décrit les **dix** que porte `ci.yml` ; les quatre autres viennent des trois
+autres workflows du dépôt — `Analyze` (CodeQL, `codeql.yml`), `Shell scripts` et
+`Build and boot the image` / `Deploy script --dry-run` (`image.yml`, arrivés avec la phase 8).
 
 | Porte (job CI)                  | Commande                                                                            | Ce qu'elle fait passer au rouge                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | ------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -523,19 +536,21 @@ l'aurait fait disparaître de la liste sans erreur).
 > `Playwright (apps/web)` arrive avec la phase 9.6 du plan front-end. Historique complet →
 > `docs/open-questions.md`.
 >
-> ⚠️ Une réserve datée du 28/08/2026, sur une seule des dix : `Cold setup (migrate + seed)` vient
-> d'être réécrite pour lancer le composite réel, et cette version-là **n'a pas encore tourné sur un
-> runner GitHub** — la branche qui la porte ne peut pas déclencher sa propre pull request. Elle est
-> vérifiée en local et recoupée avec la liste logicielle documentée d'`ubuntu-latest`, pas
-> observée verte sur la plateforme. La ligne est ouverte dans `docs/open-questions.md`.
+> ✅ La réserve du 28/08/2026 sur `Cold setup (migrate + seed)` est levée. Le job venait d'être
+> réécrit pour lancer le composite réel, et cette version-là **n'avait jamais tourné sur un runner
+> GitHub** : la branche qui la portait ne pouvait pas déclencher sa propre pull request. Elle a
+> tourné verte sur chaque pull request depuis. Elle n'est donc plus seulement recoupée avec la
+> liste logicielle documentée d'`ubuntu-latest`, elle est observée verte sur la plateforme.
 >
-> ⚠️ Aucune de ces dix n'empêche un merge aujourd'hui, pour la raison donnée plus haut : la
-> protection de branche n'est pas disponible sur ce plan. C'est une limite assumée et datée
-> (ADR-0040), pas une case oubliée.
+> ✅ Depuis le 03/09/2026, chacune de ces dix empêche un merge — elles font partie des quatorze
+> checks exigés sur `main`, `enforce_admins` compris (ADR-0086). La réserve qui figurait ici, « aucune
+> de ces dix n'empêche un merge », décrivait l'état antérieur et n'est plus vraie.
 
-Les hooks locaux (lefthook) rejouent une partie de ces portes **avant** le commit et le push — et
-depuis ADR-0040 ils ne les doublent plus, ils sont **le seul arrêt mécanique** qui précède un merge,
-puisque aucune des dix ne le bloque. ⚠️ Ils
+Les hooks locaux (lefthook) rejouent une partie de ces portes **avant** le commit et le push. De
+l'ADR-0040 à l'ADR-0086 ils ont été **le seul arrêt mécanique** qui précédait un merge, puisque
+aucune porte ne le bloquait ; depuis le 03/09/2026 ils doublent des portes qui bloquent vraiment, ce
+qui les remet dans leur rôle normal — échouer sur le poste plutôt que sur un runner, deux minutes
+plus tôt. ⚠️ Ils
 ne s'installent pas tout seuls : `ignore-scripts` est activé, donc un clone frais n'en a aucun tant
 qu'on n'a pas lancé `pnpm exec lefthook install`. Ce qu'ils font :
 gitleaks sur ce qui est indexé — le seul des deux qui empêche réellement la fuite, la CI ne scannant

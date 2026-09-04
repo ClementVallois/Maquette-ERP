@@ -31,12 +31,19 @@ export function DeniedState({ deniedBy, role }: DeniedStateProps): ReactElement 
         <ShieldAlertIcon aria-hidden="true" className="size-5 text-destructive" />
       </span>
       <h1 className="text-card-title">{LABELS.problem.heading.denied}</h1>
-      <dl className="flex w-full flex-col gap-1 text-sm">
-        <div className="flex justify-between gap-4">
+      {/* Stacked (label above value), not side-by-side: this card is capped at `max-w-md`
+          regardless of viewport, and a domain `problemType` path (`/problems/assignment-
+          missing-habilitation`, the longest one this repo has) does not fit next to its own
+          label in that width on any screen — a `justify-between` row here wraps both halves
+          independently and staggers them, not just on narrow viewports. */}
+      <dl className="flex w-full flex-col gap-3 text-sm">
+        <div className="flex flex-col items-center gap-0.5">
           <dt className="text-muted-foreground">{LABELS.problem.deniedBy}</dt>
-          <dd className="font-mono text-[0.8125rem] text-foreground">{deniedBy}</dd>
+          <dd className="max-w-full font-mono text-[0.8125rem] break-words text-foreground">
+            {deniedBy}
+          </dd>
         </div>
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col items-center gap-0.5">
           <dt className="text-muted-foreground">{LABELS.persona.role}</dt>
           <dd>
             <RoleBadge role={role} />

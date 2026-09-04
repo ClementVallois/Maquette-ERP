@@ -32,7 +32,7 @@
  * screens' hand-written renderer does, but the typographic choice is the API copy's and is kept.
  */
 export const LABELS = {
-  appName: 'CRA → Facture',
+  appName: 'Maquette ERP',
   demo: {
     title: 'Données de démonstration',
     body: 'Toutes les données sont synthétiques. Cette instance est réinitialisée chaque nuit : toute modification sera effacée.',
@@ -172,8 +172,11 @@ export const LABELS = {
       pendingSentenceNone: 'Aucun CRA n’attend votre décision.',
       open: 'Ouvrir le pré-facturier',
       /** One work-queue row's action — opens that row's own period, not the one on screen
-       * (the bug the queue exists to fix: the counter used to point at the displayed month). */
-      decide: 'Décider',
+       * (the bug the queue exists to fix: the counter used to point at the displayed month).
+       * Item 21, QA round 3: renamed from "Décider" and now opens the consultant's CRA directly
+       * (`/cra/$period/$consultantId`) instead of the pré-facturier — a manager reads the month
+       * before deciding, "Vérifier" names that first step. */
+      decide: 'Vérifier',
     },
     billing: {
       draft: 'Factures en brouillon',
@@ -215,6 +218,33 @@ export const LABELS = {
       tableCaption: 'Les mêmes chiffres, en tableau.',
       year: 'Année',
       total: 'Total',
+      /** Item 23, QA round 3 — the eye/eye-off affordance (`VisibilityToggle`) on this section. */
+      hide: 'Masquer les graphiques',
+      show: 'Afficher les graphiques',
+    },
+    /** Item 17, QA round 3: the dashboard's "informations CSE / vie de l’entreprise" module — a
+     * small rotating carousel of authored company-news messages, every role. */
+    companyNews: {
+      heading: 'Informations CSE / vie de l’entreprise',
+      hide: 'Masquer les informations CSE',
+      show: 'Afficher les informations CSE',
+      previous: 'Message précédent',
+      next: 'Message suivant',
+      /** `{index}`/`{total}` interpolated — a dot's own accessible name. */
+      goToMessage: 'Aller au message {index} sur {total}',
+      /** Said in the interface, not only in the README: the attachment is a file name, and this
+       * mockup has no document store to open it from. */
+      attachmentNotProvided: '(document non fourni dans la maquette)',
+    },
+    /** Item 18, QA round 3: the dashboard's org-chart panel, consultant and manager only — billing
+     * has no place in this org chart in the seed (the one billing persona is the director every
+     * manager reports to, not a subject of this read). */
+    orgChart: {
+      heading: 'Mon équipe',
+      manager: 'Manager',
+      noManager: 'Aucun manager renseigné.',
+      reports: 'Équipe ({count})',
+      noReports: 'Aucun rattachement direct.',
     },
   },
 
@@ -272,6 +302,10 @@ export const LABELS = {
     notStartedYet: 'Ce mois n’a pas encore été commencé. Remplissez-le, puis enregistrez.',
     nothingRecorded: 'Rien n’est encore saisi sur ce mois.',
     refused: 'Ce CRA a été refusé par le manager. Corrigez-le, puis soumettez-le à nouveau.',
+    /** Item 31, QA round 3: prefixes the manager's free-text refusal reason wherever it is shown
+     * verbatim (the consultant's own CRA, and the manager's read of it), so the reason reads as a
+     * labelled field rather than an unattributed sentence. */
+    refusalReasonPrefix: 'Motif : ',
     emptyList: 'Aucun CRA sur cette période.',
     emptyListHint:
       'Ce n’est pas un refus : la liste est bien la vôtre, elle ne contient simplement rien pour ce mois.',
@@ -351,6 +385,19 @@ export const LABELS = {
       dayIncompleteColumn: 'À compléter',
       dayIncomplete:
         'Ce jour ouvré n’atteint pas une journée complète : le mois ne pourra pas être soumis tant qu’il y manque quelque chose.',
+      /** Item 28, QA round 3: a consultant-side warning, never a block — time entered on a
+       * weekend or un jour férié happens in this business (the manager's own `flagged`/
+       * `nonWorkable` markers exist for exactly this) and the submission still goes through.
+       * `{count}` interpolated, singular/plural chosen at the call site. */
+      nonWorkableEnteredOne:
+        '1 jour saisi tombe un week-end ou un jour férié — la soumission reste possible, mais votre manager le verra signalé.',
+      nonWorkableEnteredMany:
+        '{count} jours saisis tombent un week-end ou un jour férié — la soumission reste possible, mais votre manager les verra signalés.',
+      /** Same fact, read by the manager instead of the consultant who entered it — the read-only
+       * CRA detail view (`manager-cra-grid-screen.tsx`), not only the validate dialog. */
+      nonWorkableEnteredManagerOne: '1 jour de ce mois tombe un week-end ou un jour férié.',
+      nonWorkableEnteredManagerMany:
+        '{count} jours de ce mois tombent un week-end ou un jour férié.',
       /** Accessible names for the five-option `<select>` a cell is (ADR-0068, ADR-0070) — never
        * the raw fraction glyph alone, which reads as nothing to a screen reader. */
       quantityOptions: {
@@ -525,7 +572,16 @@ export const LABELS = {
       confirm: 'Valider',
       cancel: 'Annuler',
       periodFactLabel: 'Période',
-      flaggedDaysFactLabel: 'Jours signalés',
+      /** Item 28, QA round 3: a weekend/holiday entry made visually loud (a banner, not a plain
+       * `<dl>` row a manager could validate past without reading) — `{count}` interpolated,
+       * singular/plural chosen at the call site. Shown only where the count is known
+       * (`manager-cra-grid-screen.tsx`'s own `data.flags`); the pré-facturier's own row-level
+       * "Valider" does not have this data — `PreFacturierCraRow` computes no `CraFlag`, by design.
+       * That asymmetry is an open row in `docs/open-questions.md`, dated 04/09/2026. */
+      flaggedDaysWarningOne:
+        '1 jour de ce mois tombe un week-end ou un jour férié — vérifiez-le avant de valider.',
+      flaggedDaysWarningMany:
+        '{count} jours de ce mois tombent un week-end ou un jour férié — vérifiez-les avant de valider.',
       clientsFactLabel: 'Clients avec du temps saisi ce mois',
       recordedDaysFactLabel: 'Jours saisis',
       lateFactLabel: 'Signalé en retard',
@@ -809,8 +865,7 @@ export const LABELS = {
       '/problems/day-outside-period': 'Ce jour n’appartient pas au mois saisi.',
       '/problems/refusal-reason-required': 'Un refus doit dire ce qu’il faut corriger.',
       '/problems/unknown-mission': 'Cette mission n’existe pas.',
-      '/problems/day-overbooked':
-        'Une journée compte quatre quarts de journée : celle-ci est déjà complète.',
+      '/problems/day-overbooked': 'Une journée ne peut pas dépasser le volume horaire prévu.',
       '/problems/validated-cra-is-immutable':
         'Ce CRA est validé : un relevé de temps validé ne se modifie plus.',
       '/problems/cra-transition-not-allowed':
@@ -894,7 +949,9 @@ export const LABELS = {
     openMenu: 'Ouvrir le menu',
     closeMenu: 'Fermer le menu',
     breadcrumbHome: 'Accueil',
-    comingSoonTitle: 'Cet écran arrive dans une prochaine phase',
+    /** Not "arrive dans une prochaine phase": no remaining phase of this build makes screens, and
+     * the README states these three as deliberate placeholders rather than unfinished work. */
+    comingSoonTitle: 'Cet écran n’est pas construit dans cette maquette',
     comingSoonBody:
       'Cette page n’est pas encore construite dans la maquette : elle existe dans la navigation pour montrer le périmètre complet, pas pour être ouverte aujourd’hui.',
     notFoundTitle: 'Page introuvable',
@@ -903,6 +960,14 @@ export const LABELS = {
     unexpectedErrorBody:
       'Une erreur inattendue a interrompu l’affichage de cette page. Revenez à l’accueil et recommencez.',
     sessionInvalidated: 'Votre persona n’est plus reconnue. Choisissez-en une à nouveau.',
+  },
+
+  /** Item 20, QA round 3: three placeholder pages under a small sidebar group, every role
+   * (`ALL_ROLES` in `config/navigation.ts`) — each renders `ComingSoon`, no screen behind it yet. */
+  selfService: {
+    mesInformationsNav: 'Mes informations',
+    mesNotesDeFraisNav: 'Mes notes de frais',
+    mesAbsencesNav: 'Mes demandes d’absence',
   },
 
   footer: {

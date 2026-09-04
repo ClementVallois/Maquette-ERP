@@ -23,6 +23,11 @@ interface ValidateConfirmDialogProps {
    * with recorded work on hand, the pré-facturier's own row does not, and neither one invents a
    * fact it would have to recompute the domain's own eligibility rules to get right. */
   readonly facts: readonly ValidateConfirmFact[];
+  /** Item 28, QA round 3: a weekend/holiday entry is a fact worth more visual weight than a plain
+   * `<dl>` row — this used to be one of `facts` above, indistinguishable from "période" or
+   * "clients", and the whole reason for the warning is to make it hard to validate past by
+   * accident. `0`/`undefined` renders nothing. */
+  readonly flaggedDaysCount?: number;
   readonly pending: boolean;
   readonly onConfirm: () => void;
   readonly onCancel: () => void;
@@ -37,6 +42,7 @@ interface ValidateConfirmDialogProps {
 export function ValidateConfirmDialog({
   consultantName,
   facts,
+  flaggedDaysCount,
   pending,
   onConfirm,
   onCancel,
@@ -56,6 +62,19 @@ export function ValidateConfirmDialog({
             </DialogTitle>
             <DialogDescription>{LABELS.preFacturier.validateConfirmDialog.lead}</DialogDescription>
           </DialogHeader>
+
+          {/* Item 28, QA round 3: same amber tone the CRA grid's own flagged-day marker uses — a
+              warning, never a block, so validation is still one click away below. */}
+          {flaggedDaysCount !== undefined && flaggedDaysCount > 0 && (
+            <div className="mt-1 rounded-lg bg-status-late-fill p-2.5 text-sm text-status-late-text ring-1 ring-status-late-dot/30">
+              {flaggedDaysCount === 1
+                ? LABELS.preFacturier.validateConfirmDialog.flaggedDaysWarningOne
+                : LABELS.preFacturier.validateConfirmDialog.flaggedDaysWarningMany.replace(
+                    '{count}',
+                    String(flaggedDaysCount),
+                  )}
+            </div>
+          )}
 
           {facts.length > 0 && (
             <dl className="flex flex-col gap-1 py-1 text-sm">

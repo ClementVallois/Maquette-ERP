@@ -1,10 +1,13 @@
 import {
   CalendarCheckIcon,
+  CalendarOffIcon,
   FileTextIcon,
+  IdCardIcon,
   LayoutDashboardIcon,
   type LucideIcon,
   ReceiptTextIcon,
   UserRoundCheckIcon,
+  WalletIcon,
 } from 'lucide-react';
 
 import type { Role } from '@/features/session/types';
@@ -100,6 +103,30 @@ export const NAVIGATION: readonly NavEntry[] = [
     icon: FileTextIcon,
     path: '/factures',
     roles: MANAGER_AND_BILLING,
+  },
+  /** Item 20, QA round 3: three placeholder pages (`ComingSoon`, no screen behind them yet),
+   * every role, listed consecutively so they read as one small group in the sidebar without a
+   * submenu affordance `NavEntry`/`Sidebar` do not otherwise support. */
+  {
+    id: 'mes-informations',
+    label: LABELS.selfService.mesInformationsNav,
+    icon: IdCardIcon,
+    path: '/mes-informations',
+    roles: ALL_ROLES,
+  },
+  {
+    id: 'mes-notes-de-frais',
+    label: LABELS.selfService.mesNotesDeFraisNav,
+    icon: WalletIcon,
+    path: '/mes-notes-de-frais',
+    roles: ALL_ROLES,
+  },
+  {
+    id: 'mes-absences',
+    label: LABELS.selfService.mesAbsencesNav,
+    icon: CalendarOffIcon,
+    path: '/mes-absences',
+    roles: ALL_ROLES,
   },
 ] as const;
 

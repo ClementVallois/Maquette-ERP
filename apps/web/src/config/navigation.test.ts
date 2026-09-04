@@ -13,13 +13,25 @@ import { navigationForRole } from './navigation';
  * before it ever reaches a browser.
  */
 describe('navigationForRole', () => {
-  it('shows exactly the consultant entries: Tableau de bord, Mes CRA', () => {
+  // Item 20, QA round 3: three placeholder pages (`ComingSoon`), every role, appended last —
+  // every list below carries the same three trailing entries regardless of role.
+  const SELF_SERVICE_LABELS = [
+    LABELS.selfService.mesInformationsNav,
+    LABELS.selfService.mesNotesDeFraisNav,
+    LABELS.selfService.mesAbsencesNav,
+  ];
+
+  it('shows exactly the consultant entries: Tableau de bord, Mes CRA, self-service', () => {
     const labels = navigationForRole('consultant').map((entry) => entry.label);
 
-    expect(labels).toStrictEqual([LABELS.dashboard.heading, LABELS.cra.nav]);
+    expect(labels).toStrictEqual([
+      LABELS.dashboard.heading,
+      LABELS.cra.nav,
+      ...SELF_SERVICE_LABELS,
+    ]);
   });
 
-  it('shows exactly the manager entries: Tableau de bord, Pré-facturier, CRA, Affectations, Factures', () => {
+  it('shows exactly the manager entries: Tableau de bord, Pré-facturier, CRA, Affectations, Factures, self-service', () => {
     const labels = navigationForRole('manager').map((entry) => entry.label);
 
     expect(labels).toStrictEqual([
@@ -28,16 +40,18 @@ describe('navigationForRole', () => {
       LABELS.cra.navManager,
       LABELS.assignment.nav,
       LABELS.invoice.nav,
+      ...SELF_SERVICE_LABELS,
     ]);
   });
 
-  it('shows exactly the billing entries: Tableau de bord, Pré-facturier, Factures', () => {
+  it('shows exactly the billing entries: Tableau de bord, Pré-facturier, Factures, self-service', () => {
     const labels = navigationForRole('billing').map((entry) => entry.label);
 
     expect(labels).toStrictEqual([
       LABELS.dashboard.heading,
       LABELS.preFacturier.nav,
       LABELS.invoice.nav,
+      ...SELF_SERVICE_LABELS,
     ]);
   });
 
