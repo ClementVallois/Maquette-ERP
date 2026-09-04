@@ -51,14 +51,10 @@ export default defineConfig({
     },
   },
   build: {
-    // Item 17, QA round 3: `src/assets/news-*.svg` (the company-news module's illustrations) are
-    // each well under Vite's default 4KB inline threshold, so a plain import would inline them as
-    // a `data:` URI in the built JS — `img-src 'self'` (`apps/api/src/web/reply.ts`'s CSP)
-    // refuses a `data:` image, same reasoning `apps/web/index.html`'s own favicon comment gives
-    // for staying same-origin. An explicit `?url` import suffix is the documented way to force
-    // Vite to never inline one specific import, but did not stop these three from being inlined
-    // here (verified against the actual `dist/` output, not assumed) — this size-based override
-    // is the mechanism that measurably works, so it is what ships.
+    // ADR-0092: an image the app references is served from its own origin, never inlined as a
+    // `data:` URI, which the production CSP's `img-src 'self'` refuses. The trap this guards is
+    // that it is invisible outside a production build — `pnpm run dev` sends no CSP — and that
+    // `?url`, the documented per-import opt-out, does not work in this project.
     assetsInlineLimit: (filePath) => (/\/news-[^/]+\.svg$/u.test(filePath) ? false : undefined),
   },
   server: {
