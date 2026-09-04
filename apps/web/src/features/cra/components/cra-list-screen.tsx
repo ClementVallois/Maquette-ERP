@@ -498,7 +498,10 @@ function CraListFilters({
         onChange={setStatuses}
       />
       <Select value={year === undefined ? FILTER_ALL : String(year)} onValueChange={setYear}>
-        <SelectTrigger aria-label={LABELS.cra.filters.yearLabel} className="w-36">
+        {/* Item 24, QA round 3: `w-36` (144px) clipped "Toutes les années" to "Toutes les anné" —
+            widened to fit that longest option; the panel already matches the trigger's own width
+            via `position: popper` (items 7/10), so only the trigger needed changing. */}
+        <SelectTrigger aria-label={LABELS.cra.filters.yearLabel} className="w-48">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
