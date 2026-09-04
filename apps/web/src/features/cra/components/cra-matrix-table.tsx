@@ -233,7 +233,12 @@ export function CraMatrixTable({
       // gap the bar sits on top of the "Total du jour" row instead of under it. Reserved
       // unconditionally (never measured against whether a bar is actually showing): the grid is
       // wider than its viewport for every month this mockup seeds.
-      className="overflow-x-auto rounded-xl bg-card pb-3 shadow-card ring-1 ring-border"
+      // `relative`: `sr-only` is `position: absolute`, so without a positioned ancestor here the
+      // `<caption>` and every non-workable day's screen-reader label resolve against the initial
+      // containing block — outside this scrollport, which therefore does not clip them, and the
+      // *document* pans sideways. Same trap `cra-quantity-cell.tsx` names for its own cells; this
+      // is the containing-block form of the fix, which also holds for any `sr-only` added later.
+      className="relative overflow-x-auto rounded-xl bg-card pb-3 shadow-card ring-1 ring-border"
     >
       <table className="w-full border-collapse text-sm">
         <caption className="sr-only">
