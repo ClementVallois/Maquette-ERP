@@ -8,7 +8,7 @@
 The current web version (Phase 6, `apps/api/src/web/`) is functional and rigorous, but deliberately
 austere: server-rendered HTML, no client-side JavaScript, two navigation links and no dashboard.
 This plan rebuilds the **interactive** UI with a modern stack and a product-grade finish suitable
-for a CEO demonstration.
+for a live demonstration to a non-technical decision-maker.
 
 Three premises distinguish this plan from its predecessor:
 
@@ -644,7 +644,7 @@ desktop Lighthouse Performance and Accessibility above 90 for dashboard and Pré
 
 ### 10.4 Demo checklist
 
-Write `docs/demo-checklist.md` as the exact CEO script and final Playwright journey: reset → selector
+Write `docs/demo-checklist.md` as the exact demonstration script and final Playwright journey: reset → selector
 notice → Alice's seeded matrix, edit and submit → Bruno dashboard, Pré-facturier, Claire validation,
 Alice refusal and margin → Emma scope 403 → Henri invoice issuance, printable tab and margin 403 →
 selector.
