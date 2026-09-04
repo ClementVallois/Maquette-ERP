@@ -623,7 +623,9 @@ function CraProgress({
         aria-valuemin={0}
         aria-valuemax={total}
         aria-label={label}
-        className="h-1.5 w-full max-w-64 shrink-0 overflow-hidden rounded-full bg-muted"
+        // No `shrink-0`: at 375px the bar's own 256px `max-w-64` plus the `text-nowrap` label
+        // beside it came to 424px inside a 351px page. The bar is the half that can give ground.
+        className="h-1.5 w-full max-w-64 overflow-hidden rounded-full bg-muted"
       >
         <div
           className="h-full rounded-full bg-primary transition-[width]"
