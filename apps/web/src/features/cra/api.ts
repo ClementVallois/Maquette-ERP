@@ -34,6 +34,9 @@ export interface CraListFilters {
    * matches `apps/api/src/routes/api.ts`'s own `year`/`month` query params. */
   readonly year?: number;
   readonly month?: number;
+  /** Item 22, QA round 3: matches `apps/api/src/routes/api.ts`'s own `beforePeriod` — "every
+   * period strictly before this one", what the dashboard's "CRA en retard" deep link needs. */
+  readonly beforePeriod?: string;
   readonly limit?: number;
   readonly offset?: number;
 }
@@ -58,6 +61,9 @@ export function fetchCraList(filters: CraListFilters = {}): Promise<ApiResult<Cr
   }
   if (filters.month !== undefined) {
     params.set('month', String(filters.month));
+  }
+  if (filters.beforePeriod !== undefined) {
+    params.set('beforePeriod', filters.beforePeriod);
   }
 
   return apiFetch<CraListResponse>(`/api/v1/cras?${params.toString()}`);

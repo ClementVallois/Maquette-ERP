@@ -194,6 +194,9 @@ interface CraListScreenProps {
   /** Item 4 (QA round 2), same "always present, manager-only controls" shape as the two above. */
   readonly year: number | undefined;
   readonly month: number | undefined;
+  /** Item 22, QA round 3: the dashboard's "CRA en retard" deep link — no filter control of its
+   * own, set only by that link's URL. */
+  readonly beforePeriod: string | undefined;
   readonly page: number;
   readonly pageSize: number;
 }
@@ -210,6 +213,7 @@ export function CraListScreen({
   statuses,
   year,
   month,
+  beforePeriod,
   page,
   pageSize,
 }: CraListScreenProps): ReactElement {
@@ -221,13 +225,18 @@ export function CraListScreen({
     statuses,
     ...(year === undefined ? {} : { year }),
     ...(month === undefined ? {} : { month }),
+    ...(beforePeriod === undefined ? {} : { beforePeriod }),
     limit: pageSize,
     offset: (page - 1) * pageSize,
   };
   const query = useCraList(filters);
   const navigate = useNavigate();
   const filtersActive =
-    consultantIds.length > 0 || statuses.length > 0 || year !== undefined || month !== undefined;
+    consultantIds.length > 0 ||
+    statuses.length > 0 ||
+    year !== undefined ||
+    month !== undefined ||
+    beforePeriod !== undefined;
 
   if (query.isPending) return <ListSkeleton />;
 

@@ -11,6 +11,26 @@ with a period, including its immediate neighbours. Shipped with the period, on t
 period was dropped incidentally when the item was written down, not a deliberate instruction to
 break the file's own punctuation convention. Flagging in case that reading is wrong.
 
+## Item 22 — a new `beforePeriod` read-side filter, no existing mechanism covered it
+
+The "CRA en attente de décision" card maps cleanly onto the existing filters (`statuses=submitted`,
+`year`/`month` omitted). "CRA en retard" does not: `lateCras` (`apps/api/src/routes/api.ts`) is
+`status !== 'validated' AND lastDayOf(period) < today`, and `/api/v1/cras`'s `CraListQuery` had no
+way to express a period range — only one exact year, one exact month, or an exact `period`. Rather
+than approximate it client-side (which would desync the count and the list the moment pagination
+or an edge-of-month case bit), added `beforePeriod` end to end: `CraListQuery.beforePeriod`
+(`packages/timesheet`), `c.period < $N` in `PgCraRepository.list`/`.count`, `CraListParams` on
+`GET /api/v1/cras`, and `cra.index.tsx`'s search schema. It is a read-side query capability in the
+same shape as the existing `year`/`month` filters (item 4, QA round 2 set that precedent), not a
+new domain invariant, so no ADR seemed warranted — flagging here in case Clement disagrees and
+wants one written for the query surface itself. `beforePeriod` on the dashboard link is computed
+from the browser's own clock (`currentPeriod()`, already used by the "months ahead" picker) rather
+than a server round-trip — the equivalence to the server's own `today`-based `lateCras` is proved
+in `CraListQuery`'s own doc comment. **Not verified against a live Postgres** (no DB in this
+sandbox) — `pg-cra-repository.int.test.ts` already exercises `year`/`month` narrowing and none of
+its existing calls pass `beforePeriod`, so nothing there should break, but the new clause itself
+has no test of its own yet.
+
 ## Item 25 — could not reproduce the alphabetical sort, fixed it defensively anyway
 
 Searched every period-bearing Select/column in `apps/web` (the CRA table's year/month filters,

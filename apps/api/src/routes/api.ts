@@ -152,6 +152,13 @@ const CraListParams = Pagination.extend({
   statuses: CommaSeparatedStatuses,
   year: YearQuery,
   month: MonthQuery,
+  // Item 22, QA round 3: the dashboard's "CRA en retard" deep link — every period strictly
+  // before this one, matching `lateCras`' own `lastDayOf(period) < today` (`CraListQuery`'s own
+  // doc comment, `packages/timesheet`, has the equivalence).
+  beforePeriod: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/u)
+    .optional(),
 });
 
 const InvoiceListParams = Pagination.extend({
@@ -388,6 +395,9 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
           ...(query.value.statuses === undefined ? {} : { statuses: query.value.statuses }),
           ...(query.value.year === undefined ? {} : { year: query.value.year }),
           ...(query.value.month === undefined ? {} : { month: query.value.month }),
+          ...(query.value.beforePeriod === undefined
+            ? {}
+            : { beforePeriod: query.value.beforePeriod }),
         };
         const cras = await unit.cras.list({
           ...filters,

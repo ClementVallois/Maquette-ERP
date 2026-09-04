@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 import { linkOf, type ActionLink } from '@/components/action-link';
 import { DeniedState } from '@/components/feedback/denied-state';
@@ -13,6 +13,7 @@ import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
 import { frenchDate, frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
+import { currentPeriod } from '@/lib/period';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
 import { callToAction, type DashboardCallToAction } from '../actions';
@@ -342,15 +343,57 @@ function ConsultantCards({ data }: { readonly data: ConsultantDashboard }): Reac
   );
 }
 
+/**
+ * Item 22, QA round 3: `StatCard` wrapped in a `Link` rather than a `to`/`onNavigate` prop added
+ * to `StatCard` itself — that component is shared with the two counts below that stay plain
+ * (§ "Billable ce mois", `BillingCards`' own three), and a stat card that only *sometimes*
+ * navigates is a worse interface than a plain card a caller can choose to wrap.
+ */
+function StatCardLink({
+  to,
+  search,
+  children,
+}: {
+  readonly to: '/cra';
+  readonly search: { readonly statuses: DashboardCraStatus[]; readonly beforePeriod?: string };
+  readonly children: ReactNode;
+}): ReactElement {
+  return (
+    <Link
+      to={to}
+      search={search}
+      className="block rounded-xl transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      {children}
+    </Link>
+  );
+}
+
 function ManagerCards({ data }: { readonly data: ManagerDashboard }): ReactElement {
   const labels = LABELS.dashboard.manager;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard label={labels.pending} value={String(data.pendingDecisions)} />
+        {/* Item 22, QA round 3: both cards below deep-link to `/cra`, filtered to exactly what
+            they count. ADR-0082: these counts are never scoped to the displayed period — the
+            link omits `year`/`month` entirely (not merely leaves them at their current value) so
+            the list agrees with the count instead of silently narrowing to the wrong month. */}
+        <StatCardLink to="/cra" search={{ statuses: ['submitted'] }}>
+          <StatCard label={labels.pending} value={String(data.pendingDecisions)} />
+        </StatCardLink>
         <StatCard label={labels.billable} value={frenchEuros(data.billableCents)} />
-        <StatCard label={labels.late} value={String(data.lateCras)} />
+        {/* "En retard" = not validated AND the period has closed (`lateCras`,
+            `apps/api/src/routes/api.ts`) — `beforePeriod` is the exact server-side equivalent
+            (`CraListQuery`'s own doc comment has the proof), computed from this browser's own
+            clock the same way `currentPeriod()`'s other caller (the "months ahead" picker)
+            already does. */}
+        <StatCardLink
+          to="/cra"
+          search={{ statuses: ['draft', 'submitted', 'refused'], beforePeriod: currentPeriod() }}
+        >
+          <StatCard label={labels.late} value={String(data.lateCras)} />
+        </StatCardLink>
       </div>
     </div>
   );

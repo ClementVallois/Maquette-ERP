@@ -49,6 +49,7 @@ function craListQueryKey(
   readonly string[],
   number | undefined,
   number | undefined,
+  string | undefined,
   number | undefined,
   number | undefined,
 ] {
@@ -61,6 +62,8 @@ function craListQueryKey(
     // different filter values must never share a cache entry.
     filters.year,
     filters.month,
+    // Item 22, QA round 3: same reasoning as `year`/`month` above.
+    filters.beforePeriod,
     filters.limit,
     filters.offset,
   ];
