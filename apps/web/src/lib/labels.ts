@@ -388,7 +388,7 @@ export const LABELS = {
       clearRow: 'Vider la ligne',
       removeRow: 'Retirer la ligne',
       addActivity: 'Ajouter une activité',
-      addActivityPlaceholder: 'Choisir une mission…',
+      addActivityPlaceholder: 'Ajouter une mission…',
       noActivityToAdd: 'Toutes les missions affectées ce mois-ci figurent déjà dans la grille.',
       notAssignableThisDay: 'Mission non affectée ce jour-là.',
       /** task 6.2's day-total signal (`isDayOverbooked`, `matrix.ts`) — never a blocker: the
