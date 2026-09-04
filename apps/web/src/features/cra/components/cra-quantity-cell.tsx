@@ -105,12 +105,14 @@ export function CraQuantityCell({
       data-cra-day={dayDataAttribute}
       ref={registerRef}
       value={String(value)}
-      // The accessible name, and deliberately not a paired `sr-only` <label>: `sr-only` is
-      // `position: absolute`, no ancestor here is positioned, so such a label resolves against the
-      // initial containing block — outside the grid's own `overflow-x-auto`, which therefore does
-      // not clip it. Sixty-two of them pushed the *document* scroll width past the viewport and the
-      // whole page panned sideways. `aria-label` is what the two read-only branches above already
-      // use, and it wins over a <label> in the name computation regardless.
+      // The accessible name, and deliberately not a paired `sr-only` <label>: sixty-two of those
+      // pushed the *document* scroll width past the viewport and the whole page panned sideways,
+      // because `sr-only` is `position: absolute` and nothing between the cell and the initial
+      // containing block was positioned, so the grid's own `overflow-x-auto` did not clip them.
+      // `cra-matrix-table.tsx`'s scrollport and the shell's `<main>` are both `relative` since
+      // item 34 and so would contain such a label today — this stays an `aria-label` anyway: it is
+      // what the two read-only branches above already use, and it wins over a <label> in the name
+      // computation regardless.
       aria-label={accessibleName}
       onChange={(event) => {
         onChange(parseQuantity(event.target.value));

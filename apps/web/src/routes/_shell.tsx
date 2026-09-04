@@ -166,7 +166,15 @@ function ShellLayout(): ReactElement {
           entries={entries}
           persona={persona}
         />
-        <main id="main-content" className="flex-1 overflow-y-auto">
+        {/* `relative`: this is the app's only scrollport — the wrapper above is `h-dvh
+            overflow-hidden`, so nothing is meant to scroll the document itself. `sr-only` is
+            `position: absolute`, and without a positioned ancestor every screen-reader-only
+            caption and label in the page below resolves against the initial containing block,
+            outside this scrollport, which therefore does not clip it. On `/pre-facturier` at
+            375px that alone gave the *document* a 2545px scroll height against an 812px viewport:
+            once `main` bottomed out the whole page kept scrolling into blank space. Measured;
+            `relative` returns the document to exactly its viewport height. */}
+        <main id="main-content" className="relative flex-1 overflow-y-auto">
           <div className="mx-auto flex max-w-[1360px] flex-col gap-6 px-3 py-4 sm:px-6 sm:py-6">
             <DemoNotice />
             <Outlet />
