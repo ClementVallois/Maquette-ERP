@@ -75,11 +75,17 @@ export function BusinessTimeline({
         ))}
       </ol>
 
-      <ol className="mt-4 hidden gap-1 overflow-x-auto pb-1 sm:flex">
+      {/* No `gap`/`px` on the `<ol>`/`<li>` here: the connector line below is sized from the
+          `<li>`'s own width (a bubble-to-bubble reach, `left-1/2 w-full` on a `w-full` box), so
+          adding horizontal breathing room on the `<li>` or a gap on the `<ol>` would move each
+          bubble's centre further apart than the line's own span reaches — a visible break before
+          every bubble. The padding needed so text doesn't touch between columns goes on the text
+          wrapper below the connector row instead, where it cannot affect that math. */}
+      <ol className="mt-4 hidden overflow-x-auto pb-1 sm:flex">
         {items.map((item, index) => (
           <li
             key={item.key}
-            className="flex min-w-36 flex-1 flex-col items-center gap-2 px-2 text-center"
+            className="flex min-w-36 flex-1 flex-col items-center gap-2 text-center"
           >
             {/* The connecting line and the bubble share this one fixed-height, flex-centred box
                 — both are positioned relative to its exact vertical centre (`top-1/2
@@ -101,7 +107,9 @@ export function BusinessTimeline({
                 )}
               />
             </div>
-            <TimelineText item={item} />
+            <div className="px-2">
+              <TimelineText item={item} />
+            </div>
           </li>
         ))}
       </ol>
