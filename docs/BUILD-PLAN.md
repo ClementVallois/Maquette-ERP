@@ -34,8 +34,9 @@ implied finish is therefore **early September 2026**, not 21/08.
 What that means for the 24/08 conversation: phases 0–6 plus 8 constitute a **demonstrable chain in
 production** — the CRA-to-invoice chain, the enforced boundary, authorization by role and scope, and the
 **seven** screens Phase 6 shipped — which Phase 8 would put at `https://erp.clementvallois.fr`.
-**That host serves nothing yet**: Phase 8 has not landed, and this sentence describes the intended
-end state, not the present one. Phases 7, 9 and 10 harden and explain it.
+**Phase 8 landed on 02/09/2026 and that host serves the chain**; the sentence above described an
+intended end state and is kept because the calendar is a record of what was planned, not a
+description of today. Phases 7, 9 and 10 harden and explain it.
 If a link has to go out on 24/08, it goes out at the end of Phase 8, with the README saying plainly
 what is finished and what is still being built. Nothing is cut; the reader is told where the work is.
 
@@ -280,6 +281,8 @@ block a merge is a warning, not a gate). ~~**Human step**: enabling branch prote
 UI.~~ **That step was never available**: branch protection needs GitHub Pro or a public repository,
 and this one is private on the free plan — found on 19/08/2026 when the first pull request was
 opened. The eight gates are advisory until the repository goes public in Phase 9. **ADR-0040**.
+**Done on 03/09/2026**: the repository is public, branch protection is on, fourteen checks are
+required and `enforce_admins` is set — **ADR-0086** supersedes ADR-0040.
 
 ### 0.6 — `BUILD-RULES.md` and `CLAUDE.md` point at this plan
 
@@ -810,14 +813,18 @@ The **disclosure decision** — whether this repository becomes public, and what
 named here rather than in 9.2 because 9.2 is about a reading path, not about publication.
 
 If the answer is yes, two things follow in the same act and neither costs anything: branch
-protection becomes available, so the **ten CI jobs** can be ticked as required checks (the step Phase 7 could
+protection becomes available, so the CI jobs can be ticked as required checks (the step Phase 7 could
 not run — **ADR-0040**), and the Actions status becomes visible to anyone holding the link, so the
 README can carry a CI badge instead of asking to be believed. A superseding ADR records both.
 
 If the answer is no, ADR-0040 stands unchanged and the README keeps saying the gates are advisory.
 That is a complete outcome, not a failure to reach one.
 
-### 9.3 — `docs/demo.md`
+**Answered yes on 03/09/2026** (**ADR-0086**): fourteen required checks — the eleven of `ci.yml`
+plus two from `image.yml` and CodeQL's `Analyze` — with `enforce_admins`. The badge followed on
+04/09/2026.
+
+### 9.3 — the demo script (shipped as `docs/demo-checklist.md`)
 
 The written scenario: seed → Cra entered → validated → draft invoice → out-of-scope read refused →
 **boundary broken, CI red**. It is the demo script, and it is in the repo so it survives the demo.
@@ -846,7 +853,7 @@ This is the only test of Phase 9 that counts.
 ### 10.3 — Tag and hand over
 
 Tag the release, verify the deployed digest matches the tag, check the live instance against
-`docs/demo.md` end to end.
+`docs/demo-checklist.md` end to end.
 
 ---
 
@@ -885,7 +892,7 @@ deferred rows belong in the README's "Ce que je ne construis pas" and are closed
 | **6** | Route groups as personas · the three feedback states · the refusal reason shown, not a greyed-out button · filters in the URL · Cra entry grid · printable Cra for client signature · the pré-facturier as the central screen · **the reveal click on `Tjm` and margin** · French formats and locale · reduced accessibility (keyboard, labels, contrast) · a front with no framework                                                                                                                                                                                                                                                                                                                                                                                                          |
 | **7** | ~~Required checks and branch protection~~ (moved to Phase 9 — unavailable on this plan, ADR-0040) · mutation testing on `domain/` in nightly · grouped and scheduled Renovate · the written vulnerability-management process (the `setup` replay and replayed migrations moved to Phases 4 and 3, where the code they test lands)                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | **8** | New scope, and a reopening: "there is no CD", "no secret in CI", build/deploy separation, artifact signing, runtime hardening and hosting were all settled on the premise that nothing is deployed. Each is re-decided against the new premise by ADR-0028/0029/0030 — built, or left deferred with the reason restated · **the resettable public demo and its seed lifecycle (ADR-0032)**                                                                                                                                                                                                                                                                                                                                                                                                     |
-| **9** | The cold reader's path · `docs/demo.md` · the compromise procedure · plus every **rule** owed to the README: the honest limit against an insider, the pipeline as an evidence factory, the Cra as a legal document, the three billing engines, the five decisions and the prioritisation filter, the three horizons, the OCR arbitration, the notification rules, the go-live risk, build cost and ROI, the audit trail, the full commercial chain, the "why not Odoo" answer, mission reports out of scope, and the label positions (YAGNI claimed, SOLID not)                                                                                                                                                                                                                                |
+| **9** | The cold reader's path · `docs/demo-checklist.md` · the compromise procedure · plus every **rule** owed to the README: the honest limit against an insider, the pipeline as an evidence factory, the Cra as a legal document, the three billing engines, the five decisions and the prioritisation filter, the three horizons, the OCR arbitration, the notification rules, the go-live risk, build cost and ROI, the audit trail, the full commercial chain, the "why not Odoo" answer, mission reports out of scope, and the label positions (YAGNI claimed, SOLID not)                                                                                                                                                                                                                      |
 
 **Verification, not assertion**: Phase 9 re-runs `scripts/extract-triage.ts` (from the private
 repository, written in task 0.1) over the archived triage and

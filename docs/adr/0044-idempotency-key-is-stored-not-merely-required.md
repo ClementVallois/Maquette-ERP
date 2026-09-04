@@ -91,4 +91,4 @@ row and which a client-side retry could otherwise defeat from outside.
 
 The cost is one nullable column and one partial index on a table that already has many of both, and
 a caller that must now hold a key across a retry — which is the whole point, and which
-`docs/demo.md` will show.
+the demo script (`docs/demo-checklist.md`) shows.

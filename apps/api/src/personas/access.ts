@@ -172,7 +172,7 @@ function originShape(origin: string | undefined): 'absent' | 'suppressed' | 'mis
  * A **missing** `Origin` is refused as well as a mismatched one. Browsers send it on every
  * cross-site state-changing request, so accepting its absence would re-open the hole for exactly
  * the requests the check exists to stop. The cost is that `curl -X POST` needs the header, and
- * `docs/demo.md` says so at the point where someone would hit it.
+ * `docs/demo-checklist.md` says so at the point where someone would hit it.
  */
 export function registerOriginCheck(app: FastifyInstance, dependencies: ServerDependencies): void {
   app.addHook('onRequest', async (request, reply) => {
