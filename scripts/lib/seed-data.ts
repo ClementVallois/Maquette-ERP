@@ -11,8 +11,8 @@
  * consultants and two more managers, none of them in `personas`; dense Cras for June, July and
  * August 2026; four veterans carrying a sparse history back to 2016, one of whom has left the
  * firm; and invoices from 2016 in three statuses. The nine named individuals above are unchanged.
- * (QA round 4 added the second of those two managers, Rennes' own, so a consultant's manager is
- * never in another office — see `managerAttachments` below.)
+ * (The second of those two managers, Rennes' own, exists so that no consultant is attached to a
+ * manager in another office — ADR-0094, and `managerAttachments` below.)
  */
 
 import { deterministicIdFactory } from '@erp/api';
@@ -294,9 +294,8 @@ const karim: RosterConsultant = {
   departureDate: null,
 };
 /** A third, non-selectable manager -- Rennes gets its own local management line the same way
- * Bordeaux (Karim) does, so François's is never attached to a manager outside his own office
- * (QA round 4: every read is office-scoped, and a cross-office attachment produced a Cra nobody
- * could open to validate). Reports to Henri, same as Bruno/Emma/Karim. */
+ * Bordeaux (Karim) does, so François is not attached to a manager outside his own office
+ * (ADR-0094). Reports to Henri, same as Bruno/Emma/Karim. */
 const thomas: RosterConsultant = {
   id: ids.next(),
   firstName: 'Thomas',
@@ -482,7 +481,7 @@ export const consultantGrades = [
     toDate: null,
     cjmCents: 19000,
   }, // 190 €/j
-  // Roster expansion (item 6, QA round 1; QA round 4 added the second manager): one grade per
+  // Roster expansion (item 6, QA round 1; ADR-0094 added the second manager): one grade per
   // new consultant, cycling Junior/Confirmé/Senior (a manager gets the Manager grade instead).
   // `fromDate` matches each roster member's own join date — 2016 for the four veterans and for
   // each manager, 2025 for every dense-only filler (a year of margin before the earliest 2026
@@ -919,10 +918,9 @@ export const assignments = [
 ] as const;
 
 // ── Manager attachments ─────────────────────────────────────────────────────
-// Each consultant reports to a manager. Managers report to the director. A consultant's manager
-// is always in the consultant's own office (QA round 4): every read in this app is scoped by
-// `actor.officeId`, so a cross-office attachment produces a Cra the manager can never open a
-// screen to validate.
+// Each consultant reports to a manager in that consultant's own office; managers report to the
+// director, the one attachment that crosses an office. ADR-0094 — and
+// `tests/seed-office-scope.test.ts`, which fails if either half stops holding.
 
 export const managerAttachments = [
   {
@@ -946,10 +944,8 @@ export const managerAttachments = [
     fromDate: '2024-01-01',
     toDate: null,
   },
-  // Rennes and Bordeaux, not Lyon/Paris (QA round 4): François and Gabrielle used to report
-  // across offices, to Emma and Bruno respectively — a Cra no screen either manager could open,
-  // since every read is office-scoped. They now report to their own office's manager, Thomas and
-  // Karim.
+  // Rennes and Bordeaux, not Lyon/Paris: François and Gabrielle report to their own office's
+  // manager, Thomas and Karim. ADR-0094.
   {
     id: ids.next(),
     consultantId: francois.id,
@@ -996,8 +992,8 @@ export const managerAttachments = [
     fromDate: '2016-01-01',
     toDate: null,
   },
-  // QA round 4: Thomas is Rennes' own new manager, modelled on Karim in every respect — reports
-  // to Henri, dated from 2016 so he can already be François's manager on François's own row above.
+  // Thomas is Rennes' own manager, modelled on Karim in every respect (ADR-0094) — dated from
+  // 2016 so he can already be François's manager on François's own row above.
   {
     id: ids.next(),
     consultantId: thomas.id,

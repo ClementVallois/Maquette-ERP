@@ -22,8 +22,16 @@ recording it instead as an Open row dated 04/09/2026 with three candidate answer
 
 ## Decision
 
-**A `manager_attachment` never crosses an office.** The seed is the only writer of that table in
-this mockup, so the invariant is enforced where it is created:
+**A consultant's `manager_attachment` never crosses an office.** One shape is exempt and always
+was: a **manager reporting to the director**, who sits in Paris — Emma from Lyon, Karim from
+Bordeaux, Thomas from Rennes. It is safe for the one reason that makes the rule necessary
+elsewhere: `scripts/seed.ts` writes a `Cra` only for someone holding an active assignment, a
+manager holds none, so such a row never names a month anybody has to validate. The exemption is
+asserted rather than described (`tests/seed-office-scope.test.ts`), and it fails the day a manager
+is given an assignment.
+
+The seed is the only writer of that table in this mockup, so the invariant is enforced where it is
+created:
 
 - Gabrielle Petit reattaches to **Karim Faure**, Bordeaux's own manager (added by item 6 of QA
   round 1, non-selectable);
@@ -79,8 +87,18 @@ with a test.
 
 ## Consequences
 
-Cheap: every seeded `Cra` is now validatable by someone who can actually see it, which is what the
-demonstration claims. Nothing in the domain, the API or the SPA changed — the fix is data.
+Cheap: no seeded `Cra` is left naming a manager who cannot open a screen to see it. Nothing in the
+domain, the API or the SPA changed — the fix is data. The claim stops there deliberately: all but
+one seeded `Cra` arrives `Validated` and therefore immutable, so "validatable" describes exactly
+one month (Claire's June, Paris), and that one was already reachable by `manager-paris` before this
+ADR.
+
+What it does **not** deliver, named here rather than left to be discovered: François (Rennes) and
+Gabrielle (Bordeaux) now report to Thomas and Karim, and neither is in the persona picker, which
+stays at four (ADR-0023). A month either of them submits through the interface — the interactive
+journey the demonstration runs — still has no selectable persona able to validate it. The failure
+mode moved from "the manager is in the wrong office" to "the manager has no persona"; it did not
+close. Row opened in `docs/open-questions.md`, dated 04/09/2026.
 
 Expensive: the roster gains a person, so `48 consultants / 3 managers` becomes `49 / 4` in
 CLAUDE.md, in the README's "Jeu de données", and in every test that counts them. And the seed no

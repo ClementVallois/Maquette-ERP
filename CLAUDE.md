@@ -66,9 +66,11 @@ The seed data must look like the reality of a consulting firm:
   individuals plus a roster-expansion cohort — none of it selectable in the persona picker, which
   stays at **exactly four** entries (ADR-0023). **4 managers** (Bruno in Paris, Emma in Lyon,
   Karim in Bordeaux, Thomas in Rennes), each with 10+ direct reports for the two selectable ones
-  (Bruno and Emma). **A consultant's manager is always in the consultant's own office**
-  (ADR-0094): every read is scoped by `actor.officeId`, so a cross-office attachment produces a
-  Cra no manager can open a screen to validate. **4
+  (Bruno and Emma). **A consultant's manager is always in the consultant's own
+  office** (ADR-0094): every read is scoped by `actor.officeId`, so a cross-office attachment
+  produces a Cra no manager can open a screen to validate. The managers themselves report to the
+  director in Paris, which is the one attachment that crosses an office and is safe only because a
+  manager holds no assignment and therefore no Cra. **4
   veterans** carry sparse historical CRAs back to 2016 on missions extended to cover that span,
   and **one of them (Marine) has left the firm** (`departure_date`, ADR-0079) — her old CRAs and
   invoices stay readable, and she is absent from every current roster read. Every active
