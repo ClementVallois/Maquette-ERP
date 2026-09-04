@@ -7,10 +7,12 @@
  * Réunion client at 8.5 % · EU B2B client under Autoliquidation · Guyane client outside VAT scope ·
  * Grade carrying the default Tjm grid · Cjm as the sensitive value the scope test protects.
  *
- * Item 6 (QA round 1) added volume on top of that shape, further down this file: 39 more
- * consultants and a third manager, none of them in `personas`; dense Cras for June, July and
+ * Item 6 (QA round 1) added volume on top of that shape, further down this file: 40 more
+ * consultants and two more managers, none of them in `personas`; dense Cras for June, July and
  * August 2026; four veterans carrying a sparse history back to 2016, one of whom has left the
  * firm; and invoices from 2016 in three statuses. The nine named individuals above are unchanged.
+ * (The second of those two managers, Rennes' own, exists so that no consultant is attached to a
+ * manager in another office — ADR-0094, and `managerAttachments` below.)
  */
 
 import { deterministicIdFactory } from '@erp/api';
@@ -231,9 +233,9 @@ interface RosterConsultant {
   readonly departureDate: string | null;
 }
 
-// The four veterans/departure and the new manager, named individually rather than pulled from a
-// pool: each carries its own office/practice/role/departure, so a shared generator would need as
-// much per-entry configuration as writing them out plainly does.
+// The four veterans/departure and the two new managers, named individually rather than pulled
+// from a pool: each carries its own office/practice/role/departure, so a shared generator would
+// need as much per-entry configuration as writing them out plainly does.
 
 /** Paris veteran, active -- historical Cra on `mAuditDora`, still on staff through 2026. */
 const julien: RosterConsultant = {
@@ -288,6 +290,19 @@ const karim: RosterConsultant = {
   email: emailOf('Karim', 'Faure'),
   officeId: bordeaux.id,
   practiceId: offensive.id,
+  role: 'manager',
+  departureDate: null,
+};
+/** A third, non-selectable manager -- Rennes gets its own local management line the same way
+ * Bordeaux (Karim) does, so François is not attached to a manager outside his own office
+ * (ADR-0094). Reports to Henri, same as Bruno/Emma/Karim. */
+const thomas: RosterConsultant = {
+  id: ids.next(),
+  firstName: 'Thomas',
+  lastName: 'Lemoine',
+  email: emailOf('Thomas', 'Lemoine'),
+  officeId: rennes.id,
+  practiceId: iam.id,
   role: 'manager',
   departureDate: null,
 };
@@ -379,6 +394,7 @@ const rosterConsultants: readonly RosterConsultant[] = [
   camille,
   theo,
   karim,
+  thomas,
   ...parisFillers,
   ...lyonFillers,
   ...bordeauxFillers,
@@ -465,13 +481,14 @@ export const consultantGrades = [
     toDate: null,
     cjmCents: 19000,
   }, // 190 €/j
-  // Roster expansion (item 6, QA round 1): one grade per new consultant, cycling
-  // Junior/Confirmé/Senior (Karim, the new manager, gets the Manager grade). `fromDate` matches
-  // each roster member's own join date — 2016 for the four veterans and for Karim, 2025 for every
-  // dense-only filler (a year of margin before the earliest 2026 CRA).
+  // Roster expansion (item 6, QA round 1; ADR-0094 added the second manager): one grade per
+  // new consultant, cycling Junior/Confirmé/Senior (a manager gets the Manager grade instead).
+  // `fromDate` matches each roster member's own join date — 2016 for the four veterans and for
+  // each manager, 2025 for every dense-only filler (a year of margin before the earliest 2026
+  // CRA).
   ...rosterConsultants.map((c, index) => {
     const isVeteran = index < 4; // julien, marine, camille, theo
-    const isManager = c.role === 'manager'; // karim
+    const isManager = c.role === 'manager'; // karim, thomas
     const grade = isManager
       ? gradeManager
       : cyclic([gradeJunior, gradeConfirme, gradeSenior] as const, index);
@@ -842,7 +859,8 @@ export const assignments = [
   // `null` — or the departure date for Marine, closed the same way ADR-0079 asks every open row
   // to close. Julien/Camille/Théo sit on the same historically-extended mission a veteran of
   // their office would realistically have carried for a decade (`mAuditDora`/`mSocReunion`/
-  // `mGrcGuyane`, all pushed back to 2016 above); Karim, the new manager, carries none.
+  // `mGrcGuyane`, all pushed back to 2016 above); Karim and Thomas, the two new managers, carry
+  // none.
   {
     id: ids.next(),
     consultantId: julien.id,
@@ -900,7 +918,9 @@ export const assignments = [
 ] as const;
 
 // ── Manager attachments ─────────────────────────────────────────────────────
-// Each consultant reports to a manager. Managers report to the director.
+// Each consultant reports to a manager in that consultant's own office; managers report to the
+// director, the one attachment that crosses an office. ADR-0094 — and
+// `tests/seed-office-scope.test.ts`, which fails if either half stops holding.
 
 export const managerAttachments = [
   {
@@ -924,17 +944,19 @@ export const managerAttachments = [
     fromDate: '2024-01-01',
     toDate: null,
   },
+  // Rennes and Bordeaux, not Lyon/Paris: François and Gabrielle report to their own office's
+  // manager, Thomas and Karim. ADR-0094.
   {
     id: ids.next(),
     consultantId: francois.id,
-    managerId: emma.id,
+    managerId: thomas.id,
     fromDate: '2023-06-01',
     toDate: null,
   },
   {
     id: ids.next(),
     consultantId: gabrielle.id,
-    managerId: bruno.id,
+    managerId: karim.id,
     fromDate: '2024-06-01',
     toDate: null,
   },
@@ -966,6 +988,15 @@ export const managerAttachments = [
   {
     id: ids.next(),
     consultantId: karim.id,
+    managerId: henri.id,
+    fromDate: '2016-01-01',
+    toDate: null,
+  },
+  // Thomas is Rennes' own manager, modelled on Karim in every respect (ADR-0094) — dated from
+  // 2016 so he can already be François's manager on François's own row above.
+  {
+    id: ids.next(),
+    consultantId: thomas.id,
     managerId: henri.id,
     fromDate: '2016-01-01',
     toDate: null,

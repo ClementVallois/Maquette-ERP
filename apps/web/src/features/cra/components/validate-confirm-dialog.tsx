@@ -26,8 +26,11 @@ interface ValidateConfirmDialogProps {
   /** Item 28, QA round 3: a weekend/holiday entry is a fact worth more visual weight than a plain
    * `<dl>` row — this used to be one of `facts` above, indistinguishable from "période" or
    * "clients", and the whole reason for the warning is to make it hard to validate past by
-   * accident. `0`/`undefined` renders nothing. */
-  readonly flaggedDaysCount?: number;
+   * accident. Required and nullable, deliberately: a caller must say whether it computed the flag
+   * at all, rather than silently inheriting "no warning" through an optional prop. `> 0` is the
+   * loud warning; `0` renders nothing, same as before; `null` renders a muted advisory.
+   * ADR-0095. */
+  readonly flaggedDaysCount: number | null;
   readonly pending: boolean;
   readonly onConfirm: () => void;
   readonly onCancel: () => void;
@@ -65,7 +68,7 @@ export function ValidateConfirmDialog({
 
           {/* Item 28, QA round 3: same amber tone the CRA grid's own flagged-day marker uses — a
               warning, never a block, so validation is still one click away below. */}
-          {flaggedDaysCount !== undefined && flaggedDaysCount > 0 && (
+          {flaggedDaysCount !== null && flaggedDaysCount > 0 && (
             <div className="mt-1 rounded-lg bg-status-late-fill p-2.5 text-sm text-status-late-text ring-1 ring-status-late-dot/30">
               {flaggedDaysCount === 1
                 ? LABELS.preFacturier.validateConfirmDialog.flaggedDaysWarningOne
@@ -74,6 +77,14 @@ export function ValidateConfirmDialog({
                     String(flaggedDaysCount),
                   )}
             </div>
+          )}
+
+          {/* ADR-0095. Plain text and not a link: a navigation link inside an open dialog
+              discards the decision state the dialog is holding. */}
+          {flaggedDaysCount === null && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {LABELS.preFacturier.validateConfirmDialog.flaggedDaysNotComputed}
+            </p>
           )}
 
           {facts.length > 0 && (

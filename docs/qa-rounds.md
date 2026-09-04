@@ -1,13 +1,13 @@
 # QA rounds — what a read of the running mockup asked for
 
-Three review passes over the running application, by the person who owns the decisions, after
+Four review passes over the running application, by the person who owns the decisions, after
 Phase 6 and the front-end plan had merged. They are cited by number across `docs/adr/` ("item 4,
 QA round 1"), and this file is what those citations resolve to. It records **what was asked**, not
 what was done: the how lives in the commit that carries each item, and the decisions each one
 forced live in the ADRs named below.
 
 Rounds 1 and 2 were worked on the branch `fix/qa-round-1`, round 3 on `fix/qa-round-3` and
-`fix/qa-round-3-mobile`. One item per commit throughout.
+`fix/qa-round-3-mobile`, round 4 on `fix/qa-round-4-doc-and-scope`. One item per commit throughout.
 
 ## Round 1 — worked 31/08/2026
 
@@ -76,3 +76,21 @@ French, and what shipped for it, is `docs/todo.md`; this table is the index thos
 
 Item 37 ("a consultant search on the assignment page") was written down mid-sentence and is not part
 of this round. It stays in `docs/todo.md` exactly as typed.
+
+## Round 4 — worked 04/09/2026
+
+The odd one out, and named here because eleven citations in the code and the documentation point at
+it: **nothing in round 4 came from a fresh read of the running application.** It closed three rows
+already written down in `docs/open-questions.md` — the README front matter (01/09/2026) and the two
+dated 04/09/2026 that the round 3 checkpoint left standing — which makes it the first slice of
+**Phase 9**, the documentation pass, rather than a fifth review pass. It is numbered as a round
+only because the branch and the citations were already written that way.
+
+| #   | What was closed                                                                                                                                                       | Outcome            |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 1   | The README describes screens, counts and phases that had drifted from the code; every number re-derived by running the command                                        | Shipped            |
+| 2   | Two seeded `manager_attachments` cross an office, producing a CRA no manager can open a screen to validate                                                            | Shipped — ADR-0094 |
+| 3   | The pré-facturier's validate dialog is silently different from the CRA view's: it computes no weekend/holiday flag and says so nowhere (round 3, item 28's open half) | Shipped — ADR-0095 |
+
+Its checkpoint — what did not run, and what each raised point resolved to — is in
+`docs/open-questions.md`, under "QA round 4 checkpoint".

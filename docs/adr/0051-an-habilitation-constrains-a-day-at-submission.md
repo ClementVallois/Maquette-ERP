@@ -49,7 +49,7 @@ that `pnpm run seed` succeeds and the demo runs end to end. A dataset that viola
 break the seed; one that complies never shows the rule firing. Both are true at once, so the
 demonstration moves to `submission-checks.test.ts`, which proves the refusal, proves it names the
 missing clearance, and proves the dated behaviour on both sides of an expiry. Phase 9's
-`docs/demo.md` points at that test rather than at a screen.
+The demo script (`docs/demo-checklist.md`) points at that test rather than at a screen.
 
 ## Rejected option
 

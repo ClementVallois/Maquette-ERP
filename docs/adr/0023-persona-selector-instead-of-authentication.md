@@ -89,7 +89,8 @@ too**.
 
 Refusing a missing `Origin` is the part that costs something, and it is deliberate. Browsers send
 it on every cross-site state-changing request, so accepting its absence re-opens the hole for any
-client that omits it. The cost is that `curl -X POST` needs `-H "Origin: …"`, which `docs/demo.md`
+client that omits it. The cost is that `curl -X POST` needs `-H "Origin: …"`, which the demo
+script (`docs/demo-checklist.md`)
 will say out loud.
 
 No CSRF token, no double-submit cookie, no session store. Two independent controls — `SameSite`
@@ -198,7 +199,7 @@ The costs, stated rather than found later:
 
 - **Four personas share one browser.** Selecting a persona in one tab changes it in all of them,
   because the cookie is per-origin. Comparing two personas side by side needs two browser profiles
-  or a private window, and `docs/demo.md` will say so.
+  or a private window, and the demo script (`docs/demo-checklist.md`) says so.
 - **`Origin` is required on writes**, so a `curl` example without it gets a 403 and looks like a
   bug. It is documented at the point where someone would hit it.
 - **The persona table is reference data**, which means adding a persona is a seed change and a

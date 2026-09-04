@@ -679,6 +679,8 @@ export function PreFacturierScreen({
         <ValidateConfirmDialog
           consultantName={confirmingValidate.consultantName}
           facts={validateFactsFor(confirmingValidate, period)}
+          // `PreFacturierCraRow` carries no `CraFlag` to count. ADR-0095.
+          flaggedDaysCount={null}
           pending={validateMutation.isPending}
           onCancel={() => {
             setConfirmingValidate(null);

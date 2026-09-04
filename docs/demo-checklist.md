@@ -1,6 +1,6 @@
 # Demo checklist
 
-The exact script for the CEO demo (`docs/frontend-plan.md` Phase 10, task 10.4), run against the
+The exact script for the guided demonstration (`docs/frontend-plan.md` Phase 10, task 10.4), run against the
 seed (`2026-06`, ADR-0022) and nothing else — no fixture invented for this document, no step it
 asks a presenter to take that the running application cannot actually produce.
 
