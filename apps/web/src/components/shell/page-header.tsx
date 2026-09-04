@@ -23,12 +23,41 @@ export interface PageHeaderParentCrumb {
 
 interface PageHeaderProps {
   readonly title: string;
+  /**
+   * Item 4, QA round 5: what the bare `<h1>` below shows **below `md`** instead of `title`, when
+   * `title` itself is too long there — `/cra/$period`'s "Mes CRA — septembre 2026" has no room
+   * next to nothing else on a phone, and the ellipsis `truncate` adds cuts the month in half
+   * rather than dropping it cleanly. Equal to `title` on every route this round did not touch
+   * (`_shell.tsx`'s `mobileTitleFor`), so `<ResponsiveTitle>` below is then rendering the same
+   * text twice, once per breakpoint span — never two different strings a screen reader would
+   * announce both of, since `display:none` (`md:hidden`/`hidden md:inline`) removes the other
+   * span from the accessibility tree entirely, the same reasoning item 33's breadcrumb comment
+   * below already relies on.
+   */
+  readonly mobileTitle: string;
   /** Omitted on the dashboard itself — a breadcrumb back to the page you are already on is noise. */
   readonly showBreadcrumb: boolean;
   /** The one level between "Tableau de bord" and `title` — `/factures/$id`'s own "Factures" or
    * "Pré-facturier", so far the only screen reached from two different lists (A10). `undefined`
    * everywhere else: every other screen is a direct child of the dashboard. */
   readonly parent?: PageHeaderParentCrumb | undefined;
+}
+
+/** The one `<h1>` both branches below render, `truncate`d exactly as before — the only change is
+ * *which* string shows below `md` (item 4, QA round 5). */
+function ResponsiveTitle({
+  title,
+  mobileTitle,
+}: {
+  readonly title: string;
+  readonly mobileTitle: string;
+}): ReactElement {
+  return (
+    <h1 className="text-page-title truncate">
+      <span className="md:hidden">{mobileTitle}</span>
+      <span className="hidden md:inline">{title}</span>
+    </h1>
+  );
 }
 
 /**
@@ -38,9 +67,14 @@ interface PageHeaderProps {
  * later phase's page-local header (inside a card, not the topbar) can reuse without pulling in the
  * persona block that lives beside it in `Topbar`.
  */
-export function PageHeader({ title, showBreadcrumb, parent }: PageHeaderProps): ReactElement {
+export function PageHeader({
+  title,
+  mobileTitle,
+  showBreadcrumb,
+  parent,
+}: PageHeaderProps): ReactElement {
   if (!showBreadcrumb) {
-    return <h1 className="text-page-title truncate">{title}</h1>;
+    return <ResponsiveTitle title={title} mobileTitle={mobileTitle} />;
   }
 
   return (
@@ -84,7 +118,7 @@ export function PageHeader({ title, showBreadcrumb, parent }: PageHeaderProps): 
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="text-page-title truncate">{title}</h1>
+      <ResponsiveTitle title={title} mobileTitle={mobileTitle} />
     </div>
   );
 }

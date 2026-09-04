@@ -51,6 +51,21 @@ function titleFor(
   return `${entryLabel} — ${frenchMonth(match[1])}`;
 }
 
+/**
+ * Item 4, QA round 5: below `md`, `/cra/$period`'s full title ("Mes CRA — septembre 2026") has no
+ * room and its ellipsis cuts the month in half — read separately below `md` in `page-header.tsx`.
+ * Item 33 (QA round 3) already solved the *breadcrumb*'s own overflow by hiding it below `lg`; this
+ * is a second, narrower band inside what that fix left showing (the bare `<h1>`), and it changes
+ * only which **string** renders there, not the mechanism that decides whether it overflows
+ * (`truncate`, unchanged). The period is visible further down every `/cra/$period` screen, so
+ * nothing is lost by dropping it from the topbar specifically at this width. No other route in
+ * `titleFor` needs the same treatment — the CRA route is the one item 4 names, and this returns
+ * `entryLabel` unchanged for every other path, `titleFor`'s own value included.
+ */
+function mobileTitleFor(entryLabel: string, fullTitle: string, pathname: string): string {
+  return CRA_PERIOD_IN_PATH.test(pathname) ? entryLabel : fullTitle;
+}
+
 const PRE_FACTURIER_PATH_PREFIX = '/pre-facturier';
 
 /**
@@ -142,7 +157,9 @@ function ShellLayout(): ReactElement {
 
   const entries = navigationForRole(persona.role);
   const activeEntry = navEntryForPath(entries, pathname);
-  const title = titleFor(activeEntry?.label ?? LABELS.appName, pathname, search);
+  const entryLabel = activeEntry?.label ?? LABELS.appName;
+  const title = titleFor(entryLabel, pathname, search);
+  const mobileTitle = mobileTitleFor(entryLabel, title, pathname);
   const parent = parentCrumbFor(pathname, search);
   const showBreadcrumb = activeEntry?.path !== '/tableau-de-bord';
 
@@ -161,6 +178,7 @@ function ShellLayout(): ReactElement {
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
           title={title}
+          mobileTitle={mobileTitle}
           showBreadcrumb={showBreadcrumb}
           parent={parent}
           entries={entries}

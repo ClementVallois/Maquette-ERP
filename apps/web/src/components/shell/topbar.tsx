@@ -19,6 +19,10 @@ import { LABELS } from '@/lib/labels';
 
 interface TopbarProps {
   readonly title: string;
+  /** Item 4, QA round 5: what the bare `<h1>` shows below `md`, when `title` itself would not fit
+   * — `page-header.tsx`'s own comment has the full reasoning. Equal to `title` on every route this
+   * round did not touch. */
+  readonly mobileTitle: string;
   readonly showBreadcrumb: boolean;
   readonly parent?: PageHeaderParentCrumb | undefined;
   readonly entries: readonly NavEntry[];
@@ -33,6 +37,7 @@ interface TopbarProps {
  */
 export function Topbar({
   title,
+  mobileTitle,
   showBreadcrumb,
   parent,
   entries,
@@ -74,7 +79,12 @@ export function Topbar({
       </Sheet>
 
       <div className="min-w-0 flex-1">
-        <PageHeader title={title} showBreadcrumb={showBreadcrumb} parent={parent} />
+        <PageHeader
+          title={title}
+          mobileTitle={mobileTitle}
+          showBreadcrumb={showBreadcrumb}
+          parent={parent}
+        />
       </div>
 
       {/* The reserved strip: nothing renders here on purpose (direction-visuelle.md §6). */}
