@@ -74,13 +74,14 @@ test.describe('accessibility — Mon CRA', () => {
     // validé est immuable."), which shares the substring. Scope to the timeline's `listitem` role:
     // the banner lives in an `Alert`, not a list, so this is unambiguous without narrowing to
     // `exact: true` (which would still not separate the two — both render the bare phrase).
-    // `:visible`: item 30 (QA round 3) made `BusinessTimeline` render two trees at once (a
-    // horizontal one from `sm` up, a vertical fallback below it, `sm:hidden`/`hidden sm:flex`) —
-    // the same reason `cra-grid-screen.tsx`'s own triple-mounted matrix needs this filter.
+    // Item 30 (QA round 3) made `BusinessTimeline` render two trees at once (a horizontal one
+    // from `sm` up, a vertical fallback below it, `sm:hidden`/`hidden sm:flex`) — unlike
+    // `cra-grid-screen.tsx`'s own multi-mounted matrix, this stays a single `getByRole` match:
+    // `display:none` (what `hidden` resolves to) removes an element from the accessibility tree
+    // by definition, so `getByRole` already excludes the off-breakpoint tree without help.
     await page
       .getByRole('listitem')
       .filter({ hasText: 'CRA validé' })
-      .and(page.locator(':visible'))
       .waitFor({ state: 'visible' });
 
     await assertAccessible(page);

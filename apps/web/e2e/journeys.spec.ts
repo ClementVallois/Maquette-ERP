@@ -389,12 +389,9 @@ test.describe('item 3 — a manager opens and decides a CRA from the pré-factur
     // real regression, reported rather than fixed here. The timeline's own "CRA soumis" entry is
     // what actually appears; scoped to `listitem` because the immutability banner carries the
     // same substring (the same ambiguity `axe.spec.ts`'s "CRA validé" locator had).
-    // `.and(page.locator(':visible'))`: item 30 (QA round 3) made `BusinessTimeline` render two
-    // trees at once (`sm:hidden`/`hidden sm:flex`) — without this, two `listitem`s match.
     await page
       .getByRole('listitem')
       .filter({ hasText: 'CRA soumis' })
-      .and(page.locator(':visible'))
       .waitFor({ state: 'visible' });
 
     await switchPersonaViaUi(page, 'manager-paris');
@@ -448,11 +445,9 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     // Not a bare `getByText('CRA validé', { exact: false })`: it matches both the timeline's own
     // "CRA validé" entry and the immutability banner's sentence, which carries the same substring
     // (`axe.spec.ts`'s identical fix explains why `listitem` rather than `exact: true`).
-    // `.and(page.locator(':visible'))`: item 30 (QA round 3), same reasoning as above.
     await page
       .getByRole('listitem')
       .filter({ hasText: 'CRA validé' })
-      .and(page.locator(':visible'))
       .waitFor({ state: 'visible' });
     await expect(page.getByText('Validé par Bruno Leroy', { exact: false })).toBeVisible();
 
@@ -1360,17 +1355,12 @@ test.describe('J3 — manager-paris (Bruno): refuses the month Alice submitted i
       .waitFor({ state: 'visible' });
     await page.getByRole('button', { name: 'Soumettre au manager' }).click();
     // Not `Soumis à {time}`: see the same comment where this pattern first appears, above.
-    // `.and(page.locator(':visible'))`: item 30 (QA round 3), same reasoning as above — applied
-    // before `.first()` so that pick is among the visible tree's entries, not DOM order across
-    // both trees (`BusinessTimeline`'s hidden `sm:hidden` fallback happens to come first in the
-    // markup, which `.first()` alone would have picked and then waited forever on).
     // `.first()`: this Cra was already submitted once in J1 before being refused, so the
     // timeline now carries two "CRA soumis" entries once this resubmission lands — either one
     // proves the same fact, and `.waitFor()` enforces strict mode the same as any other locator.
     await page
       .getByRole('listitem')
       .filter({ hasText: 'CRA soumis' })
-      .and(page.locator(':visible'))
       .first()
       .waitFor({ state: 'visible' });
 
