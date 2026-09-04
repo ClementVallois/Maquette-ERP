@@ -911,6 +911,14 @@ export const LABELS = {
     sessionInvalidated: 'Votre persona n’est plus reconnue. Choisissez-en une à nouveau.',
   },
 
+  /** Item 20, QA round 3: three placeholder pages under a small sidebar group, every role
+   * (`ALL_ROLES` in `config/navigation.ts`) — each renders `ComingSoon`, no screen behind it yet. */
+  selfService: {
+    mesInformationsNav: 'Mes informations',
+    mesNotesDeFraisNav: 'Mes notes de frais',
+    mesAbsencesNav: 'Mes demandes d’absence',
+  },
+
   footer: {
     mockup:
       'Maquette de démonstration. Données synthétiques, aucun client réel, aucun taux réel. Le sélecteur de persona remplace une authentification et ne doit pas être présenté comme telle.',
