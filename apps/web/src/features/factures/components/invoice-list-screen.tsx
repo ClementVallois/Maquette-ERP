@@ -81,6 +81,12 @@ function columns(returnTo: string): ColumnDef<InvoiceListItem>[] {
       accessorFn: (row) => row.supplyPeriod,
       header: LABELS.invoice.supplyPeriod,
       cell: ({ row }) => frenchMonth(row.original.supplyPeriod),
+      // Item 25, QA round 3: an explicit comparator on the raw `YYYY-MM` accessor value, not
+      // TanStack's `auto` sortingFn (whose column-type detection is not something to depend on)
+      // and never on the rendered French month label — `frenchMonth('2026-02')` ("février") sorts
+      // after `frenchMonth('2026-01')` ("janvier") alphabetically only by coincidence.
+      sortingFn: (rowA, rowB) =>
+        rowA.original.supplyPeriod.localeCompare(rowB.original.supplyPeriod),
     },
     {
       id: 'number',

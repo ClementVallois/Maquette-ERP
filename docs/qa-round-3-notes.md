@@ -11,6 +11,21 @@ with a period, including its immediate neighbours. Shipped with the period, on t
 period was dropped incidentally when the item was written down, not a deliberate instruction to
 break the file's own punctuation convention. Flagging in case that reading is wrong.
 
+## Item 25 — could not reproduce the alphabetical sort, fixed it defensively anyway
+
+Searched every period-bearing Select/column in `apps/web` (the CRA table's year/month filters,
+the pré-facturier's `PeriodSelector`, the invoice list's own `period` column) — everywhere else a
+period list is either built server-side already sorted on the raw `YYYY-MM` key (descending,
+`offeredPeriods` in `apps/api/src/composition/pre-facturier.ts`) or is a fixed 1-12 month-number
+list. The one column matching the item's exact wording ("Période d'exécution" is `LABELS.invoice
+.supplyPeriod`, the `/factures` table's `period` column header) already sorted by `row.supplyPeriod`
+(the raw key) via TanStack's default `accessorFn`-based sort, which should already be chronological
+by construction. Could not reproduce a live alphabetical-sort bug from reading the code alone (no
+browser available in this pass). Made the column's `sortingFn` explicit anyway — a direct
+`localeCompare` on the raw key — so the sort no longer depends on TanStack's `auto` column-type
+detection, which is the only mechanism that could plausibly have produced the reported symptom.
+Worth a five-minute look in a real browser before calling this closed.
+
 ## Item 31 — the timeline is a third display site
 
 The brief named the CRA banner (consultant + manager read). `apps/web/src/features/cra/components/cra-timeline.tsx`
