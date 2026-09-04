@@ -546,9 +546,11 @@ autres workflows du dépôt — `Analyze` (CodeQL, `codeql.yml`), `Shell scripts
 > checks exigés sur `main`, `enforce_admins` compris (ADR-0086). La réserve qui figurait ici, « aucune
 > de ces dix n'empêche un merge », décrivait l'état antérieur et n'est plus vraie.
 
-Les hooks locaux (lefthook) rejouent une partie de ces portes **avant** le commit et le push — et
-depuis ADR-0040 ils ne les doublent plus, ils sont **le seul arrêt mécanique** qui précède un merge,
-puisque aucune des dix ne le bloque. ⚠️ Ils
+Les hooks locaux (lefthook) rejouent une partie de ces portes **avant** le commit et le push. De
+l'ADR-0040 à l'ADR-0086 ils ont été **le seul arrêt mécanique** qui précédait un merge, puisque
+aucune porte ne le bloquait ; depuis le 03/09/2026 ils doublent des portes qui bloquent vraiment, ce
+qui les remet dans leur rôle normal — échouer sur le poste plutôt que sur un runner, deux minutes
+plus tôt. ⚠️ Ils
 ne s'installent pas tout seuls : `ignore-scripts` est activé, donc un clone frais n'en a aucun tant
 qu'on n'a pas lancé `pnpm exec lefthook install`. Ce qu'ils font :
 gitleaks sur ce qui est indexé — le seul des deux qui empêche réellement la fuite, la CI ne scannant

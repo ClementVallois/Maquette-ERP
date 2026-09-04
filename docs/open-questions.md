@@ -4212,18 +4212,52 @@ own checkpoint reached about its two implementation-before-test pairs. What the 
 that the next round can be planned differently: if a pass is going to be split for speed again, the
 test belongs in the pass that writes the code, not in the one that reviews it.
 
+### The verification pass, and the two fixes that broke something of their own
+
+The rules audit was re-run against the commit that answered it, which is the half of "dispatch the
+reviewers" that is easy to skip. It confirmed nine findings resolved and found six more, two of them
+introduced by the fixes themselves:
+
+- **ADR-0093's second condition disqualified the very handlers ADR-0093 exists to permit.** As
+  drafted it forbade a branch that "changes which records are read" — but `/api/v1/dashboard`'s two
+  arms read entirely different sets, and that is the whole reason they are two arms. The threshold
+  would have fired on the day it was written. Rewritten to say what it means: a branch may read
+  _more_ for a richer response; what it may never do is narrow what the actor may see. A third
+  condition was added for protected fields, which the draft said nothing about — a role branch that
+  decides whether a payload carries a `Cjm` has made an authorization decision whatever it looks
+  like. `docs/BUILD-RULES.md`'s amended line inherited the same ambiguity and is corrected with it.
+- **The README contradicted itself ten lines after being corrected.** The paragraph on lefthook still
+  read "ils sont le seul arrêt mécanique qui précède un merge, puisque aucune des dix ne le bloque",
+  citing the superseded ADR-0040 — in the same section a reader opens specifically to learn whether
+  the gates block.
+- `CONTEXT.md`'s new `OrgChart` entry repeated the overstatement ADR-0090 had just been amended for,
+  calling the whole term an office-bounded intersection when only its N-1 half is.
+- The mutation table below named `team.int.test.ts` and `/api/v1/team`, which the same commit had
+  renamed away — the one table in this checkpoint that claims to be a reproducible record.
+- `use-reduced-motion.ts`'s comment was corrected in one clause and left wrong in the next ("skip
+  starting the interval" for a `requestAnimationFrame` loop).
+- The test fixture kept its `teamapi-` identifier namespace through the rename.
+
+And one the audit was right to raise that this checkpoint cannot resolve by editing: **ADR-0090's
+title still says "stops at the office boundary"**, which the amended body now holds for one half
+only. ADR-0045 forbids editing an ADR's own identity after the fact, and a title is that class of
+thing — so the residue is deliberate, and the route to changing it is a superseding ADR, not an
+edit. Named here so the cost is known rather than discovered.
+
 ### The mutations that were run, since three tests claim to be discriminating
 
 Each was applied to the real code, the suite re-run, and the code restored:
 
-| Mutation                                                    | Result                               |
-| ----------------------------------------------------------- | ------------------------------------ |
-| `consultantsOfOffice` widened past the actor's office       | 2 of 7 `team.int.test.ts` fail       |
-| the `managerOn` filter dropped from `/api/v1/team`          | 1 of 7 fail                          |
-| `departure_date IS NULL` dropped from `consultantsOfOffice` | 2 of 7 fail                          |
-| `c.period < $10` relaxed to `<=`                            | 1 of 60 `api.int.test.ts` fail       |
-| `relative` removed from `<main>`                            | 17 of 20 `responsive.spec.ts` fail   |
-| `relative` removed from the CRA scrollport                  | 3 of 20 fail, and not the same three |
+| Mutation                                                    | Result                                     |
+| ----------------------------------------------------------- | ------------------------------------------ |
+| `consultantsOfOffice` widened past the actor's office       | 2 of 9 `org-chart.int.test.ts` fail        |
+| the `managerOn` filter dropped from `/api/v1/org-chart`     | 1 of 9 fail                                |
+| `departure_date IS NULL` dropped from `consultantsOfOffice` | 2 of 9 fail                                |
+| `c.period < $10` relaxed to `<=` in `list`                  | 1 of 60 `api.int.test.ts` fail             |
+| the same clause neutered in `count`                         | 2 of 60 fail                               |
+| `!reducedMotion` dropped from the carousel's `rotating`     | the negative half of the motion pair fails |
+| `relative` removed from `<main>`                            | 17 of 20 `responsive.spec.ts` fail         |
+| `relative` removed from the CRA scrollport                  | 3 of 20 fail, and not the same three       |
 
 ### What the two review subagents found, and where each finding went
 

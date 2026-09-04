@@ -113,8 +113,9 @@ ADR and moves to the README's "Ce que je ne construis pas" — never a silent om
   which of the records that exist this actor may see; the domain decides whether an actor may act
   given who acted before them (**ADR-0006**). One decision each, and no handler compares a role
   **to authorize**. A handler may compare one to pick which shape of a role-discriminated
-  response it returns, under **ADR-0093**'s two conditions: the route declares every role that
-  reaches it, and every branch returns rather than refusing or narrowing a query.
+  response it returns, under **ADR-0093**'s three conditions: the route declares every role that
+  reaches it; no branch narrows what the actor may see (reading _more_ for a richer response is
+  fine, adding a scope filter is not); and no branch gates a protected field.
 - Three roles × `Office` scope. A manager reads their own office, never another's.
 - Separation of duties, two rules only: whoever records a Cra does not validate it; whoever
   validates does not issue the invoice.

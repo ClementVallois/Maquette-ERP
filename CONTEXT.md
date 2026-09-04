@@ -117,8 +117,11 @@ The people immediately around one `Consultant` in the reporting hierarchy, as on
 (`GET /api/v1/org-chart`, ADR-0090): their own manager (N+1), and — for a `Manager` — the reports
 they may act on (N-1). Not a synonym for `Roster`, which is an `Office`'s whole consultant list
 regardless of who manages whom, nor for `ManagerAttachment`, which is one dated link between two
-people. It is the **intersection** of the two, narrowed once more by `Departure`: an office's
-current consultants who report to the asker today. Derived on every read, never stored. Both
+people. Its N-1 half is the **intersection** of the two, narrowed once more by `Departure`: an
+office's current consultants who report to the asker today. Its N+1 half is not bounded by
+`Office` — a consultant is told who their manager is even when that manager works elsewhere,
+because that is the person who accepts their `Cra` (ADR-0090 states the asymmetry and both
+directions are tested). Derived on every read, never stored. Both
 `Roster` and `ManagerAttachment` list _Team_ under their own _Avoid_, and this entry is why the
 concept has its own word instead of borrowing that one.
 _Avoid_: Team, Reporting line, Hierarchy view, Direct reports (as a noun for the whole read)

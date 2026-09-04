@@ -23,7 +23,11 @@ picks between two **response shapes** of one discriminated union: a consultant i
 `{ role, manager }`, a manager `{ role, manager, reports }`.
 
 It is not the first. The dashboard handler on `main` has two of the same shape, and has had since
-Phase 5 — the same union-by-role response, the same branch, no ADR. A rules audit of
+Phase 5 — the same union-by-role response, the same branch, no ADR. Those two go further than this
+one: each arm reads a different set (the consultant's own month and its list; the manager's
+pré-facturier composition, its list and a roster read), because the two responses genuinely need
+different data. That is the case the conditions below have to admit, and an earlier draft of this
+ADR forbade it by accident. A rules audit of
 `fix/qa-round-3-mobile` raised the new instance and correctly noted the rule as written admits no
 exception. So the choice is not "keep this one line"; it is whether the rule means what it says or
 means something narrower that three call sites have been quietly assuming for a month.
@@ -39,9 +43,17 @@ Two conditions, both required, and both mechanical enough to check in review:
 
 1. the route carries `config: { access: forRoles(...) }` naming every role that reaches the
    handler — so no comparison is standing in for a missing declaration;
-2. every branch returns; none of them refuses, throws an authorization error, or narrows a query.
-   A branch that changes _which records_ are read is a repository decision that has escaped into a
-   handler, and this ADR does not cover it.
+2. every branch returns, and none of them **narrows what this actor may see**: no branch refuses,
+   throws an authorization error, or adds a scope filter of its own. Reading _more_ is allowed and
+   is usually the whole point — a manager's arm of the dashboard calls the pré-facturier composition
+   and a roster read that a consultant's arm does not, because the richer response needs them. What
+   is forbidden is a branch that stands in for a scope check the repository owns: `if (role ===
+'manager') office = actor.officeId` is the shape this rule exists to keep out, and no amount of
+   "it only picks a shape" excuses it.
+3. and no branch adds a **field** another branch withholds where the field is itself protected.
+   `Cjm`, `Tjm` and margin are the repository's to gate (BUILD-RULES § Authorization); a role branch
+   that decides whether a payload carries one has made an authorization decision in a handler
+   whatever it looks like.
 
 `BUILD-RULES.md`'s own line is amended to carry the narrowing, per its preamble ("If a rule and an
 ADR disagree, the ADR wins and this file is wrong; fix it").
@@ -66,10 +78,15 @@ question was not asked of you", which is the truth. The test asserts the key's a
 
 ## Reconsideration threshold
 
-Reopen when a handler's role branch first does something other than pick a return shape — narrows a
-query, skips a check, chooses a different repository call. That is the failure this ADR is holding
-the door against, and at that point the narrowing has been used as cover and the absolute rule was
-right.
+Reopen when a handler's role branch first narrows what an actor may see rather than widening what
+the response carries — a scope filter chosen by role, a check skipped for one arm, a protected field
+gated in a branch. That is the failure this ADR is holding the door against, and at that point the
+narrowing has been used as cover and the absolute rule was right.
+
+Note what this threshold is deliberately **not**: "chooses a different repository call". All three
+call sites do that already — `/api/v1/dashboard`'s two arms read entirely different sets, and
+`/api/v1/org-chart`'s manager arm makes one read the consultant arm does not. A threshold that fired
+on the day it was written would be a threshold in name only.
 
 Reopen also if the number of role-branching handlers passes roughly five. Three (two dashboard, one
 org chart) is a pattern; five is a shape the type system should be carrying instead, through a

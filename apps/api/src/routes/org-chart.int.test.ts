@@ -39,26 +39,26 @@ const transaction = useTestTransaction();
 const ORIGIN = 'http://localhost:3000';
 const SECRET = 'e'.repeat(40);
 
-const PARIS = 'teamapi-office-paris';
-const LYON = 'teamapi-office-lyon';
+const PARIS = 'orgchart-office-paris';
+const LYON = 'orgchart-office-lyon';
 
-const ALICE = 'teamapi-alice';
-const BRUNO = 'teamapi-bruno';
-const EMMA = 'teamapi-emma';
-const HENRI = 'teamapi-henri';
+const ALICE = 'orgchart-alice';
+const BRUNO = 'orgchart-bruno';
+const EMMA = 'orgchart-emma';
+const HENRI = 'orgchart-henri';
 /** Lyon, attached to Bruno (Paris) — the cross-office row the office filter has to refuse. */
-const GABY = 'teamapi-gaby';
+const GABY = 'orgchart-gaby';
 /** Lyon, attached to Emma — the one report Emma is allowed. */
-const DIANE = 'teamapi-diane';
+const DIANE = 'orgchart-diane';
 /**
  * Paris, left the firm on 2022-12-31 (ADR-0079). Her attachment to Bruno is left **open**, unlike
  * the seed's own, which closes on her departure date: with it closed, `managerOn` alone would keep
  * her out of his roster and the departure filter could be deleted without failing a thing. Open,
  * `departure_date` is the only reason she is absent — which is the claim being tested.
  */
-const MARINE = 'teamapi-marine';
+const MARINE = 'orgchart-marine';
 
-const MARINE_CRA = 'teamapi-cra-marine';
+const MARINE_CRA = 'orgchart-cra-marine';
 
 /** Well after Marine's departure, so "today" is unambiguous for `managerOn`. */
 const NOW = new Date('2026-07-02T09:00:00.000Z');
@@ -141,18 +141,18 @@ beforeEach(async () => {
     [PARIS, LYON],
   );
   await client.query(
-    `INSERT INTO public.practices (id, name) VALUES ('teamapi-practice', 'Audit')`,
+    `INSERT INTO public.practices (id, name) VALUES ('orgchart-practice', 'Audit')`,
   );
   await client.query(
     `INSERT INTO public.consultants (id, first_name, last_name, email, office_id, practice_id,
        role, departure_date)
-     VALUES ($1, 'Alice', 'Martin', 'teamapi-a@t', $7, 'teamapi-practice', 'consultant', NULL),
-            ($2, 'Bruno', 'Leroy', 'teamapi-b@t', $7, 'teamapi-practice', 'manager', NULL),
-            ($3, 'Emma', 'Robert', 'teamapi-e@t', $8, 'teamapi-practice', 'manager', NULL),
-            ($4, 'Henri', 'Laurent', 'teamapi-h@t', $7, 'teamapi-practice', 'director', NULL),
-            ($5, 'Gaby', 'Petit', 'teamapi-g@t', $8, 'teamapi-practice', 'consultant', NULL),
-            ($6, 'Diane', 'Nguyen', 'teamapi-d@t', $8, 'teamapi-practice', 'consultant', NULL),
-            ($9, 'Marine', 'Girard', 'teamapi-m@t', $7, 'teamapi-practice', 'consultant',
+     VALUES ($1, 'Alice', 'Martin', 'orgchart-a@t', $7, 'orgchart-practice', 'consultant', NULL),
+            ($2, 'Bruno', 'Leroy', 'orgchart-b@t', $7, 'orgchart-practice', 'manager', NULL),
+            ($3, 'Emma', 'Robert', 'orgchart-e@t', $8, 'orgchart-practice', 'manager', NULL),
+            ($4, 'Henri', 'Laurent', 'orgchart-h@t', $7, 'orgchart-practice', 'director', NULL),
+            ($5, 'Gaby', 'Petit', 'orgchart-g@t', $8, 'orgchart-practice', 'consultant', NULL),
+            ($6, 'Diane', 'Nguyen', 'orgchart-d@t', $8, 'orgchart-practice', 'consultant', NULL),
+            ($9, 'Marine', 'Girard', 'orgchart-m@t', $7, 'orgchart-practice', 'consultant',
              '2022-12-31')`,
     [ALICE, BRUNO, EMMA, HENRI, GABY, DIANE, PARIS, LYON, MARINE],
   );
