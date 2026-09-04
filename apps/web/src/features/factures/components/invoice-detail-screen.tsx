@@ -36,6 +36,15 @@ import { IssuanceDialog } from './issuance-dialog';
 const INVOICE_PRINT_PATH = '/facture';
 const CRA_PRINT_PATH = '/releve';
 
+/** Item 30, QA round 3: the same dot colours `StatusBadge` reads — `validated` reuses the Cra
+ * status' own green (the same event, read from the invoice's side), `issued` shares it too
+ * (`--status-invoice-issued-dot`'s own token is the same green tone), `drafted` is neutral. */
+const TIMELINE_KIND_DOT_CLASS: Record<'validated' | 'drafted' | 'issued', string> = {
+  validated: 'bg-status-cra-validated-dot',
+  drafted: 'bg-status-invoice-draft-dot',
+  issued: 'bg-status-invoice-issued-dot',
+};
+
 function DetailSkeleton(): ReactElement {
   return (
     <div className="flex flex-col gap-4" aria-hidden="true">
@@ -369,6 +378,7 @@ export function InvoiceDetailScreen({
           title: LABELS.timeline[item.kind],
           at: item.at,
           actorName: item.actorName,
+          dotClassName: TIMELINE_KIND_DOT_CLASS[item.kind],
         }))}
       />
 
