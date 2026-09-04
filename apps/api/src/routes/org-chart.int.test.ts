@@ -25,8 +25,8 @@ import { savepointTransactionally } from '../testing/transaction.ts';
  *   round 4 reattached both to their own office's manager — the cross-office case this test still
  *   has to refuse. Bruno must not read her name — every other read in this app is bounded by
  *   `actor.officeId`, and an org-chart panel that reached past it would be the one screen that
- *   leaks a name the rest of the API refuses to show. `docs/open-questions.md` carries the
- *   consequence for the *write* side, which this endpoint does not decide.
+ *   leaks a name the rest of the API refuses to show. ADR-0094 decided the consequence for the
+ *   *write* side, which this endpoint does not decide.
  * - **Hierarchy.** `Diane` works in Lyon and reports to Emma. She is in Emma's office *and* in
  *   Emma's chain; `Gaby` is in Emma's office and not in her chain. Emma reads exactly one of them.
  *

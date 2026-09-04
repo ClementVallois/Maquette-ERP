@@ -577,9 +577,9 @@ export const LABELS = {
        * singular/plural chosen at the call site. Shown only where the count is known
        * (`manager-cra-grid-screen.tsx`'s own `data.flags`); the pré-facturier's own row-level
        * "Valider" does not have this data — `PreFacturierCraRow` computes no `CraFlag`, by design.
-       * That asymmetry is real and stays open (`docs/open-questions.md`, dated 04/09/2026); what
-       * QA round 4 closes is its *silence* — `flaggedDaysNotComputed` below is what the
-       * pré-facturier's caller shows instead of nothing. */
+       * That asymmetry is real and stays (ADR-0095); what ADR-0095 closes is its *silence* —
+       * `flaggedDaysNotComputed` below is what the pré-facturier's caller shows instead of
+       * nothing. */
       flaggedDaysWarningOne:
         '1 jour de ce mois tombe un week-end ou un jour férié — vérifiez-le avant de valider.',
       flaggedDaysWarningMany:
