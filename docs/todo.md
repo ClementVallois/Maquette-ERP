@@ -233,85 +233,195 @@ dev` tournant répond 200 `image/svg+xml` exactement sur le href déclaré ; le 
     (bug fix, not a decision). Verified live after `db:reset`: both endpoints 200, SSR page 200.
     `pnpm run check`, `test:int`, and the full `journeys` e2e project (20/20) all green.
 
-13. On a plusieurs factures pour un même client pour une même période avec un même montant. Est-ce normal ? Si ce n'est pas le cas, il faut corriger.
+13. On a plusieurs factures pour un même client pour une même période avec un même montant. Est-ce normal ? Si ce n'est pas le cas, il faut corriger. -> DONE, we added for which consultant it was invoiced.
 
-14. Je veux renommer partout où ça se trouve le nom de la maquette de CRA -> Facture à "Maquette ERP", ce sera plus parlant.
+14. ✅ FAIT — commit `f17241e`. « Maquette ERP » partout où le nom apparaissait : `package.json`,
+    le `<title>`, la barre latérale, le README, les libellés serveur (`apps/api/src/web/labels.ts`)
+    et client (`apps/web/src/lib/labels.ts`) — les deux fichiers de libellés existent et comptent
+    tous les deux.
 
-15. Remplacer la favicon actuelle car elle ne semble pas fonctionner
+15. ✅ FAIT — commit `bca3091`. Favicon redessinée, plus les replis PNG et apple-touch qui
+    manquaient. Le test de `routing.spec.ts` qui vérifiait qu'un `<link rel="icon">` répond 200 en
+    SVG a été resserré sur `[type="image/svg+xml"]` — sans ça il tombait sur le premier PNG déclaré
+    et n'aurait plus vérifié ce qu'il annonce.
 
-16. En prod (sur le VPS) si je refraichis une page en faisant F5, j'ai ces erreurs :
-    Content-Security-Policy: The page’s settings blocked an inline script (script-src-elem) from being executed because it violates the following directive: “script-src 'self'”. Consider using a hash ('sha256-7BwvLlbJgAi6ysmcgnAoSL3ccZQoRZ2eOpuyRlacc3g=') or a nonce. content.js:74:196
-    Content-Security-Policy: The page’s settings blocked an inline script (script-src-elem) from being executed because it violates the following directive: “script-src 'self'”. Consider using a hash ('sha256-JgSe21crTC86mj0Fq5U5jbn5/Z0AC477ykC/jCr23cg=') or a nonce. content.js:74:196
-    Layout was forced before the page was fully loaded. If stylesheets are not yet loaded this may cause a flash of unstyled content. node.js:416:1
-    Content-Security-Policy: The page’s settings blocked a JavaScript eval (script-src) from being executed because it violates the following directive: “script-src 'self'” (Missing 'unsafe-eval') schemas-C_zGlbVp.js:1:2496
-    GET
-    https://erp.clementvallois.fr/assets/demo-notice-B6nVk7b7.js
-    NS_ERROR_CORRUPTED_CONTENT
-    GET
-    https://erp.clementvallois.fr/assets/role-badge-NvoVPJsh.js
-    NS_ERROR_CORRUPTED_CONTENT
-    GET
-    https://erp.clementvallois.fr/assets/alert-Byj5vq5n.js
-    NS_ERROR_CORRUPTED_CONTENT
-    GET
-    https://erp.clementvallois.fr/assets/format-BCA0AxUz.js
-    NS_ERROR_CORRUPTED_CONTENT
-    GET
-    https://erp.clementvallois.fr/assets/tableau-de-bord-CxAG83_T.js
-    NS_ERROR_CORRUPTED_CONTENT
-    GET
-    https://erp.clementvallois.fr/assets/stat-card-CJdm-mp9.js
-    NS_ERROR_CORRUPTED_CONTENT
-    GET
-    https://erp.clementvallois.fr/assets/denied-state-nzR-Smvh.js
-    NS_ERROR_CORRUPTED_CONTENT
-    GET
-    https://erp.clementvallois.fr/assets/period-DN8Mm4OR.js
-    NS_ERROR_CORRUPTED_CONTENT
-    GET
-    https://erp.clementvallois.fr/assets/skeleton-BJNIKfBr.js
-    NS_ERROR_CORRUPTED_CONTENT
-    GET
-    https://erp.clementvallois.fr/assets/hooks-CF1p_ac3.js
-    NS_ERROR_CORRUPTED_CONTENT
-    Loading module from “https://erp.clementvallois.fr/assets/demo-notice-B6nVk7b7.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
-    Loading module from “https://erp.clementvallois.fr/assets/alert-Byj5vq5n.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
-    Loading module from “https://erp.clementvallois.fr/assets/role-badge-NvoVPJsh.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
-    Loading module from “https://erp.clementvallois.fr/assets/format-BCA0AxUz.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
-    Loading module from “https://erp.clementvallois.fr/assets/tableau-de-bord-CxAG83_T.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
-    Loading module from “https://erp.clementvallois.fr/assets/denied-state-nzR-Smvh.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
-    Loading module from “https://erp.clementvallois.fr/assets/stat-card-CJdm-mp9.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
-    TypeError: error loading dynamically imported module: https://erp.clementvallois.fr/assets/demo-notice-B6nVk7b7.js index-cqrEhFEg.js:9:64126
-    Loading module from “https://erp.clementvallois.fr/assets/skeleton-BJNIKfBr.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
-    Loading module from “https://erp.clementvallois.fr/assets/period-DN8Mm4OR.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
-    Loading module from “https://erp.clementvallois.fr/assets/hooks-CF1p_ac3.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
+16. ✅ FAIT — commits `3f21a1b` puis `2cb6fcd` (PR #17, mergée sur `main` séparément), ADR-0088.
+    Cause **mesurée**, pas déduite : le vhost nginx entier était limité par un seul
+    `limit_req zone=erp_maquette rate=10r/s burst=20`, dimensionné pour un humain qui clique. Une
+    seule route SPA demande le document plus des dizaines de chunks en parallèle ; au-delà du
+    vingtième, nginx répondait sa **propre page HTML 503**, donc le navigateur recevait `text/html`
+    en demandant un module JavaScript et le refusait au titre du `X-Content-Type-Options: nosniff`
+    de l'application — exactement les `NS_ERROR_CORRUPTED_CONTENT` et les « disallowed MIME type »
+    de la liste. Mesuré avant correctif : 60 requêtes parallèles sur un seul asset donnaient
+    exactement 20 × 200 puis 40 × 503 ; après, 60 × 200. Livré : `location ^~ /assets/` sur une
+    seconde zone (`100r/s burst=200`, toujours limitée), `immutable` sur les assets et `no-cache`
+    explicite sur le shell, et `z.config({ jitless: true })` pour la ligne « Missing 'unsafe-eval' »
+    (Zod 4 sonde le JIT avec `Function('')`, se rabat correctement, mais le navigateur journalise
+    le refus avant). Vérifié en production : trois rechargements forcés de `/tableau-de-bord`, zéro
+    erreur console, zéro requête en échec. ⚠️ **Deux lignes de la liste n'ont jamais été à nous** :
+    `content.js:74` et `node.js:416` sont les scripts d'une extension de navigateur — à revérifier
+    en navigation privée, extensions coupées.
 
-17. Créer un petit module d'information sur le tableau de bord pour y afficher les informations du CSE ou de la vie de l'entreprise. Il faut l'afficher par défaut mais il peut être replié/masquer (icone oeil visible, oeil barré). Les messages à l'intérieur doivent défiler avec un timer visible. On n'affiche que les 5 derniers messages. Si on nouveau message est publié, ça doit démasquer automatiquement le lecteur s'il avait été masqué. Crée ces messages. On peut y mettre une image, pas que du texte. On peut y mettre un document en pièce jointe également. J'ai mis une image (module-documentation.png) de comment ça se présente sur un outil du marché, mais je veux qu'on modernise ça et que ça colle à notre design. Il faut se souvenir du choix de l'utilisateur, s'il l'a masqué ou non pour ne pas afficher ce module à chaque fois s'il l'a masqué (hormis en cas de nouveau message)
+17. ✅ FAIT — commits `e2717f2` puis `106c90d`, ADR-0092. Module « Informations CSE / vie de
+    l'entreprise » : cinq messages au plus, défilement avec minuterie visible, image et pièce
+    jointe possibles, repli persisté **par persona**
+    (`erp:dashboard-company-news-hidden-at:${personaKey}`, via `lib/local-preference.ts`, lecture et
+    écriture sous `try`/`catch`) et réapparition automatique à la publication d'un nouveau message.
+    `106c90d` corrige deux défauts trouvés en repassant sur le lot : la boucle RAF de progression
+    re-rendait tout le tableau de bord ~60 fois par seconde indéfiniment (rendant tout screenshot
+    non déterministe), et la zone de message n'avait pas de hauteur minimale. Les trois
+    illustrations ne sont **jamais** inlinées (ADR-0092) : sous `data:`, la CSP de production
+    (`img-src 'self'`) les refuserait, et ça ne se voit que sur un build servi.
 
-18. Il faut aussi un petit module sur le tableau de bord pour afficher les collaborateurs directs et le manager direct. Dans le cas d'un manager, il faut afficher les personnes N-1 sous sa responsabilité et également son manager (donc son N+1).
+18. ✅ FAIT — commit `35d5202`, test `b5a63fb`, ADR-0090. `GET /api/v1/team` : pour un consultant
+    son N+1, pour un manager ses N-1 **et** son N+1. Aucun SQL nouveau — `hierarchy()` (jusqu'ici
+    utilisé côté écriture seulement) et `consultantsOfOffice()`. La décision réelle est
+    l'ADR-0090 : les N-1 d'un manager sont l'**intersection** de son implantation et de sa chaîne
+    hiérarchique, parce que le seed porte deux rattachements inter-implantations (Gabrielle,
+    Bordeaux → Bruno, Paris) et que tout le reste de l'API est borné à `actor.officeId`. Test
+    d'autorisation **par rôle et par portée** ajouté (`team.int.test.ts`) : chacun des trois filtres
+    — implantation, hiérarchie, `departure_date` — a été retiré pour de vrai et fait tomber au moins
+    un test. Les deux moitiés de l'ADR-0079 sont vérifiées séparément : Marine est absente de
+    l'effectif courant **et** son CRA de 2022 reste lisible par le même manager.
 
-19. Sur les boutons (copier...) qui servent à partager les liens, il faut une petite animation qui laisse penser qu'on a bien cliqué dessus et que ça a été copié dans le clipboard directement sur le bouton (en plus du message infobulle en bas à droite)
+19. ✅ FAIT — commit `5342d50`. Le bouton de copie accuse la copie sur lui-même (icône et libellé),
+    en plus du toast.
 
-20. Il me faut une nouvelle page avec un sous-ensemble de pages (ou directement le sous-ensemble) pour gérer "Mes informations", "Mes notes de frais", "Mes demandes d'absence". Pour le moment, on met juste un placeholder qui dit que la page est en construction si on clique sur l'une de ces pages.
+20. ✅ FAIT — commit `2f11d74`. Trois pages `ComingSoon` — « Mes informations », « Mes notes de
+    frais », « Mes demandes d'absence » — visibles pour les trois rôles, en fin de menu.
+    `shell.spec.ts` assertait la liste **exacte** des entrées de nav par rôle : les quatre listes
+    ont été mises à jour, pas assouplies. Le README dit maintenant explicitement que ce sont des
+    emplacements assumés, pour qu'un lecteur froid ne trouve pas la contradiction avec la section
+    « Ce que je ne construis pas » tout seul.
 
-21. A la place du bouton "Décider" pour un manager pour le CRA d'un consultant, on veut le renommer "Vérifier" et ça doit nous amener directement sur le CRA de la personne en question plutôt que sur le pré-facturier.
+21. ✅ FAIT — commit `6aac97a`. « Décider » devient « Vérifier » et ouvre le CRA du consultant
+    directement, plus le pré-facturier.
 
-22. Sur le tableau de bord, "CRA en attente de décision" et "CRA en retard" si je clique sur ces cartes, je dois arriver sur une vue filtrée qui me montre ces éléments.
+22. ✅ FAIT — commit `2a446ad`, tests `0153c78`, ADR-0091. Les deux cartes pointent sur `/cra`
+    filtré sur exactement ce qu'elles comptent, et **omettent** `year`/`month` au lieu de les
+    laisser sur la période affichée (ADR-0082 : ces compteurs ne sont jamais bornés à une période)
+    — c'est le piège de l'item, une carte à 3 au-dessus d'une liste à 1. « En retard » n'avait
+    aucun équivalent : `beforePeriod` a été ajouté de bout en bout (port de domaine, SQL, route,
+    schéma de recherche), ce qui est une décision et a donc un ADR. Cinq tests d'intégration, dont
+    l'égalité qui compte : `lateCras` et la liste que la carte ouvre renvoient le même nombre.
+    Vérifié aussi en direct dans un navigateur (carte 1 / liste 1 ligne, sur les deux cartes).
 
-23. La zone qui contient les graphiques doit pouvoir être masquées, comme on le fait pour le module de communication (icone oeil visible, oeil barré). Il faut se souvenir du choix de l'utilisateur, s'il l'a masqué ou non pour ne pas afficher ce module à chaque fois s'il l'a masqué.
+23. ✅ FAIT — commit `82c45c4`. Zone des graphiques repliable, même icône œil / œil barré que le
+    module d'information, choix persisté **par persona**
+    (`erp:dashboard-charts-visible:${personaKey}`, même helper, même `try`/`catch`).
 
-24. Dans le tableau CRA d'un manager, le filtre des années est coupé, ça n'affiche que "Toutes les anné" au lieu de "Toutes les années", il faut peut-être agrandir la largeur de ce champs
+24. ✅ FAIT — commit `f4a797c`. Le déclencheur du filtre d'années est élargi ; « Toutes les années »
+    ne se coupe plus.
 
-25. Le filtre sur la période d'exécution dans le tableau facture ne doit pas être basé sur l'ordre alphabétique mais sur l'ordre chronologique
+25. ✅ FAIT — commit `78ebefb`, **et vérifié dans un vrai navigateur cette session**, ce que le
+    commit d'origine laissait ouvert. La colonne « Période d'exécution » trie sur la clé brute
+    `YYYY-MM` via un `sortingFn` explicite plutôt que sur la détection automatique de type de
+    TanStack. Mesuré sur `/factures` : ascendant donne juin → juillet → août 2026 (chronologique —
+    l'ordre alphabétique donnerait août, juillet, juin), descendant l'inverse.
 
-26. Dans un CRA, plutôt que d'afficher "Week-end" en texte dans la colonne directement, plutôt ajouter une petite légende en dessous du tableau pour la couleur et l'expliquer. CElz fera gagner un peu d'espace horizontal.
+26. ✅ FAIT — commit `835a406`. Le texte « Week-end » / « Jour férié » quitte l'en-tête de colonne ;
+    la couleur de fond porte la distinction et une légende sous le tableau l'explique. Le texte
+    reste en `sr-only`, donc un lecteur d'écran a toujours l'information. ⚠️ **C'est cet item qui a
+    causé l'item 34** : `sr-only` est `position: absolute`, et rien entre lui et le bloc conteneur
+    initial n'était positionné — voir l'ADR-0089. L'assertion e2e correspondante a été **mise à
+    jour, pas supprimée** : elle vérifie maintenant le nom accessible _et_ le contenu du `sr-only`.
 
-27. Dans un CRA, l'erreur "Une journée compte quatre quarts de journée : celle-ci est déjà complète." doit être renommée en "Une journée ne peut pas dépasser le volume horaire prévu"
+27. ✅ FAIT — commit `bb55ce6`. Message reformulé, avec le point final que portent toutes les autres
+    phrases du fichier (les deux fichiers de libellés).
 
-28. Dans un CRA, il faut un warning (pas une erreur) si un consultant tente de soumettre un CRA dont le total des jours saisis dépasse le nombre de jour ouvrés (dans le cas où il saisit du temps sur le week-end et/ou jours fériés). De même, il doit être visuellement facile pour un manager de voir qu'un CRA à valider contient des jours saisis sur le week-end et/ou jours fériés, à la fois sur la vue détaillée du CRA mais aussi sur le message de confirmation de validation d'un CRA d'un consultant (Valider le CRA de Alice Martin ?)
+28. ✅ FAIT (une moitié), ⚠️ **une moitié ouverte** — commit `0645aa5`. Le warning à la soumission
+    et le repérage visuel côté manager sont faits, y compris dans la boîte de confirmation ouverte
+    depuis le CRA détaillé. **Le bouton « Valider » du pré-facturier n'a pas le warning** :
+    `PreFacturierCraRow` ne calcule aucun `CraFlag` par ligne (résumé léger et paginé, par
+    conception), et l'ajouter voudrait dire charger les lignes et le calendrier de chaque CRA
+    listé. Coût non mesuré, donc non tranché ici → ligne dans `docs/open-questions.md` datée du
+    04/09/2026, à décider d'ici le 30/09/2026.
 
-29. Dans le tableau de bord consultant, la ligne "Le CRA de X a été refusé : une correction est attendue.", le bouton "Ouvrir ce CRA" n'est pas centré verticalement dans la barre, il n'y a pas de marge/pagging en dessous
+29. ✅ FAIT — commit `6001d36`. Bouton d'action de l'alerte centré verticalement, avec l'espace en
+    dessous qui manquait.
 
-30. La chronologie métier doit être horizontale plutôt que verticale, pour gagner de la place dans la page. Il faut colorer les bulles selon le type d'évènement/statut. Il faut que la ligne entre les bulles, si on la conserve, soit centrée entre les bulles.
+30. ✅ FAIT — commits `ec5f4f0`, `0d2229f`, `fde6fdb`. Chronologie horizontale à partir de `sm`,
+    bulles colorées par statut, connecteur centré. Les deux commits suivants sont des corrections
+    trouvées en **repassant** sur le lot : le connecteur s'arrêtait 20px avant la bulle suivante
+    (le `px-2` du `<li>` et le `gap-1` de l'`<ol>`, que le calcul `left-1/2 w-full` de la ligne ne
+    lit pas — l'espacement a déménagé sur l'enveloppe du texte), et quatre filtres `:visible`
+    ajoutés en e2e reposaient sur une prémisse fausse (`getByRole` exclut déjà `display:none`).
+    Revérifié cette session dans un navigateur à 375 / 640 / 1440 px, sur une facture à deux
+    évènements et sur une facture annulée par avoir à trois : connecteurs centrés et joignant les
+    bulles dans tous les cas.
 
-31. Sur un CRA refusé, il faut écrire "Motif : XXX" plutôt que juste le message du manager, ce sera plus parlant.
+31. ✅ FAIT — commits `4a8033e` puis `c98b2e4`. « Motif : » préfixe le message du manager sur le CRA
+    refusé, et aussi dans la chronologie métier — un troisième site d'affichage que l'énoncé ne
+    nommait pas. Vérifié dans le constructeur `craTimeline` que `detail` n'est jamais rempli que
+    pour le type `refused`, donc préfixer inconditionnellement y est sans risque.
+
+Focus sur le design mobile :
+
+32. ✅ FAIT — commit `0c1ba33`. `denied-state.tsx`, `error-state.tsx`, `empty-state.tsx`, vérifiés
+    avec le vrai CSS compilé à 375 et 768 px sur le contenu le plus défavorable (le `problemType` le
+    plus long, un `correlationId` uuidv7 complet). Deux vrais défauts : les lignes du `<dl>` de
+    `DeniedState` étaient en `justify-between`, donc un `problemType` long se repliait
+    indépendamment de son libellé et les deux moitiés se décalaient — elles sont empilées
+    maintenant ; et le bouton de copie du `correlationId` restait collé au bout de la ligne, orphelin,
+    dès que l'identifiant passait à la ligne — c'est du texte au fil maintenant, qui se replie d'un
+    bloc. `empty-state.tsx` n'avait rien à corriger.
+
+33. ✅ FAIT — commit `d2af17d`, **et le vrai cas `?from=` vérifié cette session**, ce que le commit
+    d'origine n'avait pas fait (sa maquette de test codait un fil en dur). Le fil d'Ariane est
+    `hidden lg:block` — le même seuil que le burger de `topbar.tsx` et que `sidebar.tsx`, pas `sm` —
+    donc en dessous de 1024 px il ne reste que le `<h1>` tronqué. `display:none` le retire aussi de
+    l'arbre d'accessibilité, plutôt que de le laisser annoncé sans être vu. Au-dessus, la liste
+    passe en `flex-nowrap`, chaque miette sauf la dernière est `shrink-0`, et seule la dernière
+    (nom du client + mois) tronque. Mesuré sur le vrai lien à trois miettes
+    (Accueil → Pré-facturier → « Banque Nationale de Test — août 2026 ») à 375 / 768 / 1023 / 1024
+    / 1440 px : la barre fait exactement 56 px partout, le fil est `none` en dessous de 1024 et
+    `block` au-dessus, aucun débordement.
+
+34. ✅ FAIT — commits `10168c9`, `c317de5`, test `c53426e`, ADR-0089. **Une seule cause pour
+    l'essentiel, et c'est l'item 26 de ce même lot qui l'a introduite** : `sr-only` est
+    `position: absolute`, rien entre lui et le bloc conteneur initial n'était positionné, donc les
+    libellés lecteur-d'écran des jours non ouvrés (et le `<caption>`, depuis toujours) échappaient
+    au conteneur de défilement et agrandissaient le **document**. Mesuré : `scrollWidth` de 1367 à
+    768 px, 1615 à 1024 et à 1440, et `window.scrollTo(600, 0)` déplaçait vraiment la vue. Isolé en
+    basculant chaque candidat un par un : `position: relative` sur le conteneur ramène le document à
+    sa largeur, `overflow-x: hidden` non. `cra-quantity-cell.tsx` décrivait ce piège depuis la phase
+    6 (et le contournait par `aria-label`) ; son commentaire disait « aucun ancêtre ici n'est
+    positionné » comme un fait présent, ce qui a cessé d'être vrai — corrigé dans la foulée.
+    Deux écrans restaient cassés **à 375 px seulement** (`c317de5`), invisibles à la largeur de 768
+    où la passe précédente avait mesuré : le formulaire d'Affectations (une colonne de grille sous
+    `lg`, dont le minimum automatique se résolvait sur l'`<option>` la plus large des `<select>` —
+    466 px dans une page de 351), et la barre de progression du CRA (`shrink-0` à côté d'un libellé
+    `text-nowrap`, 424 px indivisibles).
+
+35. ✅ FAIT — commit `e29f1f6`, ADR-0089. Même défaut que l'item 34, à 90 degrés. Le shell est
+    `h-dvh overflow-hidden` avec `<main>` pour unique conteneur de défilement : le document n'est
+    censé défiler ni horizontalement ni verticalement, et il faisait les deux. Mesuré à 375 px :
+    `scrollHeight` du document à 2545 pour `/pre-facturier` (contre 812 de fenêtre), 1464 pour le
+    tableau de bord, 1526 pour les factures — d'où le « on scrolle plus bas que ce que prévoit la
+    page », le plus visible sur l'écran qui a le plus de tableaux. `relative` sur `<main>`. Vérifié
+    sur trois personas, huit routes, deux largeurs : le document fait exactement la hauteur de la
+    fenêtre partout, `window.scrollTo(0, 5000)` laisse `scrollY` à 0, et aucune page n'a d'espace
+    vide sous son dernier élément.
+
+36. ✅ FAIT — commit `ffc2a14`. À 375 px les cartes « Émetteur » et « Facturé à » tenaient côte à
+    côte dans ~170 px chacune : « N° de TVA intracommunautaire » prenait trois lignes à gauche, sa
+    valeur débordait de la carte à droite, « Adresse de livraison » se repliait sur sept lignes, et
+    les deux moitiés se repliaient indépendamment. Une seule colonne sous `sm`, libellé au-dessus de
+    la valeur, côte à côte et valeur à droite à partir de `sm`. `break-words` sur la valeur n'est pas
+    cosmétique : un numéro de TVA est un mot insécable plus large que la carte, et il poussait le
+    conteneur de défilement du shell de côté (`main.scrollWidth` 468 contre 375 — 375 maintenant).
+    Le squelette de chargement reçoit le même `sm:grid-cols-2`, pour ne plus annoncer deux colonnes
+    que la page chargée n'utilise pas à cette largeur. Les montants sont intacts : récapitulatif de
+    TVA et totaux gardent leurs colonnes tabulaires alignées à droite, aucun ne se replie au milieu
+    d'un nombre.
+
+**Garde-fou ajouté pour 34 et 35** : `apps/web/e2e/responsive.spec.ts`, projet Playwright dédié,
+vérifie sur quatre largeurs (375 / 768 / 1024 / 1440) et tous les écrans en lecture seule que le
+document ne défile sur aucun axe, que `<main>` ne défile pas horizontalement, et qu'aucune page n'a
+d'espace vide sous son dernier élément. Les deux correctifs `relative` sont indépendants et le test
+le prouve : retirer celui de `<main>` fait tomber 17 des 20 cas, retirer celui de la grille CRA en
+fait tomber 3 — et pas les mêmes.
+
+To do général :
+
+37. Il faut revoir la page d'affectation des missions pour avoir une barre de recherche d'un consultant,

@@ -242,6 +242,14 @@ personnel ne revendique ni l'un ni l'autre, ADR-0028).
 - la gestion des utilisateurs et l'authentification en production (sélecteur de persona assumé : il
   rend l'autorisation démontrable en trois clics là où un vrai IdP la rendrait invisible).
 
+Trois entrées de menu — **Mes informations**, **Mes notes de frais**, **Mes demandes d'absence** —
+existent pourtant dans la barre latérale de chaque rôle et ouvrent une page « à venir ». C'est
+volontaire : un ERP interne les porte toutes les trois, et les montrer à leur place situe la chaîne
+CRA → facture dans l'outil dont elle n'est qu'un module. Elles sont des **maquettes d'emplacement**,
+pas des écrans inachevés : aucune n'a de domaine, de table ni d'API derrière elle, et les deux
+dernières figurent au-dessus comme non construites. Une page qui affiche honnêtement qu'elle n'existe
+pas encore vaut mieux qu'un menu qui ment sur le périmètre de l'outil.
+
 > **« Pourquoi ne pas installer Odoo ? »** Odoo fait déjà « feuille de temps → facture en régie », et
 > c'est la bonne question. La réponse n'est pas fonctionnelle : ce sont les contraintes que l'outil du
 > marché ne porte pas — habilitation PASSI par portée **et par date**, règle d'indépendance
