@@ -37,3 +37,7 @@ reports/
 # Maquette-ERP-notes repository; ignored here so a stray `git add .` cannot bring them back.
 CHOIX.md
 draft.md
+
+# Reference screenshots pasted in for a QA round: read locally, never published. The repo is
+# public (ADR-0086), and a screenshot of a third-party product is not ours to redistribute.
+docs/images/

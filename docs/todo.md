@@ -234,3 +234,84 @@ dev` tournant répond 200 `image/svg+xml` exactement sur le href déclaré ; le 
     `pnpm run check`, `test:int`, and the full `journeys` e2e project (20/20) all green.
 
 13. On a plusieurs factures pour un même client pour une même période avec un même montant. Est-ce normal ? Si ce n'est pas le cas, il faut corriger.
+
+14. Je veux renommer partout où ça se trouve le nom de la maquette de CRA -> Facture à "Maquette ERP", ce sera plus parlant.
+
+15. Remplacer la favicon actuelle car elle ne semble pas fonctionner
+
+16. En prod (sur le VPS) si je refraichis une page en faisant F5, j'ai ces erreurs :
+    Content-Security-Policy: The page’s settings blocked an inline script (script-src-elem) from being executed because it violates the following directive: “script-src 'self'”. Consider using a hash ('sha256-7BwvLlbJgAi6ysmcgnAoSL3ccZQoRZ2eOpuyRlacc3g=') or a nonce. content.js:74:196
+    Content-Security-Policy: The page’s settings blocked an inline script (script-src-elem) from being executed because it violates the following directive: “script-src 'self'”. Consider using a hash ('sha256-JgSe21crTC86mj0Fq5U5jbn5/Z0AC477ykC/jCr23cg=') or a nonce. content.js:74:196
+    Layout was forced before the page was fully loaded. If stylesheets are not yet loaded this may cause a flash of unstyled content. node.js:416:1
+    Content-Security-Policy: The page’s settings blocked a JavaScript eval (script-src) from being executed because it violates the following directive: “script-src 'self'” (Missing 'unsafe-eval') schemas-C_zGlbVp.js:1:2496
+    GET
+    https://erp.clementvallois.fr/assets/demo-notice-B6nVk7b7.js
+    NS_ERROR_CORRUPTED_CONTENT
+    GET
+    https://erp.clementvallois.fr/assets/role-badge-NvoVPJsh.js
+    NS_ERROR_CORRUPTED_CONTENT
+    GET
+    https://erp.clementvallois.fr/assets/alert-Byj5vq5n.js
+    NS_ERROR_CORRUPTED_CONTENT
+    GET
+    https://erp.clementvallois.fr/assets/format-BCA0AxUz.js
+    NS_ERROR_CORRUPTED_CONTENT
+    GET
+    https://erp.clementvallois.fr/assets/tableau-de-bord-CxAG83_T.js
+    NS_ERROR_CORRUPTED_CONTENT
+    GET
+    https://erp.clementvallois.fr/assets/stat-card-CJdm-mp9.js
+    NS_ERROR_CORRUPTED_CONTENT
+    GET
+    https://erp.clementvallois.fr/assets/denied-state-nzR-Smvh.js
+    NS_ERROR_CORRUPTED_CONTENT
+    GET
+    https://erp.clementvallois.fr/assets/period-DN8Mm4OR.js
+    NS_ERROR_CORRUPTED_CONTENT
+    GET
+    https://erp.clementvallois.fr/assets/skeleton-BJNIKfBr.js
+    NS_ERROR_CORRUPTED_CONTENT
+    GET
+    https://erp.clementvallois.fr/assets/hooks-CF1p_ac3.js
+    NS_ERROR_CORRUPTED_CONTENT
+    Loading module from “https://erp.clementvallois.fr/assets/demo-notice-B6nVk7b7.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
+    Loading module from “https://erp.clementvallois.fr/assets/alert-Byj5vq5n.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
+    Loading module from “https://erp.clementvallois.fr/assets/role-badge-NvoVPJsh.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
+    Loading module from “https://erp.clementvallois.fr/assets/format-BCA0AxUz.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
+    Loading module from “https://erp.clementvallois.fr/assets/tableau-de-bord-CxAG83_T.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
+    Loading module from “https://erp.clementvallois.fr/assets/denied-state-nzR-Smvh.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
+    Loading module from “https://erp.clementvallois.fr/assets/stat-card-CJdm-mp9.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
+    TypeError: error loading dynamically imported module: https://erp.clementvallois.fr/assets/demo-notice-B6nVk7b7.js index-cqrEhFEg.js:9:64126
+    Loading module from “https://erp.clementvallois.fr/assets/skeleton-BJNIKfBr.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
+    Loading module from “https://erp.clementvallois.fr/assets/period-DN8Mm4OR.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
+    Loading module from “https://erp.clementvallois.fr/assets/hooks-CF1p_ac3.js” was blocked because of a disallowed MIME type (“text/html”). tableau-de-bord
+
+17. Créer un petit module d'information sur le tableau de bord pour y afficher les informations du CSE ou de la vie de l'entreprise. Il faut l'afficher par défaut mais il peut être replié/masquer (icone oeil visible, oeil barré). Les messages à l'intérieur doivent défiler avec un timer visible. On n'affiche que les 5 derniers messages. Si on nouveau message est publié, ça doit démasquer automatiquement le lecteur s'il avait été masqué. Crée ces messages. On peut y mettre une image, pas que du texte. On peut y mettre un document en pièce jointe également. J'ai mis une image (module-documentation.png) de comment ça se présente sur un outil du marché, mais je veux qu'on modernise ça et que ça colle à notre design. Il faut se souvenir du choix de l'utilisateur, s'il l'a masqué ou non pour ne pas afficher ce module à chaque fois s'il l'a masqué (hormis en cas de nouveau message)
+
+18. Il faut aussi un petit module sur le tableau de bord pour afficher les collaborateurs directs et le manager direct. Dans le cas d'un manager, il faut afficher les personnes N-1 sous sa responsabilité et également son manager (donc son N+1).
+
+19. Sur les boutons (copier...) qui servent à partager les liens, il faut une petite animation qui laisse penser qu'on a bien cliqué dessus et que ça a été copié dans le clipboard directement sur le bouton (en plus du message infobulle en bas à droite)
+
+20. Il me faut une nouvelle page avec un sous-ensemble de pages (ou directement le sous-ensemble) pour gérer "Mes informations", "Mes notes de frais", "Mes demandes d'absence". Pour le moment, on met juste un placeholder qui dit que la page est en construction si on clique sur l'une de ces pages.
+
+21. A la place du bouton "Décider" pour un manager pour le CRA d'un consultant, on veut le renommer "Vérifier" et ça doit nous amener directement sur le CRA de la personne en question plutôt que sur le pré-facturier.
+
+22. Sur le tableau de bord, "CRA en attente de décision" et "CRA en retard" si je clique sur ces cartes, je dois arriver sur une vue filtrée qui me montre ces éléments.
+
+23. La zone qui contient les graphiques doit pouvoir être masquées, comme on le fait pour le module de communication (icone oeil visible, oeil barré). Il faut se souvenir du choix de l'utilisateur, s'il l'a masqué ou non pour ne pas afficher ce module à chaque fois s'il l'a masqué.
+
+24. Dans le tableau CRA d'un manager, le filtre des années est coupé, ça n'affiche que "Toutes les anné" au lieu de "Toutes les années", il faut peut-être agrandir la largeur de ce champs
+
+25. Le filtre sur la période d'exécution dans le tableau facture ne doit pas être basé sur l'ordre alphabétique mais sur l'ordre chronologique
+
+26. Dans un CRA, plutôt que d'afficher "Week-end" en texte dans la colonne directement, plutôt ajouter une petite légende en dessous du tableau pour la couleur et l'expliquer. CElz fera gagner un peu d'espace horizontal.
+
+27. Dans un CRA, l'erreur "Une journée compte quatre quarts de journée : celle-ci est déjà complète." doit être renommée en "Une journée ne peut pas dépasser le volume horaire prévu"
+
+28. Dans un CRA, il faut un warning (pas une erreur) si un consultant tente de soumettre un CRA dont le total des jours saisis dépasse le nombre de jour ouvrés (dans le cas où il saisit du temps sur le week-end et/ou jours fériés). De même, il doit être visuellement facile pour un manager de voir qu'un CRA à valider contient des jours saisis sur le week-end et/ou jours fériés, à la fois sur la vue détaillée du CRA mais aussi sur le message de confirmation de validation d'un CRA d'un consultant (Valider le CRA de Alice Martin ?)
+
+29. Dans le tableau de bord consultant, la ligne "Le CRA de X a été refusé : une correction est attendue.", le bouton "Ouvrir ce CRA" n'est pas centré verticalement dans la barre, il n'y a pas de marge/pagging en dessous
+
+30. La chronologie métier doit être horizontale plutôt que verticale, pour gagner de la place dans la page. Il faut colorer les bulles selon le type d'évènement/statut. Il faut que la ligne entre les bulles, si on la conserve, soit centrée entre les bulles.
+
+31. Sur un CRA refusé, il faut écrire "Motif : XXX" plutôt que juste le message du manager, ce sera plus parlant.
