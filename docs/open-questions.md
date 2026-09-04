@@ -4474,6 +4474,18 @@ looking at. What follows is every point that changed something, and every point 
   citations made resolvable, `.claude/agents/` added to the inventory of tracked tooling, and the
   three placeholder screens given their rows in the per-role table.
 
+**Found by the CI, after both subagents had cleared the branch.** The `Cold setup (migrate + seed)`
+job pins a row count per seeded table and reads them back as `erp_app`; `public.consultants` was
+pinned at **48** and the roster addition of `3f1bea7` made it **49**. The job went red on the first
+push of this branch. It is worth writing down because of who missed it: the seed change is nine
+commits old, `pnpm run check` is green, 614 unit tests and 225 integration tests pass, and the
+`rules-auditor` looked for exactly this — its report says "no test, ADR or README line pins a filler
+amount", and it was right about tests and wrong about the repository, because the pin is in
+`.github/workflows/ci.yml` and it declared CI out of scope. Three readers, one machine, and the
+machine found it. That is the argument of this repository, made against itself. Fixed in the same
+pass; the other eight pins were re-measured against a fresh `pnpm run db:reset` and all eight still
+hold.
+
 **Deferred, with a row above and a named phase:** the persona gap ADR-0094 leaves open; the two
 untracked files; and the test-first breach the commit order of this branch proves — `3f1bea7` and
 `f3405e8` ship implementation with no test and the guards land six commits later.

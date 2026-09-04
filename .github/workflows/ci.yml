@@ -375,7 +375,7 @@ jobs:
             DECLARE
               expected CONSTANT text[][] := ARRAY[
                 ['public.offices','4'], ['public.practices','5'], ['public.personas','4'],
-                ['public.consultants','48'], ['public.clients','5'], ['public.missions','7'],
+                ['public.consultants','49'], ['public.clients','5'], ['public.missions','7'],
                 ['timesheet.cras','148'], ['billing.invoices','66'], ['public.domain_events','147']
               ];
               found bigint;
