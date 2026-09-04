@@ -163,19 +163,24 @@ test.describe('prefers-reduced-motion — a Radix open transition (Select)', () 
 });
 
 /**
- * Item 17, QA round 3 added the one animated thing in this app the stylesheet cannot reach: the
- * company-news carousel rotates on a `requestAnimationFrame` loop, not a CSS animation, so
- * `globals.css`'s `@media (prefers-reduced-motion: reduce)` block has nothing to collapse.
- * `lib/use-reduced-motion.ts` reads the query in JS instead and `rotating` gates the loop on it.
+ * Item 17, QA round 3 added the one animated thing in this app the stylesheet alone cannot fully
+ * account for: the company-news carousel's timer bar. Item 1, QA round 5 (ADR-0096) made it a
+ * named CSS animation (`news-progress-fill`), which `globals.css`'s `@media
+ * (prefers-reduced-motion: reduce)` block **does** collapse to a near-zero duration like any
+ * other — but a bar that still fills, just almost instantly, would fire its completion handler
+ * immediately and spin the carousel through every message at frame rate instead of leaving it
+ * still. `lib/use-reduced-motion.ts` reads the query in JS instead and `autoRotateEnabled` gates
+ * the bar's render on it, not only its duration.
  *
  * This file's own opening claim — "the one test that proves the rule actually reaches a real
- * animated element" — stopped being true when that landed, which is why this describe exists. It
+ * animated element" — is not quite true of this describe any more (the animation *is* one CSS
+ * now reaches), which is why it stays its own describe rather than folding into the two above. It
  * is the only one here that needs a persona and a live API: the kitchen sink has no carousel.
  *
- * The assertion is the timer bar's existence, not its duration. Under the preference the RAF loop
- * never starts, `rotating` is false, and the bar is not rendered at all — so "it exists and is
- * filling" versus "it is not there" is the same paired positive/negative this file uses
- * throughout, read off the element the loop actually drives.
+ * The assertion is the timer bar's existence, not its duration. Under the preference
+ * `autoRotateEnabled` is false and the bar is not rendered at all — so "it exists and is filling"
+ * versus "it is not there" is the same paired positive/negative this file uses throughout, read
+ * off the element the animation actually drives.
  */
 test.describe('prefers-reduced-motion — a JS rotation (company-news carousel)', () => {
   const PROGRESS = '[data-slot="news-progress"]';

@@ -3,12 +3,14 @@ import { useEffect, useState } from 'react';
 const QUERY = '(prefers-reduced-motion: reduce)';
 
 /**
- * Item 17, QA round 3: the company-news carousel's auto-rotation is a JS `requestAnimationFrame`
- * loop, not a CSS transition — `globals.css`'s own `@media (prefers-reduced-motion: reduce)` rule
- * (which collapses every animation/transition duration to near-zero) has nothing to catch here, so
- * this is read in JS instead and used to skip starting the loop at all. Reactive (a `change`
- * listener, not a one-off read) since a reviewer plausibly toggles the OS setting live while this
- * page is open.
+ * Item 17, QA round 3: the company-news carousel's auto-rotation timer. Item 1, QA round 5
+ * (ADR-0096) moved the timer bar itself to a CSS animation (`news-progress-fill`, `globals.css`),
+ * which that file's own `@media (prefers-reduced-motion: reduce)` rule does collapse to a
+ * near-zero duration — but collapsing the duration is not the same as not rotating: an animation
+ * that still runs, just almost instantly, fires `onAnimationEnd` immediately and spins the
+ * carousel through every message at frame rate. This hook is read in JS instead and used to skip
+ * rendering the bar (and therefore rotating) at all. Reactive (a `change` listener, not a one-off
+ * read) since a reviewer plausibly toggles the OS setting live while this page is open.
  */
 export function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(() => {

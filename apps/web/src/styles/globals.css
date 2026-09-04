@@ -429,3 +429,19 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Item 1, QA round 5 (ADR-0096): the company-news carousel's timer bar. A named keyframe rather
+   than a Tailwind transition utility because the fill has to be pausable mid-flight without
+   losing progress — `company-news-panel.tsx` toggles `animation-play-state` on the same element
+   instead of recomputing a remaining duration, which a `transition` restarted from a JS-tracked
+   percentage cannot do as cheaply. `prefers-reduced-motion` above still collapses this animation's
+   duration like any other, but the panel does not rely on that alone (its own header comment says
+   why): it gates the bar's render on `useReducedMotion()` in JS first. */
+@keyframes news-progress-fill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
