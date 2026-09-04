@@ -14,7 +14,14 @@ export function CraTimeline({ timeline }: Pick<CraGridResponse, 'timeline'>): Re
         title: LABELS.timeline[item.kind],
         at: item.at,
         actorName: item.actorName,
-        ...(item.detail === undefined ? {} : { detail: item.detail }),
+        ...(item.detail === undefined
+          ? {}
+          : {
+              // Item 31, QA round 3: `detail` is only ever set for a `refused` entry (the
+              // manager's free-text reason) — `api.ts`'s `craTimeline` never populates it for any
+              // other kind — so this prefix is unconditionally correct here.
+              detail: `${LABELS.cra.refusalReasonPrefix}${item.detail}`,
+            }),
       }))}
     />
   );
