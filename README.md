@@ -7,9 +7,12 @@
 
 ## Où en est cette maquette
 
-**Phases 1 à 6 terminées** — le plan en compte onze, numérotées 0 à 10
+**Phases 0 à 8 terminées** — le plan en compte onze, numérotées 0 à 10
 ([`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md)). Les phases 1 à 3 datent du 19/08/2026, la 4 et la 5
-du 21/08/2026, la 6 du 22/08/2026.
+du 21/08/2026, la 6 — les écrans — du 22/08/2026, le plan front-end qui remplace l'interactif par
+une SPA React du 28/08/2026, la 7 (durcissement de la CI) du 31/08/2026 et la 8 (déploiement) du
+03/09/2026. **La phase 9 est en cours** : c'est la relecture documentaire, et ce README en est le
+livrable. Reste la phase 10, le gel.
 
 Les **domaines**, en TypeScript pur et sans base de données : `timesheet` — CRA, cycle de vie,
 calendrier ouvré, règles de soumission, validation et événement de domaine — et `billing` —
@@ -30,8 +33,8 @@ authentification (ADR-0023), et la chaîne complète CRA → facture en une tran
 lancer : section « Démarrer » plus bas.
 
 Les compteurs de tests se recomptent plutôt qu'ils ne se croient : `pnpm run test` pour les tests
-unitaires, `pnpm run test:int` pour ceux qui tournent contre un vrai PostgreSQL. Au **22/08/2026**,
-511 et 167.
+unitaires, `pnpm run test:int` pour ceux qui tournent contre un vrai PostgreSQL. Au **04/09/2026**,
+611 et 225.
 
 **La chaîne franchit déjà la frontière** : `billing` réagit à `timesheet.TimesheetValidated` et
 produit un projet de facture par client. **Aucun fichier livré de `billing` — tests compris —
@@ -46,15 +49,36 @@ méritent d'être nommés : `packages/billing/src/__boundary-fixture__/` viole l
 qu'aucune règle ne mentionne — il prouve que la liste `allowed` **refuse par défaut**, ce qui est la
 moitié la plus facile à perdre.
 
-Les **écrans** existent depuis la phase 6. Sept pages rendues par le serveur — sélecteur de
-persona, mois d'un consultant, grille de saisie, pré-facturier, marge, facture imprimable, relevé de
-CRA imprimable — plus la page qui rend un refus. Aucune étape de build front, aucun script envoyé
-au navigateur (ADR-0009, ADR-0025) : c'est vrai du code d'aujourd'hui, et **la décision a bougé le
-24/08/2026** — ADR-0062 remplace ADR-0009 et fait passer l'interface interactive en SPA React (les
-deux imprimables restent rendus par le serveur). Rien n'en est écrit ; voir « pas encore » juste en
-dessous. **Le point d'entrée est `http://127.0.0.1:3000/`**, le sélecteur de persona : tout le reste
-s'atteint en cliquant depuis là. La section « Démarrer » dit comment lancer l'instance, et la même
-chaîne se voit en HTTP ou à l'écran, au choix.
+Les **écrans** existent depuis la phase 6, et depuis le 28/08/2026 l'interactif est une **SPA
+React** servie par la même instance Fastify que l'API — ADR-0062 remplace ADR-0009, ADR-0063 fixe
+l'origine unique, ADR-0064 dit ce que la CSP admet. Deux documents restent **rendus par le
+serveur**, et ce sont les seuls : la **facture imprimable** (`/facture/:id`, ADR-0055) et le
+**relevé de CRA imprimable** (`/releve/:id`, ADR-0056). Tout le reste est la SPA, ce qui implique
+une **étape de build** (`pnpm --filter @erp/web build`) que la section « Démarrer » donne.
+
+**Le point d'entrée est `http://127.0.0.1:3000/`** : le sélecteur de persona. En choisir une mène
+au **tableau de bord**, d'où la barre latérale ouvre le reste — et elle n'offre que ce que le rôle
+de la persona autorise (`apps/web/src/config/navigation.ts` est la seule source de cette
+décision) :
+
+| Écran                                                                               | Rôles                |
+| ----------------------------------------------------------------------------------- | -------------------- |
+| Tableau de bord `/tableau-de-bord`                                                  | tous                 |
+| Pré-facturier `/pre-facturier`                                                      | manager, facturation |
+| CRA `/cra` — les siens pour un consultant, ceux de son implantation pour un manager | consultant, manager  |
+| Affectations `/affectations`                                                        | manager              |
+| Factures `/factures`                                                                | manager, facturation |
+
+La **marge** (`/marge/:consultantId`) n'a **pas** d'entrée de menu : elle ne s'atteint que par un
+clic explicite sur une ligne du pré-facturier, parce que chaque lecture est une divulgation
+journalisée (ADR-0052) et qu'une entrée permanente inviterait exactement le survol que ce
+clic-là évite. Le tableau de bord porte aussi deux panneaux transverses — l'**organigramme** (« mon
+manager » pour un consultant, « mon équipe » pour un manager, ADR-0090) et les **actualités du
+cabinet**. Trois entrées de menu — **Mes informations**, **Mes notes de frais**, **Mes demandes
+d'absence** — sont des **pages d'attente assumées**, sans domaine ni API derrière elles ; la section
+« Ce que je ne construis pas » dit pourquoi.
+
+La même chaîne se voit en HTTP ou à l'écran, au choix.
 
 **L'instance tourne : [https://erp.clementvallois.fr](https://erp.clementvallois.fr)** — déployée le
 03/09/2026. La chaîne complète de la phase 8 est en service sur l'hôte : l'image publiée par la CI
@@ -62,17 +86,10 @@ et tirée par digest, PostgreSQL sur un réseau privé sans port publié, les mi
 conteneurs éphémères, le minuteur systemd qui interroge GHCR, et la remise à zéro nocturne
 (ADR-0032 — les données sont synthétiques et repartent de zéro chaque nuit à 03h30).
 
-Restent la passe de relecture documentaire (phase 9) et le gel (phase 10). La phase 0 — outillage,
-CI, règles d'écriture — précède les autres et est faite.
-
-**L'interface interactive en SPA React est livrée** — décidée le 24/08/2026, écrite depuis, et
-couverte par les tests Playwright de `apps/web/e2e/`. Elle a son plan de construction
-([`docs/frontend-plan.md`](docs/frontend-plan.md)), sa direction visuelle
-([`docs/direction-visuelle.md`](docs/direction-visuelle.md)) et ses trois arbitrages — ADR-0062
-(React), ADR-0063 (servie par la même instance Fastify, même origine) et ADR-0064 (la CSP admet un
-script). Les deux documents imprimables, eux, n'ont pas bougé. ⚠️ Ces deux documents de plan sont
-en anglais, contrairement à ce que cette phrase a longtemps annoncé ; la passe de relecture de la
-phase 9 tranche s'ils sont traduits ou assumés tels quels.
+La SPA est couverte de bout en bout par les tests Playwright de `apps/web/e2e/`, et elle a son plan
+de construction ([`docs/frontend-plan.md`](docs/frontend-plan.md)) et sa direction visuelle
+([`docs/direction-visuelle.md`](docs/direction-visuelle.md)). ⚠️ Ces deux documents-là sont **en
+anglais**, comme tout le reste du dépôt et contrairement à ce README.
 
 Quatre fichiers répondent aux questions qu'on se pose en arrivant. [`CONTEXT.md`](CONTEXT.md)
 définit le vocabulaire — métier (`Tjm`, `Cjm`, `pré-facturier`, `régie`, `intercontrat`, `avoir`,
@@ -87,14 +104,25 @@ qui le tranchera.
 règle est dans `CLAUDE.md` : le code, les commits et les arbitrages en anglais, le README dans la
 langue du lecteur qui ouvre ce dépôt sans brief.
 
-Le reste de `docs/` est du **journal de construction**, pas de la documentation d'arrivée :
-[`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md) est l'ordre et le calendrier des phases,
-[`docs/PHASE-4-5-CLOSURE.md`](docs/PHASE-4-5-CLOSURE.md) est le relevé des revues de ces deux
-phases-là (les suivantes sont closes dans `open-questions.md`, ce qui est une incohérence de forme
-assumée), [`docs/frontend-plan.md`](docs/frontend-plan.md) et
-[`docs/direction-visuelle.md`](docs/direction-visuelle.md) sont le plan et la direction visuelle de
-la SPA à construire, et [`docs/agents/`](docs/agents/) décrit l'outillage d'agents utilisé pour
-construire le dépôt. Rien n'y est nécessaire pour comprendre la maquette.
+Le reste de `docs/` est du **journal de construction**, pas de la documentation d'arrivée. Rien n'y
+est nécessaire pour comprendre la maquette, et l'inventaire est ici plutôt qu'ailleurs pour qu'un
+fichier ne s'y ajoute pas en silence :
+
+| Fichier                                                                         | Ce que c'est                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BUILD-PLAN.md`                                                                 | l'ordre, les branches et le calendrier des phases                                                                                                                                                 |
+| `frontend-plan.md`, `direction-visuelle.md`                                     | le plan de construction et la direction visuelle de la SPA                                                                                                                                        |
+| `running.md`                                                                    | les deux topologies d'exécution (dev / prod-démo) et la panne qui suit quand on les mélange                                                                                                       |
+| `vulnerability-management.md`                                                   | ce qui se passe quand la porte `Dependency scan` passe au rouge                                                                                                                                   |
+| `PHASE-4-5-CLOSURE.md`                                                          | le relevé des revues de ces deux phases-là (les suivantes sont closes dans `open-questions.md`, incohérence de forme assumée)                                                                     |
+| `qa-rounds.md`, `todo.md`                                                       | les trois passes de relecture de l'application qui tourne, **par le propriétaire du dépôt** : ce qui a été demandé, et ce qui en a été fait                                                       |
+| `audit-produit-ui-ux.md`, `plan-densification.md`, `plan-roles-rh-direction.md` | trois notes de travail sur ce que la maquette pourrait devenir. **Elles n'engagent rien** : ce qui en est sorti est passé par un ADR ou par « Ce que je ne construis pas », le reste n'existe pas |
+| `demo-checklist.md`                                                             | le script de démonstration, écrit pour être **vérifiable** — chaque étape nomme le test automatisé qui la prouve                                                                                  |
+| `agents/`                                                                       | l'outillage d'agents utilisé pour construire le dépôt                                                                                                                                             |
+
+⚠️ Ces trois notes de travail et `todo.md` sont **en français**, contrairement à la règle du dépôt
+(tout en anglais sauf ce README). C'est assumé et non corrigé : `todo.md` reproduit mot pour mot des
+demandes formulées en français, et les traduire remplacerait la demande par sa paraphrase.
 
 Pour vérifier soi-même plutôt que me croire. Les versions sont **strictes** (`engine-strict` est
 activé, donc la première commande échoue au lieu d'avertir) : **Node ≥ 24.13.1** — la version exacte
@@ -261,7 +289,8 @@ pas encore vaut mieux qu'un menu qui ment sur le périmètre de l'outil.
 
 ## Architecture
 
-Cinq paquets, et **une seule flèche** entre les deux modules métier.
+Six paquets — c'est le compte que `pnpm run boundaries` imprime — et **une seule flèche** entre les
+deux modules métier.
 
 ```
 packages/timesheet ──┐
@@ -270,6 +299,8 @@ packages/billing  ───┘                         contrat d'événement, po
 packages/contracts                            (ce qui circule sur le fil : problem+json)
 apps/api                                      (racine de composition : compose les modules,
                                                n'est importé par aucun)
+apps/web                                      (la SPA React, servie par apps/api — n'importe que
+                                               `contracts`, jamais un paquet du domaine)
 ```
 
 - **`timesheet`** et **`billing`** sont **scellés** (**ADR-0001**). `billing` n'importe rien de
@@ -282,6 +313,10 @@ apps/api                                      (racine de composition : compose l
 - **`contracts`** tient ce qui est publié sur le fil et rien d'autre : la forme RFC 9457
   `problem+json` et les identifiants de problème que l'API possède. Il est séparé de `platform`
   parce qu'un client HTTP en a besoin et n'a aucune raison de connaître le domaine.
+- **`apps/web`** est la SPA. Elle n'importe qu'un seul paquet du dépôt, **`contracts`**, et
+  recopie délibérément les quelques littéraux dont elle a besoin (`Role`, `CraStatus`) plutôt que
+  d'importer `platform` ou `timesheet` : ce qu'un navigateur connaît d'un domaine, c'est le
+  contrat HTTP, rien d'autre.
 - **`apps/api`** est la **racine de composition** (**ADR-0015**) : elle instancie les dépôts,
   ouvre la transaction, branche l'abonné sur l'émetteur. Un module ne l'importe jamais — la règle
   de dépendance nomme la flèche inverse pour que son échec se lise bien.
@@ -296,17 +331,17 @@ et le test négatif prouve qu'elle **refuse**.
 
 Chaque ligne vient d'un arbitrage écrit, avec l'option écartée et le seuil de réouverture.
 
-| Choix                                                                                                             | ADR                          | Option écartée                                                                                  |
-| ----------------------------------------------------------------------------------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------- |
-| **TypeScript** strict, **Node.js** ≥ 24.13.1                                                                      | —                            | —                                                                                               |
-| **Fastify**                                                                                                       | ADR-0008                     | NestJS — un conteneur d'injection et des décorateurs pour une douzaine de routes                |
-| **HTML rendu serveur** pour les deux imprimables ; **React + TypeScript** en SPA pour l'interactif (à construire) | ADR-0062 (remplace ADR-0009) | Vue — shadcn/ui n'y existe qu'en portage communautaire, et ce code-là est recopié dans le dépôt |
-| **PostgreSQL 18**, SQL écrit à la main                                                                            | ADR-0011                     | Un ORM — `FOR UPDATE` et les schémas par module doivent rester lisibles                         |
-| Migrations : fichiers `.sql` numérotés + runner                                                                   | ADR-0011                     | Un outil de migration tiers                                                                     |
-| **Montants en centimes entiers**                                                                                  | ADR-0002                     | Un objet `Money`, une bibliothèque décimale                                                     |
-| **Zod** aux frontières, et nulle part ailleurs                                                                    | ADR-0042                     | Une validation qui redescend dans le domaine                                                    |
-| **Vitest** · **pino** · **pnpm** workspaces                                                                       | —                            | —                                                                                               |
-| **Sélecteur de persona** au lieu d'une authentification                                                           | ADR-0023                     | Un vrai IdP, qui rendrait l'autorisation invisible en démonstration                             |
+| Choix                                                                                              | ADR                                              | Option écartée                                                                                  |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| **TypeScript** strict, **Node.js** ≥ 24.13.1                                                       | —                                                | —                                                                                               |
+| **Fastify**                                                                                        | ADR-0008                                         | NestJS — un conteneur d'injection et des décorateurs pour une douzaine de routes                |
+| **HTML rendu serveur** pour les deux imprimables ; **React + TypeScript** en SPA pour l'interactif | ADR-0062 (remplace ADR-0009), ADR-0063, ADR-0064 | Vue — shadcn/ui n'y existe qu'en portage communautaire, et ce code-là est recopié dans le dépôt |
+| **PostgreSQL 18**, SQL écrit à la main                                                             | ADR-0011                                         | Un ORM — `FOR UPDATE` et les schémas par module doivent rester lisibles                         |
+| Migrations : fichiers `.sql` numérotés + runner                                                    | ADR-0011                                         | Un outil de migration tiers                                                                     |
+| **Montants en centimes entiers**                                                                   | ADR-0002                                         | Un objet `Money`, une bibliothèque décimale                                                     |
+| **Zod** aux frontières, et nulle part ailleurs                                                     | ADR-0042                                         | Une validation qui redescend dans le domaine                                                    |
+| **Vitest** · **pino** · **pnpm** workspaces                                                        | —                                                | —                                                                                               |
+| **Sélecteur de persona** au lieu d'une authentification                                            | ADR-0023                                         | Un vrai IdP, qui rendrait l'autorisation invisible en démonstration                             |
 
 **Absents, et c'est un choix** : Redis, Kafka, RabbitMQ, Elasticsearch, Terraform, Kubernetes,
 microservices, tout ORM, toute bibliothèque décimale, toute file de jobs, Vue, génération de
@@ -353,11 +388,15 @@ Deux façons de voir la même chaîne : **à l'écran**, ou en HTTP. Les deux pa
 `http://127.0.0.1:3000`.
 
 **À l'écran** — ouvrez **<http://127.0.0.1:3000/>** dans un navigateur. Vous arrivez sur le
-sélecteur de persona ; choisissez `manager-paris`, et la navigation mène au pré-facturier, d'où un
-mois se valide ou se refuse. `billing-paris` est la persona qui émet une facture ;
-`consultant-paris` est celle qui saisit un mois. Changer de persona se fait depuis l'en-tête de
-chaque page. Rien à installer côté navigateur : les pages sont du HTML rendu par le serveur, sans
-script.
+sélecteur de persona ; choisissez `manager-paris`, et vous atterrissez sur le **tableau de bord**.
+De là, la barre latérale mène au **pré-facturier**, où un mois se valide ou se refuse. Le parcours
+complet dans l'ordre : `consultant-paris` saisit et soumet un mois (**CRA**), `manager-paris` le
+valide (**pré-facturier**, ou la grille du CRA elle-même), et `billing-paris` émet la facture que
+cette validation a mise en brouillon (**Factures**). Changer de persona se fait depuis l'en-tête.
+
+⚠️ **Le build front n'est pas optionnel** : sans `pnpm --filter @erp/web build`, `/` renvoie un 404
+ordinaire — `apps/web/dist/` n'est pas versionné, un clone frais n'en a pas, et `apps/api` sert
+alors une SPA qui n'existe pas. C'est la troisième commande de la section ci-dessus.
 
 ⚠️ **`127.0.0.1` et non `localhost`.** La panne est trompeuse : sous `localhost` les pages
 s'affichent normalement (`200`), et seule la **première écriture** est refusée — un bouton qui ne
@@ -436,9 +475,16 @@ pôles, quatre implantations (Paris, Lyon, Rennes, Bordeaux), des missions en **
 **Le volume, depuis item 6 (QA round 1, 31/08/2026)** — parce qu'un cabinet de neuf consultants sur
 un seul mois n'exerce ni la pagination, ni les filtres, ni l'historique :
 
-- **48 personnes** dans `public.consultants`, dont **3 managers**. Quatre d'entre elles seulement
-  sont sélectionnables dans le choix de persona (ADR-0023) ; les autres existent pour peupler les
-  listes de leur manager — les deux managers sélectionnables en comptent une vingtaine chacun.
+- **49 personnes** dans `public.consultants`, dont **4 managers** — un par implantation. Quatre
+  d'entre elles seulement sont sélectionnables dans le choix de persona (ADR-0023) ; les autres
+  existent pour peupler les listes de leur manager — les deux managers sélectionnables en comptent
+  une vingtaine chacun.
+- **Le manager d'un consultant est toujours dans l'implantation du consultant**
+  (**[ADR-0094](docs/adr/0094-a-consultants-manager-is-in-the-consultants-office.md)**). Ce n'est
+  pas cosmétique : toute lecture de cette application est bornée par `actor.officeId`, donc un
+  rattachement qui traverse une implantation produit un CRA que le manager désigné pour le valider
+  ne peut ouvrir sur aucun écran. Le seed en portait deux, écrits avant que les implantations ne
+  bornent quoi que ce soit.
 - **Juin, juillet et août 2026 sont denses** : chaque consultant actif y a un CRA. **Septembre est
   volontairement vide** — c'est le mois en cours, celui qu'un lecteur remplit lui-même en suivant
   la démonstration.
@@ -587,7 +633,8 @@ moment**, sans attendre la cadence. Décision, option écartée et seuil →
 **[ADR-0075](docs/adr/0075-the-vulnerability-management-procedure-and-where-it-lives.md)**.
 
 ⚠️ **L'application GitHub Renovate n'est pas installée sur ce dépôt** — vérifié le 28/08/2026 :
-aucun webhook, aucune pull request ouverte par le bot, dépôt privé. Installer une App GitHub est
+aucun webhook, aucune pull request ouverte par le bot. Le dépôt était alors privé ; il est public
+depuis le 03/09/2026, ce qui lève l'obstacle sans rien changer au constat. Installer une App GitHub est
 une action de plateforme, à faire depuis github.com : ni la CI ni un script de ce dépôt ne peut la
 déclencher, et elle n'est pas faite. Ce README dit
 donc ce qui est vrai — la configuration est committée et correcte — et pas ce qui ne l'est pas

@@ -62,10 +62,13 @@ The seed data must look like the reality of a consulting firm:
 - Time-and-materials **and** fixed-price missions (only T&M is invoiced by this mockup)
 - One consultant in **bench** (intercontrat)
 - One **certification-based habilitation** that constrains an assignment (e.g., PASSI-qualified auditor required on a qualified mission)
-- **48 consultants** in total (item 6, QA round 1): the 9 original named individuals plus a
-  roster-expansion cohort — none of it selectable in the persona picker, which stays at
-  **exactly four** entries (ADR-0023). **3 managers** (Bruno, Emma, and a new one, Karim, in
-  Bordeaux), each with 10+ direct reports for the two selectable ones (Bruno and Emma). **4
+- **49 consultants** in total (item 6, QA round 1; one more in QA round 4): the 9 original named
+  individuals plus a roster-expansion cohort — none of it selectable in the persona picker, which
+  stays at **exactly four** entries (ADR-0023). **4 managers** (Bruno in Paris, Emma in Lyon,
+  Karim in Bordeaux, Thomas in Rennes), each with 10+ direct reports for the two selectable ones
+  (Bruno and Emma). **A consultant's manager is always in the consultant's own office**
+  (ADR-0094): every read is scoped by `actor.officeId`, so a cross-office attachment produces a
+  Cra no manager can open a screen to validate. **4
   veterans** carry sparse historical CRAs back to 2016 on missions extended to cover that span,
   and **one of them (Marine) has left the firm** (`departure_date`, ADR-0079) — her old CRAs and
   invoices stay readable, and she is absent from every current roster read. Every active
