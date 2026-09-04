@@ -426,6 +426,27 @@ d'espace vide sous son dernier élément. Les deux correctifs `relative` sont in
 le prouve : retirer celui de `<main>` fait tomber 17 des 20 cas, retirer celui de la grille CRA en
 fait tomber 3 — et pas les mêmes.
 
+---
+
+## Énoncés d'origine, items 32 à 36
+
+Les items 1 à 31 ont leur formulation d'origine dans l'historique git : elle a été remplacée par son
+résultat au fil des sessions, mais les commits qui l'ont écrite existent (`ebf8115` pour 14-31). Les
+items 32 à 36, eux, n'ont jamais été commités avant d'être remplacés — ils sont donc recopiés ici,
+mot pour mot, pour que la demande survive à sa réponse.
+
+> **Focus sur le design mobile :**
+>
+> 32. Les messages d'erreur du style "Accès refusé" doivent être revus pour être plus jolis sur mobile parce que le texte actuellement part dans tous les sens.
+>
+> 33. La top bar, quand on est dans la page de CRA affiche le fil d'Ariane mais ça dépassé largement. Il faut garder uniquement "Mes CRA" peut-être? Ca pose aussi problème sur la page d'une facture. Pareil pour les autres pages en fait, il ne faut pas afficher le fil d'Ariane et s'assurer que ce qu'on affiche rentre dans la top bar.
+>
+> 34. Dans la page de CRA, on peut scroller horizontalement toute la page. Ca ne devrait pas être possible. C'est aussi le cas sur la page Affectations et sur la page d'une Facture. C'est peut-être pas les seuls écrans. J'imagine que ça vient du fait que du texte est trop long et va sur la partie droite de l'écran.
+>
+> 35. Dans certaines pages, on peut scroller plus bas que ce qui est prévu par la page (c'est aussi parfois le cas sur desktop), c'est particulièrement visible si on scroll en continu sur la page "Pré-facturier"
+>
+> 36. Sur la page de facture, le texte va dans tous les sens en version mobile, il faut bien s'assurer que le texte reste bien dans les cartes, que ce soit aligné comme il faut entre le label et le texte correspondant
+
 To do général :
 
 37. Il faut revoir la page d'affectation des missions pour avoir une barre de recherche d'un consultant,
