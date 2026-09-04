@@ -45,6 +45,9 @@ out everywhere" change would pass the first and break the second.
 Each of the three filters — office, hierarchy, departure — was removed in turn and the suite re-run:
 each removal fails at least one test.
 
+Visible on the seed as it stands: `manager_attachments` gives Bruno twenty open reports, and the
+panel shows him nineteen. The missing one is Gabrielle.
+
 ## Rejected option
 
 **Answer the hierarchy as it is recorded, ignoring the office** — i.e. every consultant whose
