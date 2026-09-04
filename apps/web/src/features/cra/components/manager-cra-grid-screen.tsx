@@ -19,7 +19,7 @@ import { useManagerCraGrid, useValidateCra } from '../hooks';
 import { ABSENCE_ROW_KEY, initMatrix } from '../matrix';
 import type { ManagerCraGridResponse, ValidationResponse } from '../types';
 
-import { CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
+import { CraLegend, CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
 import { CraTimeline } from './cra-timeline';
 import { RefuseDialog } from './refuse-dialog';
 import { ValidateConfirmDialog, type ValidateConfirmFact } from './validate-confirm-dialog';
@@ -297,6 +297,9 @@ function ManagerCraGridBody({
         editable={false}
         flaggedDays={flaggedDays}
       />
+      {/* Item 26, QA round 3: the manager's read-only grid uses the same colour-only weekend/
+          holiday header cells as the consultant's own grid, so it needs the same legend. */}
+      <CraLegend />
 
       {/* Both dialogs land the manager back on the pré-facturier once there is nothing left to
           decide on this row — item 3's "must land back somewhere sensible after validating". A

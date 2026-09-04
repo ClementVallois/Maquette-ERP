@@ -471,8 +471,12 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     await expect(cell(page, 'Absence', '18/06/2026')).toHaveText('1');
 
     // 13/06 — a worked Saturday, flagged rather than blocked (VARIED_MONTH.flaggedSaturday).
-    const saturdayHeader = page.getByRole('columnheader', { name: /S 13/ });
-    await expect(saturdayHeader).toContainText('Week-end');
+    // Item 26, QA round 3: "Week-end" no longer renders as visible text in the column header
+    // (the header cell's own background colour carries that now, explained by the legend below
+    // the table) — it stays in an `sr-only` span, so the accessible name (what `getByRole` matches
+    // against) still names it, and the axe pass below still has something to check.
+    const saturdayHeader = page.getByRole('columnheader', { name: /S 13.*Week-end/ });
+    await expect(saturdayHeader.locator('.sr-only')).toHaveText('Week-end');
     await expect(saturdayHeader).toContainText('Signalé');
     await expect(cell(page, DORA, '13/06/2026')).toHaveText('1');
 
