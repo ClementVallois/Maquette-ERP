@@ -187,7 +187,7 @@ test.describe('item 5 — the favicon actually resolves', () => {
   test('the declared <link rel="icon"> answers 200 with an SVG content type', async ({ page }) => {
     await page.goto('/');
 
-    const href = await page.locator('link[rel="icon"]').getAttribute('href');
+    const href = await page.locator('link[rel="icon"][type="image/svg+xml"]').getAttribute('href');
     if (href === null) throw new MarkupAssumptionError('index.html always declares a favicon.');
 
     const response = await page.request.get(href);
