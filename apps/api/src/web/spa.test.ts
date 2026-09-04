@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { registerSpa, serveSpaShellOrNull } from './spa.ts';
+import { registerSpa, sendBuiltAsset, serveSpaShellOrNull } from './spa.ts';
 
 /**
  * `registerSpa` and `serveSpaShellOrNull` against a real, throwaway `dist`-shaped directory —
@@ -75,6 +75,45 @@ describe('registerSpa — the built assets, /assets/*', () => {
     await rm(join(secretDir, 'erp-spa-secret.txt'), { force: true });
   });
 
+  it('refuses the same traversal through sendBuiltAsset, the path the route actually takes', async () => {
+    // The test above proves `reply.sendFile`. This one proves the function the route hands the
+    // captured segment to — the one carrying the `nosemgrep` suppression, and therefore the one
+    // whose safety is being asserted rather than scanned for. Two `..` segments, not one: the
+    // `assets/` prefix `sendBuiltAsset` prepends absorbs the first, so `../x` would only reach
+    // back into `distDir` itself and would prove nothing about leaving it.
+    const secretDir = distDir.replace(/\/$/u, '').split('/').slice(0, -1).join('/');
+    await writeFile(join(secretDir, 'erp-spa-secret.txt'), 'must never be served');
+
+    const direct = Fastify();
+    registerSpa(direct, distDir);
+    direct.get('/direct-helper', (_request, reply) =>
+      sendBuiltAsset(reply, distDir, '../../erp-spa-secret.txt'),
+    );
+    await direct.ready();
+
+    const response = await direct.inject({ method: 'GET', url: '/direct-helper' });
+
+    expect(response.statusCode).not.toBe(200);
+    expect(response.body).not.toContain('must never be served');
+
+    await direct.close();
+    await rm(join(secretDir, 'erp-spa-secret.txt'), { force: true });
+  });
+
+  it('caches a content-hashed asset for a year, immutably (ADR-0088)', async () => {
+    const response = await app.inject({ method: 'GET', url: '/assets/index-fixture.js' });
+
+    // The three parts are asserted separately on purpose: `max-age` alone is what the plugin's
+    // default (`max-age=0`) already said, and `immutable` alone is what stops the conditional
+    // request a `304` would still cost. Losing either one reopens the production failure this
+    // pair was written for — every chunk re-requested on every reload, over the vhost's rate
+    // limit, answered with an HTML 503 the browser refuses as a module.
+    const cacheControl = response.headers['cache-control'];
+    expect(cacheControl).toContain('public');
+    expect(cacheControl).toContain('max-age=31536000');
+    expect(cacheControl).toContain('immutable');
+  });
+
   it('declares an Access config on its route, the same shape registerAccessControl requires', async () => {
     // `onRoute` fires as each route is registered, so the hook must be added before `registerSpa`
     // runs — this is a fresh instance for exactly that reason (`beforeEach`'s `app` already
@@ -109,6 +148,22 @@ describe('serveSpaShellOrNull', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain('<title>fixture</title>');
+    await withShell.close();
+  });
+
+  it('never caches the shell, whose URL is stable while its content is not (ADR-0088)', async () => {
+    // The other half of the pair above, and the reason the caching options are set per-`sendFile`
+    // rather than on the plugin registration both calls share: `index.html` is the one file here
+    // whose URL does not change when its bytes do, so an `immutable` answer would pin a returning
+    // visitor to a list of chunk names the next deployment has already deleted.
+    const withShell = Fastify();
+    registerSpa(withShell, distDir);
+    withShell.get('/whatever', (_request, reply) => serveSpaShellOrNull(reply, distDir));
+    await withShell.ready();
+
+    const response = await withShell.inject({ method: 'GET', url: '/whatever' });
+
+    expect(response.headers['cache-control']).toBe('no-cache');
     await withShell.close();
   });
 
