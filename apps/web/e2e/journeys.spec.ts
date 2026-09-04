@@ -422,6 +422,14 @@ test.describe('item 3 — a manager opens and decides a CRA from the pré-factur
     await confirmDialog.getByText('Valider le CRA de Alice Martin ?').waitFor({
       state: 'visible',
     });
+    // ADR-0095, the half that must stay silent. This dialog is opened from the CRA detail view,
+    // which passes a real `flaggedDaysCount` — so the "not computed" advisory must be absent
+    // whether the count is zero or not. Asserted here and its opposite in J2, because the defect
+    // was the two paths being indistinguishable: either assertion alone would pass on a component
+    // that showed the advisory always, or never.
+    await expect(
+      confirmDialog.getByText('ne sont pas vérifiés dans cette liste', { exact: false }),
+    ).toBeHidden();
     await confirmDialog.getByRole('button', { name: 'Valider' }).click();
 
     const validateDialog = page.getByRole('dialog');
@@ -1107,6 +1115,12 @@ test.describe('J2 — manager-paris (Bruno): validates Claire’s submitted June
     await confirmDialog.getByText('Valider le CRA de Claire Dubois ?').waitFor({
       state: 'visible',
     });
+    // ADR-0095. `PreFacturierCraRow` computes no `CraFlag`, so this dialog is passed `null` and
+    // must say so rather than render nothing — which is what it used to do, indistinguishably
+    // from "computed, and it is zero". The mirror of J1's assertion above.
+    await expect(
+      confirmDialog.getByText('ne sont pas vérifiés dans cette liste', { exact: false }),
+    ).toBeVisible();
     await confirmDialog.getByRole('button', { name: 'Valider' }).click();
 
     const validateDialog = page.getByRole('dialog');

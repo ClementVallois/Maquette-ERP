@@ -34,7 +34,7 @@ lancer : section « Démarrer » plus bas.
 
 Les compteurs de tests se recomptent plutôt qu'ils ne se croient : `pnpm run test` pour les tests
 unitaires, `pnpm run test:int` pour ceux qui tournent contre un vrai PostgreSQL. Au **04/09/2026**,
-611 et 225.
+614 et 225.
 
 **La chaîne franchit déjà la frontière** : `billing` réagit à `timesheet.TimesheetValidated` et
 produit un projet de facture par client. **Aucun fichier livré de `billing` — tests compris —
