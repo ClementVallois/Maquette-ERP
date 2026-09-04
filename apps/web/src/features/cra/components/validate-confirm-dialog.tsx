@@ -26,10 +26,10 @@ interface ValidateConfirmDialogProps {
   /** Item 28, QA round 3: a weekend/holiday entry is a fact worth more visual weight than a plain
    * `<dl>` row — this used to be one of `facts` above, indistinguishable from "période" or
    * "clients", and the whole reason for the warning is to make it hard to validate past by
-   * accident. Required and nullable since QA round 4, deliberately: a caller must say whether it
-   * computed the flag at all, rather than silently inheriting "no warning" through an optional
-   * prop. `> 0` is the loud warning; `0` renders nothing, same as before; `null` — the count was
-   * never computed — renders a muted advisory instead of nothing. */
+   * accident. Required and nullable, deliberately: a caller must say whether it computed the flag
+   * at all, rather than silently inheriting "no warning" through an optional prop. `> 0` is the
+   * loud warning; `0` renders nothing, same as before; `null` renders a muted advisory.
+   * ADR-0095. */
   readonly flaggedDaysCount: number | null;
   readonly pending: boolean;
   readonly onConfirm: () => void;
@@ -79,11 +79,8 @@ export function ValidateConfirmDialog({
             </div>
           )}
 
-          {/* QA round 4: `null` means the caller never computed the flag (the pré-facturier's own
-              row-level "Valider" — item 28's asymmetry above) — muted, not the loud warning
-              styling, because it is not known to be a problem, only unchecked. Plain text, no
-              link: a navigation link here would discard this dialog's state mid-decision, and the
-              pré-facturier row already links to the CRA detail view. */}
+          {/* ADR-0095. Plain text and not a link: a navigation link inside an open dialog
+              discards the decision state the dialog is holding. */}
           {flaggedDaysCount === null && (
             <p className="mt-1 text-sm text-muted-foreground">
               {LABELS.preFacturier.validateConfirmDialog.flaggedDaysNotComputed}

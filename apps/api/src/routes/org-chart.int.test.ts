@@ -21,8 +21,8 @@ import { savepointTransactionally } from '../testing/transaction.ts';
  *
  * - **Office.** `Gaby` works in Lyon and `manager_attachments` names *Bruno* (Paris) as her
  *   manager. That row is not invented out of nowhere: `scripts/lib/seed-data.ts` carried two of
- *   exactly this shape (Gabrielle/Bordeaux → Bruno/Paris, François/Rennes → Emma/Lyon) before QA
- *   round 4 reattached both to their own office's manager — the cross-office case this test still
+ *   exactly this shape (Gabrielle/Bordeaux → Bruno/Paris, François/Rennes → Emma/Lyon) until
+ *   ADR-0094 reattached both to their own office's manager — the cross-office case this test still
  *   has to refuse. Bruno must not read her name — every other read in this app is bounded by
  *   `actor.officeId`, and an org-chart panel that reached past it would be the one screen that
  *   leaks a name the rest of the API refuses to show. ADR-0094 decided the consequence for the

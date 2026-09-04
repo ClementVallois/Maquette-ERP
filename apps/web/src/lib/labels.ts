@@ -584,10 +584,7 @@ export const LABELS = {
         '1 jour de ce mois tombe un week-end ou un jour férié — vérifiez-le avant de valider.',
       flaggedDaysWarningMany:
         '{count} jours de ce mois tombent un week-end ou un jour férié — vérifiez-les avant de valider.',
-      /** QA round 4: the muted counterpart to the two warnings above, for a caller that has not
-       * computed the flag at all (`flaggedDaysCount: null`) — distinct from "computed, and it is
-       * zero", which renders nothing. Plain advisory text, not the loud banner styling: it is not
-       * known to be a problem, only unchecked. */
+      /** The muted counterpart to the two warnings above, for `flaggedDaysCount: null`. ADR-0095. */
       flaggedDaysNotComputed:
         'Les jours tombant un week-end ou un jour férié ne sont pas vérifiés dans cette liste — ouvrez le CRA pour les vérifier avant de valider.',
       clientsFactLabel: 'Clients avec du temps saisi ce mois',
