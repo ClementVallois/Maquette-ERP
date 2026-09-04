@@ -88,6 +88,32 @@ browser available in this pass). Made the column's `sortingFn` explicit anyway �
 detection, which is the only mechanism that could plausibly have produced the reported symptom.
 Worth a five-minute look in a real browser before calling this closed.
 
+## Item 30 — three follow-up fixes found on a second pass, before batch 1 was declared done
+
+Caught these by re-checking the batch rather than trusting the first pass, and fixed all three
+(no live-browser risk, all verified statically or with a throwaway Playwright script against the
+real built CSS, deleted afterwards — not committed):
+
+- The horizontal timeline's connector line fell 20px short of the next bubble (`px-2` on the
+  `<li>` and `gap-1` on the `<ol>`, neither of which the line's own `left-1/2 w-full` math
+  accounts for). Fixed by moving that spacing onto the text wrapper, which the connector never
+  reads.
+- The four `.and(page.locator(':visible'))` e2e additions (`axe.spec.ts` ×1, `journeys.spec.ts`
+  ×3) were built on a wrong premise: `getByRole` already excludes `display:none` elements from
+  the accessibility tree by default, so the dual-tree render never produced the strict-mode
+  violation the original comment claimed. Verified with a standalone script (real built CSS, both
+  configured viewports, `getByRole('listitem')` already returned exactly one match with or
+  without the filter) before reverting — not just reasoned about. Reverted all four; comments
+  corrected to say why no filter is needed.
+- The company-news carousel (item 17) re-rendered the whole dashboard ~60 times a second forever
+  via its RAF progress loop, and its message row had no minimum height — both make any screenshot
+  or layout-stability check on `/tableau-de-bord` non-deterministic. Throttled the state write to
+  a 2% step and gave the row a `sm:min-h-20`. Also widened the carousel dots' touch target to 24px
+  (visual dot unchanged) — axe would not have caught the original 6px target (`target-size` is
+  `enabled: false` in this repo's axe-core 4.13.0, not run by the bare `.analyze()` call
+  `assertAccessible` makes), but it is a real mobile-usability gap and batch 2 starts looking for
+  exactly this class of issue next.
+
 ## Item 31 — the timeline is a third display site
 
 The brief named the CRA banner (consultant + manager read). `apps/web/src/features/cra/components/cra-timeline.tsx`
