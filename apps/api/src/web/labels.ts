@@ -300,8 +300,7 @@ export const LABELS = {
       '/problems/day-outside-period': 'Ce jour n’appartient pas au mois saisi.',
       '/problems/refusal-reason-required': 'Un refus doit dire ce qu’il faut corriger.',
       '/problems/unknown-mission': 'Cette mission n’existe pas.',
-      '/problems/day-overbooked':
-        'Une journée compte deux demi-journées : celle-ci est déjà complète.',
+      '/problems/day-overbooked': 'Une journée ne peut pas dépasser le volume horaire prévu.',
       '/problems/validated-cra-is-immutable':
         'Ce CRA est validé : un relevé de temps validé ne se modifie plus.',
       '/problems/cra-transition-not-allowed':
