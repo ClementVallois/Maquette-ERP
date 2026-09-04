@@ -47,8 +47,13 @@ const crossOffice = managerAttachments.filter(
 
 describe('ADR-0094 — the seed never attaches a consultant to a manager in another office', () => {
   it('gives every consultant a manager in their own office', () => {
-    const offenders = crossOffice
-      .filter((a) => roleOf(a.consultantId) === 'consultant')
+    const attached = managerAttachments.filter((a) => roleOf(a.consultantId) === 'consultant');
+    // Without this, renaming the `consultant` role literal empties `attached` and the assertion
+    // below passes for the wrong reason: nothing to check rather than nothing wrong.
+    expect(attached.length).toBeGreaterThan(0);
+
+    const offenders = attached
+      .filter((a) => officeOf(a.consultantId) !== officeOf(a.managerId))
       .map(
         (a) => `${byId.get(a.consultantId)?.email ?? '?'} → ${byId.get(a.managerId)?.email ?? '?'}`,
       );
@@ -90,10 +95,14 @@ describe('ADR-0094 — the seed never attaches a consultant to a manager in anot
    * that gains a consultant and no manager reintroduces the same dead end.
    */
   it('gives every office that has a consultant at least one manager', () => {
-    const withoutManager = offices
-      .filter((office) =>
-        consultants.some((c) => c.officeId === office.id && c.role === 'consultant'),
-      )
+    const staffed = offices.filter((office) =>
+      consultants.some((c) => c.officeId === office.id && c.role === 'consultant'),
+    );
+    // Same trap as the first test: move the role literal and every office drops out of `staffed`,
+    // so "no office lacks a manager" holds over an empty population.
+    expect(staffed.length).toBe(offices.length);
+
+    const withoutManager = staffed
       .filter(
         (office) => !consultants.some((c) => c.officeId === office.id && c.role === 'manager'),
       )

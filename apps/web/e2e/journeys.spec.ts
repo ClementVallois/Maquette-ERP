@@ -1,5 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
+import { LABELS } from '../src/lib/labels.ts';
+
+/** The dialog's "the flag was never computed" advisory, read from the label the component
+ * actually renders rather than hand-copied: `toBeHidden()` passes on a locator that matches
+ * nothing, so a substring typed here would go green forever the day the label is reworded. */
+const NOT_COMPUTED_ADVISORY = LABELS.preFacturier.validateConfirmDialog.flaggedDaysNotComputed;
+
 /**
  * Annexe B's e2e journeys, reworked for ADR-0070's matrix and the five things this task built.
  *
@@ -427,9 +434,7 @@ test.describe('item 3 — a manager opens and decides a CRA from the pré-factur
     // whether the count is zero or not. Asserted here and its opposite in J2, because the defect
     // was the two paths being indistinguishable: either assertion alone would pass on a component
     // that showed the advisory always, or never.
-    await expect(
-      confirmDialog.getByText('ne sont pas vérifiés dans cette liste', { exact: false }),
-    ).toBeHidden();
+    await expect(confirmDialog.getByText(NOT_COMPUTED_ADVISORY, { exact: false })).toBeHidden();
     await confirmDialog.getByRole('button', { name: 'Valider' }).click();
 
     const validateDialog = page.getByRole('dialog');
@@ -1117,10 +1122,9 @@ test.describe('J2 — manager-paris (Bruno): validates Claire’s submitted June
     });
     // ADR-0095. `PreFacturierCraRow` computes no `CraFlag`, so this dialog is passed `null` and
     // must say so rather than render nothing — which is what it used to do, indistinguishably
-    // from "computed, and it is zero". The mirror of J1's assertion above.
-    await expect(
-      confirmDialog.getByText('ne sont pas vérifiés dans cette liste', { exact: false }),
-    ).toBeVisible();
+    // from "computed, and it is zero". The mirror of the assertion in "item 3 — a manager opens
+    // and decides a CRA from the pré-facturier" above.
+    await expect(confirmDialog.getByText(NOT_COMPUTED_ADVISORY, { exact: false })).toBeVisible();
     await confirmDialog.getByRole('button', { name: 'Valider' }).click();
 
     const validateDialog = page.getByRole('dialog');
