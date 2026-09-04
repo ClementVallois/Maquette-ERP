@@ -48,6 +48,13 @@ export function CompanyNewsPanel({ personaKey }: { readonly personaKey: string }
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
   const startedAtRef = useRef(0);
+  // The RAF loop below still ticks every frame (cheap: two subtractions, no state write), but
+  // only calls `setProgress` when the rounded value actually changed — otherwise this panel, on
+  // the app's own landing page, would re-render the whole dashboard tree at 60fps forever, which
+  // makes screenshots and layout-stability checks non-deterministic for no visible benefit (the
+  // step below is imperceptible at a 6s rotation).
+  const lastEmittedRef = useRef(0);
+  const PROGRESS_STEP = 0.02;
   const reducedMotion = useReducedMotion();
 
   const rotating = visible && !paused && !reducedMotion && messages.length > 1;
@@ -59,10 +66,18 @@ export function CompanyNewsPanel({ personaKey }: { readonly personaKey: string }
     const tick = (now: number): void => {
       const elapsed = now - startedAtRef.current;
       const fraction = Math.min(1, elapsed / ROTATE_MS);
-      setProgress(fraction);
+      // `Math.floor`, not `Math.round`: repo-wide ban (ADR-0035, money-motivated but written
+      // without a scope carve-out) — quantizing down rather than to nearest is just as fine for a
+      // progress bar that only ever fills forward.
+      const quantized = Math.floor(fraction / PROGRESS_STEP) * PROGRESS_STEP;
+      if (quantized !== lastEmittedRef.current) {
+        lastEmittedRef.current = quantized;
+        setProgress(quantized);
+      }
       if (fraction >= 1) {
         setIndex((current) => (current + 1) % messages.length);
         startedAtRef.current = now;
+        lastEmittedRef.current = 0;
         setProgress(0);
       }
       frame = requestAnimationFrame(tick);
@@ -78,6 +93,7 @@ export function CompanyNewsPanel({ personaKey }: { readonly personaKey: string }
 
   function goTo(next: number): void {
     setIndex(((next % messages.length) + messages.length) % messages.length);
+    lastEmittedRef.current = 0;
     setProgress(0);
     // Without this, a manual jump (a dot, prev/next) leaves `startedAtRef` at its old value —
     // the RAF loop's effect only restarts on `[rotating, messages.length]`, neither of which a
@@ -124,7 +140,13 @@ export function CompanyNewsPanel({ personaKey }: { readonly personaKey: string }
             if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false);
           }}
         >
-          <div className="flex items-start gap-3">
+          {/* `sm:min-h-20`: matches the illustration's own `h-20` so switching from an
+              illustrated message to a short text-only one (or back) doesn't collapse/grow the
+              row — the rotation would otherwise reflow whatever sits below this panel on every
+              advance, real or automatic. Not a full fix (a very long body still grows the row;
+              measuring every message's true height up front would be needed for that), but it
+              removes the worst, most frequent case. */}
+          <div className="flex items-start gap-3 sm:min-h-20">
             {current.imageSrc !== null && (
               <img
                 src={current.imageSrc}
@@ -168,8 +190,12 @@ export function CompanyNewsPanel({ personaKey }: { readonly personaKey: string }
                 <ChevronLeftIcon aria-hidden="true" />
               </Button>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center">
                 {messages.map((message, dotIndex) => (
+                  // `size-6` (24px): the visible dot stays `size-1.5`, but the button itself — the
+                  // actual touch target — does not shrink to match it. A future axe run with
+                  // WCAG 2.2's `target-size` enabled (off by default in this repo's axe-core
+                  // version — `docs/qa-round-3-notes.md`) would flag anything smaller.
                   <button
                     key={message.id}
                     type="button"
@@ -180,11 +206,16 @@ export function CompanyNewsPanel({ personaKey }: { readonly personaKey: string }
                     onClick={() => {
                       goTo(dotIndex);
                     }}
-                    className={cn(
-                      'size-1.5 rounded-full transition-colors',
-                      dotIndex === index ? 'bg-primary' : 'bg-border',
-                    )}
-                  />
+                    className="flex size-6 items-center justify-center"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'size-1.5 rounded-full transition-colors',
+                        dotIndex === index ? 'bg-primary' : 'bg-border',
+                      )}
+                    />
+                  </button>
                 ))}
               </div>
 
