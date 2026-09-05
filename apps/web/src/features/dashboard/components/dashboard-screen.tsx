@@ -14,7 +14,7 @@ import { LABELS } from '@/lib/labels';
 import { currentPeriod } from '@/lib/period';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
-import { callToAction, type DashboardCallToAction } from '../actions';
+import { callToAction } from '../actions';
 import { useDashboard } from '../hooks';
 import type {
   BillingDashboard,
@@ -53,18 +53,29 @@ function DashboardSkeleton(): ReactElement {
  * a second copy of a StatCard's own figure — the sentence names what to *do*, the cards above it
  * already named what the figure *is*.
  *
+ * `action` is optional (F11): a current month `consultantQueue` already carries as the work
+ * queue's own primary "à faire maintenant" row renders here as a **summary sentence with no
+ * button** — the queue above is the one place that action lives, so this card does not repeat it.
+ * Only a status `consultantQueue` never lists (`validated`, nothing left to do) keeps its button.
+ *
  * Where it points is decided in `../actions.ts`, as data: the destination is a typed `LinkProps`,
  * so a search param cannot be smuggled into `to` as a query string (which TanStack Router does
  * not parse — that module's header says why). */
-function ActionCard({ sentence, action }: DashboardCallToAction): ReactElement {
-  const { label, ...link } = action;
-
+function ActionCard({
+  sentence,
+  action,
+}: {
+  readonly sentence: string;
+  readonly action?: ActionLink;
+}): ReactElement {
   return (
     <div className="flex items-center justify-between gap-4 rounded-xl bg-card p-5 shadow-card ring-1 ring-border">
       <p className="text-sm text-foreground">{sentence}</p>
-      <Button asChild size="sm">
-        <Link {...link}>{label}</Link>
-      </Button>
+      {action !== undefined && (
+        <Button asChild size="sm">
+          <Link {...linkOf(action)}>{action.label}</Link>
+        </Button>
+      )}
     </div>
   );
 }
@@ -290,6 +301,13 @@ function queueOf(data: DashboardResponse): readonly QueueItem[] {
 function ConsultantCards({ data }: { readonly data: ConsultantDashboard }): ReactElement {
   const labels = LABELS.dashboard.consultant;
   const status = data.myMonthStatus;
+  // ADR-0097 removed the *other-month* duplicate (`RefusedElsewhereNotices`, which repeated
+  // `consultantQueue`'s own refused-elsewhere row). F11 completes that decision for the
+  // *current*-month one: `consultantQueue` already lists this period for every status but
+  // `validated` (a validated month is not "à faire maintenant"), with the identical fact, label
+  // and destination `ActionCard` used to repeat here. Only `validated` — absent from the queue —
+  // keeps the button; every other status shows the summary sentence alone.
+  const { sentence, action } = callToAction(data);
 
   return (
     <div className="flex flex-col gap-4">
@@ -301,12 +319,7 @@ function ConsultantCards({ data }: { readonly data: ConsultantDashboard }): Reac
         <StatCard label={labels.recorded} value={frenchDays(data.recordedQuarterDays)} />
         <StatCard label={labels.remaining} value={String(data.remainingWorkableDays)} />
       </div>
-      {/* ADR-0097: the destructive `RefusedElsewhereNotices` alert this used to render alongside
-          `ActionCard` is gone — `consultantQueue`'s own "à faire maintenant" row already carries
-          the identical fact and the identical "Ouvrir ce CRA" action for every refused period
-          other than the one showing here, so keeping both put the same call to action on the
-          screen twice. */}
-      <ActionCard {...callToAction(data)} />
+      <ActionCard sentence={sentence} {...(status === 'validated' ? { action } : {})} />
     </div>
   );
 }
