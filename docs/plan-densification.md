@@ -320,6 +320,18 @@ Les identifiants techniques restent dans un second niveau. Effort : moyen. Pas d
 chronologie se lit des données déjà persistées ; une ADR si elle exige d'exposer `domain_events` sur
 le fil (c'est une surface d'API nouvelle, et elle est lisible par rôle).
 
+**Correctif du 05/09/2026 (F12 de `docs/audit-ceo-readiness-2026-09-05.md`) — la promesse ci-dessus
+est réduite.** Le composant livré reconstruit les colonnes de statut **courantes** (soumis / refusé
+/ validé, brouillon / émis), pas `public.domain_events` : `Cra.submit()` écrase `submittedAt` et
+efface le refus précédent, donc un CRA renvoyé après refus **fait disparaître ce refus de la vue** ;
+une facture annulée garde sa date d'émission d'origine et **ne montre pas l'annulation**. Le journal
+d'événements existe toujours en base — ce n'est pas une perte de données, seulement une limite de
+présentation. `BusinessTimeline` porte maintenant une légende (« Les statuts actuellement connus, pas
+un historique complet des évènements ») plutôt que de laisser le titre « Chronologie métier » sous-
+entendre plus que ce que les données affichées prouvent. Un historique complet adossé à
+`domain_events` reste une décision ultérieure, non prise ici — pas de ligne `docs/open-questions.md`
+dédiée pour l'instant, la légende suffit à rendre l'écart honnête tant que personne ne l'a demandé.
+
 #### A4 — Filiation CRA → ligne → TVA → total ✅
 
 _[§6.2 + L3]_

@@ -7,6 +7,50 @@ dépôt.
 **Nature du document :** audit de la maquette existante et propositions. Ce document ne demande
 aucune modification de code et ne transforme pas les idées hors périmètre en engagements.
 
+## Statut au 5 septembre 2026
+
+Cet audit n’est plus un plan d’action à exécuter tel quel — il l’a déjà été. `docs/plan-densification.md`
+(02/09/2026) en est le **descendant opérationnel** : il a trié chaque constat ci-dessous en Gardé,
+Optionnel ou Laissé de côté (sa §10 fait la traçabilité identifiant par identifiant). Les QA rounds 3,
+4 et 5 (`docs/qa-rounds.md`, travaillées 03-04/09/2026) ont livré la majorité de ce qui était Gardé.
+Un audit plus récent et non versionné, `docs/audit-ceo-readiness-2026-09-05.md` (matériel propriétaire
+de Clement, non modifié par cette passe), a repris ce qui restait ouvert et l’a formalisé en
+constats **F01 à F15**, avec priorités P0/P1/P2.
+
+**Cette passe (05/09/2026, branche `fix/audit-produit-residuel`) ferme sept de ces résidus,** tous
+sans RH/Direction, sans nouveau module et sans agrandir le périmètre (`CLAUDE.md`, règle « ne pas
+étendre le périmètre ») :
+
+| Résidu fermé                                                                                                                  | Constat CEO | Item de cet audit                                                          | Commit    |
+| ----------------------------------------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------- | --------- |
+| Unités de la ligne de facture (jours × taux journalier, plus le prix au quart de journée)                                     | F03         | P2.2 (Q7, densification B4)                                                | `f28a267` |
+| Récupération sur une page hors-plage (distincte d’un résultat filtré vide)                                                    | F07         | P0.3 (Q2, densification A12)                                               | `e96863d` |
+| Une seule action « à faire » sur le mois courant du consultant                                                                | F11         | P1.1 (Q1, densification A1) — complète l’ADR-0097                          | `874b544` |
+| Trois textes qui promettaient ce que l’interface ne tient pas                                                                 | F14         | P1.7 (D3, densification B2)                                                | `feb6b7f` |
+| File de brouillons de facturation (discriminant consultant, portée des compteurs manager, découverte historique)              | F10         | P0.2 et P1.5 (D2/D4, densification A1/A7)                                  | `c5005b6` |
+| Chronologie CRA/facture étiquetée comme jalons courants, pas un historique complet                                            | F12         | P2.5 (L5, densification A3)                                                | `6c29e0e` |
+| Portée du tri des tableaux rendue honnête (désactivé sur les trois tables server-paginées plutôt que de mentir sur sa portée) | F06         | P1.4 (Q3, densification A8) — **partiellement traité**, tri global reporté | `9c2d72d` |
+
+**Ce que cette passe ne ferme pas**, faute d’être dans son périmètre confié : F01 (provenance de la
+publication), F02 (changement de persona qui efface une session), F04 (caches non invalidés), F05
+(imprimable d’une facture annulée), F08 (script de démo), F09 (tests de l’écran d’affectation), F13
+(effectif sans affectation dans le graphique de staffing), F15 (réconciliation documentaire). Ils
+restent ouverts exactement comme `docs/audit-ceo-readiness-2026-09-05.md` les décrit ; ce document ne
+les rouvre pas et ne les referme pas.
+
+Le document source n'est pas dans le dépôt et n'a pas vocation à y entrer. **Les deux tableaux
+ci-dessus sont donc le référent public des numéros F** : un lecteur qui croise `// F10:` dans le code
+(31 occurrences dans `apps/api` et `apps/web`) résout le numéro ici, en une ligne, sans avoir à ouvrir
+un fichier qu'il n'a pas — c'est la raison pour laquelle les quinze sont glosés, y compris les huit
+que cette passe ne touche pas.
+
+Sous chaque intitulé P0/P1/P2 et dans chaque tableau de lot ci-dessous, une ligne datée dit **shipped**
+(avec l’ADR ou le commit qui le porte), **superseded** (une direction abandonnée par une décision
+plus tardive — ne pas la restaurer pour cocher une case obsolète), ou **still open** (avec un pointeur
+vers un identifiant de densification, un numéro F, ou une ligne `docs/open-questions.md`). Le tableau
+de maturité n’est pas renoté — une note refaite sans avoir refait tourner l’audit serait une
+fabrication ; une ligne juste en dessous nomme seulement quels axes ont bougé, et pourquoi.
+
 ## 1. Synthèse exécutive
 
 La maquette est solide sur son cœur de démonstration : elle raconte une chaîne métier complète,
@@ -57,6 +101,18 @@ Les notes ci-dessous évaluent la **maquette dans son périmètre déclaré**, p
 | Pédagogie et aide à l’apprentissage  |   2/5 | Les règles sont visibles, mais rarement expliquées au bon endroit et au bon niveau                    |
 | Innovation utile                     | 2,5/5 | Le potentiel de traçabilité est fort, mais encore peu exploité comme outil de compréhension           |
 | Préparation à un ERP de production   |   2/5 | Faible par choix explicite : pas d’authentification réelle, notifications, exports, délégations, etc. |
+
+**Note du 05/09/2026 :** ce tableau n’est pas renoté (re-noter un audit qu’on n’a pas fait rejouer
+serait une fabrication). Direction seulement, à confirmer par un futur audit qui rejoue la méthode :
+**Architecture de l’information** et **Ergonomie et productivité** ont probablement progressé (files
+de travail bornées et explicites, récupération de page hors-plage, tri qui ne prétend plus couvrir
+ce qu’il ne couvre pas) ; **États, feedback et résilience** aussi (`OrgChartPanel` a maintenant un état
+d’échec compact) ; **Pédagogie et aide à l’apprentissage** un peu (chronologie étiquetée honnêtement),
+mais reste basse — aucun élément du Lot 3 (glossaire mis à part, déjà livré) n’a été construit par
+cette passe. Deux règles distinctes le tiennent fermé : `CLAUDE.md` « ne pas étendre le
+périmètre » (générale, elle ne nomme ni §6 ni les lots), et
+`docs/audit-ceo-readiness-2026-09-05.md`, qui demande explicitement de ne pas laisser une passe
+de finition ouvrir un nouveau chantier produit.
 
 ## 2. Méthode et limites de l’audit
 
@@ -190,6 +246,8 @@ trois lignes parfaites.
 
 #### P0.1 — L’émission ne donne pas une synthèse financière suffisante
 
+> **Statut 05/09 :** shipped — Gardé **B1** (densification), confirmé par `docs/audit-ceo-readiness-2026-09-05.md` : « Present in list/detail/issuance with provisional markers. No blind issuance found. »
+
 Une facture brouillon n’expose pas les trois cartes de total, car `totals` est absent tant qu’elle
 n’est pas émise. Le dialogue d’émission n’affiche le total TTC que si ce même champ existe. Il peut
 donc demander de figer un document sans afficher le montant final dans la confirmation. En revanche,
@@ -205,6 +263,8 @@ vais-je figer ? ».
 
 #### P0.2 — Les actions en attente et leur destination ne sont pas toujours alignées
 
+> **Statut 05/09 :** shipped — Gardé **A1** (ADR-0091, item 22 QA round 3 : chaque compteur manager mène à la liste qu’il compte) ; le résidu (discriminant consultant manquant sur la file de facturation, F10) est fermé par cette passe, commit `c5005b6`.
+
 Le tableau de bord manager compte désormais des CRA soumis sur d’autres périodes, mais son bouton
 ouvre le pré-facturier sans cibler nécessairement la période concernée. Le compteur dit donc « il y
 a du travail », puis peut conduire à un écran où ce travail n’apparaît pas.
@@ -217,6 +277,8 @@ le bon CRA. Conserver les KPI comme synthèse secondaire.
 les éléments qu’il compte.
 
 #### P0.3 — Une partie de l’historique existe mais n’est pas atteignable
+
+> **Statut 05/09 :** shipped pour l’essentiel — Gardé **A12** (dont **A6a/A6b**, pagination et sélecteur de mois dédié). Le résidu nommé par F07 (page hors-plage confondue avec un résultat filtré vide) est fermé par cette passe, commit `e96863d`.
 
 Le pré-facturier dérive ses périodes d’une page plafonnée de CRA. Avec le volume actuel, Paris et
 Lyon peuvent ne plus proposer les périodes historiques 2016–2024. La liste des factures est elle
@@ -234,6 +296,8 @@ par l’API.
 
 #### P1.1 — Le tableau de bord est un résumé, pas encore un espace de pilotage
 
+> **Statut 05/09 :** shipped — Gardé **A1** (réorganisation en file de travail / « Ce mois » / activité récente). Le résidu nommé par F11 (le CTA « Ouvrir mon CRA » restait dupliqué sur le mois courant, au-delà de ce qu’ADR-0097 avait déjà retiré pour un autre mois) est fermé par cette passe, commit `874b544`.
+
 Le premier écran montre trois cartes et une action. Au début du mois, il est largement vide et donne
 peu de raisons d’y rester. Pour une maquette revue le 1er septembre, les zéros du mois courant sont
 logiques mais affaiblissent l’impact de la première impression.
@@ -248,6 +312,8 @@ Pour la démonstration, ajouter un accès explicite « Voir un mois avec des don
 paramètre caché dans l’URL.
 
 #### P1.2 — Le responsive couvre une tablette, pas un téléphone
+
+> **Statut 05/09 :** still open (acceptation, pas implémentation) — Gardé **A11**, décision desktop+mobile prise. `docs/audit-ceo-readiness-2026-09-05.md` : rendu tactile échantillonné et sain, mais aucun parcours dédié saisie→soumission au format tactile promis (390×844) n’a encore couru. Hors périmètre de cette passe ; voir BUILD-PLAN Phase 10.
 
 Le projet « mobile-shell » utilise 768 × 1024 px avec un profil desktop. Le tiroir de navigation est
 bien testé, mais les cartes restent sur trois colonnes, les blocs de facture sur deux colonnes, et
@@ -264,6 +330,8 @@ problématique.
 Ajouter au minimum des tests à 390 × 844 px, zoom 200 % et orientation paysage.
 
 #### P1.3 — La grille CRA impose une forte charge cognitive
+
+> **Statut 05/09 :** shipped pour son cœur — Gardé **A9** (légende, activité/total collants, progression, action « aller au jour incomplet »). Le mode « semaine » (ancien **O5**) est shipped, pas optionnel : la densification l’a promu en Gardé comme moitié desktop de **A11**, et le sélecteur mois/semaine existe (`apps/web/src/features/cra/components/cra-grid-screen.tsx`, `desktopView`). Restent still open les deux vraies optionnelles, **O6** et **O7**, non engagées.
 
 L’écran combine navigation mensuelle, ajout d’activité, codes couleur, week-ends, semaines, outils
 par ligne, sélecteurs par cellule, totaux et alertes. Il est efficace une fois appris, mais peu
@@ -284,6 +352,8 @@ survol/focus. Le mois complet oblige à beaucoup défiler.
 
 #### P1.4 — Les tableaux n’offrent pas une ergonomie homogène de données
 
+> **Statut 05/09 :** partiellement traité — Gardé **A8** (filtres, compteurs, pagination livrés) + **A12**. Le tri restait un contrôle qui prétendait trier tout le résultat et n’en triait qu’une page (F06) : cette passe (commit `9c2d72d`) ne le referme pas complètement — elle rend sa portée honnête (désactivé sur les trois tables server-paginées) et reporte le tri global à une ADR non encore écrite, `docs/open-questions.md`, Phase 10/30-09/2026.
+
 La plupart des listes n’ont ni tri par colonne, ni pagination, ni recherche commune, ni choix de
 densité. Les filtres sont bons sur la liste CRA manager, mais absents ou plus limités ailleurs.
 
@@ -296,6 +366,8 @@ Ne pas ajouter de cases à cocher tant qu’aucune action groupée n’existe.
 
 #### P1.5 — Plusieurs lignes de facture sont difficiles à distinguer
 
+> **Statut 05/09 :** shipped — Gardé **A7** (discriminant consultant sur les listes de factures et le pré-facturier). Le même trou sur la file « à faire maintenant » de facturation (F10) est fermé par cette passe, commit `c5005b6`.
+
 Dans le pré-facturier, plusieurs brouillons peuvent porter le même client, sans numéro ni total.
 La ligne n’expose pas assez d’information pour comprendre pourquoi il existe plusieurs documents.
 
@@ -304,6 +376,8 @@ implantation si nécessaire, date de création, ou un identifiant court de broui
 ouvrable et non seulement lisible.
 
 #### P1.6 — La validation manager est immédiate malgré ses conséquences
+
+> **Statut 05/09 :** still open, optionnel — **O4** (récapitulatif avant validation) non engagé ; hors périmètre de cette passe et non couvert par un numéro F.
 
 « Valider » déclenche directement la création des brouillons de facture, puis montre le résultat.
 C’est fluide, mais sensible à un clic accidentel et moins rassurant qu’une étape de vérification.
@@ -314,6 +388,8 @@ confirmation synthétique : consultant, période, jours, jours signalés, factur
 si le domaine le permet ; sinon expliciter l’irréversibilité avant le clic.
 
 #### P1.7 — Les textes exposent l’architecture au lieu d’aider la décision
+
+> **Statut 05/09 :** shipped — Gardé **B2** (les identifiants d’ADR ont largement quitté l’interface normale). Le résidu nommé par F14 (trois textes qui promettaient ce que l’interface ne tient pas : une facture brouillon « qui changera », un rapport CSE « joint ci-dessous », un panneau d’organigramme muet en cas d’échec) est fermé par cette passe, commit `feb6b7f`.
 
 Des messages visibles citent des ADR, « côté serveur », la clé d’idempotence, les modules ou des
 détails de piste d’audit. Ces éléments sont intéressants pour une démonstration technique, mais ils
@@ -329,6 +405,8 @@ mode « Montrer les coulisses » réservé à la démonstration ou dans la docum
 
 #### P1.8 — Le détail de facture manque de navigation contextuelle
 
+> **Statut 05/09 :** shipped — Gardé **A10** (fil d’Ariane contextuel, retour avec filtres, lien imprimable secondaire). Le tri de la table des lignes reste soumis à la même réserve que P1.4 (F06).
+
 Le titre global reste « Factures », le fil d’Ariane ne représente qu’Accueil → Factures, et il n’y
 a pas de retour visible vers la liste avec ses filtres. La page locale affiche le client, mais ne
 porte pas son identité dans le shell.
@@ -341,6 +419,8 @@ comme une action secondaire avec une icône d’ouverture dans un nouvel onglet.
 
 #### P2.1 — Sauvegarde et feedback
 
+> **Statut 05/09 :** shipped — Gardé **B3** (état de sauvegarde persistant). F02 (un changement de persona annulé efface la session malgré des modifications visibles à l’écran) reste ouvert, hors périmètre de cette passe.
+
 Le toast « Enregistré » confirme l’action, mais disparaît et n’indique pas quand la version courante
 a été sauvegardée. La protection de navigation évite une perte accidentelle, ce qui est déjà bien.
 
@@ -351,6 +431,8 @@ brouillon et soumission.
 
 #### P2.2 — Cohérence des unités
 
+> **Statut 05/09 :** shipped — Gardé **B4**, partiellement fait le 25/08 (décision D5, `frenchDays`). Le résidu nommé par F03 (le prix unitaire imprimé au quart de journée à côté d’une quantité déjà convertie en jours) est fermé par cette passe, commit `f28a267` : les deux documents impriment désormais jours × taux journalier, jamais un mélange d’unités.
+
 Le CRA parle en jours, certaines lignes de facture en quarts de journée, et la marge affiche une
 quantité brute dont l’unité n’est pas toujours évidente. La cohérence comptable est correcte, mais
 la lecture demande une conversion mentale.
@@ -359,6 +441,8 @@ la lecture demande une conversion mentale.
 `88 quarts = 22 j`. Ajouter une aide contextuelle sur TJM et CJM.
 
 #### P2.3 — Densité et hiérarchie visuelle
+
+> **Statut 05/09 :** still open, optionnel — **O8** non engagé ; hors périmètre de cette passe et non couvert par un numéro F.
 
 Le tableau de bord laisse une grande surface vide, tandis que le pré-facturier et le détail de
 facture empilent beaucoup de blocs verticaux. La sidebar réserve aussi un pied vide. Cette retenue
@@ -370,6 +454,8 @@ graphiques inventés.
 
 #### P2.4 — Filtres et vues mémorisées
 
+> **Statut 05/09 :** still open, optionnel — **O9** non engagé (les vues nommées personnelles restent explicitement exclues, **X6**, faute de vrais comptes) ; hors périmètre de cette passe.
+
 Les filtres CRA vivent dans l’URL, ce qui est excellent. Il manque la possibilité de conserver une
 vue fréquente telle que « mes consultants, CRA soumis ou refusés ».
 
@@ -378,6 +464,8 @@ Les vues nommées et personnelles ne deviennent pertinentes qu’avec de vrais c
 
 #### P2.5 — Journal d’activité lisible
 
+> **Statut 05/09 :** shipped, avec réserve — Gardé **A3** (chronologie métier livrée, item 30 QA round 3). Le résidu nommé par F12 (elle ne reconstruit que les colonnes de statut courantes, pas `public.domain_events` — un CRA renvoyé efface son refus précédent de la vue) est traité par cette passe, commit `6c29e0e` : une légende dit maintenant honnêtement ce que le composant montre. Un historique complet adossé aux événements reste une décision non prise ici (voir `docs/plan-densification.md`, item A3, annotation du 05/09).
+
 Le système possède une forte notion de traçabilité, mais l’utilisateur final ne voit pas une
 chronologie simple : créé, enregistré, soumis, refusé, corrigé, validé, facture créée puis émise.
 
@@ -385,6 +473,8 @@ chronologie simple : créé, enregistré, soumis, refusé, corrigé, validé, fa
 conséquence. Les identifiants techniques restent disponibles dans un panneau secondaire.
 
 #### P2.6 — Accessibilité à compléter manuellement
+
+> **Statut 05/09 :** clos par décision, pas par implémentation — une revue manuelle (NVDA/VoiceOver, zoom 200 %, contraste documenté) reste explicitement hors périmètre de la maquette (ligne README « Ce que je ne construis pas », **X5**). Ce n’est pas un gap oublié ; ne pas la rouvrir sans décision de Clement.
 
 Les tests automatiques couvrent les erreurs critiques/sérieuses, mais ne vérifient pas la qualité de
 l’ordre de lecture, la compréhension des annonces dynamiques, le zoom, les contrastes réels sur
@@ -395,6 +485,14 @@ sans souris, un test à 200 % de zoom et un test de contraste documenté. Inclur
 les dialogues après erreur et le défilement horizontal de la grille.
 
 ## 6. Innovation orientée apprentissage
+
+> **Statut 05/09 :** cette section correspond au **Lot 3** de `docs/plan-densification.md` (L1-L6)
+> et à sa **§6.5/§6.7** exclues. Deux éléments sont **shipped** : 6.2 filiation interactive
+> (Gardé **A4**, « Keep this as a strong CEO demonstration moment » per l’audit CEO) et 6.4
+> glossaire contextuel (Gardé **B5**). Le reste (6.1, 6.3, 6.6 — Optionnel **O10/O2/O4**, non
+> engagés) reste **still open**, et 6.5/6.7 (bac à sable, assistant IA) sont **superseded par
+> décision explicite** : `CLAUDE.md` exclut désormais tout le Lot 3/Lot 4 d’une suite à cette passe
+> — ne pas les construire pour « finir » cette section.
 
 L’innovation utile ici n’est pas un chatbot posé sur chaque écran. Le produit possède déjà un
 excellent matériau pédagogique : règles métier, rôles, événements, calculs et filiation des
@@ -471,6 +569,10 @@ de risque.
 **Sortie attendue :** aucune action critique sans récapitulatif, aucun compteur sans destination
 cohérente, aucune fuite de vocabulaire d’architecture dans le parcours normal.
 
+> **Statut 05/09 :** shipped en entier. D1→**B1**, D2→**A1** (résidu F10 fermé par `c5005b6`),
+> D3→**B2** (résidu F14 fermé par `feb6b7f`), D4→**A7** (résidu F10 fermé par `c5005b6`),
+> D5→**A5**. Voir la table de traçabilité `docs/plan-densification.md` §10 pour chaque alias.
+
 ### Lot 1 — Rendre le travail quotidien efficace
 
 | ID  | Action                                                                  | Impact    | Effort relatif |
@@ -486,6 +588,14 @@ cohérente, aucune fuite de vocabulaire d’architecture dans le parcours normal
 **Sortie attendue :** une personne trouve n’importe quel élément autorisé, comprend ce qui lui
 reste à faire et atteint l’action utile sans détour.
 
+> **Statut 05/09 :** shipped pour l’essentiel, un point partiel. Q1→**A1**, Q2→**A12** (résidu F07
+> fermé par `e96863d`), Q4→**A9** (sous-ensemble, extensions optionnelles still open), Q5→**B3**
+> (F02 reste ouvert, hors périmètre), Q6→**A10**, Q7→**B4** (résidu F03 fermé par `f28a267`).
+> **Q3 reste partiel** : filtres/tri/recherche existent, mais le tri ne portait que sur la page
+> chargée (F06) — cette passe (`9c2d72d`) rend sa portée honnête plutôt que de le compléter ; le
+> tri global sur les trois tables server-paginées est reporté, `docs/open-questions.md` (Phase 10,
+> 30/09/2026).
+
 ### Lot 2 — Décider et construire la stratégie responsive
 
 | ID  | Action                                                             | Impact    | Effort relatif |
@@ -496,6 +606,13 @@ reste à faire et atteint l’action utile sans détour.
 | R4  | Si mobile : vue hebdomadaire du CRA et actions collées             | Très fort | Fort           |
 
 **Sortie attendue :** aucune promesse implicite de mobile que les écrans métier ne peuvent tenir.
+
+> **Statut 05/09 :** décision prise (R2 : mobile supporté) et largement construit — Gardé **A11**
+> (chaîne consultant), **O5/O13** promus avec lui, **X2** (desktop-only) annulé.
+> `docs/audit-ceo-readiness-2026-09-05.md` a échantillonné un rendu tactile sain (profil iPhone 13, 390×664, sans
+> violation axe ni débordement), mais **aucun parcours dédié saisie → soumission tactile** (R1/R4,
+> 390×844) n’a encore couru — **still open**, hors périmètre de cette passe, avant l’acceptation du
+> 09/09 (BUILD-PLAN Phase 10).
 
 ### Lot 3 — Ajouter la couche pédagogique
 
@@ -510,6 +627,13 @@ reste à faire et atteint l’action utile sans détour.
 
 **Sortie attendue :** un nouveau lecteur comprend le processus en l’utilisant, sans devoir lire le
 README ou les ADR.
+
+> **Statut 05/09 :** mixte, et **CLAUDE.md exclut désormais toute suite à ce lot**. L1→**B5**
+> (shipped) et L5→**A3** (shipped, avec la réserve F12 traitée par cette passe, `6c29e0e` — voir
+> l’intitulé P2.5 plus haut) et L3→**A4** (shipped) sont livrés. L2/L4/L6 (**O2/O10**, et **X3** pour
+> le bac à sable) restent **still open** — non engagés, et ne doivent pas être construits pour
+> « finir » cette section : ce serait exactement le nouveau chantier produit que la consigne de ce
+> travail interdit.
 
 ### Lot 4 — ERP cible, hors maquette actuelle
 
@@ -529,6 +653,11 @@ README ou les ADR.
 L’écran d’affectation de missions demandé précédemment appartient à ce lot. Son report explicite est
 cohérent : il ouvre un nouveau chemin d’écriture, de nouvelles autorisations et des règles PASSI ;
 ce n’est pas une simple page supplémentaire.
+
+> **Statut 05/09 :** l’écran d’affectation en a été **sorti et construit** — Gardé **A14**
+> (`/affectations`), seul élément de ce lot à l’être. Le reste de la liste reste **hors maquette par
+> décision**, désormais explicite dans `CLAUDE.md` (« What this mockup does NOT build » / README
+> « Ce que je ne construis pas ») — ce n’est pas un residu à fermer, c’est un périmètre tenu.
 
 ## 8. Recommandations écran par écran
 

@@ -43,9 +43,13 @@ function TimelineText({ item }: { readonly item: TimelineItem }): ReactElement {
  */
 export function BusinessTimeline({
   title,
+  caption,
   items,
 }: {
   readonly title: string;
+  /** F12: names what this component actually is — the milestones currently available, not a
+   * complete history — rather than let the heading alone imply more than the data backs. */
+  readonly caption?: string;
   readonly items: readonly TimelineItem[];
 }): ReactElement | null {
   if (items.length === 0) return null;
@@ -53,6 +57,7 @@ export function BusinessTimeline({
   return (
     <section className="rounded-xl bg-card p-5 shadow-card ring-1 ring-border">
       <h3 className="text-card-title">{title}</h3>
+      {caption !== undefined && <p className="text-xs text-muted-foreground">{caption}</p>}
 
       <ol className="mt-4 flex flex-col gap-0 sm:hidden">
         {items.map((item, index) => (

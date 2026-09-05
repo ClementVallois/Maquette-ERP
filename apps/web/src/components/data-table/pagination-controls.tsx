@@ -13,6 +13,32 @@ import { LABELS } from '@/lib/labels';
 
 const PAGE_SIZES = [10, 20, 50] as const;
 
+/**
+ * Whether the 1-indexed `page` addresses a slice beyond the known result set — a stale bookmark,
+ * a filter that shrank the set, or another visitor's change — rather than "nothing matches these
+ * filters" (`total === 0`, which this deliberately reports as in range: page 1 of nothing is not
+ * an impossible page, it is the correct empty page). F07: the two cases need different recovery.
+ */
+export function isPageOutOfRange(page: number, pageSize: number, total: number): boolean {
+  return total > 0 && (page - 1) * pageSize >= total;
+}
+
+/**
+ * The `{first}–{last} sur {total}` range, reconciled with `total` rather than derived from
+ * `offset` alone — the bug F07 reproduced (`page=999` rendering "19961–24 sur 24 résultats").
+ * `offset >= total` (nothing left to show at this offset) reads as `0–0`, never a first value
+ * above the last or the total.
+ */
+export function rangeOf(
+  offset: number,
+  limit: number,
+  total: number,
+): { first: number; last: number } {
+  if (total === 0 || offset >= total) return { first: 0, last: 0 };
+
+  return { first: offset + 1, last: Math.min(offset + limit, total) };
+}
+
 interface PaginationControlsProps {
   readonly total: number;
   readonly limit: number;
@@ -28,8 +54,7 @@ export function PaginationControls({
   onPageChange,
   onPageSizeChange,
 }: PaginationControlsProps): ReactElement {
-  const first = total === 0 ? 0 : offset + 1;
-  const last = Math.min(offset + limit, total);
+  const { first, last } = rangeOf(offset, limit, total);
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">

@@ -14,7 +14,7 @@ import { LABELS } from '@/lib/labels';
 import { currentPeriod } from '@/lib/period';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
-import { callToAction, type DashboardCallToAction } from '../actions';
+import { callToAction } from '../actions';
 import { useDashboard } from '../hooks';
 import type {
   BillingDashboard,
@@ -53,18 +53,28 @@ function DashboardSkeleton(): ReactElement {
  * a second copy of a StatCard's own figure — the sentence names what to *do*, the cards above it
  * already named what the figure *is*.
  *
+ * `action` is optional: a caller with nothing to offer renders the sentence alone. `ManagerCards`
+ * and `BillingCards` always pass one; `ConsultantCards` renders no card at all rather than a
+ * buttonless one (F11 — see its own comment).
+ *
  * Where it points is decided in `../actions.ts`, as data: the destination is a typed `LinkProps`,
  * so a search param cannot be smuggled into `to` as a query string (which TanStack Router does
  * not parse — that module's header says why). */
-function ActionCard({ sentence, action }: DashboardCallToAction): ReactElement {
-  const { label, ...link } = action;
-
+function ActionCard({
+  sentence,
+  action,
+}: {
+  readonly sentence: string;
+  readonly action?: ActionLink;
+}): ReactElement {
   return (
     <div className="flex items-center justify-between gap-4 rounded-xl bg-card p-5 shadow-card ring-1 ring-border">
       <p className="text-sm text-foreground">{sentence}</p>
-      <Button asChild size="sm">
-        <Link {...link}>{label}</Link>
-      </Button>
+      {action !== undefined && (
+        <Button asChild size="sm">
+          <Link {...linkOf(action)}>{action.label}</Link>
+        </Button>
+      )}
     </div>
   );
 }
@@ -89,7 +99,21 @@ function ageSentence(iso: string | null): string | undefined {
   return labels.ageManyDays.replace('{days}', String(days));
 }
 
-function WorkQueue({ items }: { readonly items: readonly QueueItem[] }): ReactElement {
+/** F10: what a role's queue is bounded to, and where to see the rest — billing's own "ten oldest
+ * drafts" note, `undefined` for a role whose queue is not bounded (a manager's/consultant's own
+ * queue is already every actionable Cra, not a capped slice of a larger list). */
+interface QueueNote {
+  readonly text: string;
+  readonly seeAll: ActionLink;
+}
+
+function WorkQueue({
+  items,
+  note,
+}: {
+  readonly items: readonly QueueItem[];
+  readonly note?: QueueNote;
+}): ReactElement {
   const labels = LABELS.dashboard.queue;
 
   return (
@@ -98,24 +122,34 @@ function WorkQueue({ items }: { readonly items: readonly QueueItem[] }): ReactEl
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground">{labels.nowEmpty}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {items.map((item) => (
-            <li
-              key={item.key}
-              className="flex items-center justify-between gap-4 rounded-xl bg-card p-4 shadow-card ring-1 ring-border"
-            >
-              <div className="flex flex-col">
-                <span className="text-sm text-foreground">{item.primary}</span>
-                {item.secondary !== undefined && (
-                  <span className="text-xs text-muted-foreground">{item.secondary}</span>
-                )}
-              </div>
-              <Button asChild size="sm" variant="outline">
-                <Link {...linkOf(item.action)}>{item.action.label}</Link>
-              </Button>
-            </li>
-          ))}
-        </ul>
+        <>
+          {note !== undefined && (
+            <p className="text-xs text-muted-foreground">
+              {note.text}{' '}
+              <Link {...linkOf(note.seeAll)} className="text-primary underline underline-offset-2">
+                {note.seeAll.label}
+              </Link>
+            </p>
+          )}
+          <ul className="flex flex-col gap-2">
+            {items.map((item) => (
+              <li
+                key={item.key}
+                className="flex items-center justify-between gap-4 rounded-xl bg-card p-4 shadow-card ring-1 ring-border"
+              >
+                <div className="flex flex-col">
+                  <span className="text-sm text-foreground">{item.primary}</span>
+                  {item.secondary !== undefined && (
+                    <span className="text-xs text-muted-foreground">{item.secondary}</span>
+                  )}
+                </div>
+                <Button asChild size="sm" variant="outline">
+                  <Link {...linkOf(item.action)}>{item.action.label}</Link>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </section>
   );
@@ -270,7 +304,10 @@ function managerQueue(data: ManagerDashboard): readonly QueueItem[] {
 function billingQueue(data: BillingDashboard): readonly QueueItem[] {
   return data.oldestDrafts.map((row) => ({
     key: row.invoiceId,
-    primary: `${row.billedToName} — ${frenchMonth(row.supplyPeriod)}`,
+    // F10: carries the same consultant discriminator A7/A13 already added to the invoice and
+    // pré-facturier lists — without it, several rows here can share a client, a month and an
+    // amount with nothing to tell them apart.
+    primary: `${row.consultantName} — ${row.billedToName} — ${frenchMonth(row.supplyPeriod)}`,
     secondary: frenchEuros(row.totalTtcCents),
     action: { label: LABELS.invoice.open, to: '/factures/$id', params: { id: row.invoiceId } },
   }));
@@ -290,6 +327,16 @@ function queueOf(data: DashboardResponse): readonly QueueItem[] {
 function ConsultantCards({ data }: { readonly data: ConsultantDashboard }): ReactElement {
   const labels = LABELS.dashboard.consultant;
   const status = data.myMonthStatus;
+  // ADR-0097 removed the *other-month* duplicate (`RefusedElsewhereNotices`, which repeated
+  // `consultantQueue`'s own refused-elsewhere row). F11 completes that decision for the
+  // *current*-month one: `consultantQueue` already lists this period for every status but
+  // `validated`, carrying the identical sentence (`labels.hints[status]`, the same string
+  // `callToAction` returns), the identical label and the identical destination. The card is
+  // therefore not rendered at all for those statuses — keeping it without its button left a
+  // bordered box whose whole content was one sentence already read two inches above it. Only
+  // `validated`, which the queue never lists (a validated month is not "à faire maintenant"),
+  // still has something of its own to say.
+  const { sentence, action } = callToAction(data);
 
   return (
     <div className="flex flex-col gap-4">
@@ -301,12 +348,7 @@ function ConsultantCards({ data }: { readonly data: ConsultantDashboard }): Reac
         <StatCard label={labels.recorded} value={frenchDays(data.recordedQuarterDays)} />
         <StatCard label={labels.remaining} value={String(data.remainingWorkableDays)} />
       </div>
-      {/* ADR-0097: the destructive `RefusedElsewhereNotices` alert this used to render alongside
-          `ActionCard` is gone — `consultantQueue`'s own "à faire maintenant" row already carries
-          the identical fact and the identical "Ouvrir ce CRA" action for every refused period
-          other than the one showing here, so keeping both put the same call to action on the
-          screen twice. */}
-      <ActionCard {...callToAction(data)} />
+      {status === 'validated' && <ActionCard sentence={sentence} action={action} />}
     </div>
   );
 }
@@ -381,21 +423,30 @@ function BillingCards({ data }: { readonly data: BillingDashboard }): ReactEleme
   );
 }
 
-/** Whether this role's month reads as genuinely empty — the A5 trigger for `SeeMonthsWithData`. */
+/**
+ * Whether the *displayed period itself* reads as genuinely empty — the A5 trigger for
+ * `SeeMonthsWithData`, "Voir un mois avec des données".
+ *
+ * F10: this used to also require every role's own cross-period queue field to be empty
+ * (`refusedPeriods`, `pendingDecisions`/`lateCras` — ADR-0082 — `oldestDrafts`), so a single old
+ * refusal, pending decision or draft sitting in another month hid the shortcut even when the
+ * period on screen had nothing. Scoped to the period-specific figures only, so historical-period
+ * discovery stops depending on whether an old task happens to exist.
+ */
 function isEmpty(data: DashboardResponse): boolean {
   switch (data.role) {
     case 'consultant':
-      return (
-        data.myMonthStatus === null &&
-        data.recordedQuarterDays === 0 &&
-        data.refusedPeriods.length === 0
-      );
+      return data.myMonthStatus === null && data.recordedQuarterDays === 0;
     case 'manager':
-      return data.pendingDecisions === 0 && data.billableCents === 0 && data.lateCras === 0;
-    case 'billing':
+      // `billableCents` alone is not "this month is empty": a month whose Cras are all still
+      // `submitted` bills nothing yet, and the queue above is at that moment listing rows for it.
+      // `awaitingDecision` is cross-period (ADR-0082), so only its rows on the displayed period
+      // count here — an older month's pending decision must not hide the shortcut again.
       return (
-        data.draftInvoices === 0 && data.issuedInvoices === 0 && data.oldestDrafts.length === 0
+        data.billableCents === 0 && !data.awaitingDecision.some((row) => row.period === data.period)
       );
+    case 'billing':
+      return data.draftInvoices === 0 && data.issuedInvoices === 0;
   }
 }
 
@@ -455,7 +506,21 @@ export function DashboardScreen({ role, period, personaKey }: DashboardScreenPro
     <div className="flex flex-col gap-6">
       <p className="text-sm text-muted-foreground">{frenchMonth(data.period)}</p>
 
-      <WorkQueue items={queue} />
+      <WorkQueue
+        items={queue}
+        {...(data.role === 'billing' && queue.length > 0
+          ? {
+              note: {
+                text: LABELS.dashboard.queue.oldestDraftsNote,
+                seeAll: {
+                  label: LABELS.dashboard.queue.seeAllDrafts,
+                  to: '/factures',
+                  search: { status: 'draft' as const },
+                },
+              },
+            }
+          : {})}
+      />
 
       {isEmpty(data) && <SeeMonthsWithData period={data.period} />}
 

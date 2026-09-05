@@ -12,7 +12,14 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
-import { frenchDate, frenchDays, frenchEuros, frenchMonth, frenchPercent } from '@/lib/format';
+import {
+  QUARTER_DAYS_PER_DAY,
+  frenchDate,
+  frenchDays,
+  frenchEuros,
+  frenchMonth,
+  frenchPercent,
+} from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
@@ -136,14 +143,24 @@ function lineColumns(): ColumnDef<InvoiceLine>[] {
       id: 'quantity',
       accessorFn: (row) => row.quantityQuarterDays,
       header: LABELS.invoice.quantity,
-      cell: ({ row }) => <span className="tabular-nums">{row.original.quantityQuarterDays}</span>,
+      // F03: days, not a raw quarter-day count — paired below with the daily rate, not the
+      // quarter-day price, so "quantité × prix" reads true (the lineage panel below already does
+      // both the same way, `${frenchDays(item.quantityQuarterDays)} × ${frenchEuros(item.tjmCents)}`).
+      cell: ({ row }) => (
+        <span className="tabular-nums">{frenchDays(row.original.quantityQuarterDays)}</span>
+      ),
     },
     {
       id: 'unitPrice',
       accessorFn: (row) => row.unitPriceCents,
       header: LABELS.invoice.unitPrice,
+      // `unitPriceCents` is the price of one quarter-day (domain, ADR-0069) — exact and integer to
+      // multiply back to the daily rate (a `Tjm` is a multiple of 4 cents, ADR-0002), never to
+      // divide the quantity above by 4.
       cell: ({ row }) => (
-        <span className="tabular-nums">{frenchEuros(row.original.unitPriceCents)}</span>
+        <span className="tabular-nums">
+          {frenchEuros(row.original.unitPriceCents * QUARTER_DAYS_PER_DAY)}
+        </span>
       ),
     },
     {
@@ -332,7 +349,11 @@ export function InvoiceDetailScreen({
         </div>
       </div>
 
-      {data.status !== alreadyIssued && (
+      {/* Gated on the number, not on `status !== 'issued'`: a `cancelledByCreditNote` invoice is
+          not issued either, yet it kept the number and issue date the notice says it has neither
+          of — and prints both in the block just below. `apps/api/src/web/pages/invoice.ts` gates
+          the same label on `number === null`; the two surfaces have to agree. */}
+      {data.invoiceNumber === null && (
         <Alert>
           <AlertDescription>{LABELS.invoice.draftNotice}</AlertDescription>
         </Alert>
@@ -382,6 +403,7 @@ export function InvoiceDetailScreen({
 
       <BusinessTimeline
         title={LABELS.timeline.heading}
+        caption={LABELS.timeline.caption}
         items={data.timeline.map((item, index) => ({
           key: `${item.kind}-${item.at}-${String(index)}`,
           title: LABELS.timeline[item.kind],

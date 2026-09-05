@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 
 import { CopyLinkButton } from '@/components/copy-link-button';
 import { DataTable } from '@/components/data-table/data-table';
-import { PaginationControls } from '@/components/data-table/pagination-controls';
+import { isPageOutOfRange, PaginationControls } from '@/components/data-table/pagination-controls';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -502,6 +502,16 @@ export function PreFacturierScreen({
   if (consultantSearch !== '') returnParams.set('consultantSearch', consultantSearch);
   const returnTo = `/pre-facturier?${returnParams.toString()}`;
 
+  // F07: the invoice and CRA tables paginate independently, so each can go out of range on its
+  // own — a stale bookmark on one need not affect the other, and neither is "nothing matches this
+  // search" (that stays the search-specific empty state below).
+  const invoicesOutOfRange = isPageOutOfRange(
+    invoicePage,
+    pageSize,
+    data.pagination.invoices.total,
+  );
+  const crasOutOfRange = isPageOutOfRange(craPage, pageSize, data.pagination.cras.total);
+
   if (data.period === null) {
     return (
       <EmptyState
@@ -580,20 +590,41 @@ export function PreFacturierScreen({
           data={data.invoices}
           getRowId={(row) => row.id}
           numericColumns={['lineCount', 'totalTtc']}
+          // F06/A7: server-paginated (see `DataTable`'s own `sortable` doc comment).
+          sortable={false}
           emptyState={
-            <EmptyState
-              icon={ReceiptTextIcon}
-              title={
-                consultantSearch === ''
-                  ? LABELS.preFacturier.billableEmpty
-                  : LABELS.preFacturier.searchEmpty
-              }
-              body={
-                consultantSearch === ''
-                  ? LABELS.preFacturier.nothingBlocking
-                  : LABELS.preFacturier.searchEmptyBody
-              }
-            />
+            invoicesOutOfRange ? (
+              <EmptyState
+                icon={ReceiptTextIcon}
+                title={LABELS.pagination.outOfRangeTitle}
+                body={LABELS.pagination.outOfRangeBody}
+                action={{
+                  label: LABELS.pagination.backToResults,
+                  to: '/pre-facturier',
+                  search: {
+                    period,
+                    craPage,
+                    invoicePage: 1,
+                    pageSize,
+                    ...(consultantSearch === '' ? {} : { consultantSearch }),
+                  },
+                }}
+              />
+            ) : (
+              <EmptyState
+                icon={ReceiptTextIcon}
+                title={
+                  consultantSearch === ''
+                    ? LABELS.preFacturier.billableEmpty
+                    : LABELS.preFacturier.searchEmpty
+                }
+                body={
+                  consultantSearch === ''
+                    ? LABELS.preFacturier.nothingBlocking
+                    : LABELS.preFacturier.searchEmptyBody
+                }
+              />
+            )
           }
         />
         {data.invoices.some((invoice) => invoice.totalsAreProvisional) && (
@@ -634,20 +665,40 @@ export function PreFacturierScreen({
           data={data.cras}
           getRowId={(row) => row.craId}
           numericColumns={['recorded']}
+          sortable={false}
           emptyState={
-            <EmptyState
-              icon={FileTextIcon}
-              title={
-                consultantSearch === ''
-                  ? LABELS.preFacturier.crasEmpty
-                  : LABELS.preFacturier.searchEmpty
-              }
-              body={
-                consultantSearch === ''
-                  ? LABELS.preFacturier.crasEmptyHint
-                  : LABELS.preFacturier.searchEmptyBody
-              }
-            />
+            crasOutOfRange ? (
+              <EmptyState
+                icon={FileTextIcon}
+                title={LABELS.pagination.outOfRangeTitle}
+                body={LABELS.pagination.outOfRangeBody}
+                action={{
+                  label: LABELS.pagination.backToResults,
+                  to: '/pre-facturier',
+                  search: {
+                    period,
+                    craPage: 1,
+                    invoicePage,
+                    pageSize,
+                    ...(consultantSearch === '' ? {} : { consultantSearch }),
+                  },
+                }}
+              />
+            ) : (
+              <EmptyState
+                icon={FileTextIcon}
+                title={
+                  consultantSearch === ''
+                    ? LABELS.preFacturier.crasEmpty
+                    : LABELS.preFacturier.searchEmpty
+                }
+                body={
+                  consultantSearch === ''
+                    ? LABELS.preFacturier.crasEmptyHint
+                    : LABELS.preFacturier.searchEmptyBody
+                }
+              />
+            )
           }
         />
         <PaginationControls

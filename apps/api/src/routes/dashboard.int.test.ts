@@ -473,6 +473,7 @@ describe('GET /api/v1/dashboard — billing', () => {
         readonly billedToName: string;
         readonly supplyPeriod: string;
         readonly totalTtcCents: number;
+        readonly consultantName: string;
       }[];
     }>();
     expect(body).toMatchObject({
@@ -484,12 +485,15 @@ describe('GET /api/v1/dashboard — billing', () => {
     });
     // Chloé's draft: HT is 22 days × 800 € = 17 600 €, TTC at 20% is 21 120 € — computed from the
     // lines, not stored, since a draft's totals are provisional (Rank B1).
+    // F10: `consultantName` is the source-consultant discriminator A7/A13 already carry on the
+    // invoice and pré-facturier lists, resolved from the draft's own source Cra.
     expect(body.oldestDrafts).toStrictEqual([
       {
         invoiceId: expect.any(String),
         billedToName: 'Banque Nationale de Test',
         supplyPeriod: '2026-06',
         totalTtcCents: 2_112_000,
+        consultantName: 'Chloé Nguyen',
       },
     ]);
   });

@@ -91,10 +91,20 @@ export const LABELS = {
     perPage: 'Par page',
     previous: 'Page précédente',
     next: 'Page suivante',
+    /** F07: a page number a stale URL or another visitor's change made invalid — distinct from
+     * "no record matches these filters", which keeps its own screen-specific empty state. */
+    outOfRangeTitle: 'Cette page n’existe plus',
+    outOfRangeBody:
+      'Le nombre de résultats a changé depuis que ce lien a été ouvert. Revenez à la première page pour les retrouver.',
+    backToResults: 'Revenir aux résultats',
   },
 
   timeline: {
     heading: 'Chronologie métier',
+    /** F12: this reconstructs the current status columns, not a stored event log — a CRA
+     * resubmitted after a refusal replaces that refusal here, and a cancelled invoice keeps its
+     * original issue date with no cancellation entry. Said plainly rather than left implied. */
+    caption: 'Les statuts actuellement connus, pas un historique complet des évènements.',
     submitted: 'CRA soumis',
     refused: 'CRA refusé',
     validated: 'CRA validé',
@@ -160,9 +170,12 @@ export const LABELS = {
       openRefused: 'Ouvrir ce CRA',
     },
     manager: {
-      pending: 'CRA en attente de décision',
+      // F10: both counters below are correctly cross-period (ADR-0082) — their own card sits
+      // under "Ce mois" for lack of a better place, so the label says the scope the layout does
+      // not, rather than silently reading as if it were narrowed to the displayed month.
+      pending: 'CRA en attente de décision (toutes périodes)',
       billable: 'Facturable ce mois',
-      late: 'CRA en retard',
+      late: 'CRA en retard (toutes périodes)',
       /** `{count}` interpolated — the plan's own example sentence (task 8.4: « 1 Cra en attente
        * de votre décision »), singular/plural chosen at the call site. */
       pendingSentenceOne: '1 CRA en attente de votre décision.',
@@ -202,6 +215,10 @@ export const LABELS = {
       emptyMonthNotice:
         'Ce mois ne contient aucune donnée : c’est un mois en cours, pas un défaut.',
       seeMonthsWithData: 'Voir un mois avec des données',
+      /** F10: billing's own queue is bounded — "the ten oldest drafts", not every draft — so the
+       * heading needs to say so and point at where the rest live. */
+      oldestDraftsNote: 'Les dix brouillons les plus anciens, toutes périodes.',
+      seeAllDrafts: 'Voir tous les brouillons',
     },
     /** Rank A2 — manager/billing only. Two honest series, never a twelve-month curve (the header
      * comment of `invoice-history-chart.tsx` explains why a chart was refused until now). */
@@ -262,6 +279,9 @@ export const LABELS = {
       noManager: 'Aucun manager renseigné.',
       reports: 'Équipe ({count})',
       noReports: 'Aucun rattachement direct.',
+      /** F14: this panel used to render nothing at all on a failed read, so an existing section
+       * silently vanished. A compact line and a retry button, not a second `ErrorState` card. */
+      unavailable: 'Équipe indisponible pour le moment.',
     },
   },
 
@@ -631,7 +651,7 @@ export const LABELS = {
     open: 'Ouvrir la facture',
     openFor: 'de {name}',
     draftNotice:
-      'Ce document n’est pas une facture : il n’a ni numéro ni date d’émission, et il changera si le CRA qui l’a produit change. Il devient une facture à l’émission, et plus rien n’y bouge ensuite.',
+      'Ce document n’est pas une facture : il n’a ni numéro ni date d’émission. Il est produit à partir d’un CRA validé, donc déjà figé — mais son statut et ses montants restent provisoires tant qu’il n’est pas émis. Il devient une facture à l’émission, et plus rien n’y bouge ensuite.',
     seller: 'Émetteur',
     billedTo: 'Facturé à',
     deliveryAddress: 'Adresse de livraison',
@@ -648,7 +668,7 @@ export const LABELS = {
     lines: 'Lignes',
     designation: 'Désignation',
     quantity: 'Quantité',
-    unitPrice: 'Prix unitaire (quart de journée)',
+    unitPrice: 'Prix unitaire (jour)',
     vatRate: 'TVA',
     amount: 'Montant HT',
     vatRecap: 'Récapitulatif de TVA',

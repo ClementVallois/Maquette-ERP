@@ -55,6 +55,13 @@ interface DataTableProps<TData> {
   /** Rendered instead of the table body when `data` is empty — the caller's own `EmptyState`. */
   readonly emptyState: ReactNode;
   readonly numericColumns?: readonly string[];
+  /**
+   * `false` on a server-paginated table: this component sorts client-side, so it only ever has the
+   * loaded page to sort. Why that means no sort control rather than a page-scoped one, and what
+   * would replace it: README § "Ce que je ne construis pas", and `docs/open-questions.md` (row
+   * dated 05/09/2026) for the decision that is still open.
+   */
+  readonly sortable?: boolean;
 }
 
 export function DataTable<TData>({
@@ -63,6 +70,7 @@ export function DataTable<TData>({
   getRowId,
   emptyState,
   numericColumns = [],
+  sortable = true,
 }: DataTableProps<TData>): ReactElement {
   const [sorting, setSorting] = useState<SortingState>([]);
   const numericColumnIds = new Set(numericColumns);
@@ -82,6 +90,12 @@ export function DataTable<TData>({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getRowId,
+    // `enableSorting: false` (table-wide, not per-column) is what makes `header.column.getCanSort()`
+    // false for every column below regardless of each `ColumnDef`'s own default — the same branch
+    // that already renders a plain header, with no button and no icon, for a column that opts out
+    // one at a time (the `actions` column every screen already has) now renders every column that
+    // way when the *table* opts out.
+    enableSorting: sortable,
     state: { sorting },
     onSortingChange: setSorting,
   });

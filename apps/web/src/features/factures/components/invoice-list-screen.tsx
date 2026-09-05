@@ -5,7 +5,7 @@ import type { ReactElement, SyntheticEvent } from 'react';
 
 import { CopyLinkButton } from '@/components/copy-link-button';
 import { DataTable } from '@/components/data-table/data-table';
-import { PaginationControls } from '@/components/data-table/pagination-controls';
+import { isPageOutOfRange, PaginationControls } from '@/components/data-table/pagination-controls';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -81,12 +81,6 @@ function columns(returnTo: string): ColumnDef<InvoiceListItem>[] {
       accessorFn: (row) => row.supplyPeriod,
       header: LABELS.invoice.supplyPeriod,
       cell: ({ row }) => frenchMonth(row.original.supplyPeriod),
-      // Item 25, QA round 3: an explicit comparator on the raw `YYYY-MM` accessor value, not
-      // TanStack's `auto` sortingFn (whose column-type detection is not something to depend on)
-      // and never on the rendered French month label — `frenchMonth('2026-02')` ("février") sorts
-      // after `frenchMonth('2026-01')` ("janvier") alphabetically only by coincidence.
-      sortingFn: (rowA, rowB) =>
-        rowA.original.supplyPeriod.localeCompare(rowB.original.supplyPeriod),
     },
     {
       id: 'number',
@@ -261,6 +255,10 @@ export function InvoiceListScreen({
     );
   }
 
+  // F07: a stale `page` (a bookmark, a status change, another visitor's action) is not "no
+  // invoice matches this tab" — the result set is non-empty, only this slice of it is not.
+  const outOfRange = isPageOutOfRange(page, pageSize, query.data.total);
+
   return (
     <div className="flex flex-col gap-4">
       <form className="flex flex-wrap items-end gap-3" onSubmit={submitSearch}>
@@ -336,12 +334,29 @@ export function InvoiceListScreen({
         data={query.data.invoices}
         getRowId={(row) => row.id}
         numericColumns={['ttc']}
+        // F06/A7: this table is one server-paginated page of a larger result set — a client-side
+        // sort would order that page, not the invoices, so no sort control is offered here rather
+        // than one that looks global and is not (`DataTable`'s own `sortable` doc comment).
+        sortable={false}
         emptyState={
-          <EmptyState
-            icon={ReceiptTextIcon}
-            title={LABELS.invoice.filters[status]}
-            body={LABELS.invoice.filterEmptyBody}
-          />
+          outOfRange ? (
+            <EmptyState
+              icon={ReceiptTextIcon}
+              title={LABELS.pagination.outOfRangeTitle}
+              body={LABELS.pagination.outOfRangeBody}
+              action={{
+                label: LABELS.pagination.backToResults,
+                to: '/factures',
+                search: searchState({ page: 1 }),
+              }}
+            />
+          ) : (
+            <EmptyState
+              icon={ReceiptTextIcon}
+              title={LABELS.invoice.filters[status]}
+              body={LABELS.invoice.filterEmptyBody}
+            />
+          )
         }
       />
       {query.data.invoices.some((invoice) => invoice.totalsAreProvisional) && (

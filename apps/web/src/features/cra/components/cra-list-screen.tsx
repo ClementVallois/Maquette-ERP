@@ -6,7 +6,7 @@ import { useState } from 'react';
 
 import { CopyLinkButton } from '@/components/copy-link-button';
 import { DataTable } from '@/components/data-table/data-table';
-import { PaginationControls } from '@/components/data-table/pagination-controls';
+import { isPageOutOfRange, PaginationControls } from '@/components/data-table/pagination-controls';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -271,7 +271,29 @@ export function CraListScreen({
 
   const rows = query.data.cras;
   const hasAnyCra = rows.length > 0;
-  const emptyState = (
+  // F07: a stale `page` is not "no CRA matches these filters" — the result set is non-empty,
+  // only this slice of it is not, and its recovery is a different action (back to page 1).
+  const outOfRange = isPageOutOfRange(page, pageSize, query.data.total);
+  const emptyState = outOfRange ? (
+    <EmptyState
+      icon={CalendarIcon}
+      title={LABELS.pagination.outOfRangeTitle}
+      body={LABELS.pagination.outOfRangeBody}
+      action={{
+        label: LABELS.pagination.backToResults,
+        to: '/cra',
+        search: {
+          ...(consultantIds.length === 0 ? {} : { consultantIds: [...consultantIds] }),
+          ...(statuses.length === 0 ? {} : { statuses: [...statuses] }),
+          ...(year === undefined ? {} : { year }),
+          ...(month === undefined ? {} : { month }),
+          ...(beforePeriod === undefined ? {} : { beforePeriod }),
+          page: 1,
+          pageSize,
+        },
+      }}
+    />
+  ) : (
     <EmptyState
       icon={CalendarIcon}
       title={filtersActive ? LABELS.cra.filters.emptyTitle : LABELS.cra.emptyList}
@@ -321,6 +343,8 @@ export function CraListScreen({
               data={rows}
               getRowId={(row) => row.id}
               numericColumns={['recordedQuarterDays']}
+              // F06/A7: server-paginated (see `DataTable`'s own `sortable` doc comment).
+              sortable={false}
               emptyState={emptyState}
             />
           </div>
@@ -331,6 +355,7 @@ export function CraListScreen({
           data={rows}
           getRowId={(row) => row.id}
           numericColumns={['recordedQuarterDays']}
+          sortable={false}
           emptyState={emptyState}
         />
       )}
