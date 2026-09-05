@@ -390,6 +390,7 @@ export function InvoiceDetailScreen({
 
       <BusinessTimeline
         title={LABELS.timeline.heading}
+        caption={LABELS.timeline.caption}
         items={data.timeline.map((item, index) => ({
           key: `${item.kind}-${item.at}-${String(index)}`,
           title: LABELS.timeline[item.kind],

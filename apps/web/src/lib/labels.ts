@@ -101,6 +101,10 @@ export const LABELS = {
 
   timeline: {
     heading: 'Chronologie métier',
+    /** F12: this reconstructs the current status columns, not a stored event log — a CRA
+     * resubmitted after a refusal replaces that refusal here, and a cancelled invoice keeps its
+     * original issue date with no cancellation entry. Said plainly rather than left implied. */
+    caption: 'Les statuts actuellement connus, pas un historique complet des évènements.',
     submitted: 'CRA soumis',
     refused: 'CRA refusé',
     validated: 'CRA validé',
