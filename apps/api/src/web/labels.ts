@@ -183,7 +183,7 @@ export const LABELS = {
     open: 'Ouvrir la facture',
     openFor: 'de {name}',
     draftNotice:
-      'Ce document n’est pas une facture : il n’a ni numéro ni date d’émission, et il changera si le CRA qui l’a produit change. Il devient une facture à l’émission, et plus rien n’y bouge ensuite.',
+      'Ce document n’est pas une facture : il n’a ni numéro ni date d’émission. Il est produit à partir d’un CRA validé, donc déjà figé — mais son statut et ses montants restent provisoires tant qu’il n’est pas émis. Il devient une facture à l’émission, et plus rien n’y bouge ensuite.',
     seller: 'Émetteur',
     billedTo: 'Facturé à',
     deliveryAddress: 'Adresse de livraison',

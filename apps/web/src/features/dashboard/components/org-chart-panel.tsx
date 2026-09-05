@@ -1,6 +1,7 @@
 import { UserRoundIcon, UsersIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 
+import { Button } from '@/components/ui/button';
 import { LABELS } from '@/lib/labels';
 
 import { useOrgChart } from '../hooks';
@@ -12,18 +13,34 @@ import type { OrgChartMember } from '../types';
  * (`DashboardScreen`'s own call site) — `useOrgChart`'s `GET /api/v1/org-chart` is `forRoles('consultant',
  * 'manager')` (see that route's own comment for why billing has no place in this read).
  *
- * Pending/error states render nothing rather than a skeleton or an error card: this panel is a
- * secondary fact next to the dashboard's own primary queue/cards, which already carry the
- * screen's loading and error states — a second, competing error surface for one small panel would
- * be more noise than the panel is worth.
+ * Pending renders nothing rather than a skeleton: this panel is a secondary fact next to the
+ * dashboard's own primary queue/cards, which already carry the screen's own loading state, and a
+ * skeleton for one small panel would be more noise than the panel is worth. A failed read is
+ * different (F14): the section existed and then silently disappeared, with no way to tell "empty"
+ * from "broken" — so it keeps its heading and gets one line and a retry button, not a second,
+ * competing `ErrorState` card.
  */
 export function OrgChartPanel(): ReactElement | null {
   const query = useOrgChart();
+  const labels = LABELS.dashboard.orgChart;
 
-  if (!query.isSuccess) return null;
+  if (query.isPending) return null;
+
+  if (query.isError) {
+    return (
+      <div className="rounded-xl bg-card p-5 shadow-card ring-1 ring-border">
+        <h2 className="text-card-title">{labels.heading}</h2>
+        <p className="mt-2 flex items-center justify-between gap-3 text-sm text-muted-foreground">
+          {labels.unavailable}
+          <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
+            {LABELS.problem.retry}
+          </Button>
+        </p>
+      </div>
+    );
+  }
 
   const data = query.data;
-  const labels = LABELS.dashboard.orgChart;
 
   return (
     <div className="rounded-xl bg-card p-5 shadow-card ring-1 ring-border">

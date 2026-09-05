@@ -52,7 +52,7 @@ const MESSAGES: readonly CompanyNewsMessage[] = [
   {
     id: 'cse-cr-aout',
     title: 'CSE — compte-rendu de la réunion du 27 août',
-    body: 'Budget culture reconduit pour le dernier trimestre, chèques cadeaux de fin d’année votés à l’unanimité, et un point sur l’avancement du nouvel accord télétravail. Le compte-rendu complet est joint ci-dessous.',
+    body: 'Budget culture reconduit pour le dernier trimestre, chèques cadeaux de fin d’année votés à l’unanimité, et un point sur l’avancement du nouvel accord télétravail. Le compte-rendu complet est cité en pièce jointe, non fournie dans cette maquette.',
     publishedAt: '2026-09-01',
     author: 'Le CSE',
     imageSrc: null,
@@ -70,7 +70,7 @@ const MESSAGES: readonly CompanyNewsMessage[] = [
   {
     id: 'formation-catalogue',
     title: 'Nouveau catalogue de formations — rentrée 2026',
-    body: 'Douze nouvelles sessions ouvertes ce trimestre, dont une préparation PASSI, un module offensive security avancé et deux parcours sur la conformité RGPD/NIS2. Inscriptions via le formulaire RH jusqu’au 30 septembre.',
+    body: 'Douze nouvelles sessions ouvertes ce trimestre, dont une préparation PASSI, un module offensive security avancé et deux parcours sur la conformité RGPD/NIS2. Le catalogue complet est en pièce jointe ; les inscriptions se font via le formulaire RH habituel, hors périmètre de cette maquette.',
     publishedAt: '2026-08-22',
     author: 'Direction des ressources humaines',
     imageSrc: newsFormation,

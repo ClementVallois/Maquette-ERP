@@ -268,6 +268,9 @@ export const LABELS = {
       noManager: 'Aucun manager renseigné.',
       reports: 'Équipe ({count})',
       noReports: 'Aucun rattachement direct.',
+      /** F14: this panel used to render nothing at all on a failed read, so an existing section
+       * silently vanished. A compact line and a retry button, not a second `ErrorState` card. */
+      unavailable: 'Équipe indisponible pour le moment.',
     },
   },
 
@@ -637,7 +640,7 @@ export const LABELS = {
     open: 'Ouvrir la facture',
     openFor: 'de {name}',
     draftNotice:
-      'Ce document n’est pas une facture : il n’a ni numéro ni date d’émission, et il changera si le CRA qui l’a produit change. Il devient une facture à l’émission, et plus rien n’y bouge ensuite.',
+      'Ce document n’est pas une facture : il n’a ni numéro ni date d’émission. Il est produit à partir d’un CRA validé, donc déjà figé — mais son statut et ses montants restent provisoires tant qu’il n’est pas émis. Il devient une facture à l’émission, et plus rien n’y bouge ensuite.',
     seller: 'Émetteur',
     billedTo: 'Facturé à',
     deliveryAddress: 'Adresse de livraison',
