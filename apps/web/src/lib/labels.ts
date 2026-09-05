@@ -218,9 +218,6 @@ export const LABELS = {
       tableCaption: 'Les mêmes chiffres, en tableau.',
       year: 'Année',
       total: 'Total',
-      /** Item 23, QA round 3 — the eye/eye-off affordance (`VisibilityToggle`) on this section. */
-      hide: 'Masquer les graphiques',
-      show: 'Afficher les graphiques',
     },
     /** Item 3, QA round 5 (ADR-0098): the manager's own replacement for the invoice-history charts
      * above, which are not relevant to a manager's own question ("who is staffed on what, right

@@ -182,7 +182,7 @@ test.describe('prefers-reduced-motion — a Radix open transition (Select)', () 
  * versus "it is not there" is the same paired positive/negative this file uses throughout, read
  * off the element the animation actually drives.
  */
-test.describe('prefers-reduced-motion — a JS rotation (company-news carousel)', () => {
+test.describe('prefers-reduced-motion — the company-news carousel', () => {
   const PROGRESS = '[data-slot="news-progress"]';
 
   async function openDashboard(page: Page): Promise<void> {
@@ -199,9 +199,9 @@ test.describe('prefers-reduced-motion — a JS rotation (company-news carousel)'
     const bar = page.locator(PROGRESS);
     await bar.waitFor({ state: 'visible' });
 
-    // The bar's own child carries the width the loop writes. `toPass`, not a sleep: the first
-    // frame quantizes to 0, and how many frames it takes to clear the 2% step is the machine's
-    // business, not this test's.
+    // The bar's own child carries the width. `toPass`, not a sleep: the CSS keyframe
+    // (`news-progress-fill`, ADR-0096) starts at 0%, and how many frames it takes to grow past
+    // this assertion's floor is the machine's business, not this test's.
     await expect(async () => {
       const width = await bar
         .locator('div')
