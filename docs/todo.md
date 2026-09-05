@@ -479,11 +479,13 @@ To do général :
 40. Les graphiques du tableau de bord, par rôle : ne pas supprimer ceux qui existent, mais ils ne
     sont plus pertinents pour un manager — les remplacer par quelque chose qui l'est (répartition
     mission / intercontrat) ; côté facturation, un état vide assumé plutôt qu'un trou. ✅ FAIT —
-    commit `dbf6548`, ADR-0098. `managerStaffingSnapshot` (nouvelle route API, scopée par office,
-    lue « aujourd'hui » et non sur la période affichée) distingue une mission `Intercontrat` de
-    toute autre mission `Forfait` par son **nom**, pas son `billing_model` — deux tests
-    d'intégration le prouvent (non exécutés, Postgres requis). `InvoiceHistoryChart` et
-    `useInvoiceHistory` restent dans le dépôt, plus appelés par aucun écran.
+    commit `dbf6548`, ADR-0098. `managerStaffingSnapshot` (pas une nouvelle route : un champ
+    `staffing` de plus sur `GET /api/v1/dashboard`, scopé par office, lu « aujourd'hui » et non
+    sur la période affichée) distingue une mission `Intercontrat` de toute autre mission `Forfait`
+    par son **nom**, pas son `billing_model` — deux tests d'intégration le prouvent, exécutés
+    depuis (commit `6415582` : 227 verts, et les deux discriminent, vérifié par mutation dans les
+    deux sens). `InvoiceHistoryChart` et `useInvoiceHistory` restent dans le dépôt, plus appelés
+    par aucun écran.
 
 41. La top bar en mobile sur la page CRA affiche « Mes CRA — septembre », trop long, le mois est
     coupé en deux. Garder seulement « Mes CRA » sous le seuil `md`, desktop inchangé. ✅ FAIT —
