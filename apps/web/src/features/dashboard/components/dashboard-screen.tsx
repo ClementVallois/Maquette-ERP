@@ -100,7 +100,21 @@ function ageSentence(iso: string | null): string | undefined {
   return labels.ageManyDays.replace('{days}', String(days));
 }
 
-function WorkQueue({ items }: { readonly items: readonly QueueItem[] }): ReactElement {
+/** F10: what a role's queue is bounded to, and where to see the rest — billing's own "ten oldest
+ * drafts" note, `undefined` for a role whose queue is not bounded (a manager's/consultant's own
+ * queue is already every actionable Cra, not a capped slice of a larger list). */
+interface QueueNote {
+  readonly text: string;
+  readonly seeAll: ActionLink;
+}
+
+function WorkQueue({
+  items,
+  note,
+}: {
+  readonly items: readonly QueueItem[];
+  readonly note?: QueueNote;
+}): ReactElement {
   const labels = LABELS.dashboard.queue;
 
   return (
@@ -109,24 +123,34 @@ function WorkQueue({ items }: { readonly items: readonly QueueItem[] }): ReactEl
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground">{labels.nowEmpty}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {items.map((item) => (
-            <li
-              key={item.key}
-              className="flex items-center justify-between gap-4 rounded-xl bg-card p-4 shadow-card ring-1 ring-border"
-            >
-              <div className="flex flex-col">
-                <span className="text-sm text-foreground">{item.primary}</span>
-                {item.secondary !== undefined && (
-                  <span className="text-xs text-muted-foreground">{item.secondary}</span>
-                )}
-              </div>
-              <Button asChild size="sm" variant="outline">
-                <Link {...linkOf(item.action)}>{item.action.label}</Link>
-              </Button>
-            </li>
-          ))}
-        </ul>
+        <>
+          {note !== undefined && (
+            <p className="text-xs text-muted-foreground">
+              {note.text}{' '}
+              <Link {...linkOf(note.seeAll)} className="text-primary underline underline-offset-2">
+                {note.seeAll.label}
+              </Link>
+            </p>
+          )}
+          <ul className="flex flex-col gap-2">
+            {items.map((item) => (
+              <li
+                key={item.key}
+                className="flex items-center justify-between gap-4 rounded-xl bg-card p-4 shadow-card ring-1 ring-border"
+              >
+                <div className="flex flex-col">
+                  <span className="text-sm text-foreground">{item.primary}</span>
+                  {item.secondary !== undefined && (
+                    <span className="text-xs text-muted-foreground">{item.secondary}</span>
+                  )}
+                </div>
+                <Button asChild size="sm" variant="outline">
+                  <Link {...linkOf(item.action)}>{item.action.label}</Link>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </section>
   );
@@ -281,7 +305,10 @@ function managerQueue(data: ManagerDashboard): readonly QueueItem[] {
 function billingQueue(data: BillingDashboard): readonly QueueItem[] {
   return data.oldestDrafts.map((row) => ({
     key: row.invoiceId,
-    primary: `${row.billedToName} — ${frenchMonth(row.supplyPeriod)}`,
+    // F10: carries the same consultant discriminator A7/A13 already added to the invoice and
+    // pré-facturier lists — without it, several rows here can share a client, a month and an
+    // amount with nothing to tell them apart.
+    primary: `${row.consultantName} — ${row.billedToName} — ${frenchMonth(row.supplyPeriod)}`,
     secondary: frenchEuros(row.totalTtcCents),
     action: { label: LABELS.invoice.open, to: '/factures/$id', params: { id: row.invoiceId } },
   }));
@@ -394,21 +421,24 @@ function BillingCards({ data }: { readonly data: BillingDashboard }): ReactEleme
   );
 }
 
-/** Whether this role's month reads as genuinely empty — the A5 trigger for `SeeMonthsWithData`. */
+/**
+ * Whether the *displayed period itself* reads as genuinely empty — the A5 trigger for
+ * `SeeMonthsWithData`, "Voir un mois avec des données".
+ *
+ * F10: this used to also require every role's own cross-period queue field to be empty
+ * (`refusedPeriods`, `pendingDecisions`/`lateCras` — ADR-0082 — `oldestDrafts`), so a single old
+ * refusal, pending decision or draft sitting in another month hid the shortcut even when the
+ * period on screen had nothing. Scoped to the period-specific figures only, so historical-period
+ * discovery stops depending on whether an old task happens to exist.
+ */
 function isEmpty(data: DashboardResponse): boolean {
   switch (data.role) {
     case 'consultant':
-      return (
-        data.myMonthStatus === null &&
-        data.recordedQuarterDays === 0 &&
-        data.refusedPeriods.length === 0
-      );
+      return data.myMonthStatus === null && data.recordedQuarterDays === 0;
     case 'manager':
-      return data.pendingDecisions === 0 && data.billableCents === 0 && data.lateCras === 0;
+      return data.billableCents === 0;
     case 'billing':
-      return (
-        data.draftInvoices === 0 && data.issuedInvoices === 0 && data.oldestDrafts.length === 0
-      );
+      return data.draftInvoices === 0 && data.issuedInvoices === 0;
   }
 }
 
@@ -468,7 +498,21 @@ export function DashboardScreen({ role, period, personaKey }: DashboardScreenPro
     <div className="flex flex-col gap-6">
       <p className="text-sm text-muted-foreground">{frenchMonth(data.period)}</p>
 
-      <WorkQueue items={queue} />
+      <WorkQueue
+        items={queue}
+        {...(data.role === 'billing' && queue.length > 0
+          ? {
+              note: {
+                text: LABELS.dashboard.queue.oldestDraftsNote,
+                seeAll: {
+                  label: LABELS.dashboard.queue.seeAllDrafts,
+                  to: '/factures',
+                  search: { status: 'draft' as const },
+                },
+              },
+            }
+          : {})}
+      />
 
       {isEmpty(data) && <SeeMonthsWithData period={data.period} />}
 

@@ -166,9 +166,12 @@ export const LABELS = {
       openRefused: 'Ouvrir ce CRA',
     },
     manager: {
-      pending: 'CRA en attente de décision',
+      // F10: both counters below are correctly cross-period (ADR-0082) — their own card sits
+      // under "Ce mois" for lack of a better place, so the label says the scope the layout does
+      // not, rather than silently reading as if it were narrowed to the displayed month.
+      pending: 'CRA en attente de décision (toutes périodes)',
       billable: 'Facturable ce mois',
-      late: 'CRA en retard',
+      late: 'CRA en retard (toutes périodes)',
       /** `{count}` interpolated — the plan's own example sentence (task 8.4: « 1 Cra en attente
        * de votre décision »), singular/plural chosen at the call site. */
       pendingSentenceOne: '1 CRA en attente de votre décision.',
@@ -208,6 +211,10 @@ export const LABELS = {
       emptyMonthNotice:
         'Ce mois ne contient aucune donnée : c’est un mois en cours, pas un défaut.',
       seeMonthsWithData: 'Voir un mois avec des données',
+      /** F10: billing's own queue is bounded — "the ten oldest drafts", not every draft — so the
+       * heading needs to say so and point at where the rest live. */
+      oldestDraftsNote: 'Les dix brouillons les plus anciens, toutes périodes.',
+      seeAllDrafts: 'Voir tous les brouillons',
     },
     /** Rank A2 — manager/billing only. Two honest series, never a twelve-month curve (the header
      * comment of `invoice-history-chart.tsx` explains why a chart was refused until now). */

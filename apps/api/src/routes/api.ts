@@ -1042,26 +1042,57 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       // `everyPeriod` is a second, unfiltered read of the same page bound (ADR-0082's own
       // reasoning applied to billing): the queue below is "the oldest drafts across every month",
       // not "this month's drafts", so it cannot come off the period-scoped `invoices` read.
-      const { invoices, everyPeriod } = await dependencies.transactionally(async (unit) => ({
-        invoices: await unit.invoices.list({
-          actor,
-          limit: MAX_PAGE_SIZE,
-          offset: 0,
-          period: query.value.period,
-        }),
-        everyPeriod: await unit.invoices.list({ actor, limit: MAX_PAGE_SIZE, offset: 0 }),
-      }));
+      const { invoices, everyPeriod, oldestDrafts } = await dependencies.transactionally(
+        async (unit) => {
+          const invoicesPage = await unit.invoices.list({
+            actor,
+            limit: MAX_PAGE_SIZE,
+            offset: 0,
+            period: query.value.period,
+          });
+          const everyPeriodPage = await unit.invoices.list({
+            actor,
+            limit: MAX_PAGE_SIZE,
+            offset: 0,
+          });
 
-      const oldestDrafts = everyPeriod
-        .filter((invoice) => invoice.status === 'draft')
-        .toSorted((left, right) => left.supplyPeriod.localeCompare(right.supplyPeriod))
-        .slice(0, 10)
-        .map((invoice) => ({
-          invoiceId: invoice.id,
-          billedToName: invoice.billedToName,
-          supplyPeriod: invoice.supplyPeriod,
-          totalTtcCents: invoice.totalTtcCents ?? 0,
-        }));
+          // F10: the same consultant discriminator A7/A13 already added to the invoice and
+          // pré-facturier lists — without it, several rows of this "ten oldest drafts" block can
+          // share a client, a month and an amount with nothing to tell them apart.
+          const consultantNames = await new PgReferenceReader(unit.client).consultantNames();
+          const oldest = everyPeriodPage
+            .filter((invoice) => invoice.status === 'draft')
+            .toSorted((left, right) => left.supplyPeriod.localeCompare(right.supplyPeriod))
+            .slice(0, 10);
+
+          const oldestWithConsultant = [];
+          for (const item of oldest) {
+            // Sequential, not `Promise.all`, for the same reason the invoice list route's own A7
+            // comment gives: every read here shares the one checked-out client this transaction is.
+            const invoice = await unit.invoices.findById(item.id, actor);
+            const sourceCraId = invoice?.lines[0]?.origin.craId;
+            const sourceCra =
+              sourceCraId === undefined ? null : await unit.cras.findById(sourceCraId, actor);
+
+            oldestWithConsultant.push({
+              invoiceId: item.id,
+              billedToName: item.billedToName,
+              supplyPeriod: item.supplyPeriod,
+              totalTtcCents: item.totalTtcCents ?? 0,
+              consultantName:
+                sourceCra === null
+                  ? '—'
+                  : (consultantNames.get(sourceCra.consultantId) ?? sourceCra.consultantId),
+            });
+          }
+
+          return {
+            invoices: invoicesPage,
+            everyPeriod: everyPeriodPage,
+            oldestDrafts: oldestWithConsultant,
+          };
+        },
+      );
 
       return {
         period: query.value.period,

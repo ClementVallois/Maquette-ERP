@@ -1097,7 +1097,11 @@ test.describe('J2 — manager-paris (Bruno): validates Claire’s submitted June
     // at this point in the file (task 6.1's list, run earlier, only reads — it never decides
     // anything), so this is the one real "pending" row the whole seed has.
     await page.goto('/tableau-de-bord?period=2026-06');
-    await expect(statCardValue(page, 'CRA en attente de décision')).toHaveText('1');
+    // F10: the card's own label now says its scope out loud ("toutes périodes") — ADR-0082's
+    // cross-period read is unchanged, only the label text `statCardValue`'s exact match keys on.
+    await expect(statCardValue(page, 'CRA en attente de décision (toutes périodes)')).toHaveText(
+      '1',
+    );
     await page.screenshot({
       animations: 'disabled',
       path: 'tests/visual/review/10.4-dashboard-manager-en-attente.png',

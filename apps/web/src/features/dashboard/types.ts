@@ -107,6 +107,9 @@ export interface BillingQueueRow {
   readonly billedToName: string;
   readonly supplyPeriod: string;
   readonly totalTtcCents: number;
+  /** F10: the same discriminant A7/A13 added to the invoice and pré-facturier lists — a client,
+   * a month and an amount alone do not tell two drafts apart. `'—'` when the source Cra is gone. */
+  readonly consultantName: string;
 }
 
 export interface BillingDashboard {
@@ -115,7 +118,8 @@ export interface BillingDashboard {
   readonly draftInvoices: number;
   readonly issuedInvoices: number;
   readonly totalTtcIssuedCents: number;
-  /** Every draft across every period, oldest supply period first. */
+  /** The ten oldest drafts across every period, oldest supply period first — not every draft
+   * (F10): the full set is the invoice list's own `?status=draft` view. */
   readonly oldestDrafts: readonly BillingQueueRow[];
   readonly recentActivity: readonly DashboardActivity[];
 }
