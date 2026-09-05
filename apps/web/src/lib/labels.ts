@@ -648,7 +648,7 @@ export const LABELS = {
     lines: 'Lignes',
     designation: 'Désignation',
     quantity: 'Quantité',
-    unitPrice: 'Prix unitaire (quart de journée)',
+    unitPrice: 'Prix unitaire (jour)',
     vatRate: 'TVA',
     amount: 'Montant HT',
     vatRecap: 'Récapitulatif de TVA',

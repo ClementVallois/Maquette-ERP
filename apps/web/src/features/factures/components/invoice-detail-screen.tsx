@@ -136,14 +136,22 @@ function lineColumns(): ColumnDef<InvoiceLine>[] {
       id: 'quantity',
       accessorFn: (row) => row.quantityQuarterDays,
       header: LABELS.invoice.quantity,
-      cell: ({ row }) => <span className="tabular-nums">{row.original.quantityQuarterDays}</span>,
+      // F03: days, not a raw quarter-day count — paired below with the daily rate, not the
+      // quarter-day price, so "quantité × prix" reads true (the lineage panel below already does
+      // both the same way, `${frenchDays(item.quantityQuarterDays)} × ${frenchEuros(item.tjmCents)}`).
+      cell: ({ row }) => (
+        <span className="tabular-nums">{frenchDays(row.original.quantityQuarterDays)}</span>
+      ),
     },
     {
       id: 'unitPrice',
       accessorFn: (row) => row.unitPriceCents,
       header: LABELS.invoice.unitPrice,
+      // `unitPriceCents` is the price of one quarter-day (domain, ADR-0069) — exact and integer to
+      // multiply back to the daily rate (a `Tjm` is a multiple of 4 cents, ADR-0002), never to
+      // divide the quantity above by 4.
       cell: ({ row }) => (
-        <span className="tabular-nums">{frenchEuros(row.original.unitPriceCents)}</span>
+        <span className="tabular-nums">{frenchEuros(row.original.unitPriceCents * 4)}</span>
       ),
     },
     {

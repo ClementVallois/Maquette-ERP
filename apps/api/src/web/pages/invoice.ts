@@ -1,4 +1,5 @@
 import type { Invoice, InvoiceLine, LegalEntity, PostalAddress, VatGroup } from '@erp/billing';
+import { QUARTER_DAYS_PER_DAY } from '@erp/platform';
 
 import type { Persona } from '../../personas/catalogue.ts';
 import { fill } from '../fill.ts';
@@ -94,6 +95,19 @@ function vatOf(line: InvoiceLine): string {
     : LABELS.invoice.notCharged;
 }
 
+/**
+ * F03: `unitPriceCents` is the price of one quarter-day (`lineAmountCents(1, tjmCents)`,
+ * `packages/billing/src/domain/invoice-line.ts`) — correct for the domain and the wire, wrong to
+ * print next to a quantity already converted to days (`frenchDays` above), which is what produced
+ * the audit's mixed-unit line: "21 j × 180,00 €" reading as if 180 € were the daily rate, when the
+ * total is actually 21 j × 720 €/j. Multiplying back to the daily rate is exact and stays an
+ * integer at every step — `unitPriceCents` is a quarter of a `Tjm`, itself a whole number of euros
+ * (ADR-0002, ADR-0069) — never a division, so nothing here can produce a fraction of a cent.
+ */
+function dailyRateCents(line: InvoiceLine): number {
+  return line.unitPriceCents * QUARTER_DAYS_PER_DAY;
+}
+
 function lineTable(invoice: Invoice): Html {
   return html`<table class="lines">
     <thead>
@@ -111,7 +125,7 @@ function lineTable(invoice: Invoice): Html {
           html`<tr>
             <th scope="row">${line.designation}</th>
             <td class="num">${frenchDays(line.quantityQuarterDays)}</td>
-            <td class="num">${frenchEuros(line.unitPriceCents)}</td>
+            <td class="num">${frenchEuros(dailyRateCents(line))}</td>
             <td class="num">${vatOf(line)}</td>
             <td class="num">${frenchEuros(line.amountCents)}</td>
           </tr>`,

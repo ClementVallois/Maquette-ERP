@@ -199,7 +199,7 @@ export const LABELS = {
     },
     designation: 'Désignation',
     quantity: 'Quantité',
-    unitPrice: 'Prix unitaire (demi-journée)',
+    unitPrice: 'Prix unitaire (jour)',
     vatRate: 'TVA',
     amount: 'Montant HT',
     vatRecap: 'Récapitulatif de TVA',
