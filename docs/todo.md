@@ -447,6 +447,17 @@ mot pour mot, pour que la demande survive à sa réponse.
 >
 > 36. Sur la page de facture, le texte va dans tous les sens en version mobile, il faut bien s'assurer que le texte reste bien dans les cartes, que ce soit aligné comme il faut entre le label et le texte correspondant
 
+## Mobile usability and interaction follow-up — 2026-09-05
+
+- [ ] Find the persona selection flash / forbidden cursor root cause and fix equivalent pending interactions.
+- [ ] Replace the cramped mobile CRA matrix with vertical day/activity entry at 360 × 760, including the manager's read-only view.
+- [ ] Align the mobile topbar persona panel's labels and values.
+- [ ] Align the current-month empty-state card actions.
+- [ ] Redesign new-assignment and date-edit forms for desktop and mobile; add consultant search (also resolves item 37).
+- [ ] Centre mobile business-timeline connectors between their dots everywhere the component is used.
+- [ ] Replace the invoice's long CRA day list with a compact, readable presentation.
+- [ ] Verify the affected interactions and layouts, run relevant checks, and record results.
+
 To do général :
 
 37. Il faut revoir la page d'affectation des missions pour avoir une barre de recherche d'un consultant,
