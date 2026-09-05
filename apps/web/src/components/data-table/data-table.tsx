@@ -56,19 +56,10 @@ interface DataTableProps<TData> {
   readonly emptyState: ReactNode;
   readonly numericColumns?: readonly string[];
   /**
-   * F06/A7 (CEO audit F06, older audit P1.4/A8): `true` (default) is correct only for a table that
-   * holds **every** row of its result set — a single document's own lines (an invoice's, a
-   * mission-margin breakdown's), which this component's client-side `getSortedRowModel` sorts
-   * exactly, page or no page.
-   *
-   * `false` is for a table backed by **server pagination** (the invoice list, the CRA list, both
-   * pré-facturier tables): there, a client-side sort orders the one page currently loaded, not the
-   * result set — clicking "trier par période" would reorder ten rows out of hundreds and call it
-   * sorted. Threading a sort specification through the URL, the API and the repository so the
-   * whole result set could be sorted is deferred (`docs/open-questions.md`, dated); until it lands,
-   * the honest behaviour is no sort control here at all, not one that quietly lies about its
-   * scope. This never fetches every row to fake a global sort — that trade is exactly the one
-   * being refused.
+   * `false` on a server-paginated table: this component sorts client-side, so it only ever has the
+   * loaded page to sort. Why that means no sort control rather than a page-scoped one, and what
+   * would replace it: README § "Ce que je ne construis pas", and `docs/open-questions.md` (row
+   * dated 05/09/2026) for the decision that is still open.
    */
   readonly sortable?: boolean;
 }

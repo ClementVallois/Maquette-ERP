@@ -53,10 +53,9 @@ function DashboardSkeleton(): ReactElement {
  * a second copy of a StatCard's own figure — the sentence names what to *do*, the cards above it
  * already named what the figure *is*.
  *
- * `action` is optional (F11): a current month `consultantQueue` already carries as the work
- * queue's own primary "à faire maintenant" row renders here as a **summary sentence with no
- * button** — the queue above is the one place that action lives, so this card does not repeat it.
- * Only a status `consultantQueue` never lists (`validated`, nothing left to do) keeps its button.
+ * `action` is optional: a caller with nothing to offer renders the sentence alone. `ManagerCards`
+ * and `BillingCards` always pass one; `ConsultantCards` renders no card at all rather than a
+ * buttonless one (F11 — see its own comment).
  *
  * Where it points is decided in `../actions.ts`, as data: the destination is a typed `LinkProps`,
  * so a search param cannot be smuggled into `to` as a query string (which TanStack Router does
@@ -331,9 +330,12 @@ function ConsultantCards({ data }: { readonly data: ConsultantDashboard }): Reac
   // ADR-0097 removed the *other-month* duplicate (`RefusedElsewhereNotices`, which repeated
   // `consultantQueue`'s own refused-elsewhere row). F11 completes that decision for the
   // *current*-month one: `consultantQueue` already lists this period for every status but
-  // `validated` (a validated month is not "à faire maintenant"), with the identical fact, label
-  // and destination `ActionCard` used to repeat here. Only `validated` — absent from the queue —
-  // keeps the button; every other status shows the summary sentence alone.
+  // `validated`, carrying the identical sentence (`labels.hints[status]`, the same string
+  // `callToAction` returns), the identical label and the identical destination. The card is
+  // therefore not rendered at all for those statuses — keeping it without its button left a
+  // bordered box whose whole content was one sentence already read two inches above it. Only
+  // `validated`, which the queue never lists (a validated month is not "à faire maintenant"),
+  // still has something of its own to say.
   const { sentence, action } = callToAction(data);
 
   return (
@@ -346,7 +348,7 @@ function ConsultantCards({ data }: { readonly data: ConsultantDashboard }): Reac
         <StatCard label={labels.recorded} value={frenchDays(data.recordedQuarterDays)} />
         <StatCard label={labels.remaining} value={String(data.remainingWorkableDays)} />
       </div>
-      <ActionCard sentence={sentence} {...(status === 'validated' ? { action } : {})} />
+      {status === 'validated' && <ActionCard sentence={sentence} action={action} />}
     </div>
   );
 }
@@ -436,7 +438,13 @@ function isEmpty(data: DashboardResponse): boolean {
     case 'consultant':
       return data.myMonthStatus === null && data.recordedQuarterDays === 0;
     case 'manager':
-      return data.billableCents === 0;
+      // `billableCents` alone is not "this month is empty": a month whose Cras are all still
+      // `submitted` bills nothing yet, and the queue above is at that moment listing rows for it.
+      // `awaitingDecision` is cross-period (ADR-0082), so only its rows on the displayed period
+      // count here — an older month's pending decision must not hide the shortcut again.
+      return (
+        data.billableCents === 0 && !data.awaitingDecision.some((row) => row.period === data.period)
+      );
     case 'billing':
       return data.draftInvoices === 0 && data.issuedInvoices === 0;
   }

@@ -38,6 +38,12 @@ publication), F02 (changement de persona qui efface une session), F04 (caches no
 restent ouverts exactement comme `docs/audit-ceo-readiness-2026-09-05.md` les décrit ; ce document ne
 les rouvre pas et ne les referme pas.
 
+Le document source n'est pas dans le dépôt et n'a pas vocation à y entrer. **Les deux tableaux
+ci-dessus sont donc le référent public des numéros F** : un lecteur qui croise `// F10:` dans le code
+(31 occurrences dans `apps/api` et `apps/web`) résout le numéro ici, en une ligne, sans avoir à ouvrir
+un fichier qu'il n'a pas — c'est la raison pour laquelle les quinze sont glosés, y compris les huit
+que cette passe ne touche pas.
+
 Sous chaque intitulé P0/P1/P2 et dans chaque tableau de lot ci-dessous, une ligne datée dit **shipped**
 (avec l’ADR ou le commit qui le porte), **superseded** (une direction abandonnée par une décision
 plus tardive — ne pas la restaurer pour cocher une case obsolète), ou **still open** (avec un pointeur
@@ -602,8 +608,8 @@ reste à faire et atteint l’action utile sans détour.
 **Sortie attendue :** aucune promesse implicite de mobile que les écrans métier ne peuvent tenir.
 
 > **Statut 05/09 :** décision prise (R2 : mobile supporté) et largement construit — Gardé **A11**
-> (chaîne consultant), **O5/O13** promus avec lui, **X2** (desktop-only) annulé. `docs/audit-ceo-
-readiness-2026-09-05.md` a échantillonné un rendu tactile sain (profil iPhone 13, 390×664, sans
+> (chaîne consultant), **O5/O13** promus avec lui, **X2** (desktop-only) annulé.
+> `docs/audit-ceo-readiness-2026-09-05.md` a échantillonné un rendu tactile sain (profil iPhone 13, 390×664, sans
 > violation axe ni débordement), mais **aucun parcours dédié saisie → soumission tactile** (R1/R4,
 > 390×844) n’a encore couru — **still open**, hors périmètre de cette passe, avant l’acceptation du
 > 09/09 (BUILD-PLAN Phase 10).

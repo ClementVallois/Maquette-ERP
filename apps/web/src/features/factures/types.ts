@@ -125,7 +125,8 @@ export interface RegieDaysOrigin {
    * never on `InvoiceListItem` — no list projection anywhere in this repository carries a `Tjm`.
    * ADR-0034 requires it here specifically: "An invoice line **copies** its `Tjm` and rate; it does
    * not reference them" — the frozen rate on the line **is** the audit trail, and the SSR printable
-   * invoice (`GET /facture/:id`) already prints it as `unitPriceCents` (`LABELS.invoice.unitPrice`).
+   * invoice (`GET /facture/:id`) already prints the daily rate it derives from, `unitPriceCents *
+   * QUARTER_DAYS_PER_DAY` under `LABELS.invoice.unitPrice` ("Prix unitaire (jour)").
    * Whether the SPA's detail screen should also render `origin.tjmCents` itself (as opposed to only
    * `unitPriceCents`, which is already derived from it) is not decided here — see
    * `docs/open-questions.md`, row dated 2026-08-24, naming Phase 8.

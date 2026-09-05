@@ -349,7 +349,11 @@ export function InvoiceDetailScreen({
         </div>
       </div>
 
-      {data.status !== alreadyIssued && (
+      {/* Gated on the number, not on `status !== 'issued'`: a `cancelledByCreditNote` invoice is
+          not issued either, yet it kept the number and issue date the notice says it has neither
+          of — and prints both in the block just below. `apps/api/src/web/pages/invoice.ts` gates
+          the same label on `number === null`; the two surfaces have to agree. */}
+      {data.invoiceNumber === null && (
         <Alert>
           <AlertDescription>{LABELS.invoice.draftNotice}</AlertDescription>
         </Alert>
