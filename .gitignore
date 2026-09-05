@@ -41,3 +41,8 @@ draft.md
 # Reference screenshots pasted in for a QA round: read locally, never published. The repo is
 # public (ADR-0086), and a screenshot of a third-party product is not ours to redistribute.
 docs/images/
+
+# Private working notes kept alongside the repo but never published: interview prep, salary
+# figures, the client's name. The repository is public (ADR-0086) and deliberately anonymised
+# ("a cybersecurity consulting firm"); `*.local.md` exists so a stray `git add .` cannot undo that.
+*.local.md
