@@ -5,7 +5,7 @@ import type { ReactElement, SyntheticEvent } from 'react';
 
 import { CopyLinkButton } from '@/components/copy-link-button';
 import { DataTable } from '@/components/data-table/data-table';
-import { PaginationControls } from '@/components/data-table/pagination-controls';
+import { isPageOutOfRange, PaginationControls } from '@/components/data-table/pagination-controls';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -261,6 +261,10 @@ export function InvoiceListScreen({
     );
   }
 
+  // F07: a stale `page` (a bookmark, a status change, another visitor's action) is not "no
+  // invoice matches this tab" — the result set is non-empty, only this slice of it is not.
+  const outOfRange = isPageOutOfRange(page, pageSize, query.data.total);
+
   return (
     <div className="flex flex-col gap-4">
       <form className="flex flex-wrap items-end gap-3" onSubmit={submitSearch}>
@@ -337,11 +341,24 @@ export function InvoiceListScreen({
         getRowId={(row) => row.id}
         numericColumns={['ttc']}
         emptyState={
-          <EmptyState
-            icon={ReceiptTextIcon}
-            title={LABELS.invoice.filters[status]}
-            body={LABELS.invoice.filterEmptyBody}
-          />
+          outOfRange ? (
+            <EmptyState
+              icon={ReceiptTextIcon}
+              title={LABELS.pagination.outOfRangeTitle}
+              body={LABELS.pagination.outOfRangeBody}
+              action={{
+                label: LABELS.pagination.backToResults,
+                to: '/factures',
+                search: searchState({ page: 1 }),
+              }}
+            />
+          ) : (
+            <EmptyState
+              icon={ReceiptTextIcon}
+              title={LABELS.invoice.filters[status]}
+              body={LABELS.invoice.filterEmptyBody}
+            />
+          )
         }
       />
       {query.data.invoices.some((invoice) => invoice.totalsAreProvisional) && (

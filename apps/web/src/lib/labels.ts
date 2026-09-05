@@ -91,6 +91,12 @@ export const LABELS = {
     perPage: 'Par page',
     previous: 'Page précédente',
     next: 'Page suivante',
+    /** F07: a page number a stale URL or another visitor's change made invalid — distinct from
+     * "no record matches these filters", which keeps its own screen-specific empty state. */
+    outOfRangeTitle: 'Cette page n’existe plus',
+    outOfRangeBody:
+      'Le nombre de résultats a changé depuis que ce lien a été ouvert. Revenez à la première page pour les retrouver.',
+    backToResults: 'Revenir aux résultats',
   },
 
   timeline: {
