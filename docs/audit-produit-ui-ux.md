@@ -103,8 +103,10 @@ de travail bornées et explicites, récupération de page hors-plage, tri qui ne
 ce qu’il ne couvre pas) ; **États, feedback et résilience** aussi (`OrgChartPanel` a maintenant un état
 d’échec compact) ; **Pédagogie et aide à l’apprentissage** un peu (chronologie étiquetée honnêtement),
 mais reste basse — aucun élément du Lot 3 (glossaire mis à part, déjà livré) n’a été construit par
-cette passe, et `CLAUDE.md` l’exclut désormais explicitement de toute suite (§6, Lot 3, Lot 4 : ne pas
-lancer un nouveau chantier produit sous couvert de finition).
+cette passe. Deux règles distinctes le tiennent fermé : `CLAUDE.md` « ne pas étendre le
+périmètre » (générale, elle ne nomme ni §6 ni les lots), et
+`docs/audit-ceo-readiness-2026-09-05.md`, qui demande explicitement de ne pas laisser une passe
+de finition ouvrir un nouveau chantier produit.
 
 ## 2. Méthode et limites de l’audit
 
@@ -323,7 +325,7 @@ Ajouter au minimum des tests à 390 × 844 px, zoom 200 % et orientation paysage
 
 #### P1.3 — La grille CRA impose une forte charge cognitive
 
-> **Statut 05/09 :** shipped pour son cœur — Gardé **A9** (légende, activité/total collants, progression, action « aller au jour incomplet »). Les extensions optionnelles (**O5** mode semaine, **O6/O7**) restent still open, non engagées.
+> **Statut 05/09 :** shipped pour son cœur — Gardé **A9** (légende, activité/total collants, progression, action « aller au jour incomplet »). Le mode « semaine » (ancien **O5**) est shipped, pas optionnel : la densification l’a promu en Gardé comme moitié desktop de **A11**, et le sélecteur mois/semaine existe (`apps/web/src/features/cra/components/cra-grid-screen.tsx`, `desktopView`). Restent still open les deux vraies optionnelles, **O6** et **O7**, non engagées.
 
 L’écran combine navigation mensuelle, ajout d’activité, codes couleur, week-ends, semaines, outils
 par ligne, sélecteurs par cellule, totaux et alertes. Il est efficace une fois appris, mais peu

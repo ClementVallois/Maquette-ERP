@@ -136,7 +136,7 @@ export function frenchEuros(cents: number): string {
   return `${negative ? '−' : ''}${euros},${centimes}${NO_BREAK_SPACE}€`;
 }
 
-const QUARTER_DAYS_PER_DAY = 4;
+export const QUARTER_DAYS_PER_DAY = 4;
 /** The four remainders a count of quarter-days can leave against a whole day, in order. */
 const QUARTER_FRACTIONS = ['', ',25', ',5', ',75'] as const;
 

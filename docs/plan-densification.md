@@ -320,7 +320,7 @@ Les identifiants techniques restent dans un second niveau. Effort : moyen. Pas d
 chronologie se lit des données déjà persistées ; une ADR si elle exige d'exposer `domain_events` sur
 le fil (c'est une surface d'API nouvelle, et elle est lisible par rôle).
 
-**Correctif du 05/09/2026 (F14 de `docs/audit-ceo-readiness-2026-09-05.md`) — la promesse ci-dessus
+**Correctif du 05/09/2026 (F12 de `docs/audit-ceo-readiness-2026-09-05.md`) — la promesse ci-dessus
 est réduite.** Le composant livré reconstruit les colonnes de statut **courantes** (soumis / refusé
 / validé, brouillon / émis), pas `public.domain_events` : `Cra.submit()` écrase `submittedAt` et
 efface le refus précédent, donc un CRA renvoyé après refus **fait disparaître ce refus de la vue** ;

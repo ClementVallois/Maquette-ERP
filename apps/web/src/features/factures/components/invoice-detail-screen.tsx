@@ -12,7 +12,14 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
-import { frenchDate, frenchDays, frenchEuros, frenchMonth, frenchPercent } from '@/lib/format';
+import {
+  QUARTER_DAYS_PER_DAY,
+  frenchDate,
+  frenchDays,
+  frenchEuros,
+  frenchMonth,
+  frenchPercent,
+} from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
@@ -151,7 +158,9 @@ function lineColumns(): ColumnDef<InvoiceLine>[] {
       // multiply back to the daily rate (a `Tjm` is a multiple of 4 cents, ADR-0002), never to
       // divide the quantity above by 4.
       cell: ({ row }) => (
-        <span className="tabular-nums">{frenchEuros(row.original.unitPriceCents * 4)}</span>
+        <span className="tabular-nums">
+          {frenchEuros(row.original.unitPriceCents * QUARTER_DAYS_PER_DAY)}
+        </span>
       ),
     },
     {
