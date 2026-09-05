@@ -8,8 +8,9 @@ import type { PgReadClient } from '../persistence/pg-client.ts';
  * mission whose name this constant matches. Nothing in `packages/timesheet` or `packages/billing`
  * reads this name today; this is the first thing that does, at the application layer, the same way
  * `assignment-admin.ts` already queries `public.missions`/`public.assignments` directly rather than
- * through a module port (there is no "staffing snapshot" port and no second implementation to
- * justify one, ADR-0047).
+ * through a module port. Two ADRs, not one: ADR-0047 is why there is no port (no second
+ * implementation to justify one), ADR-0043 is why an app-tier read may reach `public.*` at all
+ * (and never `timesheet.*` or `billing.*` — that is the schema half of the boundary).
  */
 export const INTERCONTRAT_MISSION_NAME = 'Intercontrat';
 
