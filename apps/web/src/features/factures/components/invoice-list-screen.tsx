@@ -340,6 +340,10 @@ export function InvoiceListScreen({
         data={query.data.invoices}
         getRowId={(row) => row.id}
         numericColumns={['ttc']}
+        // F06/A7: this table is one server-paginated page of a larger result set — a client-side
+        // sort would order that page, not the invoices, so no sort control is offered here rather
+        // than one that looks global and is not (`DataTable`'s own `sortable` doc comment).
+        sortable={false}
         emptyState={
           outOfRange ? (
             <EmptyState

@@ -55,6 +55,22 @@ interface DataTableProps<TData> {
   /** Rendered instead of the table body when `data` is empty — the caller's own `EmptyState`. */
   readonly emptyState: ReactNode;
   readonly numericColumns?: readonly string[];
+  /**
+   * F06/A7 (CEO audit F06, older audit P1.4/A8): `true` (default) is correct only for a table that
+   * holds **every** row of its result set — a single document's own lines (an invoice's, a
+   * mission-margin breakdown's), which this component's client-side `getSortedRowModel` sorts
+   * exactly, page or no page.
+   *
+   * `false` is for a table backed by **server pagination** (the invoice list, the CRA list, both
+   * pré-facturier tables): there, a client-side sort orders the one page currently loaded, not the
+   * result set — clicking "trier par période" would reorder ten rows out of hundreds and call it
+   * sorted. Threading a sort specification through the URL, the API and the repository so the
+   * whole result set could be sorted is deferred (`docs/open-questions.md`, dated); until it lands,
+   * the honest behaviour is no sort control here at all, not one that quietly lies about its
+   * scope. This never fetches every row to fake a global sort — that trade is exactly the one
+   * being refused.
+   */
+  readonly sortable?: boolean;
 }
 
 export function DataTable<TData>({
@@ -63,6 +79,7 @@ export function DataTable<TData>({
   getRowId,
   emptyState,
   numericColumns = [],
+  sortable = true,
 }: DataTableProps<TData>): ReactElement {
   const [sorting, setSorting] = useState<SortingState>([]);
   const numericColumnIds = new Set(numericColumns);
@@ -82,6 +99,12 @@ export function DataTable<TData>({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getRowId,
+    // `enableSorting: false` (table-wide, not per-column) is what makes `header.column.getCanSort()`
+    // false for every column below regardless of each `ColumnDef`'s own default — the same branch
+    // that already renders a plain header, with no button and no icon, for a column that opts out
+    // one at a time (the `actions` column every screen already has) now renders every column that
+    // way when the *table* opts out.
+    enableSorting: sortable,
     state: { sorting },
     onSortingChange: setSorting,
   });

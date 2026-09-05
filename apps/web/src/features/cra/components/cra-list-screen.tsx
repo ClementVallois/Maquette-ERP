@@ -343,6 +343,8 @@ export function CraListScreen({
               data={rows}
               getRowId={(row) => row.id}
               numericColumns={['recordedQuarterDays']}
+              // F06/A7: server-paginated (see `DataTable`'s own `sortable` doc comment).
+              sortable={false}
               emptyState={emptyState}
             />
           </div>
@@ -353,6 +355,7 @@ export function CraListScreen({
           data={rows}
           getRowId={(row) => row.id}
           numericColumns={['recordedQuarterDays']}
+          sortable={false}
           emptyState={emptyState}
         />
       )}

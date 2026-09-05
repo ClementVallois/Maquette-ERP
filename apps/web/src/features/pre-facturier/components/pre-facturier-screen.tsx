@@ -590,6 +590,8 @@ export function PreFacturierScreen({
           data={data.invoices}
           getRowId={(row) => row.id}
           numericColumns={['lineCount', 'totalTtc']}
+          // F06/A7: server-paginated (see `DataTable`'s own `sortable` doc comment).
+          sortable={false}
           emptyState={
             invoicesOutOfRange ? (
               <EmptyState
@@ -663,6 +665,7 @@ export function PreFacturierScreen({
           data={data.cras}
           getRowId={(row) => row.craId}
           numericColumns={['recorded']}
+          sortable={false}
           emptyState={
             crasOutOfRange ? (
               <EmptyState
