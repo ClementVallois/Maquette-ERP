@@ -126,6 +126,18 @@ directions are tested). Derived on every read, never stored. Both
 concept has its own word instead of borrowing that one.
 _Avoid_: Team, Reporting line, Hierarchy view, Direct reports (as a noun for the whole read)
 
+**ManagerStaffing** (displayed as _Répartition de l'équipe_):
+Two counts, as of today, over the consultants of one `Office`: how many are on a client `Mission`
+and how many sit in `Intercontrat` (the `staffing` field of `GET /api/v1/dashboard`, ADR-0098).
+Not a list and never a stored one — it is derived on every read from the `Assignment`s active
+today, and a consultant carrying both a real mission and an `Intercontrat` row counts as on
+mission, because staffed on real work takes precedence over also being benched. It is an aggregate
+about an `Office`, which is what separates it from `Roster` (that office's people, named) and from
+`Assignment` (one consultant on one mission, dated). `Assignment` lists _Staffing_ under its own
+_Avoid_, and this entry is why the word is allowed here: it is not a synonym for one assignment,
+it is the count of them, and the qualifier `Manager` is what keeps the two apart on sight.
+_Avoid_: Occupancy, Utilisation, Bench report, Capacity
+
 **CSE** (🇫🇷 kept — _comité social et économique_):
 The French works council, whose notices are one of the message kinds the dashboard's company-news
 module carries (`features/dashboard/company-news.ts`). Statutory, and untranslatable without loss:

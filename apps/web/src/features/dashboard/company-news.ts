@@ -3,8 +3,11 @@
 // override for `news-*.svg` is what guarantees that (its comment explains why a `?url` suffix
 // alone did not).
 import newsFormation from '@/assets/news-formation.svg';
-import newsSecurite from '@/assets/news-securite.svg';
 import newsTeam from '@/assets/news-team.svg';
+// A plain import too, but this one needs no `assetsInlineLimit` entry (ADR-0092): at ~53KB it
+// already sits well above Vite's default 4096-byte inline threshold, so it is emitted as its own
+// content-hashed file the same way ADR-0092's three SVGs had to be told to be.
+import securityAlert from '@/assets/security-alert.webp';
 
 /**
  * Item 17, QA round 3: static, authored content for the dashboard's "informations CSE / vie de
@@ -18,7 +21,9 @@ import newsTeam from '@/assets/news-team.svg';
  * `import` puts a file in Vite's module graph, which is what makes it content-hashed into
  * `dist/assets/` at build time (`apps/web/index.html`'s own comment on the favicon has the full
  * reasoning) — a literal path string in a plain data module is invisible to that pipeline and
- * would 404 in production despite working in dev.
+ * would 404 in production despite working in dev. Item 1, QA round 5 swapped the security entry's
+ * illustration for a real "security alert" photo (`security-alert.webp`); the two training/team
+ * SVGs are unchanged.
  */
 
 export interface CompanyNewsMessage {
@@ -59,7 +64,7 @@ const MESSAGES: readonly CompanyNewsMessage[] = [
     body: 'Plusieurs cabinets du secteur ont signalé des emails frauduleux imitant des demandes de notes de frais urgentes. Ne cliquez sur aucun lien de ce type et transférez tout message suspect à securite-interne@secureco.test avant de le supprimer.',
     publishedAt: '2026-08-29',
     author: 'RSSI — Direction de la sécurité',
-    imageSrc: newsSecurite,
+    imageSrc: securityAlert,
     attachmentName: null,
   },
   {

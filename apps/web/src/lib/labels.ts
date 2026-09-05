@@ -218,9 +218,26 @@ export const LABELS = {
       tableCaption: 'Les mêmes chiffres, en tableau.',
       year: 'Année',
       total: 'Total',
-      /** Item 23, QA round 3 — the eye/eye-off affordance (`VisibilityToggle`) on this section. */
-      hide: 'Masquer les graphiques',
-      show: 'Afficher les graphiques',
+    },
+    /** Item 3, QA round 5 (ADR-0098): the manager's own replacement for the invoice-history charts
+     * above, which are not relevant to a manager's own question ("who is staffed on what, right
+     * now"). Billing renders no chart at all — see `chartsUnavailable` below. */
+    staffing: {
+      heading: 'Répartition de l’équipe',
+      /** States plainly that this is "now", not the period the rest of the screen is showing —
+       * ADR-0098's own reasoning for why the figure is not scoped to `period`. */
+      caption: 'Aujourd’hui, pas la période affichée ci-dessus.',
+      onMission: 'En mission',
+      intercontrat: 'Intercontrat',
+      empty: 'Aucun consultant actif dans cette implantation.',
+      hide: 'Masquer la répartition de l’équipe',
+      show: 'Afficher la répartition de l’équipe',
+    },
+    /** Item 3, QA round 5: billing's deliberate empty state where the invoice-history charts used
+     * to render — a stated absence, not a silent hole in the layout. */
+    chartsUnavailable: {
+      heading: 'Graphiques',
+      body: 'Aucun graphique pour ce rôle pour le moment.',
     },
     /** Item 17, QA round 3: the dashboard's "informations CSE / vie de l’entreprise" module — a
      * small rotating carousel of authored company-news messages, every role. */
@@ -368,7 +385,7 @@ export const LABELS = {
       clearRow: 'Vider la ligne',
       removeRow: 'Retirer la ligne',
       addActivity: 'Ajouter une activité',
-      addActivityPlaceholder: 'Choisir une mission…',
+      addActivityPlaceholder: 'Ajouter une mission…',
       noActivityToAdd: 'Toutes les missions affectées ce mois-ci figurent déjà dans la grille.',
       notAssignableThisDay: 'Mission non affectée ce jour-là.',
       /** task 6.2's day-total signal (`isDayOverbooked`, `matrix.ts`) — never a blocker: the

@@ -21,6 +21,7 @@ const manager = (overrides: Partial<ManagerDashboard> = {}): ManagerDashboard =>
   billableCents: 0,
   lateCras: 0,
   awaitingDecision: [],
+  staffing: { onMission: 0, intercontrat: 0 },
   recentActivity: [],
   ...overrides,
 });

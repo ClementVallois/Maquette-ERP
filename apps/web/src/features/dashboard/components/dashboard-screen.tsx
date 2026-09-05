@@ -1,21 +1,16 @@
 import { Link } from '@tanstack/react-router';
 import type { ReactElement, ReactNode } from 'react';
-import { useState } from 'react';
 
 import { linkOf, type ActionLink } from '@/components/action-link';
 import { DeniedState } from '@/components/feedback/denied-state';
 import { ErrorState } from '@/components/feedback/error-state';
 import { StatCard } from '@/components/stat-card';
-import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { VisibilityToggle } from '@/components/visibility-toggle';
-import { useInvoiceHistory } from '@/features/factures/hooks';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
 import { frenchDate, frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
-import { readLocalPreference, writeLocalPreference } from '@/lib/local-preference';
 import { currentPeriod } from '@/lib/period';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
@@ -30,8 +25,9 @@ import type {
   ManagerDashboard,
 } from '../types';
 
+import { BillingChartsPlaceholder } from './billing-charts-placeholder';
 import { CompanyNewsPanel } from './company-news-panel';
-import { InvoiceHistoryChart } from './invoice-history-chart';
+import { ManagerStaffingPanel } from './manager-staffing-panel';
 import { OrgChartPanel } from './org-chart-panel';
 
 /** The dense months the seed actually fills — A5's escape hatch off a genuinely blank one. */
@@ -291,43 +287,6 @@ function queueOf(data: DashboardResponse): readonly QueueItem[] {
   }
 }
 
-/**
- * ADR-0082: `refusedPeriods` other than the one already covered by `hints.refused` (via
- * `ActionCard`/`callToAction` above) — a refusal does not stop needing a correction just because
- * `period` moved past it. Folded into the queue above (`consultantQueue`); this component still
- * renders the same fact as a destructive alert, kept for the visual weight a refusal deserves
- * beyond one queue row among others.
- */
-function RefusedElsewhereNotices({
-  data,
-}: {
-  readonly data: ConsultantDashboard;
-}): ReactElement | null {
-  const labels = LABELS.dashboard.consultant;
-  const elsewhere = data.refusedPeriods.filter((period) => period !== data.period);
-
-  if (elsewhere.length === 0) return null;
-
-  return (
-    <div className="flex flex-col gap-2">
-      {elsewhere.map((period) => (
-        <Alert key={period} variant="destructive">
-          <AlertDescription>
-            {labels.refusedElsewhere.replace('{month}', frenchMonth(period))}
-          </AlertDescription>
-          <AlertAction>
-            <Button asChild size="sm" variant="outline">
-              <Link to="/cra/$period" params={{ period }}>
-                {labels.openRefused}
-              </Link>
-            </Button>
-          </AlertAction>
-        </Alert>
-      ))}
-    </div>
-  );
-}
-
 function ConsultantCards({ data }: { readonly data: ConsultantDashboard }): ReactElement {
   const labels = LABELS.dashboard.consultant;
   const status = data.myMonthStatus;
@@ -342,8 +301,12 @@ function ConsultantCards({ data }: { readonly data: ConsultantDashboard }): Reac
         <StatCard label={labels.recorded} value={frenchDays(data.recordedQuarterDays)} />
         <StatCard label={labels.remaining} value={String(data.remainingWorkableDays)} />
       </div>
+      {/* ADR-0097: the destructive `RefusedElsewhereNotices` alert this used to render alongside
+          `ActionCard` is gone — `consultantQueue`'s own "à faire maintenant" row already carries
+          the identical fact and the identical "Ouvrir ce CRA" action for every refused period
+          other than the one showing here, so keeping both put the same call to action on the
+          screen twice. */}
       <ActionCard {...callToAction(data)} />
-      <RefusedElsewhereNotices data={data} />
     </div>
   );
 }
@@ -415,54 +378,6 @@ function BillingCards({ data }: { readonly data: BillingDashboard }): ReactEleme
         <StatCard label={labels.totalIssued} value={frenchEuros(data.totalTtcIssuedCents)} />
       </div>
     </div>
-  );
-}
-
-/**
- * Rank A2 — manager and billing only: both roles already read invoice data elsewhere
- * (`GET /api/v1/invoices`, `forRoles('manager', 'billing')`), and `GET /api/v1/invoices/history`
- * carries the same gate. A consultant has no invoice visibility anywhere in this application, so
- * this section renders nothing for that role rather than a 403 nobody asked for.
- */
-function chartsVisibleKey(personaKey: string): string {
-  return `erp:dashboard-charts-visible:${personaKey}`;
-}
-
-/**
- * Item 23, QA round 3: the same eye/eye-off affordance as item 17's company-news module,
- * `VisibilityToggle`, persisted in `localStorage` keyed by persona (`lib/local-preference.ts`'s
- * own header explains why an unscoped key would leak). Shown by default, same as item 17 —
- * `readLocalPreference` returning `null` (nothing stored yet) reads as visible.
- */
-function HistorySection({ personaKey }: { readonly personaKey: string }): ReactElement | null {
-  const key = chartsVisibleKey(personaKey);
-  const [visible, setVisible] = useState(() => readLocalPreference(key) !== 'false');
-  const query = useInvoiceHistory();
-
-  if (query.isError) return null;
-
-  return (
-    <section className="flex flex-col gap-6 rounded-xl bg-card p-5 shadow-card ring-1 ring-border">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-card-title">{LABELS.dashboard.history.heading}</h2>
-        <VisibilityToggle
-          visible={visible}
-          hideLabel={LABELS.dashboard.history.hide}
-          showLabel={LABELS.dashboard.history.show}
-          onToggle={() => {
-            const next = !visible;
-            setVisible(next);
-            writeLocalPreference(key, String(next));
-          }}
-        />
-      </div>
-      {visible &&
-        (query.isPending ? (
-          <Skeleton className="h-64 w-full" />
-        ) : (
-          <InvoiceHistoryChart data={query.data} />
-        ))}
-    </section>
   );
 }
 
@@ -553,9 +468,10 @@ export function DashboardScreen({ role, period, personaKey }: DashboardScreenPro
 
       <CompanyNewsPanel personaKey={personaKey} />
 
-      {(data.role === 'manager' || data.role === 'billing') && (
-        <HistorySection personaKey={personaKey} />
+      {data.role === 'manager' && (
+        <ManagerStaffingPanel personaKey={personaKey} staffing={data.staffing} />
       )}
+      {data.role === 'billing' && <BillingChartsPlaceholder />}
 
       {(data.role === 'consultant' || data.role === 'manager') && <OrgChartPanel />}
 

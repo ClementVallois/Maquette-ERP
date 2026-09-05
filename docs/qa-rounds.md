@@ -1,13 +1,14 @@
 # QA rounds — what a read of the running mockup asked for
 
-Four review passes over the running application, by the person who owns the decisions, after
+Five review passes over the running application, by the person who owns the decisions, after
 Phase 6 and the front-end plan had merged. They are cited by number across `docs/adr/` ("item 4,
 QA round 1"), and this file is what those citations resolve to. It records **what was asked**, not
 what was done: the how lives in the commit that carries each item, and the decisions each one
 forced live in the ADRs named below.
 
 Rounds 1 and 2 were worked on the branch `fix/qa-round-1`, round 3 on `fix/qa-round-3` and
-`fix/qa-round-3-mobile`, round 4 on `fix/qa-round-4-doc-and-scope`. One item per commit throughout.
+`fix/qa-round-3-mobile`, round 4 on `fix/qa-round-4-doc-and-scope`, round 5 on `fix/qa-round-5`. One
+item per commit throughout.
 
 ## Round 1 — worked 31/08/2026
 
@@ -94,3 +95,19 @@ only because the branch and the citations were already written that way.
 
 Its checkpoint — what did not run, and what each raised point resolved to — is in
 `docs/open-questions.md`, under "QA round 4 checkpoint".
+
+## Round 5 — worked 04/09/2026
+
+A fresh read of the running application, six items.
+
+| #   | What was asked                                                                                                                                                                                                                                                                                             | Outcome            |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 1   | The company-news module: a real illustration for the security item; the previous/next arrows framing the text at a fixed position instead of moving with it; a narrow-width fallback; a smooth timer bar; a smooth transition between messages; the pause covering the whole module, not one element in it | Shipped — ADR-0096 |
+| 2   | Only one "Ouvrir ce CRA" call to action on the consultant dashboard — a validated current month plus a refused earlier month showed three overlapping prompts                                                                                                                                              | Shipped — ADR-0097 |
+| 3   | The dashboard charts, by role: the existing ones are not deleted, but stop being relevant to a manager — replaced with something that is (staffing); billing gets a deliberate empty state, not a hole                                                                                                     | Shipped — ADR-0098 |
+| 4   | The mobile topbar on the CRA page reads "Mes CRA — septembre", too long to fit; keep only "Mes CRA" below the `md` breakpoint, desktop unchanged                                                                                                                                                           | Shipped            |
+| 5   | "Choisir une mission…" becomes "Ajouter une mission…" — the control that adds a mission line to a CRA                                                                                                                                                                                                      | Shipped            |
+| 6   | The CRA legend's colour swatches are invisible against the page background when expanded                                                                                                                                                                                                                   | Shipped            |
+
+Its checkpoint — what did not run, and what each raised point resolved to — is in
+`docs/open-questions.md`, under "QA round 5 checkpoint".

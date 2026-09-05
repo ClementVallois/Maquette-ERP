@@ -28,6 +28,9 @@ const ORIGIN = 'http://localhost:3000';
 const SECRET = 'd'.repeat(40);
 
 const PARIS = 'dashapi-office-paris';
+// ADR-0098's office-scope test seeds this office only inside its own `it()`, not in `beforeEach`
+// — every other test in this file stays Paris-only, exactly as before.
+const LYON = 'dashapi-office-lyon';
 const ALICE = 'dashapi-alice';
 const CHLOE = 'dashapi-chloe';
 const BRUNO = 'dashapi-bruno';
@@ -100,6 +103,14 @@ const personas: readonly Persona[] = [
     officeId: PARIS,
     officeName: 'Paris',
     displayName: 'Henri Dubois',
+  },
+  {
+    key: 'manager-lyon',
+    role: 'manager',
+    consultantId: 'dashapi-emma-lyon-manager',
+    officeId: LYON,
+    officeName: 'Lyon',
+    displayName: 'Emma Girard',
   },
 ];
 
@@ -288,6 +299,10 @@ describe('GET /api/v1/dashboard — manager', () => {
           statusChangedAt: '2026-07-01T09:00:00.000Z',
         },
       ],
+      // ADR-0098: Alice and Chloé are both assigned to `MISSION` (Regie, not `Intercontrat`) —
+      // both count as `onMission`, none in `Intercontrat`. `NOW` (02/07) falls inside both
+      // assignments' open-ended `from_date`, so today's snapshot sees them.
+      staffing: { onMission: 2, intercontrat: 0 },
       // The one Cra with a `statusChangedAt` — Alice's is still a draft. `at` is the fixture's
       // own literal `submitted_at`, not a clock read at request time.
       recentActivity: [
@@ -319,6 +334,9 @@ describe('GET /api/v1/dashboard — manager', () => {
       billableCents: 1_760_000,
       lateCras: 1,
       awaitingDecision: [],
+      // ADR-0098: unaffected by validating Chloé's Cra — staffing reads assignments, not Cra
+      // status.
+      staffing: { onMission: 2, intercontrat: 0 },
       // Same Cra, now validated: `statusChangedAt` moves to `NOW`, the fixed clock
       // `validateChloeJune()`'s own request runs under — deterministic, not a wall-clock read.
       recentActivity: [
@@ -355,6 +373,88 @@ describe('GET /api/v1/dashboard — manager', () => {
       // 22 workable June days × 800 € — the requested period's own total, unaffected by May.
       billableCents: 0,
     });
+  });
+});
+
+/**
+ * Item 3, QA round 5 (ADR-0098): `managerStaffingSnapshot`'s two contracts — the discriminator is
+ * the mission's **name**, not its `billing_model`, and the read is scoped by office.
+ */
+describe('GET /api/v1/dashboard — manager staffing (ADR-0098)', () => {
+  it('splits by mission name, not billing model: a non-Intercontrat Forfait mission still counts as onMission', async () => {
+    const claire = 'dashapi-claire-intercontrat';
+    const david = 'dashapi-david-forfait';
+    const missionIntercontrat = 'dashapi-mission-intercontrat';
+    const missionForfait = 'dashapi-mission-forfait-interne';
+
+    await transaction.client.query(
+      `INSERT INTO public.consultants (id, first_name, last_name, email, office_id, practice_id, role)
+       VALUES ($1, 'Claire', 'Petit', 'dashapi-claire@t', $3, 'dashapi-practice', 'consultant'),
+              ($2, 'David', 'Roux', 'dashapi-david@t', $3, 'dashapi-practice', 'consultant')`,
+      [claire, david, PARIS],
+    );
+    // Two missions with the same `billing_model` ('Forfait') as `Intercontrat` genuinely is
+    // (ADR-0046) — only the one named exactly `Intercontrat` may read as such; a same-shaped
+    // internal-sounding Forfait mission with any other name is real staffed work.
+    await transaction.client.query(
+      `INSERT INTO public.missions (id, client_id, name, billing_model, start_date)
+       VALUES ($1, $3, 'Intercontrat', 'Forfait', '2026-01-05'),
+              ($2, $3, 'Refonte SI interne', 'Forfait', '2026-01-05')`,
+      [missionIntercontrat, missionForfait, CLIENT],
+    );
+    await transaction.client.query(
+      `INSERT INTO public.assignments (id, consultant_id, mission_id, from_date, to_date)
+       VALUES ($1, $3, $5, '2026-01-05', NULL), ($2, $4, $6, '2026-01-05', NULL)`,
+      [uuidv7(), uuidv7(), claire, david, missionIntercontrat, missionForfait],
+    );
+
+    const response = await dashboard('manager-paris');
+
+    expect(response.statusCode).toBe(200);
+    // Alice + Chloé (Regie, from `beforeEach`) + David (Forfait, not `Intercontrat`) = onMission;
+    // Claire (the mission literally named `Intercontrat`) alone in the other bucket.
+    expect(response.json()).toMatchObject({ staffing: { onMission: 3, intercontrat: 1 } });
+  });
+
+  it('a manager reads only their own office’s split, never the other’s', async () => {
+    const emma = 'dashapi-emma-lyon-manager';
+    const marc = 'dashapi-marc-lyon-intercontrat';
+    const missionIntercontrat = 'dashapi-mission-intercontrat-lyon';
+
+    await transaction.client.query(
+      `INSERT INTO public.offices (id, name, city) VALUES ($1, 'Lyon', 'Lyon')`,
+      [LYON],
+    );
+    await transaction.client.query(
+      `INSERT INTO public.consultants (id, first_name, last_name, email, office_id, practice_id, role)
+       VALUES ($1, 'Emma', 'Girard', 'dashapi-emma@t', $3, 'dashapi-practice', 'manager'),
+              ($2, 'Marc', 'Faure', 'dashapi-marc@t', $3, 'dashapi-practice', 'consultant')`,
+      [emma, marc, LYON],
+    );
+    await transaction.client.query(
+      `INSERT INTO public.missions (id, client_id, name, billing_model, start_date)
+       VALUES ($1, $2, 'Intercontrat', 'Forfait', '2026-01-05')`,
+      [missionIntercontrat, CLIENT],
+    );
+    await transaction.client.query(
+      `INSERT INTO public.assignments (id, consultant_id, mission_id, from_date, to_date)
+       VALUES ($1, $2, $3, '2026-01-05', NULL)`,
+      [uuidv7(), marc, missionIntercontrat],
+    );
+
+    const [parisResponse, lyonResponse] = await Promise.all([
+      dashboard('manager-paris'),
+      dashboard('manager-lyon'),
+    ]);
+
+    expect(parisResponse.statusCode).toBe(200);
+    expect(lyonResponse.statusCode).toBe(200);
+    // Deliberately not the same numbers either way round, so a scope leak (reading both offices,
+    // or swapping them) cannot pass by coincidence: Paris is Alice + Chloé on a client mission and
+    // nobody in `Intercontrat`; Lyon is the opposite shape, one consultant and it is Marc, in
+    // `Intercontrat`.
+    expect(parisResponse.json()).toMatchObject({ staffing: { onMission: 2, intercontrat: 0 } });
+    expect(lyonResponse.json()).toMatchObject({ staffing: { onMission: 0, intercontrat: 1 } });
   });
 });
 

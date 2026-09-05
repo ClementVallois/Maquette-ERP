@@ -487,10 +487,19 @@ export function CraLegend(): ReactElement {
           />
         </Button>
       </CollapsibleTrigger>
-      <CollapsibleContent className="flex flex-wrap gap-x-4 gap-y-1.5 px-1 pt-2 text-xs text-muted-foreground">
+      {/* Item 6, QA round 5: `--flag-weekend-bg` is the exact same colour as `--background`
+          (`styles/globals.css`), so expanded on the page background the weekend swatch was
+          literally invisible. `bg-card` alone does not fix that — on `--card` it is still 1.08:1,
+          and `--flag-holiday-bg` 1.03:1. The swatches carry their own `ring-1 ring-border` below:
+          a near-white fill is what these two flags *mean*, so what has to read is the chip's edge,
+          not its fill. Tokens rather than literals throughout. */}
+      <CollapsibleContent className="flex flex-wrap gap-x-4 gap-y-1.5 rounded-lg bg-card p-3 text-xs text-muted-foreground ring-1 ring-border">
         {swatches.map((swatch) => (
           <span key={swatch.key} className="flex items-center gap-1.5">
-            <span aria-hidden="true" className={cn('size-3 shrink-0 rounded', swatch.className)} />
+            <span
+              aria-hidden="true"
+              className={cn('size-3 shrink-0 rounded ring-1 ring-border', swatch.className)}
+            />
             {swatch.label}
           </span>
         ))}
