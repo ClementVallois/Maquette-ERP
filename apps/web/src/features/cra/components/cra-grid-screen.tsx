@@ -50,7 +50,7 @@ import { missingDaysFrom } from '../missing-days';
 import type { CraGridResponse, GridDay } from '../types';
 
 import { CopyPreviousMonthDialog } from './copy-previous-month-dialog';
-import { CraLegend, CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
+import { CraDayCards, CraLegend, CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
 import type { CellQuantity } from './cra-quantity-cell';
 import { CraTimeline } from './cra-timeline';
 
@@ -410,13 +410,12 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
           onChange={setMobileWeekIndex}
         />
         <div className="mt-2">
-          <CraMatrixTable
+          <CraDayCards
             period={period}
             days={mobileDays}
             rows={rows}
             matrix={matrix}
             editable={data.editable}
-            compact
             totalLabel={LABELS.cra.weekTotal}
             cellIdPrefix="mobile"
             flaggedDays={flaggedDays}
@@ -556,7 +555,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
           <Button
             className="flex-1 md:flex-none"
             variant="outline"
-            disabled={saveMonth.isPending}
+            pending={saveMonth.isPending}
             onClick={() => {
               void handleSubmitMonth(false);
             }}
@@ -565,7 +564,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
           </Button>
           <Button
             className="flex-1 md:flex-none"
-            disabled={saveMonth.isPending}
+            pending={saveMonth.isPending}
             onClick={() => {
               void handleSubmitMonth(true);
             }}

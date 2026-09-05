@@ -1,6 +1,6 @@
 import { CalendarRangeIcon, PencilIcon, PlusIcon } from 'lucide-react';
 import type { ReactElement, SyntheticEvent } from 'react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { EmptyState } from '@/components/feedback/empty-state';
@@ -43,6 +43,8 @@ export function AssignmentScreen(): ReactElement {
   const save = useSaveAssignment();
   const [form, setForm] = useState<AssignmentInput>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [consultantSearch, setConsultantSearch] = useState('');
+  const formHeading = useRef<HTMLHeadingElement>(null);
   const [filter, setFilter] = useState<ViewFilter>('current');
 
   if (query.isPending) {
@@ -70,10 +72,28 @@ export function AssignmentScreen(): ReactElement {
   const upcoming = data.assignments.filter((assignment) => isUpcoming(assignment, data.today));
   const visible = filter === 'current' ? current : data.assignments;
   const selectedMission = data.missions.find((mission) => mission.id === form.missionId);
+  const selectedConsultant = data.consultants.find(
+    (consultant) => consultant.id === form.consultantId,
+  );
+  const normalize = (value: string): string =>
+    value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/gu, '')
+      .toLocaleLowerCase('fr-FR')
+      .trim();
+  const matchingConsultants = data.consultants.filter(
+    (consultant) =>
+      consultant.departureDate === null &&
+      normalize(consultant.name).includes(normalize(consultantSearch)),
+  );
   const mutationProblem = save.error instanceof ApiProblemError ? save.error.problem : null;
 
   const startEditing = (assignment: Assignment): void => {
+    save.reset();
+    setConsultantSearch('');
     setEditingId(assignment.id);
+    formHeading.current?.scrollIntoView({ block: 'start' });
+    formHeading.current?.focus({ preventScroll: true });
     setForm({
       consultantId: assignment.consultantId,
       missionId: assignment.missionId,
@@ -84,6 +104,7 @@ export function AssignmentScreen(): ReactElement {
 
   const resetForm = (): void => {
     setEditingId(null);
+    setConsultantSearch('');
     setForm(EMPTY_FORM);
     save.reset();
   };
@@ -104,123 +125,205 @@ export function AssignmentScreen(): ReactElement {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label={LABELS.assignment.current} value={String(current.length)} />
-        <StatCard label={LABELS.assignment.upcoming} value={String(upcoming.length)} />
-        <StatCard label={LABELS.assignment.consultants} value={String(data.consultants.length)} />
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <StatCard
+          className="justify-between p-3 sm:p-5"
+          label={LABELS.assignment.current}
+          value={String(current.length)}
+        />
+        <StatCard
+          className="justify-between p-3 sm:p-5"
+          label={LABELS.assignment.upcoming}
+          value={String(upcoming.length)}
+        />
+        <StatCard
+          className="justify-between p-3 sm:p-5"
+          label={LABELS.assignment.consultants}
+          value={String(data.consultants.length)}
+        />
       </div>
 
-      <section className="rounded-xl bg-card p-5 shadow-card ring-1 ring-border">
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-card-title">
-              {editingId === null ? LABELS.assignment.new : LABELS.assignment.edit}
-            </h2>
-            <p className="text-sm text-muted-foreground">{LABELS.assignment.formLead}</p>
-          </div>
-          {editingId !== null && (
-            <Button type="button" variant="ghost" onClick={resetForm}>
-              {LABELS.assignment.cancelEdit}
-            </Button>
-          )}
+      <section className="rounded-xl bg-card p-4 shadow-card ring-1 ring-border sm:p-6">
+        <div className="mb-5 border-b border-border pb-4">
+          <h2 ref={formHeading} tabIndex={-1} className="scroll-mt-4 text-card-title outline-none">
+            {editingId === null ? LABELS.assignment.new : LABELS.assignment.edit}
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            {LABELS.assignment.formLead}
+          </p>
         </div>
         <form
-          className="grid gap-4 lg:grid-cols-5 lg:items-end"
+          className="flex min-w-0 flex-col gap-5"
           onSubmit={(event) => {
             void submit(event);
           }}
         >
-          {/* Item 34, QA round 3: `min-w-0` on the grid items, and `w-full min-w-0` on the two
-              `<select>`s below. A grid track is `minmax(auto, 1fr)`, and a `<select>`'s auto
-              minimum is the width of its widest `<option>` — "Banque Nationale de Test — Audit
-              DORA" here. Below `lg` this form is one column, so that one option stretched the
-              track to 466px inside a 351px page and the whole scrollport panned sideways. */}
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor="assignment-consultant">{LABELS.assignment.consultant}</Label>
-            <select
-              id="assignment-consultant"
-              className="h-8 w-full min-w-0 rounded-lg border border-input bg-background px-2.5 text-sm"
-              value={form.consultantId}
-              disabled={editingId !== null}
-              required
-              onChange={(event) => {
-                setForm({ ...form, consultantId: event.target.value });
-              }}
-            >
-              <option value="">{LABELS.assignment.chooseConsultant}</option>
-              {data.consultants.map((consultant) => (
-                <option
-                  key={consultant.id}
-                  value={consultant.id}
-                  disabled={consultant.departureDate !== null}
-                >
-                  {consultant.name}
-                </option>
-              ))}
-            </select>
+          <fieldset
+            disabled={save.isPending}
+            className="grid min-w-0 gap-5 lg:grid-cols-2 lg:gap-8"
+          >
+            <div className="flex min-w-0 flex-col gap-4">
+              <h3 className="text-sm font-semibold">{LABELS.assignment.selection}</h3>
+              {editingId === null ? (
+                <>
+                  <div className="flex min-w-0 flex-col gap-2">
+                    <Label htmlFor="assignment-search">{LABELS.assignment.searchConsultant}</Label>
+                    <Input
+                      id="assignment-search"
+                      type="search"
+                      className="h-11"
+                      value={consultantSearch}
+                      placeholder={LABELS.assignment.searchPlaceholder}
+                      onChange={(event) => {
+                        setConsultantSearch(event.target.value);
+                      }}
+                    />
+                    <Label htmlFor="assignment-consultant">{LABELS.assignment.consultant}</Label>
+                    <select
+                      id="assignment-consultant"
+                      className="h-11 w-full min-w-0 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
+                      value={form.consultantId}
+                      required
+                      onChange={(event) => {
+                        setForm({ ...form, consultantId: event.target.value });
+                      }}
+                    >
+                      <option value="">{LABELS.assignment.chooseConsultant}</option>
+                      {selectedConsultant !== undefined &&
+                        !matchingConsultants.some(
+                          (consultant) => consultant.id === selectedConsultant.id,
+                        ) && (
+                          <option value={selectedConsultant.id}>{selectedConsultant.name}</option>
+                        )}
+                      {matchingConsultants.map((consultant) => (
+                        <option key={consultant.id} value={consultant.id}>
+                          {consultant.name}
+                        </option>
+                      ))}
+                    </select>
+                    {matchingConsultants.length === 0 && (
+                      <p role="status" className="text-sm text-muted-foreground">
+                        {LABELS.assignment.noSearchResults}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-2">
+                    <Label htmlFor="assignment-mission">{LABELS.assignment.mission}</Label>
+                    <select
+                      id="assignment-mission"
+                      className="h-11 w-full min-w-0 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
+                      value={form.missionId}
+                      required
+                      onChange={(event) => {
+                        setForm({ ...form, missionId: event.target.value });
+                      }}
+                    >
+                      <option value="">{LABELS.assignment.chooseMission}</option>
+                      {data.missions.map((mission) => (
+                        <option key={mission.id} value={mission.id}>
+                          {mission.clientName} — {mission.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <dl className="flex flex-col gap-3 rounded-lg bg-muted p-4 text-sm">
+                  <div>
+                    <dt className="text-muted-foreground">{LABELS.assignment.consultant}</dt>
+                    <dd className="mt-1 font-medium">{selectedConsultant?.name}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">{LABELS.assignment.mission}</dt>
+                    <dd className="mt-1 font-medium">
+                      {selectedMission?.clientName} — {selectedMission?.name}
+                    </dd>
+                  </div>
+                </dl>
+              )}
+              {selectedMission !== undefined && (
+                <div className="rounded-lg border border-border p-3 text-sm text-muted-foreground">
+                  <p className="font-medium text-foreground">
+                    {selectedMission.clientName} — {selectedMission.name}
+                  </p>
+                  <p className="mt-2">
+                    {LABELS.assignment.missionDates} : {frenchDate(selectedMission.startDate)} ·{' '}
+                    {selectedMission.endDate === null
+                      ? LABELS.assignment.openEnded
+                      : frenchDate(selectedMission.endDate)}
+                  </p>
+                  <div className="mt-2">
+                    <GlossaryTerm term="habilitation" />
+                  </div>
+                  <p className="mt-1">
+                    {selectedMission.requiredHabilitations.length === 0
+                      ? LABELS.assignment.noHabilitation
+                      : LABELS.assignment.requiredHabilitations.replace(
+                          '{names}',
+                          selectedMission.requiredHabilitations.join(', '),
+                        )}
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="flex min-w-0 flex-col gap-4 lg:border-l lg:border-border lg:pl-8">
+              <h3 className="text-sm font-semibold">{LABELS.assignment.dates}</h3>
+              <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+                <div className="flex min-w-0 flex-col gap-2">
+                  <Label htmlFor="assignment-from">{LABELS.assignment.from}</Label>
+                  <Input
+                    id="assignment-from"
+                    type="date"
+                    className="h-11"
+                    value={form.fromDate}
+                    required
+                    onChange={(event) => {
+                      setForm({ ...form, fromDate: event.target.value });
+                    }}
+                  />
+                </div>
+                <div className="flex min-w-0 flex-col gap-2">
+                  <Label htmlFor="assignment-to">{LABELS.assignment.to}</Label>
+                  <Input
+                    id="assignment-to"
+                    type="date"
+                    className="h-11"
+                    value={form.toDate ?? ''}
+                    min={form.fromDate || undefined}
+                    aria-describedby="assignment-end-hint"
+                    onChange={(event) => {
+                      setForm({
+                        ...form,
+                        toDate: event.target.value === '' ? null : event.target.value,
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+              <p id="assignment-end-hint" className="text-sm text-muted-foreground">
+                {LABELS.assignment.endHint}
+              </p>
+            </div>
+          </fieldset>
+          <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
+            {editingId !== null && (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11"
+                disabled={save.isPending}
+                onClick={resetForm}
+              >
+                {LABELS.assignment.cancelEdit}
+              </Button>
+            )}
+            <Button type="submit" className="min-h-11" pending={save.isPending}>
+              {editingId === null ? <PlusIcon /> : <PencilIcon />}
+              {editingId === null ? LABELS.assignment.create : LABELS.assignment.save}
+            </Button>
           </div>
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor="assignment-mission">{LABELS.assignment.mission}</Label>
-            <select
-              id="assignment-mission"
-              className="h-8 w-full min-w-0 rounded-lg border border-input bg-background px-2.5 text-sm"
-              value={form.missionId}
-              disabled={editingId !== null}
-              required
-              onChange={(event) => {
-                setForm({ ...form, missionId: event.target.value });
-              }}
-            >
-              <option value="">{LABELS.assignment.chooseMission}</option>
-              {data.missions.map((mission) => (
-                <option key={mission.id} value={mission.id}>
-                  {mission.clientName} — {mission.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor="assignment-from">{LABELS.assignment.from}</Label>
-            <Input
-              id="assignment-from"
-              type="date"
-              value={form.fromDate}
-              required
-              onChange={(event) => {
-                setForm({ ...form, fromDate: event.target.value });
-              }}
-            />
-          </div>
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor="assignment-to">{LABELS.assignment.to}</Label>
-            <Input
-              id="assignment-to"
-              type="date"
-              value={form.toDate ?? ''}
-              onChange={(event) => {
-                setForm({ ...form, toDate: event.target.value === '' ? null : event.target.value });
-              }}
-            />
-          </div>
-          <Button type="submit" disabled={save.isPending}>
-            {editingId === null ? <PlusIcon /> : <PencilIcon />}
-            {editingId === null ? LABELS.assignment.create : LABELS.assignment.save}
-          </Button>
         </form>
 
-        {selectedMission !== undefined && (
-          <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-            <GlossaryTerm term="habilitation" />
-            <p>
-              {selectedMission.requiredHabilitations.length === 0
-                ? LABELS.assignment.noHabilitation
-                : LABELS.assignment.requiredHabilitations.replace(
-                    '{names}',
-                    selectedMission.requiredHabilitations.join(', '),
-                  )}
-            </p>
-          </div>
-        )}
         {mutationProblem !== null && (
           <Alert variant="destructive" className="mt-4">
             <AlertDescription>{sentenceFor(mutationProblem)}</AlertDescription>
@@ -229,7 +332,7 @@ export function AssignmentScreen(): ReactElement {
       </section>
 
       <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-card-title">{LABELS.assignment.list}</h2>
             <p className="text-sm text-muted-foreground">{LABELS.assignment.listLead}</p>

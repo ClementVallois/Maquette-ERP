@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import { ChevronDownIcon } from 'lucide-react';
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { toast } from 'sonner';
 
 import { RoleBadge } from '@/components/role-badge';
@@ -34,23 +34,26 @@ function initialsOf(displayName: string): string {
 export function PersonaBlock({ persona }: { readonly persona: PersonaSummary }): ReactElement {
   const clearPersona = useClearPersona();
   const navigate = useNavigate();
+  const [changing, setChanging] = useState(false);
 
-  const handleChange = (): void => {
-    clearPersona.mutate(undefined, {
-      onSuccess: () => {
-        void navigate({ to: '/' });
-      },
-      onError: () => {
-        toast.error(LABELS.shell.unexpectedErrorBody);
-      },
-    });
+  const handleChange = async (): Promise<void> => {
+    if (changing) return;
+    setChanging(true);
+    try {
+      await clearPersona.mutateAsync();
+      await navigate({ to: '/' });
+    } catch {
+      toast.error(LABELS.shell.unexpectedErrorBody);
+      setChanging(false);
+    }
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          aria-label={`${LABELS.persona.current} : ${persona.displayName}`}
           // Item 1 (QA round 2): the topbar is a fixed 56px (`h-14`, direction-visuelle.md §6) and
           // this button's own content — two text lines, the second one carrying `RoleBadge`'s own
           // box height — already filled it edge to edge with the old `py-1.5`, so its border sat
@@ -76,18 +79,28 @@ export function PersonaBlock({ persona }: { readonly persona: PersonaSummary }):
           <ChevronDownIcon aria-hidden="true" className="size-4 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel>{LABELS.persona.current}</DropdownMenuLabel>
-        <div className="flex flex-col gap-1 px-1.5 pb-1.5 text-sm text-muted-foreground">
-          <p className="flex items-center gap-1.5">
-            {LABELS.persona.role} : <RoleBadge role={persona.role} />
-          </p>
-          <p>
-            {LABELS.persona.office} : {persona.office}
-          </p>
+      <DropdownMenuContent align="end" className="w-72 max-w-[calc(100vw-1.5rem)] p-2">
+        <DropdownMenuLabel className="px-2">{persona.displayName}</DropdownMenuLabel>
+        <div className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 px-2 py-2 text-sm">
+          <span className="text-muted-foreground">{LABELS.persona.role}</span>
+          <span data-persona-value>
+            <RoleBadge role={persona.role} />
+          </span>
+          <span className="text-muted-foreground">{LABELS.persona.office}</span>
+          <span data-persona-value>{persona.office}</span>
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={handleChange}>{LABELS.persona.change}</DropdownMenuItem>
+        <DropdownMenuItem
+          className="min-h-11 px-2 aria-busy:cursor-progress"
+          aria-disabled={changing}
+          aria-busy={changing || undefined}
+          onSelect={(event) => {
+            event.preventDefault();
+            void handleChange();
+          }}
+        >
+          {changing ? LABELS.persona.loading : LABELS.persona.change}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

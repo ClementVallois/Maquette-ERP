@@ -1,7 +1,9 @@
 import type { ReactElement } from 'react';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { frenchDays } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
+import { cn } from '@/lib/utils';
 
 /**
  * ADR-0070's matrix cell: a quantity in quarter-days, nothing else. ADR-0068's reasons for a
@@ -50,9 +52,10 @@ interface CraQuantityCellProps {
   readonly editable: boolean;
   readonly assignable: boolean;
   readonly onChange: (value: CellQuantity) => void;
-  readonly onNavigate: (direction: NavigationDirection) => void;
-  readonly registerRef: (element: HTMLSelectElement | null) => void;
+  readonly onNavigate?: (direction: NavigationDirection) => void;
+  readonly registerRef?: (element: HTMLSelectElement | null) => void;
   readonly dayDataAttribute?: string;
+  readonly mobile?: boolean;
 }
 
 export function CraQuantityCell({
@@ -67,6 +70,7 @@ export function CraQuantityCell({
   onNavigate,
   registerRef,
   dayDataAttribute,
+  mobile = false,
 }: CraQuantityCellProps): ReactElement {
   const cellId = `cra-cell-${rowKey}-${day}`;
   const accessibleName = `${activityLabel} — ${dayLabel}`;
@@ -94,7 +98,7 @@ export function CraQuantityCell({
         aria-label={accessibleName}
         className="flex h-8 w-full items-center justify-center text-sm tabular-nums"
       >
-        {GLYPHS[value] === '' ? LABELS.cra.nothing : GLYPHS[value]}
+        {mobile ? frenchDays(value) : GLYPHS[value] === '' ? LABELS.cra.nothing : GLYPHS[value]}
       </span>
     );
   }
@@ -121,6 +125,7 @@ export function CraQuantityCell({
         // A modifier means the key belongs to the browser or the OS, never to the grid: Ctrl/Cmd+0
         // is the zoom reset, Alt+ArrowDown opens the native dropdown. Handling those below would
         // both swallow them and, for Ctrl+0, write a 0 into the focused cell.
+        if (onNavigate === undefined) return;
         if (event.altKey || event.ctrlKey || event.metaKey) return;
 
         // Same reasoning as the two-slot control it replaces (ADR-0068): a closed, focused native
@@ -153,11 +158,14 @@ export function CraQuantityCell({
           onChange(parseQuantity(event.key));
         }
       }}
-      className="h-8 w-full appearance-none rounded-lg border border-input bg-background text-center text-sm text-foreground tabular-nums focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+      className={cn(
+        'h-8 w-full appearance-none rounded-lg border border-input bg-background text-center text-sm text-foreground tabular-nums focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
+        mobile && 'h-11 appearance-auto px-2 text-base',
+      )}
     >
       {QUANTITIES.map((quantity) => (
         <option key={quantity} value={String(quantity)} aria-label={quantityOptionLabel(quantity)}>
-          {GLYPHS[quantity]}
+          {mobile ? frenchDays(quantity) : GLYPHS[quantity]}
         </option>
       ))}
     </select>

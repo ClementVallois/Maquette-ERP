@@ -19,7 +19,7 @@ import { useManagerCraGrid, useValidateCra } from '../hooks';
 import { ABSENCE_ROW_KEY, initMatrix } from '../matrix';
 import type { ManagerCraGridResponse, ValidationResponse } from '../types';
 
-import { CraLegend, CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
+import { CraDayCards, CraLegend, CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
 import { CraTimeline } from './cra-timeline';
 import { RefuseDialog } from './refuse-dialog';
 import { ValidateConfirmDialog, type ValidateConfirmFact } from './validate-confirm-dialog';
@@ -224,7 +224,7 @@ function ManagerCraGridBody({
           <div className="flex gap-2">
             <Button
               size="sm"
-              disabled={validateMutation.isPending}
+              pending={validateMutation.isPending}
               onClick={() => {
                 setConfirmingValidate(true);
               }}
@@ -302,14 +302,27 @@ function ManagerCraGridBody({
         </div>
       )}
 
-      <CraMatrixTable
-        period={period}
-        days={data.days}
-        rows={rows}
-        matrix={matrix}
-        editable={false}
-        flaggedDays={flaggedDays}
-      />
+      <div className="md:hidden">
+        <CraDayCards
+          totalLabel={LABELS.cra.monthTotal}
+          period={period}
+          days={data.days}
+          rows={rows}
+          matrix={matrix}
+          editable={false}
+          flaggedDays={flaggedDays}
+        />
+      </div>
+      <div className="hidden md:block">
+        <CraMatrixTable
+          period={period}
+          days={data.days}
+          rows={rows}
+          matrix={matrix}
+          editable={false}
+          flaggedDays={flaggedDays}
+        />
+      </div>
       {/* Item 26, QA round 3: the manager's read-only grid uses the same colour-only weekend/
           holiday header cells as the consultant's own grid, so it needs the same legend. */}
       <CraLegend />

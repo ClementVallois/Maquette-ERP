@@ -449,18 +449,47 @@ mot pour mot, pour que la demande survive à sa réponse.
 
 ## Mobile usability and interaction follow-up — 2026-09-05
 
-- [ ] Find the persona selection flash / forbidden cursor root cause and fix equivalent pending interactions.
-- [ ] Replace the cramped mobile CRA matrix with vertical day/activity entry at 360 × 760, including the manager's read-only view.
-- [ ] Align the mobile topbar persona panel's labels and values.
-- [ ] Align the current-month empty-state card actions.
-- [ ] Redesign new-assignment and date-edit forms for desktop and mobile; add consultant search (also resolves item 37).
-- [ ] Centre mobile business-timeline connectors between their dots everywhere the component is used.
-- [ ] Replace the invoice's long CRA day list with a compact, readable presentation.
-- [ ] Verify the affected interactions and layouts, run relevant checks, and record results.
+- [x] Find the persona selection flash / forbidden cursor root cause and fix equivalent pending interactions.
+- [x] Replace the cramped mobile CRA matrix with vertical day/activity entry at 360 × 760, including the manager's read-only view.
+- [x] Align the mobile topbar persona panel's labels and values.
+- [x] Align the current-month empty-state card actions.
+- [x] Redesign new-assignment and date-edit forms for desktop and mobile; add consultant search (also resolves item 37).
+- [x] Centre mobile business-timeline connectors between their dots everywhere the component is used.
+- [x] Replace the invoice's long CRA day list with a compact, readable presentation.
+- [x] Verify the affected interactions and layouts, run relevant checks, and record results.
+
+Implemented on `fix/mobile-cra-and-interactions`; the request was committed first as `5b8956a`.
+
+The persona flash combined `disabled:opacity-60`, `disabled:cursor-not-allowed`, and a mutation
+that finished before destination navigation. Selection now stays busy through navigation, without
+fading; the shared Button separates pending from unavailable actions across CRA saving, validation,
+refusal, invoice issuance and assignment saving. Its press translation was also removed to avoid
+position jumps. Duplicate writes remain disabled and failed selection can be retried.
+
+The mobile CRA uses shared day cards (ADR-0099), preserving quarter-day values and the existing
+whole-month write. Consultant entry keeps week navigation; the manager reads the month vertically.
+Empty non-workable days expand on demand and retain keyboard focus while editing. The assignment
+form separates selection from dates, filters consultants by name without case/accent sensitivity,
+shows mission context, and scrolls/focuses the form when editing an existing assignment.
+
+The persona panel uses aligned label/value columns. Current-month links have equal mobile widths.
+The shared timeline centres its connectors on its dots. Invoice source dates are an expandable
+two-column grid with a count and total, retaining every source date and the printable CRA link.
+
+Validation: 25 responsive browser checks across 360 / 375 / 768 / 1024 / 1440px; 32 interaction,
+shell and motion checks passed (one existing viewport-specific skip), including nine new regressions
+and axe checks on the changed mobile surfaces. All 626 unit tests passed with coverage gates;
+workspace type checking, boundary checking, changed-file lint, formatting and the production build
+passed. Browser screenshots were inspected at 360 × 760 and 1440 × 900. Early concurrent browser
+runs had intermittent page-load timeouts; the complete responsive and interaction reruns passed.
+
+Double checkpoint: pending navigation, cross-viewport state and hidden-weekend focus were the least
+certain behaviours; they now have browser regressions. Future narrow-screen drift is covered by
+adding 360 × 760 to the shared overflow suite. No domain, API or dependency change was needed.
 
 To do général :
 
-37. Il faut revoir la page d'affectation des missions pour avoir une barre de recherche d'un consultant,
+37. ✅ Done — consultant search added in the mobile usability follow-up above.
 
 ---
 

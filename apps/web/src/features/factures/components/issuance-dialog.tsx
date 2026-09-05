@@ -123,7 +123,7 @@ export function IssuanceDialog({ invoice, onClose }: IssuanceDialogProps): React
               </Button>
               <Button
                 type="button"
-                disabled={issueMutation.isPending}
+                pending={issueMutation.isPending}
                 onClick={() => {
                   void handleConfirm();
                 }}

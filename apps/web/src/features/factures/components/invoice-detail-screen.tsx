@@ -188,7 +188,7 @@ function LineageCard({ item, index }: { item: InvoiceLineage; index: number }): 
       <summary className="cursor-pointer font-medium text-foreground">
         {LABELS.invoice.lineage.line.replace('{number}', String(index + 1))} — {item.missionName}
       </summary>
-      <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-6">
+      <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-3">
         <div>
           <p className="text-muted-foreground">{LABELS.invoice.lineage.cra}</p>
           <a
@@ -199,13 +199,28 @@ function LineageCard({ item, index }: { item: InvoiceLineage; index: number }): 
           >
             {frenchMonth(item.period)}
           </a>
-          <ul className="mt-1 text-xs text-muted-foreground">
-            {item.sourceDays.map((sourceDay) => (
-              <li key={sourceDay.day}>
-                {frenchDate(sourceDay.day)} · {frenchDays(sourceDay.quarterDays)}
-              </li>
-            ))}
-          </ul>
+          <details className="mt-3 rounded-lg border border-border bg-muted/30">
+            <summary className="cursor-pointer p-3 text-sm font-medium">
+              {LABELS.invoice.lineage.sourceDates.replace(
+                '{count}',
+                String(item.sourceDays.length),
+              )}{' '}
+              · {frenchDays(item.quantityQuarterDays)}
+            </summary>
+            <ul className="grid grid-cols-2 gap-2 border-t border-border p-3 text-xs">
+              {item.sourceDays.map((sourceDay) => (
+                <li
+                  key={sourceDay.day}
+                  className="flex flex-wrap items-center justify-between gap-x-2 rounded-md bg-card px-2 py-2 ring-1 ring-border"
+                >
+                  <time dateTime={sourceDay.day}>{frenchDate(sourceDay.day)}</time>
+                  <span className="font-medium tabular-nums">
+                    {frenchDays(sourceDay.quarterDays)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </details>
         </div>
         <LineageStep label={LABELS.invoice.lineage.mission} value={item.missionName} />
         <LineageStep

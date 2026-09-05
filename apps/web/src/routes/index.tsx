@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { TriangleAlertIcon, UsersIcon } from 'lucide-react';
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -33,17 +33,20 @@ function PersonaSelectorPage(): ReactElement {
   const personas = usePersonas();
   const selectPersona = useSelectPersona();
   const navigate = useNavigate();
+  const [choosing, setChoosing] = useState<string | null>(null);
   const { session } = Route.useSearch();
 
-  const choose = (persona: PersonaSummary): void => {
-    selectPersona.mutate(persona.key, {
-      onSuccess: () => {
-        void navigate({ to: '/tableau-de-bord' });
-      },
-      onError: () => {
-        toast.error(LABELS.persona.selectError);
-      },
-    });
+  const choose = async (persona: PersonaSummary): Promise<void> => {
+    if (choosing !== null) return;
+    setChoosing(persona.key);
+    try {
+      await selectPersona.mutateAsync(persona.key);
+      await navigate({ to: '/tableau-de-bord' });
+    } catch {
+      toast.error(LABELS.persona.selectError);
+    } finally {
+      setChoosing(null);
+    }
   };
 
   return (
@@ -109,9 +112,11 @@ function PersonaSelectorPage(): ReactElement {
             <PersonaCard
               key={persona.key}
               persona={persona}
-              pending={selectPersona.isPending && selectPersona.variables === persona.key}
-              disabled={selectPersona.isPending}
-              onChoose={choose}
+              pending={choosing === persona.key}
+              disabled={choosing !== null}
+              onChoose={(chosen) => {
+                void choose(chosen);
+              }}
             />
           ))}
         </ul>
@@ -146,10 +151,11 @@ function PersonaCard({ persona, pending, disabled, onChoose }: PersonaCardProps)
       <button
         type="button"
         disabled={disabled}
+        aria-busy={pending || undefined}
         onClick={() => {
           onChoose(persona);
         }}
-        className="flex w-full flex-col items-start gap-2 rounded-xl bg-card p-5 text-left shadow-card ring-1 ring-border transition-colors duration-120 ease-out hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full flex-col items-start gap-2 rounded-xl bg-card p-5 text-left shadow-card ring-1 ring-border transition-colors duration-120 ease-out hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-progress"
       >
         <span className="text-card-title">{persona.displayName}</span>
         <span className="flex items-center gap-1.5">
@@ -158,7 +164,9 @@ function PersonaCard({ persona, pending, disabled, onChoose }: PersonaCardProps)
           <RoleBadge role={persona.role} />
           <span className="text-sm text-muted-foreground">{persona.office}</span>
         </span>
-        <span className="text-sm text-primary">{pending ? '…' : LABELS.persona.choose}</span>
+        <span className="text-sm text-primary">
+          {pending ? LABELS.persona.loading : LABELS.persona.choose}
+        </span>
       </button>
     </li>
   );

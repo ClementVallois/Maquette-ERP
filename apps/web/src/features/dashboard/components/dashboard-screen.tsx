@@ -230,10 +230,10 @@ function SeeMonthsWithData({ period }: { readonly period: string }): ReactElemen
   return (
     <div className="flex flex-col gap-2 rounded-xl bg-card p-4 shadow-card ring-1 ring-border">
       <p className="text-sm text-muted-foreground">{labels.emptyMonthNotice}</p>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">{labels.seeMonthsWithData}</span>
+      <span className="text-xs text-muted-foreground">{labels.seeMonthsWithData}</span>
+      <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-3 sm:flex sm:flex-wrap">
         {offered.map((month) => (
-          <Button asChild key={month} size="sm" variant="outline">
+          <Button asChild key={month} size="sm" variant="outline" className="min-h-11 sm:min-h-8">
             <Link to="/tableau-de-bord" search={{ period: month }}>
               {frenchMonth(month)}
             </Link>

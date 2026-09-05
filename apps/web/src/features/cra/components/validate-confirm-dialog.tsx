@@ -102,7 +102,7 @@ export function ValidateConfirmDialog({
             <Button type="button" variant="outline" onClick={onCancel}>
               {LABELS.preFacturier.validateConfirmDialog.cancel}
             </Button>
-            <Button type="button" disabled={pending} onClick={onConfirm}>
+            <Button type="button" pending={pending} onClick={onConfirm}>
               {LABELS.preFacturier.validateConfirmDialog.confirm}
             </Button>
           </DialogFooter>
