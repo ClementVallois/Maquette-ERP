@@ -77,7 +77,12 @@ export function SingleSelectCombobox({
 
   return (
     <ComboboxShell
-      ariaLabel={label}
+      // The selected value belongs in the accessible name, not only in the visible trigger text:
+      // `aria-label` *overrides* both the `<Label htmlFor>` at the call site and the button's own
+      // content in the name computation, so naming this control "Consultant" alone would announce
+      // the field twice over and its value never — a regression against the native `<select>` this
+      // replaced, which announced its selected option directly.
+      ariaLabel={selected === undefined ? label : `${label} : ${selected.label}`}
       {...(id === undefined ? {} : { triggerId: id })}
       {...(className === undefined ? {} : { triggerClassName: className })}
       {...(invalid === undefined ? {} : { triggerAriaInvalid: invalid })}

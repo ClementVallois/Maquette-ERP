@@ -105,7 +105,7 @@ for (const width of [360, 1440]) {
 
     // The consultant picker (task: one searchable combobox replacing the previous pair — a
     // standalone search box filtering a separate native `<select>`): open it, search, pick.
-    const trigger = page.getByRole('button', { name: 'Consultant', exact: true });
+    const trigger = page.getByRole('button', { name: /^Consultant/u });
     await trigger.click();
     const panel = page.locator('[data-slot="popover-content"]');
     const search = panel.getByRole('textbox', { name: 'Rechercher un consultant' });
@@ -134,11 +134,11 @@ for (const width of [360, 1440]) {
       page.getByRole('heading', { name: 'Modifier les dates', exact: true }),
     ).toBeInViewport();
     // Edit mode shows the consultant read-only (a `<dl>`), not the combobox at all.
-    await expect(page.getByRole('button', { name: 'Consultant', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Consultant/u })).toHaveCount(0);
     await expect(page.getByLabel('Du', { exact: true })).not.toHaveValue('');
     await expectAccessible(page);
     await page.getByRole('button', { name: 'Annuler la modification' }).click();
-    await expect(page.getByRole('button', { name: 'Consultant', exact: true })).toHaveText(
+    await expect(page.getByRole('button', { name: /^Consultant/u })).toHaveText(
       'Choisir un consultant…',
     );
     await expect(page.getByLabel('Du', { exact: true })).toHaveValue('');
