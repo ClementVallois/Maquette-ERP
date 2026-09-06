@@ -107,6 +107,7 @@ export function DataTable<TData>({
     readonly y: number;
     readonly t: number;
     readonly pointerId: number;
+    readonly rowId: string;
   } | null>(null);
   // `react-hooks/incompatible-library` flags `useReactTable` by name for every caller, React
   // Compiler or not: it is one of three libraries the rule hardcodes (React Hook Form's
@@ -219,12 +220,16 @@ export function DataTable<TData>({
                         y: event.clientY,
                         t: Date.now(),
                         pointerId: event.pointerId,
+                        rowId: row.id,
                       };
                     },
                     onPointerUp: (event: ReactPointerEvent<HTMLTableRowElement>) => {
                       const origin = activationOrigin.current;
                       activationOrigin.current = null;
-                      if (origin?.pointerId !== event.pointerId) return;
+                      // Both the pointer (no cross-pointer mixup) and the row (a press near a
+                      // boundary must not release into the neighbour and activate it) have to
+                      // match the one this same `pointerup` fired on.
+                      if (origin?.pointerId !== event.pointerId || origin.rowId !== row.id) return;
                       if (Date.now() - origin.t >= ACTIVATION_MAX_DWELL_MS) return;
                       if (
                         Math.abs(event.clientX - origin.x) >= ACTIVATION_MOVE_THRESHOLD_PX ||

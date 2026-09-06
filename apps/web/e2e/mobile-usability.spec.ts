@@ -175,9 +175,14 @@ test('mobile persona metadata and empty-month actions align', async ({ page }) =
   await choosePersona(page, 'manager-paris');
   await page.getByRole('button', { name: 'Persona en cours : Bruno Leroy' }).click();
   const menu = page.getByRole('menu');
+  // `[data-persona-value]` (`persona-block.tsx`), not `dd` — this panel is a `grid`, not a `dl`.
+  // `.locator('dd')` matched nothing, so `evaluateAll` returned `[]` and `expect(undefined).toBe
+  // (undefined)` passed regardless of whether the two columns actually lined up: the one
+  // assertion covering the persona panel's grid-column fix was proving nothing.
   const lefts = await menu
-    .locator('dd')
+    .locator('[data-persona-value]')
     .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().left));
+  expect(lefts).toHaveLength(2);
   expect(lefts[0]).toBe(lefts[1]);
   await expectAccessible(page);
   await page.keyboard.press('Escape');
