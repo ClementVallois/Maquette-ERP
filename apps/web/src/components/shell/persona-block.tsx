@@ -79,9 +79,9 @@ export function PersonaBlock({ persona }: { readonly persona: PersonaSummary }):
           <ChevronDownIcon aria-hidden="true" className="size-4 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72 max-w-[calc(100vw-1.5rem)] p-2">
-        <DropdownMenuLabel className="px-2">{persona.displayName}</DropdownMenuLabel>
-        <div className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 px-2 py-2 text-sm">
+      <DropdownMenuContent align="end" className="w-max min-w-56 max-w-[calc(100vw-1.5rem)] p-2">
+        <DropdownMenuLabel className="truncate px-2">{persona.displayName}</DropdownMenuLabel>
+        <div className="grid grid-cols-[auto_max-content] items-center gap-x-4 gap-y-2 px-2 py-2 text-sm">
           <span className="text-muted-foreground">{LABELS.persona.role}</span>
           <span data-persona-value>
             <RoleBadge role={persona.role} />
