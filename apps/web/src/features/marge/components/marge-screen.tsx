@@ -38,7 +38,7 @@ function lastDayOfPeriod(period: string): string {
 function MargeSkeleton(): ReactElement {
   return (
     <div className="flex flex-col gap-2" aria-hidden="true">
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-24 w-full" />
@@ -180,7 +180,7 @@ export function MargeScreen({ consultantId, period, role }: MargeScreenProps): R
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label={LABELS.margin.revenue} value={frenchEuros(data.revenueCents)} />
         <StatCard label={LABELS.margin.cost} value={frenchEuros(data.costCents)} />
         <StatCard label={LABELS.margin.margin} value={frenchEuros(data.marginCents)} />
