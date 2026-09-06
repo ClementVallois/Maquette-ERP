@@ -492,8 +492,8 @@ export function CraDayCards({
             : valueAt(matrix, row.key, day.date) > 0,
         );
         const heading = (
-          <div className="flex min-w-0 items-center justify-between gap-3">
-            <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="min-w-0 flex-1">
               <span className="block text-sm font-semibold capitalize">
                 {frenchWeekday(day.date)} {day.date.slice(8, 10)}
               </span>
@@ -506,30 +506,32 @@ export function CraDayCards({
                 <span className="block text-xs text-status-late-text">{LABELS.cra.flagged}</span>
               )}
             </div>
-            {total > 0 && (
-              <span className="flex min-w-0 flex-wrap items-center gap-1">
-                {rows
-                  .filter((row) => valueAt(matrix, row.key, day.date) > 0)
-                  .map((row) => (
-                    <span key={row.key}>
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          'block size-2 rounded-full',
-                          row.toneIndex === null
-                            ? 'bg-absence-dot'
-                            : missionTone(row.toneIndex).dotClass,
-                        )}
-                      />
-                      <span className="sr-only">
-                        {row.label} : {frenchDays(valueAt(matrix, row.key, day.date))}.{' '}
-                      </span>
+            {/* Both boxes are a fixed width and are always rendered, empty day included: the day
+                name beside them varies from "lundi 01" to "mercredi 03", and with the box sized to
+                its contents that variation moved the dots and the total sideways from one card to
+                the next. */}
+            <span className="flex w-12 shrink-0 flex-wrap items-center gap-1">
+              {rows
+                .filter((row) => valueAt(matrix, row.key, day.date) > 0)
+                .map((row) => (
+                  <span key={row.key}>
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'block size-2 rounded-full',
+                        row.toneIndex === null
+                          ? 'bg-absence-dot'
+                          : missionTone(row.toneIndex).dotClass,
+                      )}
+                    />
+                    <span className="sr-only">
+                      {row.label} : {frenchDays(valueAt(matrix, row.key, day.date))}.{' '}
                     </span>
-                  ))}
-              </span>
-            )}
+                  </span>
+                ))}
+            </span>
             <span
-              className="shrink-0 text-sm font-semibold tabular-nums"
+              className="w-12 shrink-0 text-right text-sm font-semibold tabular-nums"
               aria-label={`${LABELS.cra.dayTotal} — ${frenchDate(day.date)}`}
             >
               {frenchDays(total)}

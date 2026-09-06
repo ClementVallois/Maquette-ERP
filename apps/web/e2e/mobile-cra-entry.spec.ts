@@ -99,7 +99,7 @@ test('week fill adds a mission, preserves exceptions and supports undo without t
   await expect(
     dayCard(page, '06/07/2026').getByRole('combobox', { name: `${alpha} — 06/07/2026` }),
   ).toHaveValue('0');
-  await page.getByRole('button', { name: /Annuler — Remplir cette semaine/u }).click();
+  await page.getByRole('button', { name: /^Annuler : Remplir cette semaine/u }).click();
   await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1');
   await page.getByRole('button', { name: 'Semaine précédente' }).click();
   await expect(dayCard(page, '01/07/2026')).toHaveAttribute('open');
@@ -201,7 +201,7 @@ test('empty-month prompt uses the existing copy preview and its undo', async ({ 
   await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '21');
   await expect(page.getByText('Le mois est vide', { exact: true })).toHaveCount(0);
   await expect(dayCard(page, '01/07/2026')).not.toHaveAttribute('open');
-  await page.getByRole('button', { name: /Annuler — Copier le mois précédent/u }).click();
+  await page.getByRole('button', { name: 'Annuler : Copier le mois précédent' }).click();
   await expect(page.getByText('Le mois est vide', { exact: true })).toBeVisible();
   await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
 });
@@ -244,6 +244,34 @@ test('submission sends the month matrix and missing-day navigation opens a colla
   ).toBeFocused();
 });
 
+test('the mobile row tools clear a row and only then let it be removed', async ({ page }) => {
+  await openGrid(page, {
+    lines: [{ day: '2026-07-01', dayType: 'worked', missionId: 'alpha', quarterDays: 4 }],
+  });
+  await page.getByRole('button', { name: 'Gérer les missions de la grille' }).click();
+  const remove = page.getByRole('button', { name: `Retirer la ligne — ${alpha}` });
+  const clear = page.getByRole('button', { name: `Vider la ligne — ${alpha}` });
+
+  // The rule the desktop row tools hold by hiding the button: a row is removable only once it
+  // carries nothing across the whole month, and Absence is never removable at all.
+  await expect(remove).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Retirer la ligne — Absence' })).toHaveCount(0);
+  await clear.click();
+  await expect(remove).toBeEnabled();
+  await expect(clear).toBeDisabled();
+  await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
+
+  await remove.click();
+  await expect(clear).toHaveCount(0);
+  await dayCard(page, '01/07/2026').locator('summary').click();
+  await expect(
+    dayCard(page, '01/07/2026').getByRole('combobox', { name: `${alpha} — 01/07/2026` }),
+  ).toHaveCount(0);
+  // Removed from the grid, so it is offerable again — the mobile add control is the same one the
+  // desktop uses, widened rather than duplicated.
+  await expect(page.getByRole('combobox', { name: 'Ajouter une activité' })).toBeVisible();
+});
+
 test('read-only CRA exposes complete summaries and errors without editing tools', async ({
   page,
 }) => {
@@ -258,6 +286,11 @@ test('read-only CRA exposes complete summaries and errors without editing tools'
   });
   await expect(page.getByRole('button', { name: 'Remplir cette semaine' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Voir la proposition' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Gérer les missions de la grille' })).toHaveCount(
+    0,
+  );
+  // The week navigator is not editing, so it stays: a submitted month is still read week by week.
+  await expect(page.getByRole('button', { name: 'Semaine suivante' })).toBeVisible();
   await expect(dayCard(page, '01/07/2026')).not.toHaveAttribute('open');
   await dayCard(page, '01/07/2026').locator('summary').click();
   await expect(dayCard(page, '01/07/2026')).toContainText(alpha);

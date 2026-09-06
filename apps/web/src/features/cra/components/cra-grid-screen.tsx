@@ -1,5 +1,8 @@
 import { Link, useBlocker } from '@tanstack/react-router';
 import {
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   CopyIcon,
   EraserIcon,
   ListChecksIcon,
@@ -16,6 +19,7 @@ import { GlossaryTerm } from '@/components/glossary-term';
 import { TogglePillGroup } from '@/components/toggle-pill-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Select,
   SelectContent,
@@ -30,6 +34,7 @@ import { ApiProblemError } from '@/lib/api-client';
 import { frenchDate, frenchMonth, frenchWeekday } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
+import { cn } from '@/lib/utils';
 
 import { useCraGrid, useSaveMonth } from '../hooks';
 import {
@@ -47,6 +52,7 @@ import {
   type MatrixState,
 } from '../matrix';
 import { missingDaysFrom } from '../missing-days';
+import { missionTone } from '../mission-tone';
 import type { CraGridResponse, GridDay } from '../types';
 
 import { CopyPreviousMonthDialog } from './copy-previous-month-dialog';
@@ -172,11 +178,10 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
     readonly at: string;
   } | null>(null);
   // O7: single-level undo for "remplir/vider la ligne" — the matrix as it stood just before that
-  // one action, plus a label naming it for the button's own accessible name. Cleared once used, or
-  // whenever a fresh `data` resyncs the whole matrix below.
-  const [undo, setUndo] = useState<{ readonly matrix: MatrixState; readonly label: string } | null>(
-    null,
-  );
+  // one action, the action's own name for the button's visible text, and the row it applied to for
+  // the accessible name only. Cleared once used, or whenever a fresh `data` resyncs the whole
+  // matrix below.
+  const [undo, setUndo] = useState<UndoState | null>(null);
   // O6: "Copier le mois précédent" — a preview dialog, not a direct mutation.
   const [copyingPreviousMonth, setCopyingPreviousMonth] = useState(false);
   // React's own documented pattern for "reset state when a prop changes" (react.dev, "Adjusting
@@ -262,7 +267,11 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
 
   function handleFillRow(rowKey: string): void {
     const row = rowsByKey.get(rowKey);
-    setUndo({ matrix, label: `${LABELS.cra.matrix.fillEmptyWorkdays} — ${row?.label ?? rowKey}` });
+    setUndo({
+      matrix,
+      action: LABELS.cra.matrix.fillEmptyWorkdays,
+      detail: row?.label ?? rowKey,
+    });
     setMatrix((previous) =>
       fillEmptyWorkdays(previous, rowKey, workableDays, row?.assignableDays ?? null),
     );
@@ -271,7 +280,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
 
   function handleClearRow(rowKey: string): void {
     const row = rowsByKey.get(rowKey);
-    setUndo({ matrix, label: `${LABELS.cra.matrix.clearRow} — ${row?.label ?? rowKey}` });
+    setUndo({ matrix, action: LABELS.cra.matrix.clearRow, detail: row?.label ?? rowKey });
     setMatrix((previous) => clearRow(previous, rowKey));
     setDirty(true);
   }
@@ -381,7 +390,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
       )}
 
       {data.editable && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
           {availableToAdd.length > 0 ? (
             <AddActivityControl missions={availableToAdd} onAdd={handleAddActivity} />
           ) : (
@@ -393,7 +402,10 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
             type="button"
             variant="outline"
             size="sm"
-            className={matrix.cells.size === 0 ? 'hidden md:inline-flex' : undefined}
+            className={cn(
+              'min-h-11 w-full md:min-h-0 md:w-auto',
+              matrix.cells.size === 0 && 'hidden md:inline-flex',
+            )}
             onClick={() => {
               setCopyingPreviousMonth(true);
             }}
@@ -401,20 +413,14 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
             <CopyIcon aria-hidden="true" />
             {LABELS.cra.matrix.copyPreviousMonth}
           </Button>
-          {/* O7: single-level undo for the row tools' own fill/clear — `undo.label` names which
-              row and which of the two actions, so the button reads as a sentence, not a bare
-              "Annuler" nobody can place. */}
           {undo !== null && (
-            <Button
-              type="button"
+            <UndoButton
+              undo={undo}
               variant="ghost"
               size="sm"
               className="hidden md:inline-flex"
-              onClick={handleUndo}
-            >
-              <Undo2Icon aria-hidden="true" />
-              {LABELS.cra.matrix.undo} — {undo.label}
-            </Button>
+              onUndo={handleUndo}
+            />
           )}
         </div>
       )}
@@ -444,41 +450,33 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
             </Button>
           </div>
         )}
-        <WeekNavigator
-          days={mobileDays}
-          index={mobileWeekIndex}
-          count={weeks.length}
-          onChange={setMobileWeekIndex}
-        />
         {data.editable && (
-          <div className="mt-3 flex flex-col gap-2">
+          <div className="flex flex-col gap-2">
             <MobileWeekFill
               key={period}
               rows={fillRows}
               days={mobileDays}
               matrix={matrix}
               onFill={(nextMatrix, label) => {
-                const first = mobileDays[0]?.date;
-                const last = mobileDays.at(-1)?.date;
-                const range =
-                  first !== undefined && last !== undefined
-                    ? ` (${frenchDate(first)} — ${frenchDate(last)})`
-                    : '';
-                setUndo({ matrix, label: `${LABELS.cra.matrix.fillWeek} — ${label}${range}` });
+                setUndo({ matrix, action: LABELS.cra.matrix.fillWeek, detail: label });
                 setMatrix(nextMatrix);
                 setDirty(true);
               }}
             />
+            <MobileRowTools
+              rows={rows}
+              matrix={matrix}
+              monthDays={data.days.map((day) => day.date)}
+              onClear={handleClearRow}
+              onRemove={handleRemoveRow}
+            />
             {undo !== null && (
-              <Button
-                type="button"
-                variant="ghost"
-                className="min-h-11 h-auto justify-start whitespace-normal text-left"
-                onClick={handleUndo}
-              >
-                <Undo2Icon aria-hidden="true" />
-                {LABELS.cra.matrix.undo} — {undo.label}
-              </Button>
+              <UndoButton
+                undo={undo}
+                variant="outline"
+                className="min-h-11 w-full"
+                onUndo={handleUndo}
+              />
             )}
           </div>
         )}
@@ -581,7 +579,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
             setCopyingPreviousMonth(false);
           }}
           onConfirm={(nextMatrix) => {
-            setUndo({ matrix, label: LABELS.cra.matrix.copyPreviousMonth });
+            setUndo({ matrix, action: LABELS.cra.matrix.copyPreviousMonth, detail: null });
             setMatrix(nextMatrix);
             setDirty(true);
             setCopyingPreviousMonth(false);
@@ -623,47 +621,61 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
         </div>
       )}
 
-      {data.editable && (
-        <div className="sticky bottom-0 z-20 -mx-3 flex flex-wrap items-center gap-2 border-t border-border bg-background/95 p-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
-          <Button
-            className="flex-1 md:flex-none"
-            variant="outline"
-            pending={saveMonth.isPending}
-            onClick={() => {
-              void handleSubmitMonth(false);
-            }}
-          >
-            {LABELS.cra.save}
-          </Button>
-          <Button
-            className="flex-1 md:flex-none"
-            pending={saveMonth.isPending}
-            onClick={() => {
-              void handleSubmitMonth(true);
-            }}
-          >
-            {LABELS.cra.submit}
-          </Button>
-          <p
-            className={
-              saveMonth.isError
-                ? 'w-full text-sm text-destructive md:ml-2 md:w-auto'
-                : 'w-full text-sm text-muted-foreground md:ml-2 md:w-auto'
-            }
-            aria-live="polite"
-          >
-            {saveMonth.isPending
-              ? LABELS.cra.saveState.saving
-              : saveMonth.isError
-                ? LABELS.cra.saveState.failed
-                : dirty
-                  ? LABELS.cra.saveState.dirty
-                  : lastWrite === null
-                    ? LABELS.cra.saveState.unchanged
-                    : LABELS.cra.saveState[lastWrite.kind].replace('{time}', lastWrite.at)}
-          </p>
+      {/* Not gated on `data.editable`: the week navigation below is the only way through a month
+          on a phone, and a submitted or validated month is still read week by week. Only the
+          save/submit row inside it is editable-only. */}
+      <div className="sticky bottom-0 z-20 -mx-3 flex flex-col gap-2 border-t border-border bg-background/95 p-3 backdrop-blur md:static md:mx-0 md:gap-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+        <div className="md:hidden">
+          <WeekNavigator
+            days={mobileDays}
+            index={mobileWeekIndex}
+            count={weeks.length}
+            onChange={setMobileWeekIndex}
+            compact
+          />
         </div>
-      )}
+        {data.editable && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              className="min-h-11 flex-1 md:min-h-0 md:flex-none"
+              variant="outline"
+              pending={saveMonth.isPending}
+              onClick={() => {
+                void handleSubmitMonth(false);
+              }}
+            >
+              {LABELS.cra.save}
+            </Button>
+            <Button
+              className="min-h-11 flex-1 md:min-h-0 md:flex-none"
+              pending={saveMonth.isPending}
+              onClick={() => {
+                void handleSubmitMonth(true);
+              }}
+            >
+              {LABELS.cra.submit}
+            </Button>
+            <p
+              className={
+                saveMonth.isError
+                  ? 'w-full text-sm text-destructive md:ml-2 md:w-auto'
+                  : 'w-full text-sm text-muted-foreground md:ml-2 md:w-auto'
+              }
+              aria-live="polite"
+            >
+              {saveMonth.isPending
+                ? LABELS.cra.saveState.saving
+                : saveMonth.isError
+                  ? LABELS.cra.saveState.failed
+                  : dirty
+                    ? LABELS.cra.saveState.dirty
+                    : lastWrite === null
+                      ? LABELS.cra.saveState.unchanged
+                      : LABELS.cra.saveState[lastWrite.kind].replace('{time}', lastWrite.at)}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -786,38 +798,63 @@ function MobileWeekFill({
   );
 }
 
+/**
+ * `compact` is the phone's own action-bar form: touch-sized outline buttons and `3/5` where the
+ * desktop reads "Semaine 3 sur 5". The long sentence stays the accessible name in both, so the
+ * shortening never reaches a screen reader.
+ */
 function WeekNavigator({
   days,
   index,
   count,
   onChange,
+  compact = false,
 }: {
   readonly days: readonly GridDay[];
   readonly index: number;
   readonly count: number;
   readonly onChange: (index: number) => void;
+  readonly compact?: boolean;
 }): ReactElement {
   const first = days[0]?.date;
   const last = days.at(-1)?.date;
+  const position = LABELS.cra.matrix.weekPosition
+    .replace('{current}', String(index + 1))
+    .replace('{count}', String(count));
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg bg-muted p-2">
+    <div
+      className={cn(
+        'flex items-center justify-between gap-2',
+        compact ? 'rounded-lg' : 'rounded-lg bg-muted p-2',
+      )}
+    >
       <Button
         type="button"
-        size="icon-sm"
-        variant="ghost"
+        size={compact ? 'icon' : 'icon-sm'}
+        variant={compact ? 'outline' : 'ghost'}
+        className={compact ? 'size-11' : undefined}
         disabled={index === 0}
         aria-label={LABELS.cra.matrix.previousWeek}
         onClick={() => {
           onChange(index - 1);
         }}
       >
-        ‹
+        <ChevronLeftIcon aria-hidden="true" />
       </Button>
-      <p className="text-center text-sm font-medium">
-        {LABELS.cra.matrix.weekPosition
-          .replace('{current}', String(index + 1))
-          .replace('{count}', String(count))}
+      <p className="min-w-0 text-center text-sm font-medium">
+        {compact ? (
+          <>
+            <span className="sr-only">{position}</span>
+            <span aria-hidden="true">
+              {LABELS.cra.matrix.weekPositionShort
+                .replace('{current}', String(index + 1))
+                .replace('{count}', String(count))}
+            </span>
+          </>
+        ) : (
+          position
+        )}
         {first !== undefined && last !== undefined && (
           <span className="block text-xs font-normal text-muted-foreground">
             {frenchDate(first)} — {frenchDate(last)}
@@ -826,17 +863,147 @@ function WeekNavigator({
       </p>
       <Button
         type="button"
-        size="icon-sm"
-        variant="ghost"
+        size={compact ? 'icon' : 'icon-sm'}
+        variant={compact ? 'outline' : 'ghost'}
+        className={compact ? 'size-11' : undefined}
         disabled={index >= count - 1}
         aria-label={LABELS.cra.matrix.nextWeek}
         onClick={() => {
           onChange(index + 1);
         }}
       >
-        ›
+        <ChevronRightIcon aria-hidden="true" />
       </Button>
     </div>
+  );
+}
+
+interface UndoState {
+  readonly matrix: MatrixState;
+  readonly action: string;
+  readonly detail: string | null;
+}
+
+/**
+ * O7's single-level undo. The visible text names the action alone; the row it applied to is
+ * appended to the accessible name, which keeps the visible half a substring of it (WCAG 2.5.3).
+ */
+function UndoButton({
+  undo,
+  variant,
+  size,
+  className,
+  onUndo,
+}: {
+  readonly undo: UndoState;
+  readonly variant: 'ghost' | 'outline';
+  readonly size?: 'sm';
+  readonly className?: string;
+  readonly onUndo: () => void;
+}): ReactElement {
+  const visible = `${LABELS.cra.matrix.undo} : ${undo.action}`;
+
+  return (
+    <Button
+      type="button"
+      variant={variant}
+      {...(size === undefined ? {} : { size })}
+      className={className}
+      aria-label={undo.detail === null ? visible : `${visible} (${undo.detail})`}
+      onClick={onUndo}
+    >
+      <Undo2Icon aria-hidden="true" />
+      {visible}
+    </Button>
+  );
+}
+
+/**
+ * The phone's counterpart to `RowTools`, which hangs off a table row `CraDayCards` does not have.
+ * Same two rules as the desktop tools — Absence is never removable, and a row is only removable
+ * once it is empty across the whole month — except that the trash button is disabled rather than
+ * hidden, with `removeRowHint` stating why: a control that disappears is the one the reader could
+ * not find.
+ */
+function MobileRowTools({
+  rows,
+  matrix,
+  monthDays,
+  onClear,
+  onRemove,
+}: {
+  readonly rows: readonly MatrixRowMeta[];
+  readonly matrix: MatrixState;
+  readonly monthDays: readonly string[];
+  readonly onClear: (rowKey: string) => void;
+  readonly onRemove: (rowKey: string) => void;
+}): ReactElement | null {
+  if (rows.length === 0) return null;
+
+  return (
+    <Collapsible>
+      <CollapsibleTrigger asChild>
+        <Button type="button" variant="outline" className="group min-h-11 w-full justify-between">
+          {LABELS.cra.matrix.manageRows}
+          <ChevronDownIcon
+            aria-hidden="true"
+            className="size-4 transition-transform group-data-[state=open]:rotate-180"
+          />
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-2 rounded-xl bg-card px-3 ring-1 ring-border">
+        {rows.map((row) => {
+          const empty = isRowEmpty(matrix, row.key, monthDays);
+
+          return (
+            <div
+              key={row.key}
+              className="flex items-center gap-2 border-b border-border py-1 last:border-0"
+            >
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'size-2 shrink-0 rounded-full',
+                  row.toneIndex === null ? 'bg-absence-dot' : missionTone(row.toneIndex).dotClass,
+                )}
+              />
+              <span className="min-w-0 flex-1 break-words text-sm">{row.label}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-11"
+                disabled={empty}
+                aria-label={`${LABELS.cra.matrix.clearRow} — ${row.label}`}
+                onClick={() => {
+                  onClear(row.key);
+                }}
+              >
+                <EraserIcon />
+              </Button>
+              {row.key !== ABSENCE_ROW_KEY && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-11"
+                  disabled={!empty}
+                  aria-label={`${LABELS.cra.matrix.removeRow} — ${row.label}`}
+                  onClick={() => {
+                    onRemove(row.key);
+                  }}
+                >
+                  <Trash2Icon />
+                </Button>
+              )}
+            </div>
+          );
+        })}
+        <p className="border-t border-border py-2 text-xs text-muted-foreground">
+          {LABELS.cra.matrix.removeRowHint}
+        </p>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -935,7 +1102,14 @@ function AddActivityControl({
     // and a `Select` holding a value no longer in its own list is exactly the state this avoids
     // having to reason about.
     <Select key={missions.length} onValueChange={onAdd}>
-      <SelectTrigger className="w-64" aria-label={LABELS.cra.matrix.addActivity}>
+      {/* `min-h-*`, not `h-*`: the trigger's own height is a `data-[size=default]:h-8` variant,
+          which outranks a plain utility class. `flex-1` on the value keeps the placeholder against
+          the plus icon — the trigger is `justify-between`, which centres it once the trigger is
+          wider than its contents. */}
+      <SelectTrigger
+        className="min-h-11 w-full *:data-[slot=select-value]:flex-1 md:min-h-0 md:w-64"
+        aria-label={LABELS.cra.matrix.addActivity}
+      >
         <PlusIcon className="size-4" />
         <SelectValue placeholder={LABELS.cra.matrix.addActivityPlaceholder} />
       </SelectTrigger>
