@@ -279,7 +279,14 @@ export function invoicePage(view: InvoiceView, persona: Persona | undefined): Ht
     number === null ? LABELS.invoice.draftHeading : `${LABELS.invoice.heading} ${number}`;
 
   return shell(
-    { title: heading, persona },
+    {
+      title: heading,
+      persona,
+      crumb: {
+        href: `${PATHS.preFacturier}?period=${invoice.supplyPeriod}`,
+        label: LABELS.preFacturier.nav,
+      },
+    },
     html`<article class="document">
       <div class="letterhead">
         <h1>${heading}</h1>

@@ -15,11 +15,9 @@
  */
 export const LABELS = {
   appName: 'Maquette ERP',
-  appTagline: 'Maquette d’un module ERP interne',
 
   nav: {
     skipToContent: 'Aller au contenu',
-    main: 'Navigation principale',
   },
 
   persona: {
@@ -28,7 +26,6 @@ export const LABELS = {
     warning:
       'Ce n’est pas une connexion. Aucun mot de passe n’est demandé, aucune identité n’est vérifiée, et le sélecteur remplace un fournisseur d’identité pour rendre les règles d’autorisation démontrables en trois clics.',
     choose: 'Prendre ce rôle',
-    current: 'Persona en cours',
     change: 'Changer de persona',
     none: 'Aucun persona sélectionné',
     office: 'Implantation',
@@ -116,7 +113,6 @@ export const LABELS = {
     signatureDate: 'Date',
     signatureMark: 'Signature',
     nothingRecorded: 'Aucun jour saisi sur ce mois.',
-    back: 'Revenir au CRA',
   },
 
   preFacturier: {

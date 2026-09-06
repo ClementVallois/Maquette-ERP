@@ -122,7 +122,11 @@ export function craPrintPage(view: CraPrintView, persona: Persona | undefined): 
   const heading = `${LABELS.craPrint.heading} — ${frenchMonth(view.period)}`;
 
   return shell(
-    { title: heading, persona },
+    {
+      title: heading,
+      persona,
+      crumb: { href: `${PATHS.spaCra}/${view.period}`, label: LABELS.cra.nav },
+    },
     html`<article class="document">
       <h1>${heading}</h1>
       ${
@@ -171,9 +175,6 @@ export function craPrintPage(view: CraPrintView, persona: Persona | undefined): 
       }
       ${view.flags.length === 0 ? null : html`<p class="hint">${LABELS.craPrint.flaggedNote}</p>`}
       ${signatureBlock()}
-      <p class="actions no-print">
-        <a href="${`${PATHS.spaCra}/${view.period}`}">${LABELS.craPrint.back}</a>
-      </p>
     </article>`,
   );
 }

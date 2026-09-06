@@ -195,6 +195,21 @@ describe('the print stylesheet', () => {
   });
 });
 
+describe('the topbar crumb', () => {
+  it("points the printable Cra's crumb at the SPA's own /cra/:period, never the POST-only /consultant/cra", () => {
+    // Front-end plan Phase 9.3: `PATHS.consultantCra` ('/consultant/cra') stays a registered
+    // route for the grid's save/submit POST, but no GET answers it any more — the SPA renders the
+    // grid at `/cra/:period`, and this crumb (the printable's only back affordance, replacing the
+    // shell's old role-scoped nav) has to point there instead.
+    expect(craPrint).toContain('<a class="crumb" href="/cra/2026-06">');
+    expect(craPrint).not.toContain('/consultant/cra');
+  });
+
+  it("points the invoice's crumb at the pré-facturier, carrying the invoice's own supply period", () => {
+    expect(invoice).toContain('<a class="crumb" href="/pre-facturier?period=2026-06">');
+  });
+});
+
 describe('controls', () => {
   it('gives every button a text label rather than an icon', () => {
     // The invoice's issuance form (billing only) and the shell's own "change persona" button —
