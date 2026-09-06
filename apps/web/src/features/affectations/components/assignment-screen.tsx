@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
 import { GlossaryTerm } from '@/components/glossary-term';
+import { SingleSelectCombobox } from '@/components/single-select-combobox';
 import { StatCard } from '@/components/stat-card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -43,7 +44,6 @@ export function AssignmentScreen(): ReactElement {
   const save = useSaveAssignment();
   const [form, setForm] = useState<AssignmentInput>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [consultantSearch, setConsultantSearch] = useState('');
   const formHeading = useRef<HTMLHeadingElement>(null);
   const [filter, setFilter] = useState<ViewFilter>('current');
 
@@ -75,22 +75,16 @@ export function AssignmentScreen(): ReactElement {
   const selectedConsultant = data.consultants.find(
     (consultant) => consultant.id === form.consultantId,
   );
-  const normalize = (value: string): string =>
-    value
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/gu, '')
-      .toLocaleLowerCase('fr-FR')
-      .trim();
-  const matchingConsultants = data.consultants.filter(
-    (consultant) =>
-      consultant.departureDate === null &&
-      normalize(consultant.name).includes(normalize(consultantSearch)),
-  );
+  // ADR-0079: a departed consultant (Marine) never appears in a current roster read — the same
+  // filter `matchingConsultants` applied before the search box and native `<select>` this
+  // combobox replaces existed at all.
+  const consultantOptions = data.consultants
+    .filter((consultant) => consultant.departureDate === null)
+    .map((consultant) => ({ value: consultant.id, label: consultant.name }));
   const mutationProblem = save.error instanceof ApiProblemError ? save.error.problem : null;
 
   const startEditing = (assignment: Assignment): void => {
     save.reset();
-    setConsultantSearch('');
     setEditingId(assignment.id);
     formHeading.current?.scrollIntoView({ block: 'start' });
     formHeading.current?.focus({ preventScroll: true });
@@ -104,7 +98,6 @@ export function AssignmentScreen(): ReactElement {
 
   const resetForm = (): void => {
     setEditingId(null);
-    setConsultantSearch('');
     setForm(EMPTY_FORM);
     save.reset();
   };
@@ -167,45 +160,22 @@ export function AssignmentScreen(): ReactElement {
               {editingId === null ? (
                 <>
                   <div className="flex min-w-0 flex-col gap-2">
-                    <Label htmlFor="assignment-search">{LABELS.assignment.searchConsultant}</Label>
-                    <Input
-                      id="assignment-search"
-                      type="search"
-                      className="h-11"
-                      value={consultantSearch}
-                      placeholder={LABELS.assignment.searchPlaceholder}
-                      onChange={(event) => {
-                        setConsultantSearch(event.target.value);
-                      }}
-                    />
                     <Label htmlFor="assignment-consultant">{LABELS.assignment.consultant}</Label>
-                    <select
+                    <SingleSelectCombobox
                       id="assignment-consultant"
-                      className="h-11 w-full min-w-0 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
+                      label={LABELS.assignment.consultant}
+                      searchLabel={LABELS.assignment.searchConsultant}
+                      searchPlaceholder={LABELS.assignment.searchPlaceholder}
+                      noneSelectedLabel={LABELS.assignment.chooseConsultant}
+                      noMatchLabel={LABELS.assignment.noSearchResults}
+                      clearLabel={LABELS.assignment.clearConsultant}
+                      options={consultantOptions}
                       value={form.consultantId}
-                      required
-                      onChange={(event) => {
-                        setForm({ ...form, consultantId: event.target.value });
+                      onChange={(next) => {
+                        setForm({ ...form, consultantId: next });
                       }}
-                    >
-                      <option value="">{LABELS.assignment.chooseConsultant}</option>
-                      {selectedConsultant !== undefined &&
-                        !matchingConsultants.some(
-                          (consultant) => consultant.id === selectedConsultant.id,
-                        ) && (
-                          <option value={selectedConsultant.id}>{selectedConsultant.name}</option>
-                        )}
-                      {matchingConsultants.map((consultant) => (
-                        <option key={consultant.id} value={consultant.id}>
-                          {consultant.name}
-                        </option>
-                      ))}
-                    </select>
-                    {matchingConsultants.length === 0 && (
-                      <p role="status" className="text-sm text-muted-foreground">
-                        {LABELS.assignment.noSearchResults}
-                      </p>
-                    )}
+                      className="h-11 w-full"
+                    />
                   </div>
                   <div className="flex min-w-0 flex-col gap-2">
                     <Label htmlFor="assignment-mission">{LABELS.assignment.mission}</Label>

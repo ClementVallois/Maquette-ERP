@@ -102,13 +102,30 @@ for (const width of [360, 1440]) {
     await page.setViewportSize({ width, height: width === 360 ? 760 : 900 });
     await choosePersona(page, 'manager-paris');
     await page.goto('/affectations');
-    await page.getByRole('searchbox', { name: 'Rechercher un consultant' }).fill('alice');
-    const consultant = page.getByLabel('Consultant', { exact: true });
-    await expect(consultant.locator('option')).toHaveCount(2);
-    await consultant.selectOption({ label: 'Alice Martin' });
-    await page.getByRole('searchbox').fill('no-such-consultant');
-    await expect(page.getByRole('status').filter({ hasText: 'Aucun consultant' })).toBeVisible();
-    await expect(consultant.locator('option:checked')).toHaveText('Alice Martin');
+
+    // The consultant picker (task: one searchable combobox replacing the previous pair — a
+    // standalone search box filtering a separate native `<select>`): open it, search, pick.
+    const trigger = page.getByRole('button', { name: 'Consultant', exact: true });
+    await trigger.click();
+    const panel = page.locator('[data-slot="popover-content"]');
+    const search = panel.getByRole('textbox', { name: 'Rechercher un consultant' });
+    await search.fill('alice');
+    await expect(panel.getByRole('button')).toHaveCount(1);
+    await panel.getByRole('button', { name: 'Alice Martin' }).click();
+    // Selecting closes the popover and the trigger itself now reads the chosen name.
+    await expect(panel).toBeHidden();
+    await expect(trigger).toHaveText('Alice Martin');
+
+    // Reopening and searching for something that matches nothing still keeps the current
+    // selection present and visible — the special case the previous native `<select>` handled
+    // with a synthetic extra `<option>`.
+    await trigger.click();
+    await search.fill('no-such-consultant');
+    await expect(panel.getByText('Aucun consultant', { exact: false })).toBeVisible();
+    await expect(trigger).toHaveText('Alice Martin');
+    await page.keyboard.press('Escape');
+    await expect(panel).toBeHidden();
+
     await page
       .getByRole('button', { name: /Modifier l’affectation de/u })
       .first()
@@ -116,11 +133,14 @@ for (const width of [360, 1440]) {
     await expect(
       page.getByRole('heading', { name: 'Modifier les dates', exact: true }),
     ).toBeInViewport();
-    await expect(page.getByRole('searchbox')).toHaveCount(0);
+    // Edit mode shows the consultant read-only (a `<dl>`), not the combobox at all.
+    await expect(page.getByRole('button', { name: 'Consultant', exact: true })).toHaveCount(0);
     await expect(page.getByLabel('Du', { exact: true })).not.toHaveValue('');
     await expectAccessible(page);
     await page.getByRole('button', { name: 'Annuler la modification' }).click();
-    await expect(page.getByRole('searchbox')).toHaveValue('');
+    await expect(page.getByRole('button', { name: 'Consultant', exact: true })).toHaveText(
+      'Choisir un consultant…',
+    );
     await expect(page.getByLabel('Du', { exact: true })).toHaveValue('');
   });
 }
