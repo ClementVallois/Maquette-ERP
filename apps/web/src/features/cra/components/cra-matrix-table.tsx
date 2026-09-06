@@ -556,7 +556,7 @@ export function CraDayCards({
                         : missionTone(row.toneIndex).dotClass,
                     )}
                   />
-                  <span className="break-words">{row.label}</span>
+                  <span className="min-w-0 break-words">{row.label}</span>
                 </span>
                 <CraQuantityCell
                   rowKey={`${cellIdPrefix}-${row.key}`}
