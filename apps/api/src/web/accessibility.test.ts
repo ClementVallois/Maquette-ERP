@@ -154,6 +154,47 @@ describe('the document', () => {
   });
 });
 
+/**
+ * Content of the `{ … }` block that starts right after `openIndex` (a position just past an
+ * opening `{`, `depth` already at 1) — brace-counting rather than a regex, because a regex with no
+ * recursion cannot find the *matching* `}` of a block that nests another (`@media print { … }`
+ * nests each selector's own `{ … }`).
+ */
+function blockAfter(css: string, openIndex: number): string {
+  let depth = 1;
+  let index = openIndex;
+
+  while (depth > 0 && index < css.length) {
+    if (css[index] === '{') depth += 1;
+    else if (css[index] === '}') depth -= 1;
+    index += 1;
+  }
+
+  return css.slice(openIndex, index - 1);
+}
+
+describe('the print stylesheet', () => {
+  it('gives .no-print !important, so no element+class rule elsewhere can out-specificity it', () => {
+    // Regression for the bug the user reported live: `p.actions { display: flex }` has
+    // specificity (0,1,1), which beats a bare `.no-print` (0,1,0) regardless of source order, so
+    // `<p class="actions no-print">` printed anyway. `!important` is the fix that holds for every
+    // future `.no-print` user, not a one-off tweak to `p.actions` — CSS's cascade puts `!important`
+    // ahead of specificity, so this is the one form of the rule that cannot lose to a future
+    // element+class rule this sheet has not been written yet.
+    const printBlocks = [...STYLESHEET.body.matchAll(/@media print\s*\{/gu)].map((match) =>
+      blockAfter(STYLESHEET.body, match.index + match[0].length),
+    );
+
+    expect(printBlocks.length).toBeGreaterThan(0);
+
+    const winsOverAnyElementClassRule = printBlocks.some((block) =>
+      /\.no-print\s*\{[^}]*display:\s*none\s*!important/u.test(block),
+    );
+
+    expect(winsOverAnyElementClassRule).toBe(true);
+  });
+});
+
 describe('controls', () => {
   it('gives every button a text label rather than an icon', () => {
     // The invoice's issuance form (billing only) and the shell's own "change persona" button —
