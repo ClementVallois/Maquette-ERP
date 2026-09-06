@@ -80,7 +80,7 @@ test('mobile day quantities survive week navigation and the desktop layout', asy
   await page.getByRole('button', { name: 'Semaine suivante' }).click();
   await page.getByRole('button', { name: 'Semaine précédente' }).click();
   await expect(cell).toHaveValue('2');
-  const weekend = cards.locator('details').first();
+  const weekend = cards.locator('details').filter({ hasText: 'samedi 05' });
   await weekend.locator('summary').click();
   await weekend.getByRole('combobox').focus();
   await weekend.getByRole('combobox').selectOption('1');
@@ -128,7 +128,7 @@ test('manager day cards are read-only and the timeline joins dot centres', async
   const cards = page.locator('[data-cra-day-cards]');
   await expect(cards).toBeVisible();
   await expect(cards.getByRole('combobox')).toHaveCount(0);
-  await expect(cards.locator('article').first()).toContainText('1 j');
+  await expect(cards.locator('details').first()).toContainText('1 j');
   await expectAccessible(page);
   const timeline = page
     .locator('ol:visible')

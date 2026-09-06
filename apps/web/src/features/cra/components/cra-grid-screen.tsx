@@ -243,6 +243,14 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   }, [matrix.rowOrder, missionById]);
 
   const rowsByKey = useMemo(() => new Map(rows.map((row) => [row.key, row])), [rows]);
+  const fillRows = [
+    ...data.missions.map((mission) => ({
+      key: mission.missionId,
+      label: mission.name,
+      assignableDays: new Set(mission.assignableDays),
+    })),
+    { key: ABSENCE_ROW_KEY, label: LABELS.cra.absence, assignableDays: null },
+  ];
   const availableToAdd = data.missions.filter(
     (mission) => !matrix.rowOrder.includes(mission.missionId),
   );
@@ -349,6 +357,10 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const candidates = document.querySelectorAll<HTMLElement>(`[data-cra-day="${target}"]`);
+        for (const candidate of candidates) {
+          const disclosure = candidate.closest('details');
+          if (disclosure !== null) disclosure.open = true;
+        }
         const visible = [...candidates].find((element) => element.offsetParent !== null);
         visible?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
         visible?.focus();
@@ -381,6 +393,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
             type="button"
             variant="outline"
             size="sm"
+            className={matrix.cells.size === 0 ? 'hidden md:inline-flex' : undefined}
             onClick={() => {
               setCopyingPreviousMonth(true);
             }}
@@ -392,7 +405,13 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
               row and which of the two actions, so the button reads as a sentence, not a bare
               "Annuler" nobody can place. */}
           {undo !== null && (
-            <Button type="button" variant="ghost" size="sm" onClick={handleUndo}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="hidden md:inline-flex"
+              onClick={handleUndo}
+            >
               <Undo2Icon aria-hidden="true" />
               {LABELS.cra.matrix.undo} — {undo.label}
             </Button>
@@ -403,12 +422,66 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
       <CraLegend />
 
       <div className="md:hidden">
+        {data.editable && matrix.cells.size === 0 && (
+          <div className="mb-3 rounded-xl bg-primary/5 p-3 ring-1 ring-primary/20">
+            <p className="text-sm font-semibold">{LABELS.cra.matrix.emptyMonth}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {LABELS.cra.matrix.copyMonthPrompt.replace(
+                '{month}',
+                frenchMonth(previousPeriod(period)),
+              )}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-3 min-h-11 w-full"
+              onClick={() => {
+                setCopyingPreviousMonth(true);
+              }}
+            >
+              <CopyIcon aria-hidden="true" />
+              {LABELS.cra.matrix.previewPreviousMonth}
+            </Button>
+          </div>
+        )}
         <WeekNavigator
           days={mobileDays}
           index={mobileWeekIndex}
           count={weeks.length}
           onChange={setMobileWeekIndex}
         />
+        {data.editable && (
+          <div className="mt-3 flex flex-col gap-2">
+            <MobileWeekFill
+              key={period}
+              rows={fillRows}
+              days={mobileDays}
+              matrix={matrix}
+              onFill={(nextMatrix, label) => {
+                const first = mobileDays[0]?.date;
+                const last = mobileDays.at(-1)?.date;
+                const range =
+                  first !== undefined && last !== undefined
+                    ? ` (${frenchDate(first)} — ${frenchDate(last)})`
+                    : '';
+                setUndo({ matrix, label: `${LABELS.cra.matrix.fillWeek} — ${label}${range}` });
+                setMatrix(nextMatrix);
+                setDirty(true);
+              }}
+            />
+            {undo !== null && (
+              <Button
+                type="button"
+                variant="ghost"
+                className="min-h-11 h-auto justify-start whitespace-normal text-left"
+                onClick={handleUndo}
+              >
+                <Undo2Icon aria-hidden="true" />
+                {LABELS.cra.matrix.undo} — {undo.label}
+              </Button>
+            )}
+          </div>
+        )}
         <div className="mt-2">
           <CraDayCards
             period={period}
@@ -632,6 +705,83 @@ function CraProgress({
         />
       </div>
       <p className="text-xs text-nowrap text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
+function MobileWeekFill({
+  rows,
+  days,
+  matrix,
+  onFill,
+}: {
+  readonly rows: readonly Pick<MatrixRowMeta, 'key' | 'label' | 'assignableDays'>[];
+  readonly days: readonly GridDay[];
+  readonly matrix: MatrixState;
+  readonly onFill: (matrix: MatrixState, label: string) => void;
+}): ReactElement {
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const workableDays = days.filter((day) => day.nonWorkable === null).map((day) => day.date);
+  const options = rows.map((row) => {
+    const nextMatrix = fillEmptyWorkdays(
+      addRow(matrix, row.key),
+      row.key,
+      workableDays,
+      row.assignableDays,
+    );
+    return { row, nextMatrix, count: nextMatrix.cells.size - matrix.cells.size };
+  });
+  const selected =
+    options.find(({ row }) => row.key === selectedKey) ??
+    options.find(({ count }) => count > 0) ??
+    options[0];
+  const count = selected?.count ?? 0;
+
+  return (
+    <div className="rounded-xl bg-card p-3 ring-1 ring-border">
+      <label htmlFor="mobile-fill-activity" className="text-sm font-medium">
+        {LABELS.cra.matrix.fillWeekActivity}
+      </label>
+      <select
+        id="mobile-fill-activity"
+        className="mt-2 h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        value={selected?.row.key ?? ''}
+        onChange={(event) => {
+          setSelectedKey(event.target.value);
+        }}
+        aria-describedby="mobile-fill-hint mobile-fill-count"
+      >
+        {options.map(({ row }) => (
+          <option key={row.key} value={row.key}>
+            {row.label}
+          </option>
+        ))}
+      </select>
+      <p id="mobile-fill-hint" className="mt-2 text-xs text-muted-foreground">
+        {LABELS.cra.matrix.fillWeekHint}
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        className="mt-3 min-h-11 w-full"
+        disabled={count === 0}
+        onClick={() => {
+          if (selected !== undefined && selected.count > 0) {
+            setSelectedKey(selected.row.key);
+            onFill(selected.nextMatrix, selected.row.label);
+          }
+        }}
+      >
+        <ListChecksIcon aria-hidden="true" />
+        {LABELS.cra.matrix.fillWeek}
+      </Button>
+      <p id="mobile-fill-count" role="status" className="mt-2 text-xs text-muted-foreground">
+        {count === 0
+          ? LABELS.cra.matrix.fillWeekEmpty
+          : count === 1
+            ? LABELS.cra.matrix.fillWeekCountOne
+            : LABELS.cra.matrix.fillWeekCountMany.replace('{count}', String(count))}
+      </p>
     </div>
   );
 }

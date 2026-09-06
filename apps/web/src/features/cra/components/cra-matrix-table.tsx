@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 
 import {
   dayTotal,
+  isDayComplete,
   isDayIncomplete,
   isDayOverbooked,
   rowTotal,
@@ -464,7 +465,7 @@ export function CraDayCards({
   cellIdPrefix = 'mobile',
   totalLabel = LABELS.cra.weekTotal,
 }: CraMatrixTableProps): ReactElement {
-  const [expandedDays, setExpandedDays] = useState<ReadonlySet<string>>(() => new Set());
+  const [expandedDays, setExpandedDays] = useState<ReadonlyMap<string, boolean>>(() => new Map());
 
   return (
     <section
@@ -474,6 +475,9 @@ export function CraDayCards({
     >
       {days.map((day) => {
         const total = dayTotal(matrix, day.date);
+        const open =
+          expandedDays.get(day.date) ??
+          (!isDayComplete(matrix, day.date) && (day.nonWorkable === null || total > 0));
         const tone = isDayOverbooked(matrix, day.date)
           ? 'overbooked'
           : day.nonWorkable === null &&
@@ -490,7 +494,7 @@ export function CraDayCards({
         const heading = (
           <div className="flex min-w-0 items-center justify-between gap-3">
             <div className="min-w-0">
-              <span className="block font-semibold capitalize">
+              <span className="block text-sm font-semibold capitalize">
                 {frenchWeekday(day.date)} {day.date.slice(8, 10)}
               </span>
               {day.nonWorkable !== null && (
@@ -502,6 +506,28 @@ export function CraDayCards({
                 <span className="block text-xs text-status-late-text">{LABELS.cra.flagged}</span>
               )}
             </div>
+            {total > 0 && (
+              <span className="flex min-w-0 flex-wrap items-center gap-1">
+                {rows
+                  .filter((row) => valueAt(matrix, row.key, day.date) > 0)
+                  .map((row) => (
+                    <span key={row.key}>
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          'block size-2 rounded-full',
+                          row.toneIndex === null
+                            ? 'bg-absence-dot'
+                            : missionTone(row.toneIndex).dotClass,
+                        )}
+                      />
+                      <span className="sr-only">
+                        {row.label} : {frenchDays(valueAt(matrix, row.key, day.date))}.{' '}
+                      </span>
+                    </span>
+                  ))}
+              </span>
+            )}
             <span
               className="shrink-0 text-sm font-semibold tabular-nums"
               aria-label={`${LABELS.cra.dayTotal} — ${frenchDate(day.date)}`}
@@ -541,6 +567,8 @@ export function CraDayCards({
                   editable={editable}
                   assignable={row.assignableDays === null || row.assignableDays.has(day.date)}
                   onChange={(value) => {
+                    // Completing a focused day must not hide its select mid-edit (ADR-0100).
+                    setExpandedDays((previous) => new Map(previous).set(day.date, true));
                     onChangeCell?.(row.key, day.date, value);
                   }}
                   mobile
@@ -554,43 +582,38 @@ export function CraDayCards({
           'min-w-0 rounded-xl bg-card shadow-card ring-1 ring-border',
           dayTint(day),
         );
-        return day.nonWorkable !== null ? (
+        return (
           <details
             key={day.date}
             className={className}
-            open={total > 0 || expandedDays.has(day.date)}
+            open={open}
             onToggle={(event) => {
-              const open = event.currentTarget.open;
-              if (open === expandedDays.has(day.date)) return;
-              setExpandedDays((previous) => {
-                const next = new Set(previous);
-                if (open) next.add(day.date);
-                else next.delete(day.date);
-                return next;
-              });
+              const nextOpen = event.currentTarget.open;
+              // Native toggle also fires for React's automatic open/close updates.
+              if (nextOpen === open) return;
+              setExpandedDays((previous) => new Map(previous).set(day.date, nextOpen));
             }}
           >
             <summary
               className={cn(
-                'cursor-pointer rounded-xl p-3 marker:text-muted-foreground',
+                'min-h-11 cursor-pointer list-none rounded-xl p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden',
                 tone !== null && TOTAL_TONES[tone].headerClass,
               )}
             >
-              {heading}
+              <div className="flex items-center gap-2">
+                <ChevronDownIcon
+                  aria-hidden="true"
+                  className={cn(
+                    'size-4 shrink-0 text-muted-foreground transition-transform',
+                    !open && '-rotate-90',
+                  )}
+                />
+                <div className="min-w-0 flex-1">{heading}</div>
+              </div>
               {tone !== null && <p className="mt-1 text-xs">{TOTAL_TONES[tone].sentence}</p>}
             </summary>
             {activities}
           </details>
-        ) : (
-          <article key={day.date} className={className}>
-            <header
-              className={cn('rounded-t-xl p-3', tone !== null && TOTAL_TONES[tone].headerClass)}
-            >
-              {heading}
-              {tone !== null && <p className="mt-1 text-xs">{TOTAL_TONES[tone].sentence}</p>}
-            </header>
-            {activities}
-          </article>
         );
       })}
       <p className="flex items-center justify-between gap-3 rounded-lg bg-muted p-3 text-sm font-semibold">
