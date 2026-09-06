@@ -152,7 +152,11 @@ test('manager day cards are read-only and the timeline joins dot centres', async
   const cards = page.locator('[data-cra-day-cards]');
   await expect(cards).toBeVisible();
   await expect(cards.getByRole('combobox')).toHaveCount(0);
-  await expect(cards.locator('details').first()).toContainText('1 j');
+  // Pinned to a named workday, the way the weekend assertion above is pinned to 'samedi 05', and
+  // for the same reason: day cards are `<details>` for *every* day now, not only the non-workable
+  // ones, so `.first()` is Saturday the 1st — a weekend at 0 j. This line read `article` when
+  // `<article>` alone meant "workable day"; renaming the tag kept the syntax and lost the meaning.
+  await expect(cards.locator('details').filter({ hasText: 'lundi 03' })).toContainText('1 j');
   await expectAccessible(page);
   const timeline = page
     .locator('ol:visible')
