@@ -192,7 +192,7 @@ test('mobile persona metadata and empty-month actions align', async ({ page }) =
   await page.keyboard.press('Escape');
   const card = page
     .locator('main div')
-    .filter({ has: page.getByText('Ce mois ne contient aucune donnée', { exact: false }) })
+    .filter({ has: page.getByText('Consulter une autre période', { exact: true }) })
     .last();
   const links = card.locator('a');
   await expect(links).toHaveCount(3);

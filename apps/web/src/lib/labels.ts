@@ -213,9 +213,12 @@ export const LABELS = {
       ageToday: 'Aujourd’hui',
       ageOneDay: 'Depuis 1 jour',
       ageManyDays: 'Depuis {days} jours',
-      emptyMonthNotice:
-        'Ce mois ne contient aucune donnée : c’est un mois en cours, pas un défaut.',
-      seeMonthsWithData: 'Voir un mois avec des données',
+      /** `{month}` interpolated at the call site, and never at the start of the sentence:
+       * `frenchMonth` returns a lowercase month name. States a fact about the data and nothing
+       * about the mockup — an empty month in progress is what a real ERP shows, and it does not
+       * reassure the reader that the emptiness is not a bug. */
+      emptyMonthNotice: 'Aucune donnée pour {month}.',
+      seeAnotherPeriod: 'Consulter une autre période',
       /** F10: billing's own queue is bounded — "the ten oldest drafts", not every draft — so the
        * heading needs to say so and point at where the rest live. */
       oldestDraftsNote: 'Les dix brouillons les plus anciens, toutes périodes.',
@@ -402,6 +405,10 @@ export const LABELS = {
       previousWeek: 'Semaine précédente',
       nextWeek: 'Semaine suivante',
       weekPosition: 'Semaine {current} sur {count}',
+      /** The same fact in the width the mobile action bar has for it — `3/5`. Visible text only:
+       * `weekPosition` above stays the accessible name, so a screen reader never reads a bare
+       * fraction. */
+      weekPositionShort: '{current}/{count}',
       fillEmptyWorkdays: 'Remplir les jours ouvrés vides',
       fillWeek: 'Remplir cette semaine',
       fillWeekActivity: 'Activité à remplir',
@@ -415,6 +422,13 @@ export const LABELS = {
       previewPreviousMonth: 'Voir la proposition',
       clearRow: 'Vider la ligne',
       removeRow: 'Retirer la ligne',
+      /** Mobile counterpart of the desktop row tools, which hang off a table row the day cards do
+       * not have. The hint states the rule the trash button's `disabled` otherwise leaves
+       * unexplained — desktop hides the button instead, and a hidden control is what the reader
+       * reported as "no way to remove a mission". */
+      manageRows: 'Gérer les missions de la grille',
+      removeRowHint:
+        'Une mission ne peut être retirée que si elle ne porte aucune saisie sur le mois.',
       addActivity: 'Ajouter une activité',
       addActivityPlaceholder: 'Ajouter une mission…',
       noActivityToAdd: 'Toutes les missions affectées ce mois-ci figurent déjà dans la grille.',
@@ -472,9 +486,10 @@ export const LABELS = {
       viewLabel: 'Affichage du tableau',
       viewMonth: 'Mois',
       viewWeek: 'Semaine',
-      /** O7: single-level undo on the row tools' own "remplir"/"vider" — the button reads
-       * "{undo} — {action}", `action` being `fillEmptyWorkdays`/`clearRow` re-used verbatim with
-       * the row's name appended, so this key stays the one bare word. */
+      /** O7: single-level undo on the row tools' own "remplir"/"vider". The button reads
+       * "{undo} : {action}", `action` being `fillEmptyWorkdays`/`clearRow`/`fillWeek` re-used
+       * verbatim; the row it applied to is appended to the accessible name only, so the visible
+       * text stays short enough to read on a phone. */
       undo: 'Annuler',
       /** O6 — "Copier le mois précédent", with a preview (`copy-previous-month-dialog.tsx`): never
        * overwrites a cell already carrying something, built on the row tools' own
