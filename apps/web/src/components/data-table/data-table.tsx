@@ -7,8 +7,8 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from 'lucide-react';
-import type { ReactElement, ReactNode } from 'react';
-import { useState } from 'react';
+import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react';
+import { useRef, useState } from 'react';
 
 import {
   Table,
@@ -62,7 +62,31 @@ interface DataTableProps<TData> {
    * dated 05/09/2026) for the decision that is still open.
    */
   readonly sortable?: boolean;
+  /**
+   * Row-click-to-open, additive to the per-row `Link`/`Button asChild><Link>` every caller's
+   * `actions` column already renders — that link stays the keyboard and screen-reader path; this
+   * is a pointer-only convenience on top of it, so no `role`/`tabIndex` goes on `<tr>`.
+   *
+   * A plain `onClick` fires after a drag: on mobile this table's own wrapper
+   * (`components/ui/table.tsx`) scrolls horizontally, and the page around it scrolls vertically,
+   * and some mobile browsers still synthesize a click at the drag's end point. So this is built on
+   * `pointerdown`/`pointerup` instead — origin and pointer id recorded on down, activation gated on
+   * up by movement (<10px both axes), dwell time (<500ms), an empty text selection (rules out a
+   * desktop text-drag release) and the up target not landing inside an interactive descendant
+   * (rules out double-navigating the row's own "Ouvrir" link).
+   */
+  readonly onRowActivate?: (row: TData) => void;
 }
+
+/** Movement past this, on either axis, means "drag", not "tap" — a table scrolls in both: its own
+ * wrapper horizontally, the page around it vertically. */
+const ACTIVATION_MOVE_THRESHOLD_PX = 10;
+/** Above this dwell time between `pointerdown` and `pointerup`, it reads as a long-press/hold
+ * rather than a tap and is not treated as row activation. */
+const ACTIVATION_MAX_DWELL_MS = 500;
+/** A control nested inside the row (the `actions` column's own `Link`/`Button`, or any other
+ * focusable element a column renders) owns its own click — the row must not double-handle it. */
+const INTERACTIVE_DESCENDANT_SELECTOR = 'a,button,input,select,textarea,label,[role="button"]';
 
 export function DataTable<TData>({
   columns,
@@ -71,9 +95,19 @@ export function DataTable<TData>({
   emptyState,
   numericColumns = [],
   sortable = true,
+  onRowActivate,
 }: DataTableProps<TData>): ReactElement {
   const [sorting, setSorting] = useState<SortingState>([]);
   const numericColumnIds = new Set(numericColumns);
+  // One shared origin, not one per row: pointer input is one contact at a time, and `pointerId`
+  // below is what ties a row's `pointerup` back to the `pointerdown` that started on that same
+  // row, so a drag that starts on one row and releases over another activates neither.
+  const activationOrigin = useRef<{
+    readonly x: number;
+    readonly y: number;
+    readonly t: number;
+    readonly pointerId: number;
+  } | null>(null);
   // `react-hooks/incompatible-library` flags `useReactTable` by name for every caller, React
   // Compiler or not: it is one of three libraries the rule hardcodes (React Hook Form's
   // `useForm`, TanStack Table's `useReactTable`, TanStack Virtual's `useVirtualizer`) because each
@@ -174,18 +208,62 @@ export function DataTable<TData>({
           ))}
         </TableHeader>
         <TableBody>
-          {table.getRowModel().rows.map((row) => (
-            <TableRow key={row.id}>
-              {row.getVisibleCells().map((cell) => (
-                <TableCell
-                  key={cell.id}
-                  className={cn(numericColumnIds.has(cell.column.id) && 'text-right')}
-                >
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
+          {table.getRowModel().rows.map((row) => {
+            const activationHandlers =
+              onRowActivate === undefined
+                ? {}
+                : {
+                    onPointerDown: (event: ReactPointerEvent<HTMLTableRowElement>) => {
+                      activationOrigin.current = {
+                        x: event.clientX,
+                        y: event.clientY,
+                        t: Date.now(),
+                        pointerId: event.pointerId,
+                      };
+                    },
+                    onPointerUp: (event: ReactPointerEvent<HTMLTableRowElement>) => {
+                      const origin = activationOrigin.current;
+                      activationOrigin.current = null;
+                      if (origin?.pointerId !== event.pointerId) return;
+                      if (Date.now() - origin.t >= ACTIVATION_MAX_DWELL_MS) return;
+                      if (
+                        Math.abs(event.clientX - origin.x) >= ACTIVATION_MOVE_THRESHOLD_PX ||
+                        Math.abs(event.clientY - origin.y) >= ACTIVATION_MOVE_THRESHOLD_PX
+                      ) {
+                        return;
+                      }
+                      if ((document.getSelection()?.toString() ?? '') !== '') return;
+                      const target = event.target;
+                      if (
+                        target instanceof Element &&
+                        target.closest(INTERACTIVE_DESCENDANT_SELECTOR) !== null
+                      ) {
+                        return;
+                      }
+                      onRowActivate(row.original);
+                    },
+                    onPointerCancel: () => {
+                      activationOrigin.current = null;
+                    },
+                  };
+
+            return (
+              <TableRow
+                key={row.id}
+                className={cn(onRowActivate !== undefined && 'cursor-pointer')}
+                {...activationHandlers}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell
+                    key={cell.id}
+                    className={cn(numericColumnIds.has(cell.column.id) && 'text-right')}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>

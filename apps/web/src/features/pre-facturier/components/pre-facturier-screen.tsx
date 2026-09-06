@@ -110,6 +110,26 @@ function PeriodSelector({ period, offered }: PeriodSelectorProps): ReactElement 
   );
 }
 
+/**
+ * The one destination the "billable" table's row opens, shared between the `open` column's own
+ * `Link` (the keyboard/screen-reader path) and `DataTable`'s `onRowActivate` (the pointer-tap
+ * convenience) — one place, so the two can never point two different directions.
+ */
+function invoiceDestination(
+  row: PreFacturierInvoiceRow,
+  returnTo: string,
+): {
+  readonly to: '/factures/$id';
+  readonly params: { readonly id: string };
+  readonly search: { readonly client: string; readonly period: string; readonly from: string };
+} {
+  return {
+    to: '/factures/$id',
+    params: { id: row.id },
+    search: { client: row.billedToName, period: row.supplyPeriod, from: returnTo },
+  };
+}
+
 function invoiceColumns(returnTo: string): ColumnDef<PreFacturierInvoiceRow>[] {
   return [
     {
@@ -199,13 +219,7 @@ function invoiceColumns(returnTo: string): ColumnDef<PreFacturierInvoiceRow>[] {
       header: () => <span className="sr-only">{LABELS.action.tableActions}</span>,
       cell: ({ row }) => (
         <Link
-          to="/factures/$id"
-          params={{ id: row.original.id }}
-          search={{
-            client: row.original.billedToName,
-            period: row.original.supplyPeriod,
-            from: returnTo,
-          }}
+          {...invoiceDestination(row.original, returnTo)}
           className="ml-auto block w-fit text-sm text-primary hover:underline"
         >
           {LABELS.preFacturier.invoiceOpen}
@@ -238,6 +252,24 @@ function validateFactsFor(row: PreFacturierCraRow, period: string): ValidateConf
         : LABELS.preFacturier.validateConfirmDialog.no,
     },
   ];
+}
+
+/**
+ * The one destination the CRA-decision table's row opens (the read-only view, never
+ * validate/refuse) — shared between the `actions` column's own "Ouvrir" `Link` (the
+ * keyboard/screen-reader path) and `DataTable`'s `onRowActivate` (the pointer-tap convenience).
+ */
+function craRowDestination(
+  period: string,
+  row: PreFacturierCraRow,
+): {
+  readonly to: '/cra/$period/$consultantId';
+  readonly params: { readonly period: string; readonly consultantId: string };
+} {
+  return {
+    to: '/cra/$period/$consultantId',
+    params: { period, consultantId: row.consultantId },
+  };
 }
 
 function craColumns(
@@ -340,12 +372,7 @@ function craColumns(
       cell: ({ row }) => (
         <div className="ml-auto flex w-fit items-center gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link
-              to="/cra/$period/$consultantId"
-              params={{ period, consultantId: row.original.consultantId }}
-            >
-              {LABELS.cra.show}
-            </Link>
+            <Link {...craRowDestination(period, row.original)}>{LABELS.cra.show}</Link>
           </Button>
           {row.original.decidable && (
             <>
@@ -592,6 +619,7 @@ export function PreFacturierScreen({
           numericColumns={['lineCount', 'totalTtc']}
           // F06/A7: server-paginated (see `DataTable`'s own `sortable` doc comment).
           sortable={false}
+          onRowActivate={(row) => void navigate(invoiceDestination(row, returnTo))}
           emptyState={
             invoicesOutOfRange ? (
               <EmptyState
@@ -666,6 +694,14 @@ export function PreFacturierScreen({
           getRowId={(row) => row.craId}
           numericColumns={['recorded']}
           sortable={false}
+          // Billing renders no `actions` column at all (`craColumns`'s own `.filter()` above) —
+          // there is no destination its own row could open, so no handler for that role either.
+          {...(role === 'manager'
+            ? {
+                onRowActivate: (row: PreFacturierCraRow) =>
+                  void navigate(craRowDestination(period, row)),
+              }
+            : {})}
           emptyState={
             crasOutOfRange ? (
               <EmptyState

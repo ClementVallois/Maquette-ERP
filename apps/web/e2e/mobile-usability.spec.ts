@@ -1,6 +1,10 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+/** `no-restricted-syntax` bans a bare `new Error()` project-wide, tests included — same local
+ * pattern as `motion.spec.ts`'s own `LayoutAssumptionError`. */
+class LayoutAssumptionError extends Error {}
+
 async function choosePersona(page: Page, key: string): Promise<void> {
   await page.goto('/');
   await page.locator(`[data-persona-key="${key}"] button`).click();
@@ -202,6 +206,40 @@ test('saving a CRA uses a steady busy button and recovers after a failed request
       .locator('[data-cra-day-cards]')
       .getByRole('combobox', { name: 'Absence — 01/12/2026', exact: true }),
   ).toHaveValue('4');
+});
+
+test('a horizontal drag across a table row does not navigate, but a tap does', async ({ page }) => {
+  await choosePersona(page, 'billing-paris');
+  await page.goto('/factures');
+  const row = page.locator('table tbody tr').first();
+  await expect(row).toBeVisible();
+  const box = await row.boundingBox();
+  if (box === null)
+    throw new LayoutAssumptionError('The first invoice row must have a bounding box.');
+  const y = box.y + box.height / 2;
+  // Over the first (non-interactive) cell — not the "Ouvrir" link, which lives in the last one.
+  const startX = box.x + 12;
+
+  const urlBeforeDrag = page.url();
+  // The row's own wrapper (`components/ui/table.tsx`) scrolls horizontally on mobile — a
+  // drag-scroll across a row must not be read as a tap.
+  await page.mouse.move(startX, y);
+  await page.mouse.down();
+  await page.mouse.move(startX + 80, y, { steps: 8 });
+  await page.mouse.up();
+  expect(page.url()).toBe(urlBeforeDrag);
+  // The drag above dragged a real, desktop-only text selection along with it (mouse behaviour a
+  // touch drag does not have) — clear it so the independent tap below is not itself gated by the
+  // "non-empty selection" bail this component's `pointerup` handler also checks.
+  await page.evaluate(() => {
+    window.getSelection()?.removeAllRanges();
+  });
+
+  // A tap in the same place, no movement, does activate the row.
+  await page.mouse.move(startX, y);
+  await page.mouse.down();
+  await page.mouse.up();
+  await page.waitForURL(/\/factures\/[^/?]+/u);
 });
 
 test('invoice source dates expand into a contained grid without losing days', async ({ page }) => {

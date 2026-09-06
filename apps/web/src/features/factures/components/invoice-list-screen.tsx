@@ -52,6 +52,26 @@ function TableSkeleton(): ReactElement {
   );
 }
 
+/**
+ * The one destination a row of this table can open, shared between the `actions` column's own
+ * `Link` (the keyboard/screen-reader path) and `DataTable`'s `onRowActivate` (the pointer-tap
+ * convenience on top of it) — one place, so the two can never point two different directions.
+ */
+function invoiceDestination(
+  row: InvoiceListItem,
+  returnTo: string,
+): {
+  readonly to: '/factures/$id';
+  readonly params: { readonly id: string };
+  readonly search: { readonly client: string; readonly period: string; readonly from: string };
+} {
+  return {
+    to: '/factures/$id',
+    params: { id: row.id },
+    search: { client: row.billedToName, period: row.supplyPeriod, from: returnTo },
+  };
+}
+
 function columns(returnTo: string): ColumnDef<InvoiceListItem>[] {
   return [
     {
@@ -124,13 +144,7 @@ function columns(returnTo: string): ColumnDef<InvoiceListItem>[] {
       header: () => <span className="sr-only">{LABELS.action.tableActions}</span>,
       cell: ({ row }) => (
         <Link
-          to="/factures/$id"
-          params={{ id: row.original.id }}
-          search={{
-            client: row.original.billedToName,
-            period: row.original.supplyPeriod,
-            from: returnTo,
-          }}
+          {...invoiceDestination(row.original, returnTo)}
           className="ml-auto block w-fit text-sm text-primary hover:underline"
         >
           {LABELS.invoice.open}
@@ -338,6 +352,7 @@ export function InvoiceListScreen({
         // sort would order that page, not the invoices, so no sort control is offered here rather
         // than one that looks global and is not (`DataTable`'s own `sortable` doc comment).
         sortable={false}
+        onRowActivate={(row) => void navigate(invoiceDestination(row, returnTo))}
         emptyState={
           outOfRange ? (
             <EmptyState
