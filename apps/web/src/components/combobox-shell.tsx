@@ -22,6 +22,11 @@ interface ComboboxShellProps {
    * — the trigger's `aria-label` is still what names it; the visible `<Label>` is for sighted
    * users reading the form's structure. */
   readonly triggerId?: string;
+  /** Forwarded to the trigger `Button`'s own `aria-invalid`/`aria-describedby` — a caller-owned
+   * validation message (e.g. "choose a consultant") needs to reach the one focusable element
+   * this whole widget has, exactly as it would on a native `<select>`. */
+  readonly triggerAriaInvalid?: boolean;
+  readonly triggerAriaDescribedBy?: string;
   readonly searchLabel: string;
   readonly searchPlaceholder: string;
   readonly noMatchLabel: string;
@@ -67,6 +72,8 @@ export function ComboboxShell({
   triggerContent,
   triggerClassName,
   triggerId,
+  triggerAriaInvalid,
+  triggerAriaDescribedBy,
   searchLabel,
   searchPlaceholder,
   noMatchLabel,
@@ -100,6 +107,10 @@ export function ComboboxShell({
           variant="outline"
           size="sm"
           {...(triggerId === undefined ? {} : { id: triggerId })}
+          {...(triggerAriaInvalid === undefined ? {} : { 'aria-invalid': triggerAriaInvalid })}
+          {...(triggerAriaDescribedBy === undefined
+            ? {}
+            : { 'aria-describedby': triggerAriaDescribedBy })}
           aria-label={ariaLabel}
           className={cn('w-fit min-w-40 justify-between font-normal', triggerClassName)}
         >

@@ -24,6 +24,12 @@ interface SingleSelectComboboxProps {
   readonly onChange: (next: string) => void;
   readonly id?: string;
   readonly className?: string;
+  /** Forwarded to the trigger's own `aria-invalid`/`aria-describedby` — a caller's client-side
+   * "you must choose one" validation message, since there is no native `required` attribute on
+   * a `Button`+`Popover` pair to carry it for free the way there was on the `<select>` this
+   * replaces. */
+  readonly invalid?: boolean;
+  readonly describedById?: string;
 }
 
 /**
@@ -64,6 +70,8 @@ export function SingleSelectCombobox({
   onChange,
   id,
   className,
+  invalid,
+  describedById,
 }: SingleSelectComboboxProps): ReactElement {
   const selected = options.find((option) => option.value === value);
 
@@ -72,6 +80,8 @@ export function SingleSelectCombobox({
       ariaLabel={label}
       {...(id === undefined ? {} : { triggerId: id })}
       {...(className === undefined ? {} : { triggerClassName: className })}
+      {...(invalid === undefined ? {} : { triggerAriaInvalid: invalid })}
+      {...(describedById === undefined ? {} : { triggerAriaDescribedBy: describedById })}
       triggerContent={
         <>
           <span className="truncate">{selected?.label ?? noneSelectedLabel}</span>

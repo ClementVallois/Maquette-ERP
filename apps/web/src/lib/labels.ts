@@ -799,6 +799,7 @@ export const LABELS = {
     searchPlaceholder: 'Nom du consultant…',
     noSearchResults: 'Aucun consultant ne correspond à cette recherche.',
     clearConsultant: 'Effacer le consultant sélectionné',
+    consultantRequired: 'Choisissez un consultant avant d’enregistrer.',
     selection: 'Consultant et mission',
     dates: 'Période d’affectation',
     endHint: 'Facultatif : laissez vide pour une affectation sans date de fin.',

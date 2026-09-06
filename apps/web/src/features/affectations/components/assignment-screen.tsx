@@ -44,6 +44,11 @@ export function AssignmentScreen(): ReactElement {
   const save = useSaveAssignment();
   const [form, setForm] = useState<AssignmentInput>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // No native `<select required>` backs the consultant picker any more (a `Button`+`Popover`
+  // pair, `single-select-combobox.tsx`) — this is what replaces the browser's own "please fill
+  // this field" gate, since without it "Affecter" would otherwise silently do nothing when
+  // mission and dates are filled but no consultant is chosen.
+  const [consultantMissing, setConsultantMissing] = useState(false);
   const formHeading = useRef<HTMLHeadingElement>(null);
   const [filter, setFilter] = useState<ViewFilter>('current');
 
@@ -99,12 +104,21 @@ export function AssignmentScreen(): ReactElement {
   const resetForm = (): void => {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setConsultantMissing(false);
     save.reset();
   };
 
   const submit = async (event: SyntheticEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
-    if (form.consultantId === '' || form.missionId === '' || form.fromDate === '') return;
+    if (form.consultantId === '') {
+      setConsultantMissing(true);
+      document.getElementById('assignment-consultant')?.focus();
+      return;
+    }
+    // Mission and dates still carry a native `required`, so the browser's own constraint
+    // validation refuses the submit event before this function ever runs when either is empty —
+    // this stays a defensive check, not a second gate a user can actually reach through the UI.
+    if (form.missionId === '' || form.fromDate === '') return;
     try {
       await save.mutateAsync({ id: editingId, input: form });
       toast.success(
@@ -173,9 +187,23 @@ export function AssignmentScreen(): ReactElement {
                       value={form.consultantId}
                       onChange={(next) => {
                         setForm({ ...form, consultantId: next });
+                        setConsultantMissing(false);
                       }}
                       className="h-11 w-full"
+                      invalid={consultantMissing}
+                      {...(consultantMissing
+                        ? { describedById: 'assignment-consultant-error' }
+                        : {})}
                     />
+                    {consultantMissing && (
+                      <p
+                        id="assignment-consultant-error"
+                        role="alert"
+                        className="text-sm text-destructive"
+                      >
+                        {LABELS.assignment.consultantRequired}
+                      </p>
+                    )}
                   </div>
                   <div className="flex min-w-0 flex-col gap-2">
                     <Label htmlFor="assignment-mission">{LABELS.assignment.mission}</Label>
