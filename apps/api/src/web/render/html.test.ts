@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { html, type Html, renderToString, trustedMarkup, UnsafeMarkupError } from './html.ts';
+import { Html, html, renderToString, trustedMarkup, UnsafeMarkupError } from './html.ts';
 
 /**
  * The security-relevant test file of Phase 6. BUILD-PLAN 6.1 asks to be **generous rather than
@@ -297,5 +297,32 @@ describe('the scanner tracks state through the markup this repository actually w
     expect(() => html`<img srcset="${'a.png 1x, javascript:alert(1) 2x'}" />`).toThrow(
       UnsafeMarkupError,
     );
+  });
+});
+
+/**
+ * Package 13 of the cleanup audit: `Html.of` was a public static member, callable from any file
+ * in the repository, that constructed raw unescaped markup with no reason argument — bypassing
+ * `trustedMarkup`'s own gate entirely. `Html.read` had the matching problem in the other
+ * direction. Both are `private static` now (`html.ts`'s own header comment on the class explains
+ * why that requires `render`/`tag` to be static methods too, not merely renamed free functions).
+ *
+ * There is no runtime behavior to assert here — the fix is a compiler boundary, not a code path —
+ * so the assertion is the compiler itself: `@ts-expect-error` makes `pnpm run -s typecheck` fail
+ * if the line below *doesn't* produce a type error, which is exactly the state before this
+ * package's fix (`Html.of` was callable, so this comment would have reported "unused
+ * '@ts-expect-error' directive" and failed the same gate for the opposite reason). Verified both
+ * ways: this block was added while `of`/`read` were still public, and `pnpm run -s typecheck`
+ * failed on it (an unused directive) until the class was changed to make it fail for the reason
+ * this comment names instead.
+ */
+describe('package 13: Html cannot be constructed or read from outside this module', () => {
+  it('has no runtime assertion — see the block comment above this describe', () => {
+    // @ts-expect-error — `of` is private static; only Html's own static methods may call it.
+    Html.of('<script>evil</script>');
+    // @ts-expect-error — `read` is private static; only Html's own static methods may call it.
+    Html.read(html`safe`);
+
+    expect(true).toBe(true);
   });
 });
