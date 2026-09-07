@@ -1,5 +1,5 @@
 import { STAFFING_PROBLEM_TYPES, type StaffingProblemType } from '@erp/contracts';
-import { isoDate, isoDateOf, type Actor, type IsoDate } from '@erp/platform';
+import { isoDate, isoDateOf, toDayNumber, type Actor, type IsoDate } from '@erp/platform';
 
 import type { PgReadClient } from '../persistence/pg-client.ts';
 import { PgReferenceReader } from '../persistence/reference-reader.ts';
@@ -83,8 +83,48 @@ interface ExistsRow {
   exists: boolean;
 }
 
+interface HeldHabilitationRow {
+  habilitation_id: string;
+  obtained_at: Date | string;
+  expires_at: Date | string | null;
+}
+
 function nullableDate(value: Date | string | null): IsoDate | null {
   return value === null ? null : isoDateOf(value);
+}
+
+/** `null` reads as unbounded — a day number no real date reaches. */
+function dayNumberOrOpenEnd(date: IsoDate | null): number {
+  return date === null ? Number.POSITIVE_INFINITY : toDayNumber(date);
+}
+
+/**
+ * Whether the union of `periods` (each inclusive, `to: null` meaning open-ended) covers every day
+ * of `[from, to]` with no gap — merging touching or overlapping periods rather than checking only
+ * the two endpoints (ADR-0105). `periods` need not already be sorted or merged; this does both.
+ */
+function fullyCovers(
+  periods: readonly { from: IsoDate; to: IsoDate | null }[],
+  from: IsoDate,
+  to: IsoDate | null,
+): boolean {
+  const targetFrom = toDayNumber(from);
+  const targetTo = dayNumberOrOpenEnd(to);
+
+  const sorted = [...periods]
+    .map((period) => ({ from: toDayNumber(period.from), to: dayNumberOrOpenEnd(period.to) }))
+    .sort((left, right) => left.from - right.from);
+
+  // The last day number known covered so far, one day before the target's own start — so the
+  // first period is accepted exactly when it starts on or before that start, with no gap.
+  let coveredThrough = targetFrom - 1;
+  for (const period of sorted) {
+    if (period.from > coveredThrough + 1) return false;
+    coveredThrough = Math.max(coveredThrough, period.to);
+    if (coveredThrough >= targetTo) return true;
+  }
+
+  return coveredThrough >= targetTo;
 }
 
 export async function assignmentCatalogue(
@@ -187,7 +227,12 @@ async function validateAssignment(
   if (consultant === undefined) return { kind: 'notFound' };
 
   const departure = nullableDate(consultant.departure_date);
-  if (departure !== null && (from >= departure || (to !== null && to >= departure))) {
+  // `departure` is the first date the consultant is no longer staffable (ADR-0079's own wording),
+  // so `>=` refuses the departure day itself, not only the days after it. An **open** end (`to ===
+  // null`) is refused unconditionally once a departure is known: an unbounded assignment reaches
+  // every future day by construction, and a known departure means at least one of them is already
+  // not staffable — this was the gap the audit reproduced (an open end never compared to anything).
+  if (departure !== null && (from >= departure || to === null || to >= departure)) {
     return refused(STAFFING_PROBLEM_TYPES.departure, { departureDate: departure });
   }
 
@@ -210,18 +255,35 @@ async function validateAssignment(
     });
   }
 
-  const missing = new Set([
-    ...reference.missingHabilitations(input.consultantId, input.missionId, from),
-    ...reference.missingHabilitations(
-      input.consultantId,
-      input.missionId,
-      to ?? isoDate('9999-12-31'),
-    ),
-  ]);
-  if (missing.size > 0) {
+  // `TimesheetReference.missingHabilitations` answers one day at a time — right for a Cra
+  // submission check, which asks about one recorded day, but not enough here: an assignment
+  // covers every day of `[from, to]`, and checking only the endpoints missed a held-then-lapsed-
+  // then-renewed habilitation with a gap in the middle (reproduced: held July 1-5 and July 20-31,
+  // assignment July 1-31, accepted). The raw dated rows are read directly and merged.
+  const required = mission.requiredHabilitations;
+  const missingNames: string[] = [];
+  if (required.length > 0) {
+    const { rows: heldRows } = await client.query<HeldHabilitationRow>(
+      `SELECT habilitation_id, obtained_at, expires_at
+         FROM public.consultant_habilitations
+        WHERE consultant_id = $1 AND habilitation_id = ANY($2::text[])`,
+      [input.consultantId, required],
+    );
+    const held = heldRows.map((row) => ({
+      habilitationId: row.habilitation_id,
+      from: isoDateOf(row.obtained_at),
+      to: nullableDate(row.expires_at),
+    }));
+
+    for (const habilitationId of required) {
+      const periods = held.filter((row) => row.habilitationId === habilitationId);
+      if (!fullyCovers(periods, from, to)) missingNames.push(habilitationId);
+    }
+  }
+  if (missingNames.length > 0) {
     const { rows: names } = await client.query<{ id: string; name: string }>(
       `SELECT id, name FROM public.habilitations WHERE id = ANY($1::text[]) ORDER BY name`,
-      [[...missing]],
+      [missingNames],
     );
     return refused(STAFFING_PROBLEM_TYPES.missingHabilitation, {
       habilitations: names.map((row) => row.name).join(', '),
