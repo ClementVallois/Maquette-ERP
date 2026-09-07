@@ -130,10 +130,10 @@ export function registerPreFacturierRoutes(
             (total, row) => total + row.totalExcludingVatCents,
             0,
           ),
-          // Quarter-days, despite the name Annexe A pins for this field — the unit every quantity
-          // on the wire uses, and what `frenchDays` (both copies) takes as its argument. A
-          // consumer that divides by four before formatting prints a quarter of the truth.
-          lateDays: composition.lateQuarterDays,
+          // Package 09, sub-step 4/4: named to match its own unit (quarter-days, what
+          // `frenchDays` takes directly) rather than the old `lateDays`, which Annexe A pinned
+          // and never matched what the field actually carried.
+          lateQuarterDays: composition.lateQuarterDays,
           craCount: composition.pagination.cras.total,
         },
         invoices: composition.invoices.map((row) => ({

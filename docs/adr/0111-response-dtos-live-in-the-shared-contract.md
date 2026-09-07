@@ -101,3 +101,13 @@ rather than schema-ifying every DTO preemptively on the strength of one future c
   (today it exports `Actor`, `isRole`, `ROLES`, `Role` — see `packages/platform/src/index.ts`) adds
   it to that public surface rather than reaching past it; the boundary rule this ADR extends grants
   only `packages/platform/src/index.ts`, not the package's internals.
+- **Addendum, sub-step 4/4 (the audit's own explicit "coordinate a clear field name" instruction):**
+  once every resource moved into `@erp/contracts`, `PreFacturierSummary.lateDays` — always
+  quarter-days, never divided by four before this rename, and named after a unit it never
+  carried — became a one-field, one-commit rename to `lateQuarterDays` across its one construction
+  site (`apps/api/src/routes/pre-facturier.ts`) and its one reader
+  (`apps/web/src/features/pre-facturier/components/pre-facturier-screen.tsx`), both found and
+  fixed by the compiler once the shared interface's own field was renamed — the DTO move's whole
+  point, exercised on the field the audit named by name. Rejected: keeping `lateDays` with a
+  comment (the state before this ADR, and the audit's own evidence line) — a comment a future
+  reader can miss is not the same guarantee as a name that states the unit.

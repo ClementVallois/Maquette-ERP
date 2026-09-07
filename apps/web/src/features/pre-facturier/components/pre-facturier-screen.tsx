@@ -585,7 +585,7 @@ export function PreFacturierScreen({
         />
         <StatCard
           label={LABELS.preFacturier.summaryLate}
-          value={frenchDays(data.summary.lateDays)}
+          value={frenchDays(data.summary.lateQuarterDays)}
           helpText={LABELS.preFacturier.lateNote}
         />
         <StatCard label={LABELS.preFacturier.summaryCras} value={String(data.summary.craCount)} />

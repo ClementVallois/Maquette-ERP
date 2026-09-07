@@ -12,8 +12,15 @@ export type DeclineReason = 'notRegie' | 'unknownMission' | 'noAgreedRate' | 'un
 
 export interface PreFacturierSummary {
   readonly billableCents: number;
-  /** Quarter-days, despite the name — `frenchDays` takes this directly, never divided by four. */
-  readonly lateDays: number;
+  /**
+   * Package 09 (P1 audit), sub-step 4/4: named `lateQuarterDays`, not `lateDays` — the field
+   * always carried quarter-days (`frenchDays` takes it directly, never divided by four), and the
+   * old name was the misleading one the audit asked to be coordinated with its only client
+   * rather than kept forever. Same unit as `composition.lateQuarterDays`
+   * (`apps/api/src/composition/pre-facturier.ts`), which this field has always mirrored — the
+   * rename makes the two names agree, not just the two values.
+   */
+  readonly lateQuarterDays: number;
   readonly craCount: number;
 }
 
