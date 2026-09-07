@@ -50,6 +50,47 @@ export function billedParty(source: Client): BilledParty {
 }
 
 /**
+ * Defensive-copy helpers (package 07, ADR-0108). `readonly` blocks a caller from *reassigning* a
+ * field without a cast, but a cast defeats that just as completely for a plain string field as it
+ * does for a `Date`'s mutating method — `(invoice.billedTo.billingAddress as Mutable).line1 = 'x'`
+ * needs no method call at all. The audit's "Done when" names addresses, line origins and VAT
+ * treatments alongside timestamps, so every one of these — one level deep, no recursive framework,
+ * because none of these types nest further than this — is copied at both the constructor and the
+ * getter, exactly like `#lines`/`#validatedBy` already were.
+ */
+function copyAddress(address: PostalAddress): PostalAddress {
+  return { ...address };
+}
+
+function copyBilledParty(party: BilledParty): BilledParty {
+  return {
+    ...party,
+    billingAddress: copyAddress(party.billingAddress),
+    deliveryAddress: copyAddress(party.deliveryAddress),
+  };
+}
+
+function copySeller(seller: LegalEntity): LegalEntity {
+  return { ...seller, address: copyAddress(seller.address) };
+}
+
+function copyTerms(terms: PaymentTerms): PaymentTerms {
+  return { ...terms };
+}
+
+function copyMentions(mentions: LegalMentions): LegalMentions {
+  return { ...mentions, earlyPaymentDiscount: { ...mentions.earlyPaymentDiscount } };
+}
+
+function copyLine(line: InvoiceLine): InvoiceLine {
+  return { ...line, origin: { ...line.origin }, vat: { ...line.vat } };
+}
+
+function copyVatGroup(group: VatGroup): VatGroup {
+  return { ...group, treatment: { ...group.treatment } };
+}
+
+/**
  * A demand for payment. Holds state, so it is a class and everything a caller can do to it is a
  * named intention — there is no setter, and the lines are handed out as a copy.
  *
@@ -104,12 +145,12 @@ export class Invoice {
   }) {
     this.#id = input.id;
     this.#officeId = input.officeId;
-    this.#seller = input.seller;
-    this.#billedTo = input.billedTo;
+    this.#seller = copySeller(input.seller);
+    this.#billedTo = copyBilledParty(input.billedTo);
     this.#supplyPeriod = input.supplyPeriod;
-    this.#lines = [...input.lines];
-    this.#terms = input.terms;
-    this.#mentions = input.mentions;
+    this.#lines = input.lines.map(copyLine);
+    this.#terms = copyTerms(input.terms);
+    this.#mentions = copyMentions(input.mentions);
     this.#validatedBy = [...input.validatedBy];
   }
 
@@ -174,7 +215,8 @@ export class Invoice {
     invoice.#issueDate = input.issueDate;
     invoice.#series = input.series;
     invoice.#totals = input.totals;
-    invoice.#vatBreakdown = input.vatBreakdown;
+    invoice.#vatBreakdown =
+      input.vatBreakdown === null ? null : input.vatBreakdown.map(copyVatGroup);
     invoice.#dueDate = input.dueDate;
     return invoice;
   }
@@ -192,11 +234,11 @@ export class Invoice {
   }
 
   get seller(): LegalEntity {
-    return this.#seller;
+    return copySeller(this.#seller);
   }
 
   get billedTo(): BilledParty {
-    return this.#billedTo;
+    return copyBilledParty(this.#billedTo);
   }
 
   get supplyPeriod(): string {
@@ -204,15 +246,15 @@ export class Invoice {
   }
 
   get lines(): readonly InvoiceLine[] {
-    return [...this.#lines];
+    return this.#lines.map(copyLine);
   }
 
   get terms(): PaymentTerms {
-    return this.#terms;
+    return copyTerms(this.#terms);
   }
 
   get mentions(): LegalMentions {
-    return this.#mentions;
+    return copyMentions(this.#mentions);
   }
 
   get validatedBy(): readonly ConsultantId[] {
@@ -243,7 +285,12 @@ export class Invoice {
    * what is printed on a legal document is what was checked when it was issued.
    */
   get vatBreakdown(): readonly VatGroup[] {
-    return this.#vatBreakdown ?? vatBreakdownOf(this.#lines);
+    // Copied (package 07): once issued, `#vatBreakdown` is the same array — and the same group
+    // objects within it, `treatment` included — on every call. `vatBreakdownOf` below computes a
+    // fresh, unaliased array before issuance, so only the frozen branch needs the copy.
+    return this.#vatBreakdown === null
+      ? vatBreakdownOf(this.#lines)
+      : this.#vatBreakdown.map(copyVatGroup);
   }
 
   /**

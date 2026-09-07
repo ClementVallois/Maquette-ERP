@@ -1,6 +1,7 @@
 import { InvalidValueError, period } from '@erp/platform';
 import { describe, expect, it } from 'vitest';
 
+import type { VatGroup } from './document.ts';
 import {
   CraAlreadyProcessedError,
   EmptyInvoiceError,
@@ -121,6 +122,67 @@ describe('a draft invoice', () => {
     stolen.push(lineOf(65_000, STANDARD));
 
     expect(invoice.lines).toHaveLength(1);
+  });
+
+  it('is immune to a cast-based field mutation on the billed party address (package 07, ADR-0108)', () => {
+    // Probe for the audit's "Done when" claim: "including nested addresses". `BilledParty`/
+    // `PostalAddress` hold only strings, so unlike `Date` there is no mutating *method* to reach —
+    // but a cast defeats `readonly` just as well by reassigning the field directly. This only
+    // proves the claim if it actually fails to move the aggregate.
+    const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
+    const stolenAddress = invoice.billedTo.billingAddress as { line1: string };
+    stolenAddress.line1 = 'stolen';
+
+    expect(invoice.billedTo.billingAddress.line1).not.toBe('stolen');
+  });
+
+  it('is immune to a cast-based field mutation on the seller address (package 07, ADR-0108)', () => {
+    const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
+    const stolenAddress = invoice.seller.address as { city: string };
+    stolenAddress.city = 'stolen';
+
+    expect(invoice.seller.address.city).not.toBe('stolen');
+  });
+
+  it('is immune to a cast-based field mutation on a line origin (package 07, ADR-0108)', () => {
+    const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
+    const stolenOrigin = invoice.lines[0]!.origin as { tjmCents: number };
+    stolenOrigin.tjmCents = 1;
+
+    expect(invoice.lines[0]!.origin.tjmCents).not.toBe(1);
+  });
+
+  it('is immune to a cast-based field mutation on a line VAT treatment (package 07, ADR-0108)', () => {
+    const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
+    const stolenTreatment = invoice.lines[0]!.vat as { basisPoints: number };
+    stolenTreatment.basisPoints = 0;
+
+    expect((invoice.lines[0]!.vat as { basisPoints: number }).basisPoints).not.toBe(0);
+  });
+
+  it('does not alias the billed party or seller supplied at drafting (package 07, ADR-0108)', () => {
+    // The "in" direction of the same claim: a caller mutating the object it handed to `draft`
+    // after the call must not reach the aggregate either — the aliasing risk the audit names for
+    // constructor arguments, not just getters.
+    const billedTo = billedParty(parisClient);
+    const seller = { ...SELLER, address: { ...SELLER.address } };
+    const invoice = Invoice.draft({
+      id: 'invoice-1',
+      officeId: 'office-paris',
+      seller,
+      billedTo,
+      supplyPeriod: MARCH,
+      lines: [lineOf(65_000, STANDARD)],
+      terms: TERMS,
+      mentions: MENTIONS,
+      validatedBy: ['bruno'],
+    });
+
+    (billedTo.billingAddress as { line1: string }).line1 = 'stolen';
+    (seller.address as { city: string }).city = 'stolen';
+
+    expect(invoice.billedTo.billingAddress.line1).not.toBe('stolen');
+    expect(invoice.seller.address.city).not.toBe('stolen');
   });
 });
 
@@ -515,6 +577,20 @@ describe('Invoice.reconstitute', () => {
       },
     ]);
     expect(issued.dueDate).toBe('2099-01-01');
+  });
+
+  it('hands out the frozen VAT breakdown as a copy, once issued (package 07)', () => {
+    const issued = persistedInvoice({ ...ISSUED });
+    const stolen = issued.vatBreakdown as VatGroup[];
+    stolen.push({
+      key: 'taxable:0',
+      treatment: { kind: 'taxable', basisPoints: 0 },
+      baseCents: 1,
+      vatCents: 0,
+      mention: null,
+    });
+
+    expect(issued.vatBreakdown).toHaveLength(1);
   });
 
   it('names every missing field at once, not the first one', () => {
