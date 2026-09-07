@@ -1,4 +1,5 @@
 import { lineAmountCents } from '@erp/billing';
+import type { ConsultantEconomics, MissionEconomics } from '@erp/contracts';
 import { type Actor, assertMayRead, lastDayOf, type Period, periodToIso } from '@erp/platform';
 import type { CraRepository } from '@erp/timesheet';
 
@@ -24,27 +25,6 @@ import type { PgReadClient } from '../persistence/pg-client.ts';
  * know what they are sold for. The days themselves come through `CraRepository`, so `timesheet`
  * still answers the only question that is its own: who worked how much, on what.
  */
-
-export interface MissionEconomics {
-  readonly missionId: string;
-  readonly missionName: string;
-  readonly quarterDays: number;
-  readonly tjmCents: number;
-  readonly revenueCents: number;
-  readonly costCents: number;
-  readonly marginCents: number;
-}
-
-export interface ConsultantEconomics {
-  readonly consultantId: string;
-  readonly displayName: string;
-  readonly period: string;
-  readonly cjmCents: number;
-  readonly missions: readonly MissionEconomics[];
-  readonly revenueCents: number;
-  readonly costCents: number;
-  readonly marginCents: number;
-}
 
 interface ConsultantRow {
   first_name: string;

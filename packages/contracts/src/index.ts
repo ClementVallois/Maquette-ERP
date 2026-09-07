@@ -32,3 +32,4 @@ export type {
   AssignmentInput,
   AssignmentSaved,
 } from './staffing.ts';
+export type { ConsultantEconomics, MissionEconomics } from './economics.ts';
