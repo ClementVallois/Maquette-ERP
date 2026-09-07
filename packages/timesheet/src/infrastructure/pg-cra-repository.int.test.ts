@@ -1,8 +1,9 @@
 import { type Actor, isoDate, OutOfScopeError, period } from '@erp/platform';
-import { useTestTransaction } from '@erp/test-harness';
-import { describe, expect, it } from 'vitest';
+import { closePool, getPool, useTestTransaction } from '@erp/test-harness';
+import { afterAll, describe, expect, it } from 'vitest';
 
 import { Cra } from '../domain/cra.ts';
+import { CraAlreadyExistsError } from '../domain/errors.ts';
 import { hierarchy } from '../domain/hierarchy.ts';
 import { timesheetReference } from '../domain/reference.ts';
 import { workingCalendar } from '../domain/working-calendar.ts';
@@ -562,5 +563,246 @@ describe('PgCraRepository', () => {
       ['cra-001'],
     );
     expect(Number.parseInt(rows[0]!.count, 10)).toBe(workableDays);
+  });
+
+  describe('findByIdForWrite and findByConsultantAndPeriodForWrite (ADR-0103)', () => {
+    it('findByIdForWrite reads the same Cra findById does', async () => {
+      await seedOffices();
+      await repo().save(makeCra());
+
+      const found = await repo().findByIdForWrite('cra-001', parisManager);
+      expect(found).not.toBeNull();
+      expect(found!.id).toBe('cra-001');
+    });
+
+    it('findByIdForWrite returns null for a Cra that does not exist', async () => {
+      await seedOffices();
+      const found = await repo().findByIdForWrite('nonexistent', parisManager);
+      expect(found).toBeNull();
+    });
+
+    it('findByIdForWrite refuses, rather than hides, a Cra of another office', async () => {
+      await seedOffices();
+      await repo().save(makeCra());
+
+      await expect(repo().findByIdForWrite('cra-001', lyonManager)).rejects.toThrow(
+        OutOfScopeError,
+      );
+    });
+
+    it('findByConsultantAndPeriodForWrite reads the same Cra findByConsultantAndPeriod does', async () => {
+      await seedOffices();
+      await repo().save(makeCra());
+
+      const found = await repo().findByConsultantAndPeriodForWrite(
+        'consultant-1',
+        period(2026, 6),
+        parisManager,
+      );
+      expect(found).not.toBeNull();
+      expect(found!.id).toBe('cra-001');
+    });
+
+    it('findByConsultantAndPeriodForWrite returns null for a month with no Cra yet', async () => {
+      await seedOffices();
+      const found = await repo().findByConsultantAndPeriodForWrite(
+        'consultant-1',
+        period(2026, 6),
+        parisManager,
+      );
+      expect(found).toBeNull();
+    });
+
+    it('findByConsultantAndPeriodForWrite refuses a Cra of another office', async () => {
+      await seedOffices();
+      await repo().save(makeCra());
+
+      await expect(
+        repo().findByConsultantAndPeriodForWrite('consultant-1', period(2026, 6), lyonManager),
+      ).rejects.toThrow(OutOfScopeError);
+    });
+  });
+
+  describe('save — the second boundary of ADR-0103’s creation guard', () => {
+    it('maps a (consultant, period) collision to a typed CraAlreadyExistsError, not a raw constraint violation', async () => {
+      await seedOffices();
+
+      await repo().save(
+        Cra.open({
+          id: 'cra-first',
+          consultantId: 'consultant-1',
+          officeId: PARIS,
+          period: period(2026, 6),
+          consultantDeparture: null,
+        }),
+      );
+
+      // A second, distinct Cra id for the same (consultant, period): unreachable through
+      // `findByConsultantAndPeriodForWrite`'s advisory lock in the ordinary write path, and
+      // exercised directly here — the same way `saveDraft`'s own catch is proven in `billing`.
+      await expect(
+        repo().save(
+          Cra.open({
+            id: 'cra-second',
+            consultantId: 'consultant-1',
+            officeId: PARIS,
+            period: period(2026, 6),
+            consultantDeparture: null,
+          }),
+        ),
+      ).rejects.toThrow(CraAlreadyExistsError);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lock proofs (ADR-0103) — real pool clients, not the per-test savepoint harness above:
+// `FOR UPDATE` against your own already-held lock is a no-op, and so is an advisory lock taken
+// twice on the same session. Both need a second, genuinely independent connection to contend with.
+// ---------------------------------------------------------------------------
+
+describe('PgCraRepository — lock proofs (ADR-0103)', () => {
+  const managerActor: Actor = {
+    consultantId: 'lock-manager',
+    officeId: 'lock-office',
+    role: 'manager',
+  };
+
+  afterAll(async () => {
+    await closePool();
+  });
+
+  async function seedForLockTests(): Promise<void> {
+    const pool = getPool();
+    await pool.query(
+      `INSERT INTO public.offices (id, name, city) VALUES ('lock-office', 'Lock', 'Lock')
+       ON CONFLICT DO NOTHING`,
+    );
+    await pool.query(
+      `INSERT INTO public.practices (id, name) VALUES ('lock-practice', 'Audit')
+       ON CONFLICT DO NOTHING`,
+    );
+    await pool.query(
+      `INSERT INTO public.consultants (id, first_name, last_name, email, office_id, practice_id, role)
+       VALUES ('lock-consultant', 'Lock', 'Test', 'lock@test.com', 'lock-office', 'lock-practice', 'consultant')
+       ON CONFLICT DO NOTHING`,
+    );
+  }
+
+  async function cleanupCra(id: string): Promise<void> {
+    const pool = getPool();
+    await pool.query(`DELETE FROM timesheet.cra_lines WHERE cra_id = $1`, [id]);
+    await pool.query(`DELETE FROM timesheet.cra_flags WHERE cra_id = $1`, [id]);
+    await pool.query(`DELETE FROM timesheet.cras WHERE id = $1`, [id]);
+  }
+
+  /** Resolved if `promise` settles within `ms`; otherwise proof that it is still pending. */
+  async function isStillPending(promise: Promise<unknown>, ms = 500): Promise<boolean> {
+    const race = await Promise.race([
+      promise.then(() => 'resolved' as const),
+      new Promise<'pending'>((resolve) => {
+        setTimeout(() => {
+          resolve('pending');
+        }, ms);
+      }),
+    ]);
+    return race === 'pending';
+  }
+
+  it('findByIdForWrite blocks a second connection until the first commits', async () => {
+    await seedForLockTests();
+    const pool = getPool();
+    // Committed before either lock-holding transaction opens: a row inserted but not yet
+    // committed by A would be invisible to B under READ COMMITTED, and B's `FOR UPDATE` would
+    // find zero rows and return immediately — proving nothing about the lock this test targets.
+    await new PgCraRepository(pool, testIds).save(
+      Cra.open({
+        id: 'lock-cra-row',
+        consultantId: 'lock-consultant',
+        officeId: 'lock-office',
+        period: period(2026, 6),
+        consultantDeparture: null,
+      }),
+    );
+    const clientA = await pool.connect();
+    const clientB = await pool.connect();
+
+    try {
+      await clientA.query('BEGIN');
+      // A locks the pre-existing, already-committed row.
+      const lockedByA = await new PgCraRepository(clientA, testIds).findByIdForWrite(
+        'lock-cra-row',
+        managerActor,
+      );
+      expect(lockedByA!.status).toBe('draft');
+
+      await clientB.query('BEGIN');
+      const pendingB = new PgCraRepository(clientB, testIds).findByIdForWrite(
+        'lock-cra-row',
+        managerActor,
+      );
+
+      expect(await isStillPending(pendingB)).toBe(true);
+
+      await clientA.query('COMMIT');
+      const foundByB = await pendingB;
+      await clientB.query('COMMIT');
+
+      expect(foundByB!.id).toBe('lock-cra-row');
+    } finally {
+      clientA.release();
+      clientB.release();
+      await cleanupCra('lock-cra-row');
+    }
+  });
+
+  it('findByConsultantAndPeriodForWrite blocks a second connection on a month with no Cra yet', async () => {
+    await seedForLockTests();
+    const pool = getPool();
+    const clientA = await pool.connect();
+    const clientB = await pool.connect();
+
+    try {
+      await clientA.query('BEGIN');
+      // Nothing exists yet: only the advisory lock protects this window, since a row lock has no
+      // row to take.
+      const heldByA = await new PgCraRepository(clientA, testIds).findByConsultantAndPeriodForWrite(
+        'lock-consultant',
+        period(2026, 7),
+        managerActor,
+      );
+      expect(heldByA).toBeNull();
+
+      await clientB.query('BEGIN');
+      const pendingB = new PgCraRepository(clientB, testIds).findByConsultantAndPeriodForWrite(
+        'lock-consultant',
+        period(2026, 7),
+        managerActor,
+      );
+
+      expect(await isStillPending(pendingB)).toBe(true);
+
+      // A creates the Cra and commits, releasing the advisory lock.
+      await new PgCraRepository(clientA, testIds).save(
+        Cra.open({
+          id: 'lock-cra-created',
+          consultantId: 'lock-consultant',
+          officeId: 'lock-office',
+          period: period(2026, 7),
+          consultantDeparture: null,
+        }),
+      );
+      await clientA.query('COMMIT');
+
+      // B unblocks and finds the row A created — an edit, never a duplicate create.
+      const foundByB = await pendingB;
+      await clientB.query('COMMIT');
+
+      expect(foundByB!.id).toBe('lock-cra-created');
+    } finally {
+      clientA.release();
+      clientB.release();
+      await cleanupCra('lock-cra-created');
+    }
   });
 });

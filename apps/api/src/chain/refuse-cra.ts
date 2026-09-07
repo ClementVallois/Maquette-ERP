@@ -36,7 +36,9 @@ export async function refuseCra(
   command: RefuseCraCommand,
 ): Promise<RefuseCraOutcome> {
   return dependencies.transactionally(async (unit) => {
-    const cra = await unit.cras.findById(command.craId, command.actor);
+    // Locked (ADR-0103), for the same reason `validateCraAndDraftInvoices` locks its own read: a
+    // stale refusal must not overwrite a Cra a concurrent validation already committed.
+    const cra = await unit.cras.findByIdForWrite(command.craId, command.actor);
     if (cra === null) return { kind: 'notFound', craId: command.craId };
 
     // `refuse` checks the status and refuses an empty reason; the hierarchy check is the manager

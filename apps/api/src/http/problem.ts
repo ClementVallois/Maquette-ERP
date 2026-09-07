@@ -33,6 +33,7 @@ const STATUS_BY_PROBLEM_TYPE: Readonly<Record<string, number>> = {
 
   // @erp/timesheet
   '/problems/unknown-calendar-year': UNPROCESSABLE,
+  '/problems/cra-already-exists': CONFLICT,
   '/problems/mission-required': UNPROCESSABLE,
   '/problems/mission-not-allowed': UNPROCESSABLE,
   '/problems/day-outside-period': UNPROCESSABLE,

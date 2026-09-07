@@ -68,7 +68,10 @@ export async function validateCraAndDraftInvoices(
   command: ValidateCraCommand,
 ): Promise<ValidateCraOutcome> {
   return dependencies.transactionally(async (unit) => {
-    const cra = await unit.cras.findById(command.craId, command.actor);
+    // Locked (ADR-0103): a concurrent `refuse` or `validate` on this Cra blocks here until this
+    // transaction commits, then reads the state this call left — never a copy of the state both
+    // started from. That is what lets the checks below answer against the truth, not a race.
+    const cra = await unit.cras.findByIdForWrite(command.craId, command.actor);
     if (cra === null) {
       return { kind: 'notFound', craId: command.craId, invoices: [], declined: [] };
     }

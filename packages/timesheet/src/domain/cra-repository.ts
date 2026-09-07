@@ -90,5 +90,25 @@ export interface CraRepository {
     period: Period,
     actor: Actor,
   ): Promise<Cra | null>;
+  /**
+   * `findById`, locked for a write command (ADR-0103): `SELECT … FOR UPDATE`, so a manager's
+   * `validate`/`refuse` on the same Cra serializes against a concurrent one instead of both
+   * transitioning a copy of the same pre-lock state. Deliberately **not** what a screen reads —
+   * `findById` above stays plain, so a list or a printable never queues behind a write.
+   */
+  findByIdForWrite(id: CraId, actor: Actor): Promise<Cra | null>;
+  /**
+   * `findByConsultantAndPeriod`, locked for `recordMonth`. A row lock alone cannot protect a Cra
+   * that does not exist yet, which is why this also takes an advisory lock on
+   * `(consultantId, period)` before the read — the same shape `PgInvoiceRepository.prepareIssuance`
+   * uses for the idempotency key it cannot yet see a row for (ADR-0102). Once the Cra exists, the
+   * advisory lock and the row lock both cover it, and a manager's `findByIdForWrite` on the same
+   * row contends with either.
+   */
+  findByConsultantAndPeriodForWrite(
+    consultantId: ConsultantId,
+    period: Period,
+    actor: Actor,
+  ): Promise<Cra | null>;
   save(cra: Cra): Promise<void>;
 }

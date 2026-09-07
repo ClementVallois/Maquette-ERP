@@ -225,6 +225,24 @@ export class NotTheManagerError extends BusinessError {
 }
 
 /**
+ * The second boundary of ADR-0103's creation guard: `save`'s insert hit
+ * `cras_consultant_id_period_key` despite the advisory lock `findByConsultantAndPeriodForWrite`
+ * takes before it. The lock is what makes this unreachable in the ordinary path — every writer
+ * goes through it — so seeing this error means a caller bypassed the locked read, which is a bug
+ * to fix in that caller, not a business outcome to design a screen around. It is still a typed
+ * refusal and not a raw constraint violation, on the same reasoning `CraAlreadyProcessedError`
+ * gives in `billing`: the index is the boundary a race reaches, not the boundary a normal request
+ * does.
+ */
+export class CraAlreadyExistsError extends BusinessError {
+  readonly problemType = '/problems/cra-already-exists';
+
+  constructor(consultantId: string, period: string) {
+    super(`${consultantId} already has a Cra for ${period}`, { consultantId, period });
+  }
+}
+
+/**
  * A persisted `Cra` came back in a state the aggregate's own transitions cannot produce — a
  * `validated` record with nobody who validated it, a `refused` one with no refusal. A **technical**
  * failure and not a business one: no user action produces it, and no retry fixes it. `reconstitute`

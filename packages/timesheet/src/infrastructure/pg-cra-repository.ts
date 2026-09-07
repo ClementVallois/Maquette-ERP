@@ -14,8 +14,23 @@ import type { CraListItem, CraListQuery, CraRepository } from '../domain/cra-rep
 import type { CraStatus } from '../domain/cra-status.ts';
 import { Cra, type CraRefusal } from '../domain/cra.ts';
 import type { RecordedDayType } from '../domain/day-type.ts';
+import { CraAlreadyExistsError } from '../domain/errors.ts';
 import type { ConsultantId, CraId, MissionId, OfficeId } from '../domain/ids.ts';
 import type { CraFlag } from '../domain/submission-checks.ts';
+
+function periodIsoOf(period: Period): string {
+  return `${String(period.year)}-${String(period.month).padStart(2, '0')}`;
+}
+
+function isPgUniqueViolation(error: unknown, constraintName: string): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    (error as { code: unknown }).code === '23505' &&
+    'constraint' in error &&
+    (error as { constraint: unknown }).constraint === constraintName
+  );
+}
 
 /**
  * 200, not 50 (ADR-0081, item 6/step 3 QA round 1) — this repository's own cap, raised past the
@@ -65,10 +80,48 @@ export class PgCraRepository implements CraRepository {
     period: Period,
     actor: Actor,
   ): Promise<Cra | null> {
-    const periodIso = `${String(period.year)}-${String(period.month).padStart(2, '0')}`;
     const { rows } = await this.#client.query<CraRow>(
       `SELECT * FROM timesheet.cras WHERE consultant_id = $1 AND period = $2`,
-      [consultantId, periodIso],
+      [consultantId, periodIsoOf(period)],
+    );
+
+    if (rows.length === 0) return null;
+    const row = rows[0]!;
+    assertMayRead(actor, 'cra', { officeId: row.office_id, subjectId: row.consultant_id });
+
+    return this.#reconstitute(row);
+  }
+
+  async findByIdForWrite(id: CraId, actor: Actor): Promise<Cra | null> {
+    const { rows } = await this.#client.query<CraRow>(
+      `SELECT * FROM timesheet.cras WHERE id = $1 FOR UPDATE`,
+      [id],
+    );
+
+    if (rows.length === 0) return null;
+    const row = rows[0]!;
+    assertMayRead(actor, 'cra', { officeId: row.office_id, subjectId: row.consultant_id });
+
+    return this.#reconstitute(row);
+  }
+
+  async findByConsultantAndPeriodForWrite(
+    consultantId: ConsultantId,
+    period: Period,
+    actor: Actor,
+  ): Promise<Cra | null> {
+    // A row lock alone cannot protect a Cra that does not exist yet (ADR-0103): the advisory lock
+    // is keyed on the pair a not-yet-existing row has no id for, and it is what a concurrent
+    // `recordMonth` for the same consultant/period contends on while this one decides whether to
+    // create or edit.
+    await this.#client.query(
+      `SELECT pg_advisory_xact_lock(hashtext('timesheet.cra.write'), hashtext($1))`,
+      [`${consultantId}:${periodIsoOf(period)}`],
+    );
+
+    const { rows } = await this.#client.query<CraRow>(
+      `SELECT * FROM timesheet.cras WHERE consultant_id = $1 AND period = $2 FOR UPDATE`,
+      [consultantId, periodIsoOf(period)],
     );
 
     if (rows.length === 0) return null;
@@ -207,34 +260,44 @@ export class PgCraRepository implements CraRepository {
   }
 
   async save(cra: Cra): Promise<void> {
-    await this.#client.query(
-      `INSERT INTO timesheet.cras (
-        id, consultant_id, office_id, period, status,
-        submitted_at, validated_by, validated_at,
-        refusal_by, refusal_at, refusal_reason
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-      ON CONFLICT (id) DO UPDATE SET
-        status = EXCLUDED.status,
-        submitted_at = EXCLUDED.submitted_at,
-        validated_by = EXCLUDED.validated_by,
-        validated_at = EXCLUDED.validated_at,
-        refusal_by = EXCLUDED.refusal_by,
-        refusal_at = EXCLUDED.refusal_at,
-        refusal_reason = EXCLUDED.refusal_reason`,
-      [
-        cra.id,
-        cra.consultantId,
-        cra.officeId,
-        `${String(cra.period.year)}-${String(cra.period.month).padStart(2, '0')}`,
-        cra.status,
-        cra.submittedAt,
-        cra.validatedBy,
-        cra.validatedAt,
-        cra.refusal?.by ?? null,
-        cra.refusal?.at ?? null,
-        cra.refusal?.reason ?? null,
-      ],
-    );
+    try {
+      await this.#client.query(
+        `INSERT INTO timesheet.cras (
+          id, consultant_id, office_id, period, status,
+          submitted_at, validated_by, validated_at,
+          refusal_by, refusal_at, refusal_reason
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        ON CONFLICT (id) DO UPDATE SET
+          status = EXCLUDED.status,
+          submitted_at = EXCLUDED.submitted_at,
+          validated_by = EXCLUDED.validated_by,
+          validated_at = EXCLUDED.validated_at,
+          refusal_by = EXCLUDED.refusal_by,
+          refusal_at = EXCLUDED.refusal_at,
+          refusal_reason = EXCLUDED.refusal_reason`,
+        [
+          cra.id,
+          cra.consultantId,
+          cra.officeId,
+          periodIsoOf(cra.period),
+          cra.status,
+          cra.submittedAt,
+          cra.validatedBy,
+          cra.validatedAt,
+          cra.refusal?.by ?? null,
+          cra.refusal?.at ?? null,
+          cra.refusal?.reason ?? null,
+        ],
+      );
+    } catch (error: unknown) {
+      // The second boundary (ADR-0103): unreachable through `findByConsultantAndPeriodForWrite`'s
+      // advisory lock in the ordinary path, and here so a caller that bypasses it gets a typed
+      // conflict instead of a raw `23505` — the same idiom `saveDraft` uses in `billing`.
+      if (isPgUniqueViolation(error, 'cras_consultant_id_period_key')) {
+        throw new CraAlreadyExistsError(cra.consultantId, periodIsoOf(cra.period));
+      }
+      throw error;
+    }
 
     await this.#client.query(`DELETE FROM timesheet.cra_lines WHERE cra_id = $1`, [cra.id]);
     await this.#client.query(`DELETE FROM timesheet.cra_flags WHERE cra_id = $1`, [cra.id]);

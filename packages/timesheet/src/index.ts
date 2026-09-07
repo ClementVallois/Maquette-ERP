@@ -16,6 +16,7 @@ export {
 } from './domain/day-type.ts';
 export {
   CraAfterDepartureError,
+  CraAlreadyExistsError,
   CraTransitionError,
   DayOutsidePeriodError,
   DayOverbookedError,
