@@ -295,8 +295,14 @@ async function settle(ms = 75): Promise<void> {
 // test rather than on this file's own setup mistake.
 beforeAll(seedReferenceData);
 
-describe('validating and refusing a Cra — two real connections racing (ADR-0103)', () => {
-  it('validate wins: refuse loses with the immutability refusal, invoices stay drafted', async () => {
+// Unlike the three `describe` blocks below, these two `it`s do not start both requests
+// simultaneously: `settle()` gives the first a head start long enough that it has normally
+// already committed before the second is even sent. They are sequenced, not raced — what they
+// prove is that the loser reads the winner's true post-commit state and gets the right typed
+// refusal from it, not that the lock itself resolves a genuine simultaneous collision (the
+// `Promise.all` blocks below prove that).
+describe('validating and refusing a Cra — one request sequenced just after the other (ADR-0103)', () => {
+  it('validate first, refuse just after: refuse loses with the immutability refusal, invoices stay drafted', async () => {
     await seedSubmittedCra('cra-cc-vr-1');
 
     const validated = post<{ replayed: boolean }>(
@@ -329,7 +335,7 @@ describe('validating and refusing a Cra — two real connections racing (ADR-010
     expect(drafted.length).toBeGreaterThan(0);
   });
 
-  it('refuse wins: validate loses with the transition refusal, no invoice is drafted', async () => {
+  it('refuse first, validate just after: validate loses with the transition refusal, no invoice is drafted', async () => {
     await seedSubmittedCra('cra-cc-vr-2');
 
     const refused = post<{ status: string }>(

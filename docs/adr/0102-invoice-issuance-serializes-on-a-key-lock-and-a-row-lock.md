@@ -48,6 +48,32 @@ that finds the row already `issued` calls `Invoice.issue()` against that true st
 existing `InvoiceTransitionError` → `409 /problems/invoice-transition-not-allowed` — no new error
 type was needed.
 
+## Scope of the key lock's disclosure
+
+ADR-0044 states the replay lookup is office-scoped so "an actor who may not read the invoice does
+not learn from this route whether their key was used on one." That sentence is still true of the
+**replay** lookup — a same-key/same-invoice request outside the actor's office answers `404`, the
+ordinary not-found an out-of-scope id gets everywhere else in this API, exactly as before this
+decision.
+
+This decision's advisory lock is a different lookup with a narrower promise: `issuance_idempotency_key`
+is a single global unique index (migration 009), so the same-key/different-invoice check that
+guards it cannot be office-scoped without leaving the same race ADR-0102 exists to close — a
+manager could not check "is this key free" without first knowing which office's invoice it might
+collide with. `apps/api/src/routes/api.int.test.ts`'s cross-office test
+(`refuses a key already used by an invoice of a different office, without leaking it`) makes this
+explicit: a Lyon actor reusing a Paris invoice's key gets `409 idempotency-key-reused`, not `404` —
+they learn the key is **taken**, across the office boundary, which ADR-0044's sentence read
+literally rules out.
+
+What stays bounded is the _payload_: `keyReused`'s response carries no invoice id, number, client,
+or amount — nothing that identifies which invoice, in which office, holds the key. An actor
+learns "this key cannot be used again", the same fact a client-side retry already knows (it holds
+the key it sent), and nothing else. This is a narrower disclosure than ADR-0044's own rejected
+option would have made necessary to avoid — a per-route serialized-response table would have made
+the same key-in-use fact visible with no scoping mechanism available to hide it either, since the
+uniqueness itself is what the check is for.
+
 ## Rejected option
 
 **An optimistic `version` column**, incremented on every write and checked with
