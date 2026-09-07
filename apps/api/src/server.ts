@@ -13,7 +13,6 @@ import { registerAccessControl, registerOriginCheck } from './personas/access.ts
 import { registerApiRoutes } from './routes/api.ts';
 import { registerOpsRoutes } from './routes/ops.ts';
 import { registerSessionRoutes } from './routes/session.ts';
-import { registerFormBodyParser } from './web/form-body.ts';
 import { registerSecurityHeaders } from './web/reply.ts';
 import { representationOf } from './web/representation.ts';
 import { registerWebRoutes } from './web/routes.ts';
@@ -128,7 +127,6 @@ export function buildServer(
   // Fastify fires that hook only for routes registered after it. Registering a route first would
   // make it exempt from the declaration check — silently.
   registerSecurityHeaders(app);
-  registerFormBodyParser(app);
   registerOriginCheck(app, dependencies);
   registerAccessControl(app, dependencies);
 

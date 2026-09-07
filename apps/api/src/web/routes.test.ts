@@ -1,21 +1,17 @@
-import { ROLES } from '@erp/platform';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { DECIDES_CRA } from '../composition/pre-facturier.ts';
 import type { ApiConfig } from '../config.ts';
 import { ApiFailure } from '../errors.ts';
 import type { Transactionally } from '../persistence/unit-of-work.ts';
-import { carries, forRoles } from '../personas/access.ts';
+import { forRoles } from '../personas/access.ts';
 import { PERSONA_COOKIE, signPersonaKey } from '../personas/cookie.ts';
 import { inMemoryPersonas } from '../personas/testing/catalogue.ts';
 import { buildServer } from '../server.ts';
 
 import { STYLESHEET } from './assets.ts';
 import { LABELS } from './labels.ts';
-import { PATHS } from './paths.ts';
 import { CONTENT_SECURITY_POLICY } from './reply.ts';
-import { ISSUES_INVOICE } from './routes.ts';
 
 /**
  * The screens through `fastify.inject`, with no database: the persona catalogue is the in-memory
@@ -87,77 +83,6 @@ afterEach(async () => {
  * cookie-to-chrome round trip on a page this file still renders, and the version that GET-ed
  * `PATHS.home` for it kept passing after the route was unregistered, off the 404 page's own shell.
  */
-describe('the persona cookie', () => {
-  it('sets a signed cookie and redirects, so a refresh does not repost the choice', async () => {
-    const response = await app.inject({
-      method: 'POST',
-      url: PATHS.choosePersona,
-      headers: { origin: ORIGIN, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: 'key=manager-lyon',
-    });
-
-    expect(response.statusCode).toBe(303);
-    expect(response.headers.location).toBe(PATHS.home);
-    expect(response.headers['set-cookie']).toContain(`${PERSONA_COOKIE}=manager-lyon.`);
-    expect(response.headers['set-cookie']).toContain('HttpOnly');
-    expect(response.headers['set-cookie']).toContain('SameSite=Strict');
-  });
-
-  it('clears the persona through a POST, because a form cannot DELETE', async () => {
-    const response = await app.inject({
-      method: 'POST',
-      url: PATHS.clearPersona,
-      headers: { origin: ORIGIN, ...as('manager-lyon') },
-    });
-
-    expect(response.statusCode).toBe(303);
-    expect(response.headers['set-cookie']).toContain('Max-Age=0');
-  });
-
-  it('refuses a persona this instance does not offer, as a page and not as JSON', async () => {
-    const response = await app.inject({
-      method: 'POST',
-      url: PATHS.choosePersona,
-      headers: { origin: ORIGIN, 'content-type': 'application/x-www-form-urlencoded' },
-      payload: 'key=admin-root',
-    });
-
-    expect(response.statusCode).toBe(404);
-    expect(response.headers['content-type']).toContain('text/html');
-    expect(response.body).toContain(LABELS.problem.heading.notFound);
-  });
-});
-
-describe('the origin check, met by a browser for the first time', () => {
-  it('refuses a form post that carries no Origin', async () => {
-    const response = await app.inject({
-      method: 'POST',
-      url: PATHS.choosePersona,
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      payload: 'key=manager-lyon',
-    });
-
-    expect(response.statusCode).toBe(403);
-    expect(response.body).toContain('/problems/forbidden-origin');
-  });
-
-  it('refuses a form post from another origin, and says so on a page', async () => {
-    const response = await app.inject({
-      method: 'POST',
-      url: PATHS.choosePersona,
-      headers: {
-        origin: 'https://evil.test',
-        'content-type': 'application/x-www-form-urlencoded',
-      },
-      payload: 'key=manager-lyon',
-    });
-
-    expect(response.statusCode).toBe(403);
-    expect(response.headers['content-type']).toContain('text/html');
-    expect(response.body).toContain(LABELS.problem.heading.denied);
-  });
-});
-
 describe('a refusal on a screen path is the API refusal, rendered', () => {
   it('renders a role refusal as a page naming the rule that denied it', async () => {
     app.get('/interdit', { config: { access: forRoles('manager') } }, () => ({ ok: true }));
@@ -337,155 +262,9 @@ describe('security headers', () => {
    * `personas/access.ts` are one mechanism written in two files, and a future tightening back to
    * `no-referrer` for privacy has to fail here rather than in a reader's browser.
    */
-  it('does not send a referrer policy that nulls the Origin of its own form posts', async () => {
-    const response = await app.inject({ method: 'GET', url: PATHS.choosePersona });
+  it('does not send a referrer policy that nulls the Origin of its own writes', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/v1/personas' });
 
     expect(response.headers['referrer-policy']).not.toBe('no-referrer');
   });
-});
-
-describe('the form body parser', () => {
-  it('collects repeated field names into an array, which the Cra grid will post', async () => {
-    let seen: unknown;
-    app.post('/formulaire', { config: { access: forRoles('consultant') } }, (request) => {
-      seen = request.body;
-
-      return { ok: true };
-    });
-
-    await app.inject({
-      method: 'POST',
-      url: '/formulaire',
-      headers: {
-        origin: ORIGIN,
-        'content-type': 'application/x-www-form-urlencoded',
-        ...as('consultant-paris'),
-      },
-      payload: 'jour=2026-06-01&jour=2026-06-02&mois=2026-06',
-    });
-
-    expect(seen).toEqual({ jour: ['2026-06-01', '2026-06-02'], mois: '2026-06' });
-  });
-
-  it('cannot reach Object.prototype through a field name', async () => {
-    let seen: Record<string, unknown> = {};
-    app.post('/formulaire', { config: { access: forRoles('consultant') } }, (request) => {
-      seen = request.body as Record<string, unknown>;
-
-      return { ok: true };
-    });
-
-    await app.inject({
-      method: 'POST',
-      url: '/formulaire',
-      headers: {
-        origin: ORIGIN,
-        'content-type': 'application/x-www-form-urlencoded',
-        ...as('consultant-paris'),
-      },
-      payload: '__proto__=polluted',
-    });
-
-    expect(Object.getPrototypeOf(seen)).toBeNull();
-    expect({}).not.toHaveProperty('polluted');
-  });
-
-  it('refuses a parameter flood, and the handler never runs', async () => {
-    let reached = false;
-    app.post('/formulaire', { config: { access: forRoles('consultant') } }, () => {
-      reached = true;
-
-      return { ok: true };
-    });
-
-    // The body limit caps the bytes; this caps the *shape*. 501 one-character fields are a few
-    // kilobytes, so only the field count can be what refuses them.
-    const flood = Array.from({ length: 501 }, (_, index) => `f${String(index)}=1`).join('&');
-    const response = await app.inject({
-      method: 'POST',
-      url: '/formulaire',
-      headers: {
-        origin: ORIGIN,
-        'content-type': 'application/x-www-form-urlencoded',
-        ...as('consultant-paris'),
-      },
-      payload: flood,
-    });
-
-    expect(response.statusCode).toBe(400);
-    expect(reached).toBe(false);
-  });
-
-  it('accepts a body that sits exactly on the cap', async () => {
-    let count = 0;
-    app.post('/formulaire', { config: { access: forRoles('consultant') } }, (request) => {
-      count = Object.keys(request.body as Record<string, unknown>).length;
-
-      return { ok: true };
-    });
-
-    const atCap = Array.from({ length: 500 }, (_, index) => `f${String(index)}=1`).join('&');
-    const response = await app.inject({
-      method: 'POST',
-      url: '/formulaire',
-      headers: {
-        origin: ORIGIN,
-        'content-type': 'application/x-www-form-urlencoded',
-        ...as('consultant-paris'),
-      },
-      payload: atCap,
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(count).toBe(500);
-  });
-});
-
-/**
- * The offer and the refusal come off one declaration (ADR-0023). A screen decides whether to draw
- * the button by asking the verb's own `Access` through `carries`; these tests drive the same roles
- * at the verb itself and assert the two answers agree for **every** role — so moving a verb between
- * roles cannot leave a button behind, which a hand-written table of roles would have allowed.
- */
-describe('a verb and the button that offers it', () => {
-  const personaByRole = {
-    consultant: 'consultant-paris',
-    manager: 'manager-paris',
-    billing: 'billing-paris',
-  } as const;
-
-  async function refusedOnRole(url: string, role: (typeof ROLES)[number]): Promise<boolean> {
-    const response = await app.inject({
-      method: 'POST',
-      url,
-      headers: {
-        origin: ORIGIN,
-        'content-type': 'application/x-www-form-urlencoded',
-        ...as(personaByRole[role]),
-      },
-      payload: '',
-    });
-
-    // A role that carries the verb gets past the check and fails later on the absent database;
-    // only this problem type means the role itself was refused. These are screen paths, so the
-    // refusal arrives as a rendered page that prints its `type` (ADR-0026), never as JSON.
-    return response.statusCode === 403 && response.body.includes('/problems/insufficient-role');
-  }
-
-  for (const role of ROLES) {
-    it(`offers the Cra decision to ${role} exactly when the route carries it`, async () => {
-      expect(await refusedOnRole(`${PATHS.validateCra}/some-id`, role)).toBe(
-        !carries(DECIDES_CRA, role),
-      );
-      expect(await refusedOnRole(`${PATHS.refuseCra}/some-id`, role)).toBe(
-        !carries(DECIDES_CRA, role),
-      );
-    });
-
-    it(`refuses issuance for ${role} exactly when the route does not carry it`, async () => {
-      expect(await refusedOnRole(`${PATHS.issueInvoice}/some-id`, role)).toBe(
-        !carries(ISSUES_INVOICE, role),
-      );
-    });
-  }
 });

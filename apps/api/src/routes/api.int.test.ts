@@ -37,6 +37,8 @@ const CHLOE = 'api-chloe';
 const DEPARTED = 'api-departed';
 const GRADE = 'api-grade';
 const MISSION = 'api-mission';
+const QUALIFIED_MISSION = 'api-mission-passi';
+const PASSI = 'api-passi';
 const CLIENT = 'api-client';
 const CRA = 'api-cra';
 // A second consultant of the **same** office, on a mission sold to a second client. Two records
@@ -187,8 +189,9 @@ beforeEach(async () => {
   await client.query(
     `INSERT INTO public.missions (id, client_id, name, billing_model, start_date)
      VALUES ($1, $2, 'Audit DORA', 'Regie', '2026-01-05'),
-            ($3, $4, 'SOC run', 'Regie', '2026-01-05')`,
-    [MISSION, CLIENT, MISSION_TWO, CLIENT_TWO],
+            ($3, $2, 'Audit PASSI', 'Regie', '2026-01-05'),
+            ($4, $5, 'SOC run', 'Regie', '2026-01-05')`,
+    [MISSION, CLIENT, QUALIFIED_MISSION, MISSION_TWO, CLIENT_TWO],
   );
   await client.query(
     `INSERT INTO public.mission_tjm (id, mission_id, from_date, to_date, tjm_cents)
@@ -199,8 +202,15 @@ beforeEach(async () => {
   await client.query(
     `INSERT INTO public.assignments (id, consultant_id, mission_id, from_date, to_date)
      VALUES ($1, $2, $3, '2026-01-05', NULL),
-            ($4, $5, $6, '2026-01-05', NULL)`,
-    [uuidv7(), ALICE, MISSION, uuidv7(), CHLOE, MISSION_TWO],
+            ($4, $2, $5, '2026-01-05', NULL),
+            ($6, $7, $8, '2026-01-05', NULL)`,
+    [uuidv7(), ALICE, MISSION, uuidv7(), QUALIFIED_MISSION, uuidv7(), CHLOE, MISSION_TWO],
+  );
+  await client.query(`INSERT INTO public.habilitations (id, name) VALUES ($1, 'PASSI')`, [PASSI]);
+  await client.query(
+    `INSERT INTO public.mission_habilitations (id, mission_id, habilitation_id)
+     VALUES ($1, $2, $3)`,
+    [uuidv7(), QUALIFIED_MISSION, PASSI],
   );
   await client.query(
     `INSERT INTO public.manager_attachments (id, consultant_id, manager_id, from_date, to_date)
@@ -1228,6 +1238,55 @@ describe('recording a month through the API (ADR-0050)', () => {
         lines: { day: string; dayType: string; missionId: string; quarterDays: number }[];
       }>().lines,
     ).toStrictEqual([{ day: '2026-07-01', dayType: 'worked', missionId: MISSION, quarterDays: 4 }]);
+  });
+
+  it('keeps one day split across two missions as two distinct lines', async () => {
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: {
+        submit: false,
+        entries: [
+          { day: '2026-07-01', dayType: 'worked', missionId: MISSION, quarterDays: 2 },
+          {
+            day: '2026-07-01',
+            dayType: 'worked',
+            missionId: QUALIFIED_MISSION,
+            quarterDays: 2,
+          },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const { craId } = response.json<{ craId: string }>();
+    const found = await app.inject({
+      method: 'GET',
+      url: `/api/v1/cras/${craId}`,
+      headers: as('consultant-paris'),
+    });
+
+    expect(
+      found.json<{ lines: { day: string; missionId: string; quarterDays: number }[] }>().lines,
+    ).toEqual(
+      expect.arrayContaining([
+        { day: '2026-07-01', missionId: MISSION, quarterDays: 2, dayType: 'worked' },
+        { day: '2026-07-01', missionId: QUALIFIED_MISSION, quarterDays: 2, dayType: 'worked' },
+      ]),
+    );
+  });
+
+  it('surfaces the Habilitation refusal through the JSON write route', async () => {
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: { submit: true, entries: entries(QUALIFIED_MISSION) },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ invariant: '/problems/missing-habilitation' });
   });
 
   it('submits the month, and the flags come back with it', async () => {

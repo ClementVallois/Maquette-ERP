@@ -27,12 +27,6 @@ export interface InvoiceView {
   readonly invoice: Invoice;
   /** `null` on a draft: an unissued document has no due date, because it has no issue date. */
   readonly dueDate: string | null;
-  /**
-   * The key this render minted for the issuance form, or `null` when this actor may not issue
-   * (ADR-0059). It is per render and not per invoice: its job is to recognise **this submission
-   * arriving twice**, and the state machine is what refuses a genuine second issuance.
-   */
-  readonly issuanceKey: string | null;
 }
 
 function address(postal: PostalAddress): Html {
@@ -250,26 +244,6 @@ function originBlock(invoice: Invoice): Html {
   </section>`;
 }
 
-/**
- * Billing's one write. It is absent for every other role and for an invoice that already has a
- * number — but the route is what refuses, and this only decides what is offered.
- */
-function issuanceForm(view: InvoiceView): Html | null {
-  const key = view.issuanceKey;
-  if (key === null) return null;
-
-  if (view.invoice.number !== null) {
-    return html`<div class="note no-print"><p>${LABELS.invoice.cannotIssue}</p></div>`;
-  }
-
-  return html`<section class="no-print">
-    <form method="post" action="${`${PATHS.issueInvoice}/${view.invoice.id}`}">
-      <input type="hidden" name="idempotencyKey" value="${key}" />
-      <button type="submit">${LABELS.invoice.issue}</button>
-    </form>
-  </section>`;
-}
-
 export function invoicePage(view: InvoiceView, persona: Persona | undefined): Html {
   const { invoice } = view;
   const number = invoice.number;
@@ -310,7 +284,7 @@ export function invoicePage(view: InvoiceView, persona: Persona | undefined): Ht
       }
       <div class="parties">${sellerBlock(invoice.seller)} ${billedToBlock(invoice)}</div>
       ${lineTable(invoice)} ${vatTable(invoice.vatBreakdown, invoice)} ${mentionsBlock(invoice)}
-      ${originBlock(invoice)} ${issuanceForm(view)}
+      ${originBlock(invoice)}
     </article>`,
   );
 }

@@ -16,15 +16,6 @@ export const PATHS = {
    * selector now.
    */
   home: '/',
-  choosePersona: '/persona',
-  clearPersona: '/persona/retrait',
-  /**
-   * The consultant's own months, as a **registered route** — the POST that saves and submits a
-   * month still lives here (Phase 9.3 kept the action verb, only the two GET screens that used to
-   * render at this prefix and `${this}/:period` are gone). Not where the grid is read any more:
-   * `spaCra` below is.
-   */
-  consultantCra: '/consultant/cra',
   /**
    * The SPA's own `/cra` and `/cra/$period` (front-end plan §3, "Routes SPA épinglées") — never
    * registered by this file, reached only through the SPA fallback (Phase 9.1). Named here anyway,
@@ -44,9 +35,4 @@ export const PATHS = {
   invoice: '/facture',
   /** One Cra as the printable record of ADR-0056. An id appended to it names the month. */
   craPrint: '/releve',
-  /** The manager's two answers to a submitted month. A Cra id is appended to each. */
-  validateCra: '/pre-facturier/validation',
-  refuseCra: '/pre-facturier/refus',
-  /** Billing's one write: an invoice id appended to it is issued (ADR-0059). */
-  issueInvoice: '/facture/emission',
 } as const;

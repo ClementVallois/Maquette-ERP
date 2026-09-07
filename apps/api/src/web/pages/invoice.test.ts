@@ -91,7 +91,6 @@ const page = renderToString(
         validatedBy: ['f03-bruno'],
       }),
       dueDate: null,
-      issuanceKey: null,
     },
     undefined,
   ),
