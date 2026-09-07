@@ -19,6 +19,7 @@ import { frenchDate } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { headingFor, sentenceFor } from '@/lib/problems';
 
+import { assignmentFormRefusal } from '../form';
 import { useAssignments, useSaveAssignment } from '../hooks';
 import type { Assignment, AssignmentInput } from '../types';
 
@@ -110,15 +111,13 @@ export function AssignmentScreen(): ReactElement {
 
   const submit = async (event: SyntheticEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
-    if (form.consultantId === '') {
+    const refusal = assignmentFormRefusal(form);
+    if (refusal === 'consultant') {
       setConsultantMissing(true);
       document.getElementById('assignment-consultant')?.focus();
       return;
     }
-    // Mission and dates still carry a native `required`, so the browser's own constraint
-    // validation refuses the submit event before this function ever runs when either is empty —
-    // this stays a defensive check, not a second gate a user can actually reach through the UI.
-    if (form.missionId === '' || form.fromDate === '') return;
+    if (refusal !== null) return;
     try {
       await save.mutateAsync({ id: editingId, input: form });
       toast.success(
