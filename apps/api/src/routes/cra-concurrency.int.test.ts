@@ -265,7 +265,7 @@ async function getCra(id: string): Promise<CraDetail> {
 
 /** A short delay biasing which of two real HTTP requests reaches its lock first — deterministic
  * enough for CI, while both requests still run on genuinely independent connections. */
-async function settle(ms = 30): Promise<void> {
+async function settle(ms = 75): Promise<void> {
   await new Promise<void>((resolve) => {
     setTimeout(resolve, ms);
   });
