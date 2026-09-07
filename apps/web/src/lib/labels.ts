@@ -848,7 +848,11 @@ export const LABELS = {
     editFor: 'Modifier l’affectation de {name}',
     staffingFilterOnMission: 'En mission',
     staffingFilterIntercontrat: 'Intercontrat',
-    staffingFilterCount: '{count} consultants',
+    /** `{count}` interpolated, singular/plural chosen at the call site — the same split
+     * `dashboard.manager.pendingSentenceOne`/`Many` uses. The bucket is never empty here:
+     * the banner only renders for a filter that matched at least one consultant. */
+    staffingFilterCountOne: '1 consultant',
+    staffingFilterCountMany: '{count} consultants',
     staffingFilterClear: 'Effacer ce filtre',
   },
 

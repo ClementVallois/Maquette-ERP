@@ -268,14 +268,22 @@ export function InvoiceListScreen({
             placeholder={LABELS.invoice.searchPlaceholder}
           />
         </label>
-        <YearFilterSelect
-          value={year}
-          onChange={(next) => {
-            void navigate({ to: '/factures', search: searchState({ year: next, page: 1 }) });
-          }}
-          label={LABELS.invoice.year}
-          allLabel={LABELS.invoice.allYears}
-        />
+        {/* The caption is `aria-hidden`, not a `<label htmlFor>`: the control is a Radix trigger
+            `<button>` that already carries its own accessible name (`label` below), and a second
+            association would announce the field twice. It stays visible because this filter bar's
+            sibling search field is captioned and an uncaptioned neighbour reads as unfinished —
+            `/cra`'s own filter row, where nothing is captioned, has no such neighbour. */}
+        <div className="flex flex-col gap-1 text-sm font-medium">
+          <span aria-hidden="true">{LABELS.invoice.year}</span>
+          <YearFilterSelect
+            value={year}
+            onChange={(next) => {
+              void navigate({ to: '/factures', search: searchState({ year: next, page: 1 }) });
+            }}
+            label={LABELS.invoice.year}
+            allLabel={LABELS.invoice.allYears}
+          />
+        </div>
         <Button type="submit" variant="outline">
           {LABELS.invoice.searchAction}
         </Button>

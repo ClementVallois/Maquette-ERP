@@ -462,16 +462,25 @@ export function AssignmentScreen({ view, staffing }: AssignmentScreenProps): Rea
                 ? LABELS.assignment.staffingFilterOnMission
                 : LABELS.assignment.staffingFilterIntercontrat}
               {' · '}
-              {LABELS.assignment.staffingFilterCount.replace(
-                '{count}',
-                String(staffingConsultantIds.size),
-              )}
+              {staffingConsultantIds.size === 1
+                ? LABELS.assignment.staffingFilterCountOne
+                : LABELS.assignment.staffingFilterCountMany.replace(
+                    '{count}',
+                    String(staffingConsultantIds.size),
+                  )}
             </span>
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => void navigate({ to: '/affectations', search: { view: 'current' } })}
+              onClick={() => {
+                // Drops `staffing` only. Rebuilding the search from scratch would also reset a
+                // view the visitor picked *after* arriving through the dashboard's own deep link.
+                void navigate({
+                  to: '/affectations',
+                  search: (prev) => ({ view: prev.view }),
+                });
+              }}
             >
               {LABELS.assignment.staffingFilterClear}
             </Button>
