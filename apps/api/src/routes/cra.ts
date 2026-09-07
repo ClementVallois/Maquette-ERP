@@ -1,4 +1,16 @@
 import type { DeclineReason } from '@erp/billing';
+import type {
+  CraDetail,
+  CraGridResponse,
+  CraListResponse,
+  CraStatus,
+  GridDay,
+  InvoiceStatus,
+  ManagerCraGridResponse,
+  MonthEntriesResponse,
+  RefusalResponse,
+  ValidationResponse,
+} from '@erp/contracts';
 import { daysOf, periodFromIso } from '@erp/platform';
 import { workingCalendar } from '@erp/timesheet';
 import type { FastifyInstance } from 'fastify';
@@ -25,8 +37,34 @@ import {
   RefusalBody,
 } from './schemas.ts';
 
+/**
+ * `CraListItem.status` (`@erp/timesheet`) is `string` on the repository's own interface —
+ * accurate for a value that crosses the module boundary as an opaque string, but wider than
+ * `timesheet.cras`' own `CHECK (status IN (...))` actually allows. The cast is the one place that
+ * narrows it back to the wire union, the same reasoning `dashboard.ts`/`pre-facturier.ts`/
+ * `invoices.ts` give for the identical gap on each of those routes.
+ */
+function craRowStatus(status: string): CraStatus {
+  return status as CraStatus;
+}
+
+/**
+ * `CraLine.quarterDays` (`@erp/timesheet`) is `QuarterDays` (`number`) — wider than the wire's
+ * `1 | 2 | 3 | 4`, which every value it actually carries already satisfies (a quarter-day count
+ * per calendar day cannot exceed four). The cast is the one place that narrows it.
+ */
+function craLineQuarterDays(quarterDays: number): 1 | 2 | 3 | 4 {
+  return quarterDays as 1 | 2 | 3 | 4;
+}
+
+/** The same narrowing as `craRowStatus`, for `InvoiceListItem.status`'s own `string`
+ * (`@erp/billing`) — the invoices a validation drafted, on the wire this route answers. */
+function invoiceRowStatus(status: string): InvoiceStatus {
+  return status as InvoiceStatus;
+}
+
 /** Every day of the month, workable or not — the calendar half of front-end plan Phase 5.2's grid read. */
-function gridDaysSkeleton(periodIso: string): { date: string; nonWorkable: string | null }[] {
+function gridDaysSkeleton(periodIso: string): GridDay[] {
   const calendar = workingCalendar();
 
   return daysOf(periodFromIso(periodIso)).map((date) => ({
@@ -40,32 +78,7 @@ function gridDaysSkeleton(periodIso: string): { date: string; nonWorkable: strin
  * top of this by the manager route only, since the consultant route's caller already knows who
  * they are and Annexe A never named those two fields on the existing endpoint.
  */
-function gridResponseOf(
-  period: string,
-  grid: CraGridComposition,
-): {
-  period: string;
-  craId: string | null;
-  status: CraGridComposition['status'];
-  days: { date: string; nonWorkable: string | null }[];
-  missions: {
-    missionId: string;
-    name: string;
-    clientName: string;
-    assignableDays: readonly string[];
-  }[];
-  lines: CraGridComposition['lines'];
-  flags: CraGridComposition['flags'];
-  refusal: CraGridComposition['refusal'];
-  editable: boolean;
-  validatedBy: string | null;
-  timeline: {
-    kind: 'submitted' | 'refused' | 'validated';
-    at: string;
-    actorName: string;
-    detail?: string;
-  }[];
-} {
+function gridResponseOf(period: string, grid: CraGridComposition): CraGridResponse {
   const timeline = [];
   if (grid.submittedAt !== null) {
     timeline.push({
@@ -101,7 +114,10 @@ function gridResponseOf(
       clientName: mission.clientName,
       assignableDays: mission.assignableDays,
     })),
-    lines: grid.lines,
+    lines: grid.lines.map((line) => ({
+      ...line,
+      quarterDays: craLineQuarterDays(line.quarterDays),
+    })),
     flags: grid.flags,
     refusal: grid.refusal,
     editable: grid.editable,
@@ -165,15 +181,17 @@ export function registerCraRoutes(app: FastifyInstance, dependencies: ServerDepe
         // name to pick a consultant by, and a consultant's own rows just get their own name back.
         const consultantNames = await new PgReferenceReader(unit.client).consultantNames();
 
-        return {
+        const craListResponse: CraListResponse = {
           cras: cras.map((cra) => ({
             ...cra,
+            status: craRowStatus(cra.status),
             consultantName: consultantNames.get(cra.consultantId) ?? cra.consultantId,
           })),
           total,
           limit: query.value.limit,
           offset: query.value.offset,
         };
+        return craListResponse;
       });
     },
   );
@@ -194,16 +212,20 @@ export function registerCraRoutes(app: FastifyInstance, dependencies: ServerDepe
       );
       if (cra === null) return sendProblem(reply, notFound(request, 'Cra'));
 
-      return {
+      const craDetail: CraDetail = {
         id: cra.id,
         consultantId: cra.consultantId,
         officeId: cra.officeId,
         period: `${String(cra.period.year)}-${String(cra.period.month).padStart(2, '0')}`,
         status: cra.status,
-        lines: cra.lines,
+        lines: cra.lines.map((line) => ({
+          ...line,
+          quarterDays: craLineQuarterDays(line.quarterDays),
+        })),
         flags: cra.flags,
         validatedBy: cra.validatedBy,
       };
+      return craDetail;
     },
   );
 
@@ -258,11 +280,12 @@ export function registerCraRoutes(app: FastifyInstance, dependencies: ServerDepe
       );
       if (grid === null) return sendProblem(reply, notFound(request, 'consultant'));
 
-      return {
+      const managerCraGridResponse: ManagerCraGridResponse = {
         ...gridResponseOf(params.value.period, grid),
         consultantId: grid.consultantId,
         consultantName: grid.consultantName,
       };
+      return managerCraGridResponse;
     },
   );
 
@@ -294,7 +317,12 @@ export function registerCraRoutes(app: FastifyInstance, dependencies: ServerDepe
         },
       );
 
-      return reply.code(200).send(outcome);
+      const monthEntriesResponse: MonthEntriesResponse = {
+        craId: outcome.craId,
+        status: craRowStatus(outcome.status),
+        flags: outcome.flags,
+      };
+      return reply.code(200).send(monthEntriesResponse);
     },
   );
 
@@ -323,12 +351,16 @@ export function registerCraRoutes(app: FastifyInstance, dependencies: ServerDepe
       if (outcome.kind === 'notFound') return sendProblem(reply, notFound(request, 'Cra'));
 
       // A replay is 200, not 409: ADR-0021's contract is "original result, not rejection".
-      return reply.code(200).send({
+      const validationResponse: ValidationResponse = {
         craId: outcome.craId,
         replayed: outcome.kind === 'replayed',
-        invoices: outcome.invoices,
+        invoices: outcome.invoices.map((invoice) => ({
+          ...invoice,
+          status: invoiceRowStatus(invoice.status),
+        })),
         declined: outcome.declined,
-      });
+      };
+      return reply.code(200).send(validationResponse);
     },
   );
 
@@ -358,7 +390,8 @@ export function registerCraRoutes(app: FastifyInstance, dependencies: ServerDepe
 
       if (outcome.kind === 'notFound') return sendProblem(reply, notFound(request, 'Cra'));
 
-      return reply.code(200).send({ craId: outcome.craId, status: 'refused' });
+      const refusalResponse: RefusalResponse = { craId: outcome.craId, status: 'refused' };
+      return reply.code(200).send(refusalResponse);
     },
   );
 }

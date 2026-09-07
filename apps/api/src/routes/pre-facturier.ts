@@ -1,4 +1,4 @@
-import type { PreFacturierResponse } from '@erp/contracts';
+import type { ConsultantRosterResponse, PreFacturierResponse } from '@erp/contracts';
 import { isoDateInFirmTimeZone, periodFromIso } from '@erp/platform';
 import { workingCalendar } from '@erp/timesheet';
 import type { FastifyInstance } from 'fastify';
@@ -55,9 +55,12 @@ export function registerPreFacturierRoutes(
   app.get('/api/v1/consultants', { config: { access: forRoles('manager') } }, async (request) => {
     const actor = requireActor(request);
 
-    return dependencies.transactionally(async (unit) => ({
-      consultants: await new PgReferenceReader(unit.client).consultantsOfOffice(actor.officeId),
-    }));
+    return dependencies.transactionally(async (unit) => {
+      const rosterResponse: ConsultantRosterResponse = {
+        consultants: await new PgReferenceReader(unit.client).consultantsOfOffice(actor.officeId),
+      };
+      return rosterResponse;
+    });
   });
   app.get(
     '/api/v1/consultants/:consultantId/economics',

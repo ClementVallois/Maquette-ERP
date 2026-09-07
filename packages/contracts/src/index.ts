@@ -41,6 +41,28 @@ export type {
   PreFacturierSummary,
 } from './pre-facturier.ts';
 export type {
+  ConsultantRosterResponse,
+  CraDetail,
+  CraFlag,
+  CraGridResponse,
+  CraLine,
+  CraListItem,
+  CraListResponse,
+  CraStatus,
+  DeclinedDay,
+  GridDay,
+  GridMission,
+  ManagerCraGridResponse,
+  MonthEntriesRequest,
+  MonthEntriesResponse,
+  MonthEntry,
+  NonWorkableReason,
+  RecordedDayType,
+  RefusalResponse,
+  ValidationInvoiceItem,
+  ValidationResponse,
+} from './cra.ts';
+export type {
   BilledParty,
   DenseMonthBillable,
   DocumentTotals,
