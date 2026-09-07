@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router';
 import { CalendarRangeIcon, PencilIcon, PlusIcon } from 'lucide-react';
 import type { ReactElement, SyntheticEvent } from 'react';
 import { useRef, useState } from 'react';
@@ -8,6 +9,7 @@ import { ErrorState } from '@/components/feedback/error-state';
 import { GlossaryTerm } from '@/components/glossary-term';
 import { SingleSelectCombobox } from '@/components/single-select-combobox';
 import { StatCard } from '@/components/stat-card';
+import { TogglePillGroup } from '@/components/toggle-pill-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,9 +23,12 @@ import { headingFor, sentenceFor } from '@/lib/problems';
 
 import { assignmentFormRefusal } from '../form';
 import { useAssignments, useSaveAssignment } from '../hooks';
-import type { Assignment, AssignmentInput } from '../types';
+import { INTERCONTRAT_MISSION_NAME, type Assignment, type AssignmentInput } from '../types';
 
-type ViewFilter = 'current' | 'all';
+type ViewFilter = 'current' | 'upcoming' | 'ended' | 'all';
+type StaffingFilter = 'on-mission' | 'intercontrat';
+
+const VIEW_ORDER: readonly ViewFilter[] = ['current', 'upcoming', 'ended', 'all'];
 
 const EMPTY_FORM: AssignmentInput = {
   consultantId: '',
@@ -40,18 +45,56 @@ function isUpcoming(assignment: Assignment, today: string): boolean {
   return assignment.fromDate > today;
 }
 
-export function AssignmentScreen(): ReactElement {
+/** Neither current nor upcoming — the third of the three mutually-exclusive, exhaustive buckets
+ * `all`'s count has to sum from. */
+function isEnded(assignment: Assignment, today: string): boolean {
+  return !isCurrent(assignment, today) && !isUpcoming(assignment, today);
+}
+
+/**
+ * The client-side twin of `managerStaffingSnapshot`
+ * (`apps/api/src/staffing/staffing-snapshot.ts`): a consultant with any assignment active today
+ * whose mission is not `Intercontrat` is `'on-mission'`, even if they also hold an `Intercontrat`
+ * row today — staffed on real work takes precedence. A consultant with no assignment active today
+ * is in neither bucket (`null`), never naively read off assignment rows alone.
+ */
+function staffingBucketOf(
+  assignments: readonly Assignment[],
+  consultantId: string,
+  today: string,
+): StaffingFilter | null {
+  const active = assignments.filter(
+    (assignment) => assignment.consultantId === consultantId && isCurrent(assignment, today),
+  );
+  if (active.length === 0) return null;
+
+  return active.some((assignment) => assignment.missionName !== INTERCONTRAT_MISSION_NAME)
+    ? 'on-mission'
+    : 'intercontrat';
+}
+
+interface AssignmentScreenProps {
+  readonly view: ViewFilter;
+  readonly staffing?: StaffingFilter;
+}
+
+export function AssignmentScreen({ view, staffing }: AssignmentScreenProps): ReactElement {
   const query = useAssignments();
   const save = useSaveAssignment();
+  const navigate = useNavigate();
   const [form, setForm] = useState<AssignmentInput>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
-  // No native `<select required>` backs the consultant picker any more (a `Button`+`Popover`
-  // pair, `single-select-combobox.tsx`) — this is what replaces the browser's own "please fill
-  // this field" gate, since without it "Affecter" would otherwise silently do nothing when
-  // mission and dates are filled but no consultant is chosen.
+  // No native `<select required>` backs the consultant or mission pickers any more (both a
+  // `Button`+`Popover` pair, `single-select-combobox.tsx`) — this is what replaces the browser's
+  // own "please fill this field" gate, since without it "Affecter" would otherwise silently do
+  // nothing when the rest of the form is filled but one of the two is not chosen.
   const [consultantMissing, setConsultantMissing] = useState(false);
+  const [missionMissing, setMissionMissing] = useState(false);
   const formHeading = useRef<HTMLHeadingElement>(null);
-  const [filter, setFilter] = useState<ViewFilter>('current');
+
+  function setView(next: ViewFilter): void {
+    void navigate({ to: '/affectations', search: (prev) => ({ ...prev, view: next }) });
+  }
 
   if (query.isPending) {
     return (
@@ -76,7 +119,41 @@ export function AssignmentScreen(): ReactElement {
   const data = query.data;
   const current = data.assignments.filter((assignment) => isCurrent(assignment, data.today));
   const upcoming = data.assignments.filter((assignment) => isUpcoming(assignment, data.today));
-  const visible = filter === 'current' ? current : data.assignments;
+  const ended = data.assignments.filter((assignment) => isEnded(assignment, data.today));
+  const byStatus =
+    view === 'current'
+      ? current
+      : view === 'upcoming'
+        ? upcoming
+        : view === 'ended'
+          ? ended
+          : data.assignments;
+  // Item 3, QA round 6: the manager dashboard's staffing chart deep-links here with a consultant
+  // bucket, not an assignment property — `staffingBucketOf` replicates the server's own
+  // per-consultant precedence (`managerStaffingSnapshot`) rather than filtering rows by mission
+  // name, which would diverge from it (a consultant on-mission but with an idle `Intercontrat`
+  // row would otherwise count twice, once in each bucket).
+  const staffingConsultantIds =
+    staffing === undefined
+      ? null
+      : new Set(
+          data.consultants
+            .filter((consultant) => consultant.departureDate === null)
+            .filter(
+              (consultant) =>
+                staffingBucketOf(data.assignments, consultant.id, data.today) === staffing,
+            )
+            .map((consultant) => consultant.id),
+        );
+  const visible =
+    staffingConsultantIds === null
+      ? byStatus
+      : byStatus
+          .filter((assignment) => staffingConsultantIds.has(assignment.consultantId))
+          .filter(
+            (assignment) =>
+              staffing !== 'on-mission' || assignment.missionName !== INTERCONTRAT_MISSION_NAME,
+          );
   const selectedMission = data.missions.find((mission) => mission.id === form.missionId);
   const selectedConsultant = data.consultants.find(
     (consultant) => consultant.id === form.consultantId,
@@ -87,6 +164,11 @@ export function AssignmentScreen(): ReactElement {
   const consultantOptions = data.consultants
     .filter((consultant) => consultant.departureDate === null)
     .map((consultant) => ({ value: consultant.id, label: consultant.name }));
+  // No departed-consultant analogue here: `data.missions` is offered unfiltered.
+  const missionOptions = data.missions.map((mission) => ({
+    value: mission.id,
+    label: `${mission.clientName} — ${mission.name}`,
+  }));
   const mutationProblem = save.error instanceof ApiProblemError ? save.error.problem : null;
 
   const startEditing = (assignment: Assignment): void => {
@@ -106,6 +188,7 @@ export function AssignmentScreen(): ReactElement {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setConsultantMissing(false);
+    setMissionMissing(false);
     save.reset();
   };
 
@@ -115,6 +198,11 @@ export function AssignmentScreen(): ReactElement {
     if (refusal === 'consultant') {
       setConsultantMissing(true);
       document.getElementById('assignment-consultant')?.focus();
+      return;
+    }
+    if (refusal === 'mission') {
+      setMissionMissing(true);
+      document.getElementById('assignment-mission')?.focus();
       return;
     }
     if (refusal !== null) return;
@@ -206,22 +294,33 @@ export function AssignmentScreen(): ReactElement {
                   </div>
                   <div className="flex min-w-0 flex-col gap-2">
                     <Label htmlFor="assignment-mission">{LABELS.assignment.mission}</Label>
-                    <select
+                    <SingleSelectCombobox
                       id="assignment-mission"
-                      className="h-11 w-full min-w-0 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
+                      label={LABELS.assignment.mission}
+                      searchLabel={LABELS.assignment.searchMission}
+                      searchPlaceholder={LABELS.assignment.missionSearchPlaceholder}
+                      noneSelectedLabel={LABELS.assignment.chooseMission}
+                      noMatchLabel={LABELS.assignment.noMissionSearchResults}
+                      clearLabel={LABELS.assignment.clearMission}
+                      options={missionOptions}
                       value={form.missionId}
-                      required
-                      onChange={(event) => {
-                        setForm({ ...form, missionId: event.target.value });
+                      onChange={(next) => {
+                        setForm({ ...form, missionId: next });
+                        setMissionMissing(false);
                       }}
-                    >
-                      <option value="">{LABELS.assignment.chooseMission}</option>
-                      {data.missions.map((mission) => (
-                        <option key={mission.id} value={mission.id}>
-                          {mission.clientName} — {mission.name}
-                        </option>
-                      ))}
-                    </select>
+                      className="h-11 w-full"
+                      invalid={missionMissing}
+                      {...(missionMissing ? { describedById: 'assignment-mission-error' } : {})}
+                    />
+                    {missionMissing && (
+                      <p
+                        id="assignment-mission-error"
+                        role="alert"
+                        className="text-sm text-destructive"
+                      >
+                        {LABELS.assignment.missionRequired}
+                      </p>
+                    )}
                   </div>
                 </>
               ) : (
@@ -334,22 +433,59 @@ export function AssignmentScreen(): ReactElement {
             <h2 className="text-card-title">{LABELS.assignment.list}</h2>
             <p className="text-sm text-muted-foreground">{LABELS.assignment.listLead}</p>
           </div>
-          <div className="flex rounded-lg bg-muted p-1">
-            {(['current', 'all'] as const).map((value) => (
-              <Button
-                key={value}
-                type="button"
-                size="sm"
-                variant={filter === value ? 'secondary' : 'ghost'}
-                onClick={() => {
-                  setFilter(value);
-                }}
-              >
-                {LABELS.assignment.filters[value]}
-              </Button>
-            ))}
-          </div>
+          <TogglePillGroup
+            label={LABELS.assignment.filterGroupLabel}
+            exclusive
+            options={VIEW_ORDER.map((value) => ({
+              value,
+              label: LABELS.assignment.filters[value],
+              count:
+                value === 'current'
+                  ? current.length
+                  : value === 'upcoming'
+                    ? upcoming.length
+                    : value === 'ended'
+                      ? ended.length
+                      : data.assignments.length,
+            }))}
+            selected={[view]}
+            onChange={([next]) => {
+              setView(next === undefined ? 'current' : (next as ViewFilter));
+            }}
+          />
         </div>
+
+        {staffingConsultantIds !== null && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm">
+            <span>
+              {staffing === 'on-mission'
+                ? LABELS.assignment.staffingFilterOnMission
+                : LABELS.assignment.staffingFilterIntercontrat}
+              {' · '}
+              {staffingConsultantIds.size === 1
+                ? LABELS.assignment.staffingFilterCountOne
+                : LABELS.assignment.staffingFilterCountMany.replace(
+                    '{count}',
+                    String(staffingConsultantIds.size),
+                  )}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                // Drops `staffing` only. Rebuilding the search from scratch would also reset a
+                // view the visitor picked *after* arriving through the dashboard's own deep link.
+                void navigate({
+                  to: '/affectations',
+                  search: (prev) => ({ view: prev.view }),
+                });
+              }}
+            >
+              {LABELS.assignment.staffingFilterClear}
+            </Button>
+          </div>
+        )}
 
         {visible.length === 0 ? (
           <EmptyState

@@ -4,8 +4,8 @@ import { assignmentFormRefusal } from './form.ts';
 import type { AssignmentInput } from './types.ts';
 
 /**
- * The gate that replaced a native `<select required>` when the consultant picker became a
- * `Button`+`Popover` pair. `AssignmentScreen` has no render harness in this repository
+ * The gate that replaced a native `<select required>` when the consultant and mission pickers
+ * became `Button`+`Popover` pairs. `AssignmentScreen` has no render harness in this repository
  * (`apps/web` is tested through Playwright — see `apps/web/e2e/`), so the refusal is extracted as
  * a pure function and covered directly, the same split `pagination-controls.test.ts` uses.
  */
@@ -38,8 +38,10 @@ describe('assignmentFormRefusal', () => {
     ).toBe('consultant');
   });
 
-  it('refuses a missing mission, even though the browser normally refuses it first', () => {
-    expect(assignmentFormRefusal({ ...COMPLETE, missionId: '' })).toBe('incomplete');
+  it('refuses a missing mission, now that the browser no longer refuses it first', () => {
+    // The mission picker lost its native `<select required>` gate the same way the consultant
+    // picker did — reproduces the same silent-no-op bug the `consultant` case above guards.
+    expect(assignmentFormRefusal({ ...COMPLETE, missionId: '' })).toBe('mission');
   });
 
   it('refuses a missing start date, even though the browser normally refuses it first', () => {

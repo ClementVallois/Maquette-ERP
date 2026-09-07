@@ -253,6 +253,13 @@ export const LABELS = {
       empty: 'Aucun consultant actif dans cette implantation.',
       hide: 'Masquer la répartition de l’équipe',
       show: 'Afficher la répartition de l’équipe',
+      /** Item 3, QA round 6: the legend entries double as the entry point into `/affectations`,
+       * filtered — appended as an `sr-only` span onto each `Link`'s own visible text
+       * (`onMission`/`intercontrat` above plus the count), not an `aria-label` overriding it,
+       * since the visible legend text is not on its own a sentence describing where the link
+       * goes. */
+      openOnMission: 'Voir les consultants en mission',
+      openIntercontrat: 'Voir les consultants en intercontrat',
     },
     /** Item 3, QA round 5: billing's deliberate empty state where the invoice-history charts used
      * to render — a stated absence, not a silent hole in the layout. */
@@ -756,7 +763,11 @@ export const LABELS = {
     searchPlaceholder: 'Client ou numéro de facture…',
     searchAction: 'Rechercher',
     year: 'Année',
-    allYears: 'Toutes',
+    /** Item 4, QA round 6: "Toutes" was a `placeholder` on a captioned number input; it is now
+     * the whole visible text of a `Select` trigger, and this screen's status pills already offer
+     * a "Toutes" of their own right below it. Spelled out, which also makes it the same string
+     * `/cra`'s own year filter shows — the `w-48` trigger was sized for exactly this one. */
+    allYears: 'Toutes les années',
     clearFilters: 'Effacer les filtres',
     emptyTitle: 'Aucune facture',
     emptyBody:
@@ -816,6 +827,11 @@ export const LABELS = {
     endHint: 'Facultatif : laissez vide pour une affectation sans date de fin.',
     missionDates: 'Dates de la mission',
     chooseMission: 'Choisir une mission…',
+    searchMission: 'Rechercher une mission',
+    missionSearchPlaceholder: 'Client ou nom de mission…',
+    noMissionSearchResults: 'Aucune mission ne correspond à cette recherche.',
+    clearMission: 'Effacer la mission sélectionnée',
+    missionRequired: 'Choisissez une mission avant d’enregistrer.',
     create: 'Affecter',
     save: 'Enregistrer',
     cancelEdit: 'Annuler la modification',
@@ -825,7 +841,8 @@ export const LABELS = {
     updatedToast: 'Affectation mise à jour.',
     list: 'Affectations de l’implantation',
     listLead: 'Les affectations passées restent visibles dans l’historique.',
-    filters: { current: 'En cours', all: 'Toutes' },
+    filterGroupLabel: 'Statut',
+    filters: { current: 'En cours', upcoming: 'À venir', ended: 'Terminées', all: 'Toutes' },
     empty: 'Aucune affectation dans cette vue',
     emptyBody: 'Créez une affectation ou affichez l’historique complet.',
     currentBadge: 'En cours',
@@ -833,6 +850,14 @@ export const LABELS = {
     endedBadge: 'Terminée',
     openEnded: 'sans date de fin',
     editFor: 'Modifier l’affectation de {name}',
+    staffingFilterOnMission: 'En mission',
+    staffingFilterIntercontrat: 'Intercontrat',
+    /** `{count}` interpolated, singular/plural chosen at the call site — the same split
+     * `dashboard.manager.pendingSentenceOne`/`Many` uses. The bucket is never empty here:
+     * the banner only renders for a filter that matched at least one consultant. */
+    staffingFilterCountOne: '1 consultant',
+    staffingFilterCountMany: '{count} consultants',
+    staffingFilterClear: 'Effacer ce filtre',
   },
 
   margin: {

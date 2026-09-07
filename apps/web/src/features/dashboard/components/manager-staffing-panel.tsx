@@ -1,11 +1,30 @@
+import { Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 
+import { linkOf, type ActionLink } from '@/components/action-link';
 import { VisibilityToggle } from '@/components/visibility-toggle';
 import { LABELS } from '@/lib/labels';
 import { readLocalPreference, writeLocalPreference } from '@/lib/local-preference';
 
 import type { ManagerStaffing } from '../types';
+
+/**
+ * The two entry points into `/affectations`, filtered — item 3, QA round 6. The billing
+ * dashboard's own `?status=draft` deep link (`features/dashboard/actions.ts`) is the precedent for
+ * `ActionLink` over a widened `to: string`; `view=current` matches this chart's own "as of today"
+ * scope (ADR-0098), not the dashboard's `period`.
+ */
+const ON_MISSION_LINK: ActionLink = {
+  label: LABELS.dashboard.staffing.openOnMission,
+  to: '/affectations',
+  search: { view: 'current', staffing: 'on-mission' },
+};
+const INTERCONTRAT_LINK: ActionLink = {
+  label: LABELS.dashboard.staffing.openIntercontrat,
+  to: '/affectations',
+  search: { view: 'current', staffing: 'intercontrat' },
+};
 
 const BAR_WIDTH = 480;
 const BAR_HEIGHT = 28;
@@ -105,22 +124,39 @@ export function ManagerStaffingPanel({
             </svg>
 
             <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1.5">
+              {/* The legend entries are the clickable affordance, not the `<rect>`s above: the
+                  `<svg>` is `role="img"` with one `aria-label`, and a click handler on a rect
+                  inside it would be keyboard-unreachable and a nested-interactive (WCAG 4.1.2)
+                  problem the same way a control inside `SingleSelectCombobox`'s trigger would
+                  be. */}
+              <Link
+                {...linkOf(ON_MISSION_LINK)}
+                className="flex items-center gap-1.5 rounded-sm hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+              >
                 <span
                   aria-hidden="true"
                   className="inline-block size-2.5 rounded-full"
                   style={{ backgroundColor: 'var(--primary)' }}
                 />
                 {labels.onMission} — {staffing.onMission}
-              </span>
-              <span className="flex items-center gap-1.5">
+                {/* Content, not `aria-label` — an `aria-label` here would override the visible
+                    text above rather than extend it, dropping the count from the accessible name
+                    (axe's label-in-name). Same pattern as `invoice-list-screen.tsx`'s own
+                    `LABELS.invoice.openFor` span. */}
+                <span className="sr-only"> — {labels.openOnMission}</span>
+              </Link>
+              <Link
+                {...linkOf(INTERCONTRAT_LINK)}
+                className="flex items-center gap-1.5 rounded-sm hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+              >
                 <span
                   aria-hidden="true"
                   className="inline-block size-2.5 rounded-full"
                   style={{ backgroundColor: 'var(--border)' }}
                 />
                 {labels.intercontrat} — {staffing.intercontrat}
-              </span>
+                <span className="sr-only"> — {labels.openIntercontrat}</span>
+              </Link>
             </div>
           </div>
         ))}

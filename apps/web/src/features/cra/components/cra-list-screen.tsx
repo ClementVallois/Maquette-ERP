@@ -22,14 +22,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { YearFilterSelect } from '@/components/year-filter-select';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
+import { useCalendar } from '@/lib/calendar';
 import { frenchDays, frenchMonth, frenchMonthName } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { currentPeriod } from '@/lib/period';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
-import { useCalendar, useConsultantRoster, useCraList } from '../hooks';
+import { useConsultantRoster, useCraList } from '../hooks';
 import type { CraListItem, CraStatus } from '../types';
 
 const CRA_STATUS_ORDER: readonly CraStatus[] = ['draft', 'submitted', 'validated', 'refused'];
@@ -41,11 +43,11 @@ const STATUS_VARIANT: Record<CraStatus, StatusBadgeVariant> = {
   refused: 'cra-refused',
 };
 
-/** Item 4 (QA round 2): the "clear this filter" sentinel both `Select`s below need — Radix's
- * `SelectItem` refuses an empty string as a `value`. Shared between the year and month pickers on
- * purpose (each `Select`'s own item list is a separate Radix instance, so the one string cannot
- * collide with itself): never sent to the API or read from the URL, `CraListFilters.setYear`/
- * `setMonth` translate a click on either back to `undefined` before it ever reaches `navigate()`. */
+/** Item 4 (QA round 2): the "clear this filter" sentinel the month `Select` below needs — Radix's
+ * `SelectItem` refuses an empty string as a `value`. The year picker owns its own copy of this
+ * same sentinel now (`YearFilterSelect`, item 4 QA round 6) rather than sharing this one: never
+ * sent to the API or read from the URL, `CraListFilters.setMonth` translates a click on it back to
+ * `undefined` before it ever reaches `navigate()`. */
 const FILTER_ALL = 'all';
 const MONTH_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
@@ -421,7 +423,6 @@ function CraListFilters({
 }): ReactElement {
   const navigate = useNavigate();
   const roster = useConsultantRoster();
-  const calendar = useCalendar();
 
   // `undefined`, not `[]`, once a filter clears back to empty — the search schema treats both the
   // same way ("no filter"), and this is what keeps a cleared filter's URL as plain `/cra` again
@@ -508,13 +509,11 @@ function CraListFilters({
   // Item 4 (QA round 2). A single `Select`, not `MultiSelectCombobox`/`TogglePillGroup`: each
   // change fully replaces the one value it owns, so there is no multi-value diff to race —
   // `toggleDiff`/`applyDiff` above exist for exactly the ambiguity a single-value control never
-  // has. `FILTER_ALL` is a sentinel: Radix's `SelectItem` refuses an empty string value, and this
-  // is the "clear this one filter" option both of these `Select`s need one of.
-  function setYear(next: string): void {
-    const parsed = next === FILTER_ALL ? undefined : Number.parseInt(next, 10);
+  // has.
+  function setYear(next: number | undefined): void {
     void navigate({
       to: '/cra',
-      search: (prev) => ({ ...prev, year: parsed, page: 1 }),
+      search: (prev) => ({ ...prev, year: next, page: 1 }),
     });
   }
 
@@ -550,29 +549,12 @@ function CraListFilters({
         selected={statuses}
         onChange={setStatuses}
       />
-      <Select value={year === undefined ? FILTER_ALL : String(year)} onValueChange={setYear}>
-        {/* Item 24, QA round 3: `w-36` (144px) clipped "Toutes les années" to "Toutes les anné" —
-            widened to fit that longest option; the panel already matches the trigger's own width
-            via `position: popper` (items 7/10), so only the trigger needed changing. */}
-        <SelectTrigger aria-label={LABELS.cra.filters.yearLabel} className="w-48">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={FILTER_ALL}>{LABELS.cra.filters.yearAll}</SelectItem>
-          {/* Ascending order across the whole calendar (`useCalendar`, ADR-0004/ADR-0078), not
-              only the years this office's own Cras happen to cover: the same "known working
-              calendar" list `OpenAnotherMonth` already reads from, so a year with nothing to show
-              is still pickable (and answers the filtered-empty state) rather than silently
-              impossible to select at all. */}
-          {[...(calendar.data?.years ?? [])]
-            .sort((a, b) => a - b)
-            .map((calendarYear) => (
-              <SelectItem key={calendarYear} value={String(calendarYear)}>
-                {calendarYear}
-              </SelectItem>
-            ))}
-        </SelectContent>
-      </Select>
+      <YearFilterSelect
+        value={year}
+        onChange={setYear}
+        label={LABELS.cra.filters.yearLabel}
+        allLabel={LABELS.cra.filters.yearAll}
+      />
       <Select value={month === undefined ? FILTER_ALL : String(month)} onValueChange={setMonth}>
         <SelectTrigger aria-label={LABELS.cra.filters.monthLabel} className="w-40">
           <SelectValue />
