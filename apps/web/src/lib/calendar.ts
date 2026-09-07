@@ -9,8 +9,8 @@ export interface CalendarResponse {
 }
 
 /** The working calendar's own coverage (ADR-0004) — what bounds the "open a future month" picker. */
-export function fetchCalendar(): Promise<ApiResult<CalendarResponse>> {
-  return apiFetch<CalendarResponse>('/api/v1/calendar');
+export function fetchCalendar(signal?: AbortSignal): Promise<ApiResult<CalendarResponse>> {
+  return apiFetch<CalendarResponse>('/api/v1/calendar', { signal });
 }
 
 const CALENDAR_QUERY_KEY = ['calendar'] as const;
@@ -28,6 +28,6 @@ const CALENDAR_QUERY_KEY = ['calendar'] as const;
 export function useCalendar(): UseQueryResult<CalendarResponse> {
   return useQuery({
     queryKey: CALENDAR_QUERY_KEY,
-    queryFn: async () => unwrap(await fetchCalendar()),
+    queryFn: async ({ signal }) => unwrap(await fetchCalendar(signal)),
   });
 }

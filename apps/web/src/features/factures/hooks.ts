@@ -24,7 +24,7 @@ function invoiceListQueryKey(filters?: InvoiceListFilters) {
 export function invoiceListQueryOptions(filters: InvoiceListFilters) {
   return queryOptions({
     queryKey: invoiceListQueryKey(filters),
-    queryFn: async () => unwrap(await fetchInvoiceList(filters)),
+    queryFn: async ({ signal }) => unwrap(await fetchInvoiceList(filters, signal)),
   });
 }
 
@@ -39,7 +39,7 @@ function invoiceDetailQueryKey(id: string): readonly [string, string] {
 export function invoiceDetailQueryOptions(id: string) {
   return queryOptions({
     queryKey: invoiceDetailQueryKey(id),
-    queryFn: async () => unwrap(await fetchInvoiceDetail(id)),
+    queryFn: async ({ signal }) => unwrap(await fetchInvoiceDetail(id, signal)),
   });
 }
 
@@ -52,7 +52,7 @@ export function useInvoiceDetail(id: string): UseQueryResult<InvoiceDetail> {
 export function invoiceHistoryQueryOptions() {
   return queryOptions({
     queryKey: ['facture-historique'] as const,
-    queryFn: async () => unwrap(await fetchInvoiceHistory()),
+    queryFn: async ({ signal }) => unwrap(await fetchInvoiceHistory(signal)),
   });
 }
 

@@ -8,12 +8,12 @@ import type { PersonasResponse, SelectPersonaResponse, SessionResponse } from '.
  * uniquement les hooks"); `hooks.ts` is the only caller.
  */
 
-export function fetchPersonas(): Promise<ApiResult<PersonasResponse>> {
-  return apiFetch<PersonasResponse>('/api/v1/personas');
+export function fetchPersonas(signal?: AbortSignal): Promise<ApiResult<PersonasResponse>> {
+  return apiFetch<PersonasResponse>('/api/v1/personas', { signal });
 }
 
-export function fetchSession(): Promise<ApiResult<SessionResponse>> {
-  return apiFetch<SessionResponse>('/api/v1/session');
+export function fetchSession(signal?: AbortSignal): Promise<ApiResult<SessionResponse>> {
+  return apiFetch<SessionResponse>('/api/v1/session', { signal });
 }
 
 export function selectPersona(key: string): Promise<ApiResult<SelectPersonaResponse>> {

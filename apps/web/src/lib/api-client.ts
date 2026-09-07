@@ -71,8 +71,13 @@ interface ApiRequest {
    * own `signal` here, so TanStack Query's `cancelRefetch` (on by default whenever a persona
    * switch invalidates an active query — see `features/session/hooks.ts`) actually aborts the
    * superseded network request instead of only marking it logically stale while it keeps running.
+   * Typed `| undefined` explicitly, not just `?:` — every `fetchXxx` wrapper in each feature's
+   * `api.ts` takes `signal?: AbortSignal` itself and forwards it straight through; under
+   * `exactOptionalPropertyTypes`, a plain `?:` here would reject that forwarded `undefined` at
+   * every one of those call sites, each needing its own `... : {}` splice for a value this
+   * property already means to accept absent-or-not.
    */
-  readonly signal?: AbortSignal;
+  readonly signal?: AbortSignal | undefined;
 }
 
 /**

@@ -9,7 +9,7 @@ import type { DashboardResponse, OrgChartResponse } from './types';
 export function dashboardQueryOptions(period: string) {
   return queryOptions({
     queryKey: ['dashboard', period] as const,
-    queryFn: async () => unwrap(await fetchDashboard(period)),
+    queryFn: async ({ signal }) => unwrap(await fetchDashboard(period, signal)),
   });
 }
 
@@ -22,7 +22,7 @@ export function useDashboard(period: string): UseQueryResult<DashboardResponse> 
 export function orgChartQueryOptions() {
   return queryOptions({
     queryKey: ['org-chart'] as const,
-    queryFn: async () => unwrap(await fetchOrgChart()),
+    queryFn: async ({ signal }) => unwrap(await fetchOrgChart(signal)),
   });
 }
 

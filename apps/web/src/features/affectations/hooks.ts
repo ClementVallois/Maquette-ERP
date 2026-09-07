@@ -11,7 +11,7 @@ const ASSIGNMENTS_QUERY_KEY = ['affectations'] as const;
 export function assignmentsQueryOptions() {
   return queryOptions({
     queryKey: ASSIGNMENTS_QUERY_KEY,
-    queryFn: async () => unwrap(await fetchAssignments()),
+    queryFn: async ({ signal }) => unwrap(await fetchAssignments(signal)),
   });
 }
 

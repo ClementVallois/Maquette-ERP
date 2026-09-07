@@ -18,6 +18,7 @@ export interface PreFacturierPagination {
 export function fetchPreFacturier(
   period: string,
   pagination: PreFacturierPagination,
+  signal?: AbortSignal,
 ): Promise<ApiResult<PreFacturierResponse>> {
   const params = new URLSearchParams({
     period,
@@ -29,5 +30,5 @@ export function fetchPreFacturier(
   if (pagination.consultantSearch !== '') {
     params.set('consultantSearch', pagination.consultantSearch);
   }
-  return apiFetch<PreFacturierResponse>(`/api/v1/pre-facturier?${params.toString()}`);
+  return apiFetch<PreFacturierResponse>(`/api/v1/pre-facturier?${params.toString()}`, { signal });
 }

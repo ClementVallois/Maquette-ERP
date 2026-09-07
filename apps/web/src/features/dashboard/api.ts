@@ -8,12 +8,17 @@ import type { DashboardResponse, OrgChartResponse } from './types';
  * caller of this function already has one, either the route's own `beforeLoad` default
  * (`lib/period.ts`'s `currentPeriod()`) or a value the visitor picked.
  */
-export function fetchDashboard(period: string): Promise<ApiResult<DashboardResponse>> {
-  return apiFetch<DashboardResponse>(`/api/v1/dashboard?period=${encodeURIComponent(period)}`);
+export function fetchDashboard(
+  period: string,
+  signal?: AbortSignal,
+): Promise<ApiResult<DashboardResponse>> {
+  return apiFetch<DashboardResponse>(`/api/v1/dashboard?period=${encodeURIComponent(period)}`, {
+    signal,
+  });
 }
 
 /** Item 18, QA round 3 — `GET /api/v1/org-chart`, no query parameters (unlike the dashboard above,
  * the org chart is not read "as of" a period; it is read as of today). */
-export function fetchOrgChart(): Promise<ApiResult<OrgChartResponse>> {
-  return apiFetch<OrgChartResponse>('/api/v1/org-chart');
+export function fetchOrgChart(signal?: AbortSignal): Promise<ApiResult<OrgChartResponse>> {
+  return apiFetch<OrgChartResponse>('/api/v1/org-chart', { signal });
 }

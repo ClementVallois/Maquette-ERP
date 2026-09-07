@@ -100,7 +100,7 @@ const MANAGER_GRID_QUERY_KEY_PREFIX = ['cra', 'manager-grid'] as const;
 export function craListQueryOptions(filters: CraListFilters = {}) {
   return queryOptions({
     queryKey: craListQueryKey(filters),
-    queryFn: async () => unwrap(await fetchCraList(filters)),
+    queryFn: async ({ signal }) => unwrap(await fetchCraList(filters, signal)),
     // Item 3 (QA round 1) built the URL-driven filters as a real `navigate()` per change, which
     // is what a linkable/reloadable filter has to be — but without this, every checkbox click
     // changed the query key, flipped `isPending` back to true, and `CraListScreen` swapped its
@@ -127,14 +127,14 @@ export function useCraList(filters: CraListFilters = {}): UseQueryResult<CraList
 export function useConsultantRoster(): UseQueryResult<ConsultantRosterResponse> {
   return useQuery({
     queryKey: CONSULTANT_ROSTER_QUERY_KEY,
-    queryFn: async () => unwrap(await fetchConsultantRoster()),
+    queryFn: async ({ signal }) => unwrap(await fetchConsultantRoster(signal)),
   });
 }
 
 export function craGridQueryOptions(period: string) {
   return queryOptions({
     queryKey: craGridQueryKey(period),
-    queryFn: async () => unwrap(await fetchCraGrid(period)),
+    queryFn: async ({ signal }) => unwrap(await fetchCraGrid(period, signal)),
     // A background refetch on window focus would silently overwrite the consultant's unsaved
     // in-memory edits with the server's last-saved shape (`CraGridBody`'s own render-time
     // re-sync, ADR-0067) — safe for a read-only screen, a real data-loss risk for an editable
@@ -156,7 +156,7 @@ export function useManagerCraGrid(
 ): UseQueryResult<ManagerCraGridResponse> {
   return useQuery({
     queryKey: managerCraGridQueryKey(consultantId, period),
-    queryFn: async () => unwrap(await fetchManagerCraGrid(consultantId, period)),
+    queryFn: async ({ signal }) => unwrap(await fetchManagerCraGrid(consultantId, period, signal)),
   });
 }
 

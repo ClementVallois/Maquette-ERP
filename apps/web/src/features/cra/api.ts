@@ -44,7 +44,10 @@ export interface CraListFilters {
  * `CommaSeparatedStatuses` — an empty/absent list adds no query param at all rather than one
  * whose value is the empty string, so "no filter" and "filtered to nothing" stay distinguishable
  * on the wire. */
-export function fetchCraList(filters: CraListFilters = {}): Promise<ApiResult<CraListResponse>> {
+export function fetchCraList(
+  filters: CraListFilters = {},
+  signal?: AbortSignal,
+): Promise<ApiResult<CraListResponse>> {
   const params = new URLSearchParams({
     limit: String(filters.limit ?? DEFAULT_LIST_LIMIT),
     offset: String(filters.offset ?? 0),
@@ -65,26 +68,33 @@ export function fetchCraList(filters: CraListFilters = {}): Promise<ApiResult<Cr
     params.set('beforePeriod', filters.beforePeriod);
   }
 
-  return apiFetch<CraListResponse>(`/api/v1/cras?${params.toString()}`);
+  return apiFetch<CraListResponse>(`/api/v1/cras?${params.toString()}`, { signal });
 }
 
 /** Item 7 (QA round 1) — the consultant filter's own option list (`features/cra/hooks.ts`'s
  * `useConsultantRoster` explains why it is a separate read from the list itself). */
-export function fetchConsultantRoster(): Promise<ApiResult<ConsultantRosterResponse>> {
-  return apiFetch<ConsultantRosterResponse>('/api/v1/consultants');
+export function fetchConsultantRoster(
+  signal?: AbortSignal,
+): Promise<ApiResult<ConsultantRosterResponse>> {
+  return apiFetch<ConsultantRosterResponse>('/api/v1/consultants', { signal });
 }
 
-export function fetchCraGrid(period: string): Promise<ApiResult<CraGridResponse>> {
-  return apiFetch<CraGridResponse>(`/api/v1/cras/${period}/grid`);
+export function fetchCraGrid(
+  period: string,
+  signal?: AbortSignal,
+): Promise<ApiResult<CraGridResponse>> {
+  return apiFetch<CraGridResponse>(`/api/v1/cras/${period}/grid`, { signal });
 }
 
 /** ADR-0071 — a manager's read of a named consultant's month, read-only. */
 export function fetchManagerCraGrid(
   consultantId: string,
   period: string,
+  signal?: AbortSignal,
 ): Promise<ApiResult<ManagerCraGridResponse>> {
   return apiFetch<ManagerCraGridResponse>(
     `/api/v1/consultants/${consultantId}/cras/${period}/grid`,
+    { signal },
   );
 }
 

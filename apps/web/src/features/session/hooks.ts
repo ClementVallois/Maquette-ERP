@@ -23,7 +23,7 @@ const PERSONAS_QUERY_KEY = ['personas'] as const;
  */
 export const sessionQueryOptions = queryOptions({
   queryKey: SESSION_QUERY_KEY,
-  queryFn: async () => unwrap(await fetchSession()),
+  queryFn: async ({ signal }) => unwrap(await fetchSession(signal)),
 });
 
 export function useSession(): UseQueryResult<SessionResponse> {
@@ -33,7 +33,7 @@ export function useSession(): UseQueryResult<SessionResponse> {
 export function usePersonas(): UseQueryResult<PersonasResponse> {
   return useQuery({
     queryKey: PERSONAS_QUERY_KEY,
-    queryFn: async () => unwrap(await fetchPersonas()),
+    queryFn: async ({ signal }) => unwrap(await fetchPersonas(signal)),
   });
 }
 

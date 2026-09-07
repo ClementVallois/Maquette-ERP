@@ -11,8 +11,10 @@ import type { ConsultantEconomics } from './types';
 export function fetchConsultantEconomics(
   consultantId: string,
   period: string,
+  signal?: AbortSignal,
 ): Promise<ApiResult<ConsultantEconomics>> {
   return apiFetch<ConsultantEconomics>(
     `/api/v1/consultants/${consultantId}/economics?period=${encodeURIComponent(period)}`,
+    { signal },
   );
 }

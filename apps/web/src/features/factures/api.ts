@@ -22,6 +22,7 @@ export interface InvoiceListFilters {
 
 export function fetchInvoiceList(
   filters: InvoiceListFilters,
+  signal?: AbortSignal,
 ): Promise<ApiResult<InvoiceListResponse>> {
   const params = new URLSearchParams({
     limit: String(filters.limit),
@@ -31,11 +32,14 @@ export function fetchInvoiceList(
   if (filters.year !== undefined) params.set('year', String(filters.year));
   if (filters.search !== undefined && filters.search !== '') params.set('search', filters.search);
 
-  return apiFetch<InvoiceListResponse>(`/api/v1/invoices?${params.toString()}`);
+  return apiFetch<InvoiceListResponse>(`/api/v1/invoices?${params.toString()}`, { signal });
 }
 
-export function fetchInvoiceDetail(id: string): Promise<ApiResult<InvoiceDetail>> {
-  return apiFetch<InvoiceDetail>(`/api/v1/invoices/${id}`);
+export function fetchInvoiceDetail(
+  id: string,
+  signal?: AbortSignal,
+): Promise<ApiResult<InvoiceDetail>> {
+  return apiFetch<InvoiceDetail>(`/api/v1/invoices/${id}`, { signal });
 }
 
 /**
@@ -55,6 +59,8 @@ export function postIssuance(
 }
 
 /** Rank A2's history chart — manager/billing only, `forRoles('manager', 'billing')` on the API. */
-export function fetchInvoiceHistory(): Promise<ApiResult<InvoiceHistoryResponse>> {
-  return apiFetch<InvoiceHistoryResponse>('/api/v1/invoices/history');
+export function fetchInvoiceHistory(
+  signal?: AbortSignal,
+): Promise<ApiResult<InvoiceHistoryResponse>> {
+  return apiFetch<InvoiceHistoryResponse>('/api/v1/invoices/history', { signal });
 }

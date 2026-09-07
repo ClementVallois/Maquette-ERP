@@ -20,7 +20,8 @@ export function useConsultantEconomics(
   return useQuery(
     queryOptions({
       queryKey: ['marge', consultantId, period] as const,
-      queryFn: async () => unwrap(await fetchConsultantEconomics(consultantId, period)),
+      queryFn: async ({ signal }) =>
+        unwrap(await fetchConsultantEconomics(consultantId, period, signal)),
       staleTime: 0,
     }),
   );
