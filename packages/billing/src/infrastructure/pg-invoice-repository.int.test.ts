@@ -237,6 +237,10 @@ describe('PgInvoiceRepository', () => {
     await tx.client.query(`
       INSERT INTO billing.invoices (
         id, office_id, seller_id, status, supply_period,
+        seller_name, seller_legal_form, seller_share_capital_cents, seller_siren,
+        seller_intra_community_vat_number, seller_rcs_registration,
+        seller_address_street, seller_address_postal_code, seller_address_city,
+        seller_address_country, seller_number_prefix,
         billed_to_client_id, billed_to_name,
         billed_to_billing_street, billed_to_billing_postal_code,
         billed_to_billing_city, billed_to_billing_country,
@@ -247,6 +251,8 @@ describe('PgInvoiceRepository', () => {
         mentions_late_penalty_rate, mentions_recovery_indemnity, mentions_vat_on_debits
       )
       SELECT 'invoice-bulk-' || g, 'office-paris', 'entity-fr', 'draft', '2026-03',
+             'Sécurité & Conseil', 'SAS', 15000000, '493296529', 'FR23493296529',
+             'RCS Paris 493 296 529', '12 rue de la Boétie', '75008', 'Paris', 'FR', 'TST',
              'client-1', 'Client Test',
              '1 rue Test', '75001', 'Paris', 'France',
              '1 rue Test', '75001', 'Paris', 'France',
@@ -427,7 +433,7 @@ describe('PgInvoiceRepository', () => {
     expect(found2!.number).toBe('TST-2026-000001');
   });
 
-  it('round-trips the seller through the legal_entities table', async () => {
+  it('freezes the seller at drafting, from the legal_entities row at that moment', async () => {
     await seedReferenceData();
 
     const invoice = makeDraftInvoice();
@@ -438,6 +444,68 @@ describe('PgInvoiceRepository', () => {
     expect(found!.seller.siren).toBe('493296529');
     expect(found!.seller.numberPrefix).toBe('TST');
     expect(found!.seller.shareCapitalCents).toBe(15_000_000);
+  });
+
+  it('keeps the seller it was drafted with after legal_entities changes underneath it (package 06, ADR-0107)', async () => {
+    // The audit's own reproduction: "changing the seller name in a transaction changed the
+    // seller returned when an already issued invoice was reloaded." No public seller-edit
+    // endpoint is needed to falsify the persistence claim — a raw update to the reference row is
+    // sufficient, and is exactly what a reference-data correction or a later migration would do.
+    await seedReferenceData();
+
+    const invoice = makeDraftInvoice();
+    await repo().save(invoice);
+    invoice.issue({ by: 'claire', sequence: 1, issueDate: '2026-04-02' });
+    await repo().save(invoice);
+
+    await tx.client.query(
+      `UPDATE public.legal_entities
+          SET name = 'Renamed After The Fact', siren = '000000000', legal_form = 'SARL',
+              share_capital_cents = 1, rcs_registration = 'RCS Nowhere', number_prefix = 'ZZZ'
+        WHERE id = 'entity-fr'`,
+    );
+
+    const reloaded = await repo().findById('invoice-1', parisManager);
+
+    expect(reloaded!.seller.name).toBe('Sécurité & Conseil');
+    expect(reloaded!.seller.siren).toBe('493296529');
+    expect(reloaded!.seller.legalForm).toBe('SAS');
+    expect(reloaded!.seller.shareCapitalCents).toBe(15_000_000);
+    expect(reloaded!.seller.rcsRegistration).toBe('RCS Paris 493 296 529');
+    expect(reloaded!.seller.numberPrefix).toBe('TST');
+    // The document number was already allocated from the pre-mutation prefix — proof the freeze
+    // reaches numbering too, not just the printed identity fields.
+    expect(reloaded!.number).toBe('TST-2026-000001');
+  });
+
+  it('reloads the frozen VAT breakdown and due date rather than recomputing them, once issued', async () => {
+    // The instrument the audit's "Preserve historical results if calculation policy changes"
+    // clause actually asks for: seed stored values that *disagree* with what recomputing from
+    // the frozen lines/terms would produce, and prove the loaded aggregate reports the stored
+    // ones. A live-recompute bug returns the recomputed figures here instead.
+    await seedReferenceData();
+
+    const invoice = makeDraftInvoice();
+    await repo().save(invoice);
+    invoice.issue({ by: 'claire', sequence: 1, issueDate: '2026-04-02' });
+    await repo().save(invoice);
+
+    await tx.client.query(
+      `UPDATE billing.invoice_vat_groups SET tax_cents = tax_cents + 999 WHERE invoice_id = 'invoice-1'`,
+    );
+    await tx.client.query(
+      `UPDATE billing.invoices SET due_date = '2099-01-01' WHERE id = 'invoice-1'`,
+    );
+
+    const reloaded = await repo().findById('invoice-1', parisManager);
+
+    // The line is 21 days at 65 000 cents/day, taxed at 20 %: 1 365 000 HT, 273 000 VAT.
+    // Recomputing from the (unchanged) lines would answer 273 000 — the mutated, stored value is
+    // 273 999, and that is what a faithful reload has to answer instead.
+    expect(reloaded!.vatBreakdown).toHaveLength(1);
+    expect(reloaded!.vatBreakdown[0]!.baseCents).toBe(1_365_000);
+    expect(reloaded!.vatBreakdown[0]!.vatCents).toBe(273_999);
+    expect(reloaded!.dueDate).toBe('2099-01-01');
   });
 
   it('saveDraft throws CraAlreadyProcessedError on duplicate CRA + same client', async () => {

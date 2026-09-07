@@ -28,7 +28,7 @@ import {
   SELLER,
   TERMS,
 } from './testing/march-2026.ts';
-import type { VatTreatment } from './vat.ts';
+import { type VatTreatment, vatGroupKey } from './vat.ts';
 
 const STANDARD: VatTreatment = { kind: 'taxable', basisPoints: 2000 };
 const OVERSEAS: VatTreatment = { kind: 'taxable', basisPoints: 850 };
@@ -425,6 +425,8 @@ describe('Invoice.reconstitute', () => {
       issueDate: null,
       series: null,
       totals: null,
+      vatBreakdown: null,
+      dueDate: null,
       ...overrides,
     });
   }
@@ -439,6 +441,16 @@ describe('Invoice.reconstitute', () => {
       vatTotalCents: 20_000,
       totalIncludingVatCents: 120_000,
     },
+    vatBreakdown: [
+      {
+        key: vatGroupKey(STANDARD),
+        treatment: STANDARD,
+        baseCents: 100_000,
+        vatCents: 20_000,
+        mention: null,
+      },
+    ],
+    dueDate: dueDate(TERMS, '2026-04-02'),
   } as const;
 
   it('rebuilds a draft, and an issued invoice with everything issue set', () => {
@@ -463,10 +475,61 @@ describe('Invoice.reconstitute', () => {
     );
   });
 
+  it('refuses an issued invoice with no frozen VAT breakdown (ADR-0107)', () => {
+    expect(() => persistedInvoice({ ...ISSUED, vatBreakdown: null })).toThrow(
+      InconsistentPersistedInvoiceError,
+    );
+  });
+
+  it('refuses an issued invoice with no frozen due date (ADR-0107)', () => {
+    expect(() => persistedInvoice({ ...ISSUED, dueDate: null })).toThrow(
+      InconsistentPersistedInvoiceError,
+    );
+  });
+
+  it('reports the frozen VAT breakdown and due date, not a recomputation from the lines (ADR-0107)', () => {
+    // A stored figure that deliberately disagrees with what recomputing from `lines`/`terms`
+    // would produce — the same instrument the repository integration test uses, at the unit
+    // level: proof the getters read `#vatBreakdown`/`#dueDate`, not `vatBreakdownOf`/`dueDate()`.
+    const issued = persistedInvoice({
+      ...ISSUED,
+      vatBreakdown: [
+        {
+          key: vatGroupKey(STANDARD),
+          treatment: STANDARD,
+          baseCents: 100_000,
+          vatCents: 999,
+          mention: null,
+        },
+      ],
+      dueDate: '2099-01-01',
+    });
+
+    expect(issued.vatBreakdown).toStrictEqual([
+      {
+        key: vatGroupKey(STANDARD),
+        treatment: STANDARD,
+        baseCents: 100_000,
+        vatCents: 999,
+        mention: null,
+      },
+    ]);
+    expect(issued.dueDate).toBe('2099-01-01');
+  });
+
   it('names every missing field at once, not the first one', () => {
     // A refusal that names one field sends the reader back for a second round trip per column.
     expect(() => persistedInvoice({ ...ISSUED, series: null, issueDate: null })).toThrow(
       /no issue date, no series/,
+    );
+  });
+
+  it('refuses a draft that already carries a frozen VAT breakdown or due date (ADR-0107)', () => {
+    expect(() => persistedInvoice({ vatBreakdown: ISSUED.vatBreakdown })).toThrow(
+      InconsistentPersistedInvoiceError,
+    );
+    expect(() => persistedInvoice({ dueDate: ISSUED.dueDate })).toThrow(
+      InconsistentPersistedInvoiceError,
     );
   });
 

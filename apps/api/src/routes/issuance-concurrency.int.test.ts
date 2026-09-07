@@ -118,6 +118,10 @@ async function seedDraftInvoice(id: string, sellerId: string): Promise<void> {
   await pool.query(
     `INSERT INTO billing.invoices (
        id, office_id, seller_id, supply_period,
+       seller_name, seller_legal_form, seller_share_capital_cents, seller_siren,
+       seller_intra_community_vat_number, seller_rcs_registration,
+       seller_address_street, seller_address_postal_code, seller_address_city,
+       seller_address_country, seller_number_prefix,
        billed_to_client_id, billed_to_name,
        billed_to_billing_street, billed_to_billing_postal_code, billed_to_billing_city,
        billed_to_billing_country,
@@ -128,6 +132,8 @@ async function seedDraftInvoice(id: string, sellerId: string): Promise<void> {
        mentions_recovery_indemnity
      ) VALUES (
        $1, $2, $3, '2026-06',
+       'Concurrency SAS', 'SAS', 10000000, '000000000', 'FR00000000000', 'RCS Test',
+       '1 rue', '75000', 'Paris', 'France', 'CCY',
        $4, 'Concurrency Client',
        '1 rue', '75000', 'Paris', 'France',
        '1 rue', '75000', 'Paris', 'France',

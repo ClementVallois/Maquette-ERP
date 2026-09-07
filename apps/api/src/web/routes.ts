@@ -137,9 +137,9 @@ export function registerWebRoutes(app: FastifyInstance, dependencies: ServerDepe
         invoicePage(
           {
             invoice,
-            // A draft has no issue date, so it has no due date: the term runs from the date the
-            // document leaves, and a draft has not left.
-            dueDate: invoice.issueDate === null ? null : invoice.dueDateFrom(invoice.issueDate),
+            // The frozen due date (ADR-0107): `null` for a draft — the term runs from the date
+            // the document leaves, and a draft has not left — the stored value once issued.
+            dueDate: invoice.dueDate,
           },
           personaFor(request),
         ),

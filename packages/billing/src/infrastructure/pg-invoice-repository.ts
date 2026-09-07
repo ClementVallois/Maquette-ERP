@@ -1,6 +1,13 @@
-import { type Actor, assertMayRead, quarterDays, isoDateOf, readScope } from '@erp/platform';
+import {
+  type Actor,
+  type IsoDate,
+  assertMayRead,
+  quarterDays,
+  isoDateOf,
+  readScope,
+} from '@erp/platform';
 
-import type { DocumentTotals } from '../domain/document.ts';
+import type { DocumentTotals, VatGroup } from '../domain/document.ts';
 import { CraAlreadyProcessedError } from '../domain/errors.ts';
 import type {
   ClientId,
@@ -24,9 +31,9 @@ import type { EarlyPaymentDiscount, LegalMentions, OperationCategory } from '../
 import type { SeriesKey } from '../domain/numbering.ts';
 import type { PaymentTerms } from '../domain/payment-terms.ts';
 import type { LegalEntity } from '../domain/seller.ts';
-import type { VatTreatment } from '../domain/vat.ts';
+import { NOT_CHARGED_MENTIONS, type VatTreatment } from '../domain/vat.ts';
 
-import { exactInteger, ReferencedRowMissingError } from './columns.ts';
+import { exactInteger } from './columns.ts';
 
 const MAX_PAGE_SIZE = 50;
 
@@ -301,6 +308,10 @@ export class PgInvoiceRepository implements InvoiceRepository {
     await this.#client.query(
       `INSERT INTO billing.invoices (
         id, office_id, seller_id, status, supply_period,
+        seller_name, seller_legal_form, seller_share_capital_cents, seller_siren,
+        seller_intra_community_vat_number, seller_rcs_registration,
+        seller_address_street, seller_address_postal_code, seller_address_city,
+        seller_address_country, seller_number_prefix,
         billed_to_client_id, billed_to_name, billed_to_siren, billed_to_vat_number,
         billed_to_billing_street, billed_to_billing_postal_code,
         billed_to_billing_city, billed_to_billing_country,
@@ -315,13 +326,20 @@ export class PgInvoiceRepository implements InvoiceRepository {
       ) VALUES (
         $1, $2, $3, $4, $5,
         $6, $7, $8, $9,
-        $10, $11, $12, $13,
-        $14, $15, $16, $17,
-        $18, $19,
-        $20, $21, $22, $23, $24, $25,
-        $26, $27, $28, $29, $30,
+        $10, $11,
+        $12, $13, $14,
+        $15, $16,
+        $17, $18, $19, $20,
+        $21, $22,
+        $23, $24,
+        $25, $26,
+        $27, $28,
+        $29, $30,
         $31, $32, $33,
-        $34, $35, $36
+        $34, $35, $36,
+        $37, $38, $39, $40, $41,
+        $42, $43, $44,
+        $45, $46, $47
       ) ON CONFLICT (id) DO UPDATE SET
         status = EXCLUDED.status,
         invoice_number = EXCLUDED.invoice_number,
@@ -335,13 +353,26 @@ export class PgInvoiceRepository implements InvoiceRepository {
         -- COALESCE, not EXCLUDED: a later re-save carries no key and must not erase the one the
         -- issuance wrote. source_cra_ids learned the same lesson in Phase 3, by being erased.
         issuance_idempotency_key = COALESCE(
-          EXCLUDED.issuance_idempotency_key, billing.invoices.issuance_idempotency_key)`,
+          EXCLUDED.issuance_idempotency_key, billing.invoices.issuance_idempotency_key)
+        -- seller_* and billed_to_* are deliberately absent from this list, same reasoning as
+        -- billed_to_* already had (ADR-0107): copied at drafting, never updated on a later save.`,
       [
         invoice.id,
         invoice.officeId,
         invoice.seller.id,
         invoice.status,
         invoice.supplyPeriod,
+        invoice.seller.name,
+        invoice.seller.legalForm,
+        invoice.seller.shareCapitalCents,
+        invoice.seller.siren,
+        invoice.seller.intraCommunityVatNumber,
+        invoice.seller.rcsRegistration,
+        invoice.seller.address.line1,
+        invoice.seller.address.postalCode,
+        invoice.seller.address.city,
+        invoice.seller.address.country,
+        invoice.seller.numberPrefix,
         invoice.billedTo.clientId,
         invoice.billedTo.name,
         invoice.billedTo.siren,
@@ -368,7 +399,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
         invoice.issueDate,
         invoice.series?.entityId ?? null,
         invoice.series?.fiscalYear ?? null,
-        invoice.issueDate !== null ? invoice.dueDateFrom(invoice.issueDate) : null,
+        invoice.dueDate,
         totals?.totalExcludingVatCents ?? null,
         totals?.vatTotalCents ?? null,
         totals?.totalIncludingVatCents ?? null,
@@ -421,9 +452,23 @@ export class PgInvoiceRepository implements InvoiceRepository {
 
     for (const group of invoice.vatBreakdown) {
       await this.#client.query(
-        `INSERT INTO billing.invoice_vat_groups (id, invoice_id, group_key, base_cents, tax_cents)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [this.#newId(), invoice.id, group.key, group.baseCents, group.vatCents ?? 0],
+        `INSERT INTO billing.invoice_vat_groups (
+           id, invoice_id, group_key, base_cents, tax_cents,
+           vat_kind, vat_basis_points, vat_not_charged_reason
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          this.#newId(),
+          invoice.id,
+          group.key,
+          group.baseCents,
+          // True `NULL`, not `0` (ADR-0107): "not charged" carries no tax amount at all
+          // (ADR-0010), and the read path now depends on that distinction to reconstruct
+          // `group.treatment` rather than lose it the way the group key alone would force.
+          group.vatCents,
+          group.treatment.kind,
+          group.treatment.kind === 'taxable' ? group.treatment.basisPoints : null,
+          group.treatment.kind === 'notCharged' ? group.treatment.reason : null,
+        ],
       );
     }
   }
@@ -434,7 +479,26 @@ export class PgInvoiceRepository implements InvoiceRepository {
       [row.id],
     );
 
-    const seller = await this.#loadSeller(row.seller_id);
+    // The seller snapshot, frozen at drafting (ADR-0107): these are `billing.invoices`' own
+    // columns, never a join back to the current `public.legal_entities` row. Editing that
+    // reference row after this invoice was drafted must not change what this invoice reports.
+    const seller: LegalEntity = {
+      id: row.seller_id,
+      name: row.seller_name,
+      legalForm: row.seller_legal_form,
+      shareCapitalCents: exactInteger('seller_share_capital_cents', row.seller_share_capital_cents),
+      siren: row.seller_siren,
+      intraCommunityVatNumber: row.seller_intra_community_vat_number,
+      rcsRegistration: row.seller_rcs_registration,
+      address: {
+        line1: row.seller_address_street,
+        line2: null,
+        postalCode: row.seller_address_postal_code,
+        city: row.seller_address_city,
+        country: row.seller_address_country,
+      },
+      numberPrefix: row.seller_number_prefix,
+    };
 
     const lines: InvoiceLine[] = lineRows.map((lr) => ({
       designation: lr.designation,
@@ -503,6 +567,14 @@ export class PgInvoiceRepository implements InvoiceRepository {
           }
         : null;
 
+    // Frozen the same way totals are (ADR-0107): `null` for a draft (nothing to load — the
+    // getters fall back to a live computation from `lines`), the stored recapitulative once
+    // issued, never `vatBreakdownOf(lines)` recomputed against whatever the domain's grouping or
+    // rounding code says today.
+    const vatBreakdown: readonly VatGroup[] | null =
+      row.status === 'draft' ? null : await this.#loadVatBreakdown(row.id);
+    const dueDate: IsoDate | null = row.due_date === null ? null : isoDateOf(row.due_date);
+
     return Invoice.reconstitute({
       id: row.id as InvoiceId,
       officeId: row.office_id as OfficeId,
@@ -518,34 +590,35 @@ export class PgInvoiceRepository implements InvoiceRepository {
       issueDate: row.issue_date === null ? null : isoDateOf(row.issue_date),
       series,
       totals,
+      vatBreakdown,
+      dueDate,
     });
   }
 
-  async #loadSeller(sellerId: string): Promise<LegalEntity> {
-    const { rows } = await this.#client.query<LegalEntityRow>(
-      `SELECT * FROM public.legal_entities WHERE id = $1`,
-      [sellerId],
+  async #loadVatBreakdown(invoiceId: string): Promise<readonly VatGroup[]> {
+    const { rows } = await this.#client.query<VatGroupRow>(
+      `SELECT * FROM billing.invoice_vat_groups WHERE invoice_id = $1 ORDER BY group_key`,
+      [invoiceId],
     );
-    const row = rows[0];
-    if (row === undefined) throw new ReferencedRowMissingError('public.legal_entities', sellerId);
 
-    return {
-      id: row.id,
-      name: row.name,
-      legalForm: row.legal_form,
-      shareCapitalCents: exactInteger('share_capital_cents', row.share_capital_cents),
-      siren: row.siren,
-      intraCommunityVatNumber: row.intra_community_vat_number,
-      rcsRegistration: row.rcs_registration,
-      address: {
-        line1: row.address_street,
-        line2: null,
-        postalCode: row.address_postal_code,
-        city: row.address_city,
-        country: row.address_country,
-      },
-      numberPrefix: row.number_prefix,
-    };
+    return rows.map((row) => {
+      const treatment: VatTreatment =
+        row.vat_kind === 'taxable'
+          ? { kind: 'taxable', basisPoints: row.vat_basis_points! }
+          : {
+              kind: 'notCharged',
+              reason: row.vat_not_charged_reason! as
+                'territoryOutsideVatScope' | 'reverseChargeEuB2b',
+            };
+
+      return {
+        key: row.group_key,
+        treatment,
+        baseCents: exactInteger('base_cents', row.base_cents),
+        vatCents: row.tax_cents === null ? null : exactInteger('tax_cents', row.tax_cents),
+        mention: treatment.kind === 'taxable' ? null : NOT_CHARGED_MENTIONS[treatment.reason],
+      };
+    });
   }
 
   #reconstructOrigin(lr: InvoiceLineRow): LineOrigin {
@@ -576,6 +649,17 @@ interface InvoiceRow {
   seller_id: string;
   status: string;
   supply_period: string;
+  seller_name: string;
+  seller_legal_form: string;
+  seller_share_capital_cents: string | number;
+  seller_siren: string;
+  seller_intra_community_vat_number: string;
+  seller_rcs_registration: string;
+  seller_address_street: string;
+  seller_address_postal_code: string;
+  seller_address_city: string;
+  seller_address_country: string;
+  seller_number_prefix: string;
   billed_to_client_id: string;
   billed_to_name: string;
   billed_to_siren: string | null;
@@ -682,19 +766,13 @@ interface InvoiceLineRow {
   vat_not_charged_reason: string | null;
 }
 
-interface LegalEntityRow {
-  id: string;
-  name: string;
-  legal_form: string;
-  share_capital_cents: string | number;
-  siren: string;
-  intra_community_vat_number: string;
-  rcs_registration: string;
-  address_street: string;
-  address_postal_code: string;
-  address_city: string;
-  address_country: string;
-  number_prefix: string;
+interface VatGroupRow {
+  group_key: string;
+  base_cents: string | number;
+  tax_cents: string | number | null;
+  vat_kind: string;
+  vat_basis_points: number | null;
+  vat_not_charged_reason: string | null;
 }
 
 function isPgUniqueViolation(error: unknown, constraintName: string): boolean {

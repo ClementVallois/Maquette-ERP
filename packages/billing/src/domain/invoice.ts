@@ -79,6 +79,17 @@ export class Invoice {
   #series: SeriesKey | null = null;
   /** Computed at drafting, frozen at issuance. What is printed is what was checked. */
   #totals: DocumentTotals | null = null;
+  /**
+   * `null` until issuance, exactly like `#totals` and for the same reason (ADR-0107): a draft's
+   * recapitulative is provisional and follows its still-changing lines, so it is recomputed on
+   * every read; an issued document's is what was checked when it left, and a recomputation that
+   * can silently disagree with the frozen figure — if `vatBreakdownOf`'s rounding policy is ever
+   * revised — is not what a legal document reloads as.
+   */
+  #vatBreakdown: readonly VatGroup[] | null = null;
+  /** `null` until issuance, same reasoning as `#vatBreakdown` — a draft has no issue date to
+   * compute one from in the first place. */
+  #dueDate: IsoDate | null = null;
 
   private constructor(input: {
     id: InvoiceId;
@@ -142,6 +153,8 @@ export class Invoice {
     issueDate: IsoDate | null;
     series: SeriesKey | null;
     totals: DocumentTotals | null;
+    vatBreakdown: readonly VatGroup[] | null;
+    dueDate: IsoDate | null;
   }): Invoice {
     assertInvoiceStateIsCoherent(input);
 
@@ -161,6 +174,8 @@ export class Invoice {
     invoice.#issueDate = input.issueDate;
     invoice.#series = input.series;
     invoice.#totals = input.totals;
+    invoice.#vatBreakdown = input.vatBreakdown;
+    invoice.#dueDate = input.dueDate;
     return invoice;
   }
 
@@ -204,12 +219,31 @@ export class Invoice {
     return [...this.#validatedBy];
   }
 
+  /**
+   * A pure preview: what the due date would be for an arbitrary issue date, under this invoice's
+   * own payment terms. Used to price a hypothetical, not to answer for this document — `dueDate`
+   * (below) is that answer, and is frozen once this invoice actually has an issue date.
+   */
   dueDateFrom(issueDate: IsoDate): IsoDate {
     return dueDate(this.#terms, issueDate);
   }
 
+  /**
+   * The due date **for this invoice**, once it has one. `null` for a draft — there is no issue
+   * date yet to compute one from — and the frozen value once issued (ADR-0107), never
+   * recomputed: `dueDateFrom` stays available for a hypothetical date, this getter never is one.
+   */
+  get dueDate(): IsoDate | null {
+    return this.#dueDate;
+  }
+
+  /**
+   * The recapitulative as it stands. Once the invoice is issued this returns the **frozen** copy
+   * rather than a fresh computation, on the same reasoning `totals` already gives (ADR-0107):
+   * what is printed on a legal document is what was checked when it was issued.
+   */
   get vatBreakdown(): readonly VatGroup[] {
-    return vatBreakdownOf(this.#lines);
+    return this.#vatBreakdown ?? vatBreakdownOf(this.#lines);
   }
 
   /**
@@ -256,6 +290,7 @@ export class Invoice {
     const series = seriesKeyOf(this.#seller, input.issueDate);
     const number = documentNumber(this.#seller, series, input.sequence);
     const totals = totalsOf(this.#lines);
+    const vatBreakdown = vatBreakdownOf(this.#lines);
 
     // The gate BUILD-RULES puts before a document leaves. Tautological here and not written for
     // here — Phase 3 reconstructs a document from stored rows, where the totals are columns and
@@ -264,7 +299,7 @@ export class Invoice {
     assertDocumentAddsUp({
       id: this.#id,
       lines: this.#lines,
-      vatBreakdown: this.vatBreakdown,
+      vatBreakdown,
       totals,
     });
 
@@ -272,6 +307,10 @@ export class Invoice {
     this.#series = series;
     this.#issueDate = input.issueDate;
     this.#totals = totals;
+    // Frozen here, alongside totals, for the same reason (ADR-0107): once issued, `vatBreakdown`
+    // and `dueDate` stop tracking `#lines`/`#terms` and become what this exact moment computed.
+    this.#vatBreakdown = vatBreakdown;
+    this.#dueDate = dueDate(this.#terms, input.issueDate);
     this.#status = 'issued';
   }
 
@@ -302,12 +341,16 @@ function assertInvoiceStateIsCoherent(input: {
   issueDate: IsoDate | null;
   series: SeriesKey | null;
   totals: DocumentTotals | null;
+  vatBreakdown: readonly VatGroup[] | null;
+  dueDate: IsoDate | null;
 }): void {
   const issuedFields = {
     number: input.number,
     'issue date': input.issueDate,
     series: input.series,
     totals: input.totals,
+    'vat breakdown': input.vatBreakdown,
+    'due date': input.dueDate,
   };
 
   const missing = Object.entries(issuedFields)

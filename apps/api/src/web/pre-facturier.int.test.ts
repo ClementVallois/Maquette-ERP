@@ -43,7 +43,12 @@ const EMMA = 'pf-emma';
 const MISSION = 'pf-mission';
 const FORFAIT = 'pf-mission-forfait';
 const CLIENT = 'pf-client';
-const ENTITY = 'pf-entity';
+// `000-` sorts before the permanently-committed rows `cra-concurrency.int.test.ts` and
+// `pg-numbering-counter.int.test.ts` leave in the shared integration database
+// (`aaa-cra-concurrency-entity`, `entity-fr`), so `PgReferenceReader.seller()`'s unscoped
+// `ORDER BY id LIMIT 1` deterministically returns this file's own row, not a leftover from
+// another one — see `api.int.test.ts`'s identical `000-api-entity` for the same reasoning.
+const ENTITY = '000-pf-entity';
 const CRA_VALIDATED = 'pf-cra-validated';
 const CRA_SUBMITTED = 'pf-cra-submitted';
 

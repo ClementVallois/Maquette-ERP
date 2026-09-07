@@ -232,10 +232,17 @@ beforeEach(async () => {
     [uuidv7(), ALICE, BRUNO, uuidv7(), CHLOE, BRUNO],
   );
   await client.query(
+    // `PgReferenceReader.seller()` reads `SELECT * FROM public.legal_entities ORDER BY id LIMIT 1`
+    // — unscoped, correct for the one-seller production database, but this test file shares the
+    // integration test database with every other one, and `cra-concurrency.int.test.ts` and
+    // `pg-numbering-counter.int.test.ts` each leave a permanently committed row behind
+    // (`aaa-cra-concurrency-entity`, `entity-fr`) that this file's own uncommitted transaction can
+    // still see. `000-` sorts before both deterministically, so this row — not a leftover from
+    // another file — is the one every draft in this file's tests is issued against.
     `INSERT INTO public.legal_entities (id, name, legal_form, share_capital_cents, siren,
        intra_community_vat_number, rcs_registration, address_street, address_postal_code,
        address_city, address_country, number_prefix)
-     VALUES ('api-entity', 'SecureCo SAS', 'SAS', 10000000, '732829320', 'FR27732829320',
+     VALUES ('000-api-entity', 'SecureCo SAS', 'SAS', 10000000, '732829320', 'FR27732829320',
              'RCS Paris 732 829 320', '42 rue', '75008', 'Paris', 'France', 'SEC')`,
   );
   await client.query(
@@ -985,6 +992,10 @@ describe('the refusal, through the API', () => {
     await transaction.client.query(
       `INSERT INTO billing.invoices (
          id, office_id, seller_id, supply_period,
+         seller_name, seller_legal_form, seller_share_capital_cents, seller_siren,
+         seller_intra_community_vat_number, seller_rcs_registration,
+         seller_address_street, seller_address_postal_code, seller_address_city,
+         seller_address_country, seller_number_prefix,
          billed_to_client_id, billed_to_name,
          billed_to_billing_street, billed_to_billing_postal_code, billed_to_billing_city,
          billed_to_billing_country,
@@ -994,7 +1005,9 @@ describe('the refusal, through the API', () => {
          mentions_operation_category, mentions_early_payment_kind, mentions_late_penalty_rate,
          mentions_recovery_indemnity
        ) VALUES (
-         'api-invoice-lyon', $1, 'api-entity', '2026-06',
+         'api-invoice-lyon', $1, '000-api-entity', '2026-06',
+         'SecureCo SAS', 'SAS', 10000000, '732829320', 'FR27732829320', 'RCS Paris 732 829 320',
+         '42 rue', '75008', 'Paris', 'France', 'SEC',
          $2, 'Zenith Industries',
          '2 rue', '69002', 'Lyon', 'France',
          '2 rue', '69002', 'Lyon', 'France',
