@@ -1,88 +1,45 @@
-import type { ConsultantRosterResponse, PreFacturierResponse } from '@erp/contracts';
-import { isoDateInFirmTimeZone, periodFromIso } from '@erp/platform';
-import { workingCalendar } from '@erp/timesheet';
+import type { DeclineReason } from '@erp/billing';
+import type { PreFacturierResponse } from '@erp/contracts';
+import { isoDateInFirmTimeZone } from '@erp/platform';
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 
+import type { Blocking, CraRow } from '../composition/pre-facturier.ts';
 import { preFacturierComposition } from '../composition/pre-facturier.ts';
 import type { ServerDependencies } from '../dependencies.ts';
-import { consultantEconomics } from '../economics/consultant-economics.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
-import { PgReferenceReader } from '../persistence/reference-reader.ts';
 import { forRoles, requireActor } from '../personas/access.ts';
 import { malformed, parseInput } from '../validation.ts';
 
-import { blockingReasonsOf } from './cra.ts';
-import { ConsultantParams, notFound, PeriodQuery, PreFacturierParams } from './schemas.ts';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, PeriodQuery } from './schemas.ts';
+
+const PreFacturierParams = PeriodQuery.extend({
+  craLimit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
+  craOffset: z.coerce.number().int().min(0).default(0),
+  invoiceLimit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
+  invoiceOffset: z.coerce.number().int().min(0).default(0),
+  consultantSearch: z.string().trim().min(1).max(100).optional(),
+});
+
+/**
+ * The declared-reason half of a Cra row's `blocking` (ADR-0037): a `notValidated` block already
+ * has its own field on the row (`status`, `late`), so it is not repeated here as a string nobody
+ * would parse back into those two facts — only a validated Cra's typed decline reasons are.
+ * Package 14: moved here from `cra.ts`, its one real consumer — `cra.ts` itself never called it.
+ */
+function blockingReasonsOf(row: CraRow): readonly DeclineReason[] {
+  return row.blocking
+    .filter(
+      (item): item is { quarterDays: number; why: Extract<Blocking, { kind: 'declined' }> } =>
+        item.why.kind === 'declined',
+    )
+    .map((item) => item.why.reason);
+}
 
 export function registerPreFacturierRoutes(
   app: FastifyInstance,
   dependencies: ServerDependencies,
 ): void {
-  /**
-   * The working calendar's own coverage (ADR-0004: a written table, 2026 only today). Not a Cra
-   * read at all — it exists so `/cra`'s month picker can offer exactly the months
-   * `workingCalendar()` can answer about, instead of a hard-coded upper bound the calendar itself
-   * would silently outgrow. Every connected role may ask; the answer carries nothing scoped to an
-   * office or a consultant.
-   */
-  app.get(
-    '/api/v1/calendar',
-    { config: { access: forRoles('consultant', 'manager', 'billing') } },
-    () => ({ years: workingCalendar().years }),
-  );
-
-  /**
-   * Item 7 (QA round 1): the consultant filter's own option list, independent of `/api/v1/cras`'
-   * page — a manager's office can hold more Cra rows than one page (item 6 grows a roster past
-   * fifty), so deriving "who can I filter by" from whichever page happens to be loaded would make
-   * the picker's own options depend on which filter is already applied. Manager only, matching
-   * the one caller (`features/cra/components/cra-list-screen.tsx`'s `CraListFilters`, manager-only
-   * itself): billing sees `/api/v1/cras` too, but that screen renders neither a consultant column
-   * nor an "Ouvrir" action for that role, so this filter has nothing on screen for billing to
-   * narrow down yet — granting the read anyway would be capability nothing exercises.
-   */
-  app.get('/api/v1/consultants', { config: { access: forRoles('manager') } }, async (request) => {
-    const actor = requireActor(request);
-
-    return dependencies.transactionally(async (unit) => {
-      const rosterResponse: ConsultantRosterResponse = {
-        consultants: await new PgReferenceReader(unit.client).consultantsOfOffice(actor.officeId),
-      };
-      return rosterResponse;
-    });
-  });
-  app.get(
-    '/api/v1/consultants/:consultantId/economics',
-    { config: { access: forRoles('manager') } },
-    async (request, reply) => {
-      const params = parseInput(ConsultantParams, request.params);
-      const query = parseInput(PeriodQuery, request.query);
-      if (!params.ok) return sendProblem(reply, malformed(params.errors, contextOf(request)));
-      if (!query.ok) return sendProblem(reply, malformed(query.errors, contextOf(request)));
-
-      const actor = requireActor(request);
-      // The disclosure log lives inside `consultantEconomics` (ADR-0052), not here: this route and
-      // the `/marge` screen serve the same record, and a control written once per handler is a
-      // control the second handler forgets.
-      const economics = await dependencies.transactionally((unit) =>
-        consultantEconomics(
-          { client: unit.client, cras: unit.cras, log: request.log },
-          {
-            consultantId: params.value.consultantId,
-            period: periodFromIso(query.value.period),
-            actor,
-          },
-        ),
-      );
-
-      if (economics === null) return sendProblem(reply, notFound(request, 'economics record'));
-
-      return economics;
-    },
-  );
-
-  // ── The pré-facturier, and the Cra grid (front-end plan Phase 5.1 and 5.2) ─
-
   app.get(
     '/api/v1/pre-facturier',
     { config: { access: forRoles('manager', 'billing') } },
@@ -125,10 +82,7 @@ export function registerPreFacturierRoutes(
           lateQuarterDays: composition.lateQuarterDays,
           craCount: composition.pagination.cras.total,
         },
-        invoices: composition.invoices.map((row) => ({
-          ...row,
-          status: row.status,
-        })),
+        invoices: composition.invoices,
         cras: composition.cras.map((row) => ({
           craId: row.craId,
           consultantId: row.consultantId,

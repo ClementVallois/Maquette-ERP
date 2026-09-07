@@ -1,5 +1,6 @@
 import { isoDateInFirmTimeZone } from '@erp/platform';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { z } from 'zod';
 
 import type { ServerDependencies } from '../dependencies.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
@@ -7,11 +8,36 @@ import { forRoles, requireActor } from '../personas/access.ts';
 import {
   assignmentCatalogue,
   createAssignment,
+  type AssignmentWriteOutcome,
   updateAssignment,
 } from '../staffing/assignment-admin.ts';
 import { malformed, parseInput } from '../validation.ts';
 
-import { AssignmentBody, assignmentRefusal, IdParam, notFound } from './schemas.ts';
+import { CONFLICT, IdParam, notFound } from './schemas.ts';
+
+const IsoDateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/u);
+const AssignmentBody = z.object({
+  consultantId: z.string().min(1).max(64),
+  missionId: z.string().min(1).max(64),
+  fromDate: IsoDateString,
+  toDate: IsoDateString.nullable().default(null),
+});
+
+function assignmentRefusal(
+  request: FastifyRequest,
+  outcome: Extract<AssignmentWriteOutcome, { kind: 'refused' }>,
+) {
+  return {
+    type: outcome.problemType,
+    title: 'Assignment refused',
+    status: CONFLICT,
+    invariant: outcome.problemType,
+    errors: Object.fromEntries(
+      Object.entries(outcome.details).map(([field, value]) => [field, [value]]),
+    ),
+    ...contextOf(request),
+  };
+}
 
 export function registerAssignmentRoutes(
   app: FastifyInstance,

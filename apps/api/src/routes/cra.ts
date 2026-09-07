@@ -1,5 +1,5 @@
-import type { DeclineReason } from '@erp/billing';
 import type {
+  ConsultantRosterResponse,
   CraDetail,
   CraGridResponse,
   CraListResponse,
@@ -10,14 +10,14 @@ import type {
   ValidationResponse,
 } from '@erp/contracts';
 import { daysOf, periodFromIso } from '@erp/platform';
-import { workingCalendar } from '@erp/timesheet';
+import { CRA_STATUSES, workingCalendar } from '@erp/timesheet';
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 
 import { recordMonth } from '../chain/record-month.ts';
 import { refuseCra } from '../chain/refuse-cra.ts';
 import { validateCraAndDraftInvoices } from '../chain/validate-cra.ts';
 import { type CraGridComposition, craGridComposition } from '../composition/cra-grid.ts';
-import type { Blocking, CraRow } from '../composition/pre-facturier.ts';
 import type { ServerDependencies } from '../dependencies.ts';
 import { ApiFailure } from '../errors.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
@@ -26,23 +26,120 @@ import { forRoles, requireActor } from '../personas/access.ts';
 import { malformed, parseInput } from '../validation.ts';
 
 import {
-  ConsultantPeriodParams,
-  CraListParams,
+  CRA_LIST_MAX_PAGE_SIZE,
+  DEFAULT_PAGE_SIZE,
   IdParam,
-  MonthEntries,
   notFound,
-  PeriodParam,
-  RefusalBody,
+  Pagination,
+  YearQuery,
 } from './schemas.ts';
+
+/**
+ * A single query-string value, comma-separated, rather than a repeated key
+ * (`?consultantIds=a&consultantIds=b`) — Fastify's default querystring parser only produces an
+ * array from a repeated key, and a *single* selection would otherwise arrive as a bare string,
+ * needing a second branch here to tell "one" from "many" apart. Comma-separated needs none: an
+ * absent param stays `undefined` ("every value", the domain's own `CraListQuery` reading), and
+ * empty segments are dropped so a trailing comma or `?consultantIds=` cannot smuggle in `''` as
+ * an id. Two concrete schemas rather than one generic helper: Zod v4's `.pipe()` cannot carry a
+ * type parameter through cleanly (`input<Item>` does not narrow to `string` for an unconstrained
+ * `Item`), and two short schemas cost less than fighting that for two call sites.
+ */
+const CommaSeparatedIds = z
+  .string()
+  .optional()
+  .transform((value) => value?.split(',').filter((entry) => entry.length > 0))
+  .pipe(z.array(z.string().min(1).max(64)).optional());
+
+const CommaSeparatedStatuses = z
+  .string()
+  .optional()
+  .transform((value) => value?.split(',').filter((entry) => entry.length > 0))
+  .pipe(z.array(z.enum(CRA_STATUSES)).optional());
+
+/**
+ * Item 4 (QA round 2): "a year and/or month filter" — the month half. `YearQuery` (`./schemas.ts`)
+ * is shared with `invoices.ts`; this half has only this one consumer.
+ */
+const MonthQuery = z.coerce.number().int().min(1).max(12).optional();
+
+/**
+ * Item 7 (QA round 1): "for these three consultants, every CRA not yet validated" — both
+ * dimensions, non-exclusive within themselves (an id/status list is an OR) and ANDed with each
+ * other, pushed to the domain's `CraListQuery` (`packages/timesheet`) so item 6's larger office
+ * rosters filter server-side rather than over a page truncated by `limit`/`offset` first.
+ */
+const CraListParams = Pagination.extend({
+  // `limit` overrides the base schema's field, at `CRA_LIST_MAX_PAGE_SIZE` rather than
+  // `MAX_PAGE_SIZE` — this route's own cap, ADR-0081.
+  limit: z.coerce.number().int().min(1).max(CRA_LIST_MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
+  // No exact `period`: unlike `/api/v1/pre-facturier`, this route has never taken one, and item 7
+  // did not ask for one either (the CRA list already shows every period at once, with its own
+  // `period` column) — `year`/`month` below (item 4, QA round 2) narrow *within* that same
+  // always-every-period list, they do not add a single-period mode back.
+  consultantIds: CommaSeparatedIds,
+  statuses: CommaSeparatedStatuses,
+  year: YearQuery,
+  month: MonthQuery,
+  // Item 22, QA round 3: the dashboard's "CRA en retard" deep link — every period strictly
+  // before this one, matching `lateCras`' own `lastDayOf(period) < today` (`CraListQuery`'s own
+  // doc comment, `packages/timesheet`, has the equivalence).
+  beforePeriod: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/u)
+    .optional(),
+});
+
+const PeriodParam = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u) });
+const ConsultantPeriodParams = z.object({
+  consultantId: z.string().min(1).max(64),
+  period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u),
+});
+
+/**
+ * The month, as a body. One entry per **matrix cell** (ADR-0069 makes the quarter-day the unit,
+ * ADR-0070 makes one cell one `(day, dayType, missionId)` triplet, and ADR-0050 makes the whole
+ * month the unit of write), so a day split across two missions is two entries and needs no special
+ * case. Each entry carries its own `quarterDays`, one to four.
+ *
+ * The cap is 124 — 4 × 31, the longest month at its maximum density — so a body longer than it is
+ * not a month however it is spelled. It is enforced here and, on the web path, by the domain
+ * instead: `DayOverbookedError` refuses a fifth quarter-day on a day, which is the same bound
+ * reached by the rule rather than by the schema.
+ */
+const MAX_ENTRIES = 124;
+const MIN_QUARTER_DAYS = 1;
+const MAX_QUARTER_DAYS = 4;
+
+const MonthEntries = z.object({
+  submit: z.boolean().default(false),
+  entries: z
+    .array(
+      z.object({
+        day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+        dayType: z.union([z.literal('worked'), z.literal('absence')]),
+        missionId: z.string().min(1).max(64).nullable().default(null),
+        quarterDays: z.number().int().min(MIN_QUARTER_DAYS).max(MAX_QUARTER_DAYS),
+      }),
+    )
+    .max(MAX_ENTRIES),
+});
+
+/**
+ * The bound is a schema check — "is this a request" — and it stops short of trimming: a
+ * whitespace-only reason of the right length still reaches `refuse()`, whose own
+ * `RefusalReasonRequiredError` is the "is this a legitimate refusal" half of ADR-0042.
+ */
+const RefusalBody = z.object({ reason: z.string().min(1).max(500) });
 
 /**
  * `CraLine.quarterDays` (`@erp/timesheet`) is `QuarterDays` (`number`) — deliberately: it is the
  * same type an aggregate month total carries, and a total is not bounded to four. A single line's
  * own domain constructor (`craLine`, `packages/timesheet/src/domain/cra-line.ts`) enforces one to
  * four at construction, but nothing in `QuarterDays` itself can say so — unlike `CraStatus`/
- * `InvoiceStatus` below, this is not a repository leaking a narrower type back to `string`; it is
- * one genuinely wider type reused in two contexts. Package 14's own audit named this cast as one
- * of five to reconsider: `craRowStatus`, `invoiceRowStatus`, `craActivityStatus` and
+ * `InvoiceStatus`, this is not a repository leaking a narrower type back to `string`; it is one
+ * genuinely wider type reused in two contexts. Package 14's own audit named this cast as one of
+ * five to reconsider: `craRowStatus`, `invoiceRowStatus`, `craActivityStatus` and
  * `invoiceActivityStatus` all turned out to be dead (deleted here and in `dashboard.ts`/
  * `invoices.ts`/`pre-facturier.ts` — `CraListItem.status`/`InvoiceListItem.status`/
  * `InvoiceYearStatusCount.status` now carry their real domain union, narrowed once at the
@@ -117,21 +214,45 @@ function gridResponseOf(period: string, grid: CraGridComposition): CraGridRespon
   };
 }
 
-/**
- * The declared-reason half of a Cra row's `blocking` (ADR-0037): a `notValidated` block already
- * has its own field on the row (`status`, `late`), so it is not repeated here as a string nobody
- * would parse back into those two facts — only a validated Cra's typed decline reasons are.
- */
-export function blockingReasonsOf(row: CraRow): readonly DeclineReason[] {
-  return row.blocking
-    .filter(
-      (item): item is { quarterDays: number; why: Extract<Blocking, { kind: 'declined' }> } =>
-        item.why.kind === 'declined',
-    )
-    .map((item) => item.why.reason);
-}
-
 export function registerCraRoutes(app: FastifyInstance, dependencies: ServerDependencies): void {
+  /**
+   * The working calendar's own coverage (ADR-0004: a written table, 2026 only today). Not a Cra
+   * read at all — it exists so `/cra`'s month picker can offer exactly the months
+   * `workingCalendar()` can answer about, instead of a hard-coded upper bound the calendar itself
+   * would silently outgrow. Every connected role may ask; the answer carries nothing scoped to an
+   * office or a consultant. Package 14: moved here from `pre-facturier.ts`, its actual and only
+   * consumer today (`apps/web/src/lib/calendar.ts`, read by the CRA list/year filter) — it was
+   * never a pré-facturier concern, only placed in that file historically.
+   */
+  app.get(
+    '/api/v1/calendar',
+    { config: { access: forRoles('consultant', 'manager', 'billing') } },
+    () => ({ years: workingCalendar().years }),
+  );
+
+  /**
+   * Item 7 (QA round 1): the consultant filter's own option list, independent of `/api/v1/cras`'
+   * page — a manager's office can hold more Cra rows than one page (item 6 grows a roster past
+   * fifty), so deriving "who can I filter by" from whichever page happens to be loaded would make
+   * the picker's own options depend on which filter is already applied. Manager only, matching
+   * the one caller (`features/cra/components/cra-list-screen.tsx`'s `CraListFilters`, manager-only
+   * itself): billing sees `/api/v1/cras` too, but that screen renders neither a consultant column
+   * nor an "Ouvrir" action for that role, so this filter has nothing on screen for billing to
+   * narrow down yet — granting the read anyway would be capability nothing exercises. Package 14:
+   * moved here from `pre-facturier.ts`, its actual and only consumer (`features/cra/api.ts`) —
+   * the pré-facturier screen never called it.
+   */
+  app.get('/api/v1/consultants', { config: { access: forRoles('manager') } }, async (request) => {
+    const actor = requireActor(request);
+
+    return dependencies.transactionally(async (unit) => {
+      const rosterResponse: ConsultantRosterResponse = {
+        consultants: await new PgReferenceReader(unit.client).consultantsOfOffice(actor.officeId),
+      };
+      return rosterResponse;
+    });
+  });
+
   app.get(
     '/api/v1/cras',
     { config: { access: forRoles('consultant', 'manager', 'billing') } },
@@ -175,7 +296,6 @@ export function registerCraRoutes(app: FastifyInstance, dependencies: ServerDepe
         const craListResponse: CraListResponse = {
           cras: cras.map((cra) => ({
             ...cra,
-            status: cra.status,
             consultantName: consultantNames.get(cra.consultantId) ?? cra.consultantId,
           })),
           total,
@@ -345,10 +465,7 @@ export function registerCraRoutes(app: FastifyInstance, dependencies: ServerDepe
       const validationResponse: ValidationResponse = {
         craId: outcome.craId,
         replayed: outcome.kind === 'replayed',
-        invoices: outcome.invoices.map((invoice) => ({
-          ...invoice,
-          status: invoice.status,
-        })),
+        invoices: outcome.invoices,
         declined: outcome.declined,
       };
       return reply.code(200).send(validationResponse);

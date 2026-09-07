@@ -1,4 +1,4 @@
-import { vatGroupKey } from '@erp/billing';
+import { INVOICE_STATUSES, vatGroupKey } from '@erp/billing';
 import {
   API_PROBLEM_TYPES,
   type InvoiceDetail,
@@ -9,6 +9,7 @@ import {
 } from '@erp/contracts';
 import { isoDateInFirmTimeZone } from '@erp/platform';
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 
 import { issueInvoice } from '../chain/issue-invoice.ts';
 import { preFacturierComposition } from '../composition/pre-facturier.ts';
@@ -19,15 +20,19 @@ import { PgReferenceReader } from '../persistence/reference-reader.ts';
 import { forRoles, requireActor } from '../personas/access.ts';
 import { malformed, parseInput } from '../validation.ts';
 
-import {
-  BAD_REQUEST,
-  CONFLICT,
-  IdempotencyKey,
-  IDEMPOTENCY_KEY_HEADER,
-  IdParam,
-  InvoiceListParams,
-  notFound,
-} from './schemas.ts';
+import { CONFLICT, IdParam, notFound, Pagination, YearQuery } from './schemas.ts';
+
+const InvoiceListParams = Pagination.extend({
+  status: z.enum(INVOICE_STATUSES).optional(),
+  year: YearQuery,
+  search: z.string().trim().min(1).max(100).optional(),
+});
+
+/** This route's own bad-request status: the one place in this file that refuses a request. */
+const BAD_REQUEST = 400;
+
+const IDEMPOTENCY_KEY_HEADER = 'idempotency-key';
+const IdempotencyKey = z.string().min(8).max(200);
 
 export function registerInvoiceRoutes(
   app: FastifyInstance,
@@ -135,7 +140,6 @@ export function registerInvoiceRoutes(
 
           invoices.push({
             ...item,
-            status: item.status,
             consultantName:
               sourceCra === null
                 ? '—'
