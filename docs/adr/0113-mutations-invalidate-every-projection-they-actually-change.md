@@ -102,3 +102,18 @@ all — the reasoning above depends specifically on refusal never touching an in
   shows on any failed refetch (reviewed, not rebuilt): a save that succeeded followed by a refetch
   that fails is visibly an error with a retry action, not a silent inconsistency, and this package
   does not add a second, save-specific error surface for the same outcome.
+- **Amendment, same day, found by advisor review of the commit above (`c2e7bb9`):**
+  `invalidateAfterSaveMonth` awaits its own invalidation before `useSaveMonth`'s `onSuccess`
+  resolves, and `query-core` dispatches a mutation's `success` status only once `onSuccess`
+  settles (`mutation.ts`) — so the grid's own invalidated query refetches, and `CraGridBody`
+  re-renders with the new data, strictly _before_ `handleSubmitMonth`'s
+  `await saveMonth.mutateAsync(...)` continuation runs and calls `setDirty(false)`. The version of
+  `decideGridResync` this ADR originally described saw `dirty: true` for data the grid's own
+  successful save had just produced, and held it as a conflict — confirmed empirically with a
+  `QueryObserver` mounted on the grid's own query key, which saw the refetched data before
+  `invalidateAfterSaveMonth`'s returned promise settled on every run. A consultant who
+  successfully saved would have seen the conflict banner on their own save. Fixed by adding
+  `savePending` (`saveMonth.isPending`) to `decideGridResync`'s input: a reference arriving while
+  `dirty` is `true` and this grid's own save is still in flight is adopted, not held — safe
+  specifically because `canEdit` already locks every edit path for that same window, so there is
+  no newer edit left to protect. Fail-first, confirmed both ways.
