@@ -483,28 +483,90 @@ describe('PgInvoiceRepository', () => {
     // clause actually asks for: seed stored values that *disagree* with what recomputing from
     // the frozen lines/terms would produce, and prove the loaded aggregate reports the stored
     // ones. A live-recompute bug returns the recomputed figures here instead.
+    //
+    // Two groups, one taxable and one not, so this also exercises: (a) `invoice_vat_groups`'
+    // `tax_cents IS NULL` path the migration made representable again, and (b) whether SQL's
+    // `ORDER BY group_key` and `vatBreakdownOf`'s `localeCompare` agree on group order — they are
+    // two different comparators, and the printable prints whatever order `vatBreakdown` returns.
     await seedReferenceData();
 
-    const invoice = makeDraftInvoice();
+    const invoice = Invoice.draft({
+      id: 'invoice-1',
+      officeId: PARIS,
+      seller: SELLER,
+      billedTo: billedParty(parisClient),
+      supplyPeriod: period(2026, 3),
+      lines: [
+        regieLine({
+          designation: 'Prestation taxable — mars 2026',
+          missionId: 'mission-audit',
+          craId: 'cra-1',
+          period: '2026-03',
+          quarterDays: quarterDays(84),
+          tjmCents: 65_000,
+          vat: { kind: 'taxable', basisPoints: 2000 },
+        }),
+        regieLine({
+          designation: 'Prestation hors UE — mars 2026',
+          missionId: 'mission-audit',
+          craId: 'cra-1',
+          period: '2026-03',
+          quarterDays: quarterDays(4),
+          tjmCents: 50_000,
+          vat: { kind: 'notCharged', reason: 'reverseChargeEuB2b' },
+        }),
+      ],
+      terms: TERMS,
+      mentions: MENTIONS,
+      validatedBy: ['bruno'],
+    });
     await repo().save(invoice);
     invoice.issue({ by: 'claire', sequence: 1, issueDate: '2026-04-02' });
     await repo().save(invoice);
 
+    // The order `issue()` itself computed, in memory, before anything is reloaded — the reference
+    // this reload has to match.
+    const orderBeforeReload = invoice.vatBreakdown.map((group) => group.key);
+
     await tx.client.query(
-      `UPDATE billing.invoice_vat_groups SET tax_cents = tax_cents + 999 WHERE invoice_id = 'invoice-1'`,
+      `UPDATE billing.invoice_vat_groups SET tax_cents = tax_cents + 999
+        WHERE invoice_id = 'invoice-1' AND vat_kind = 'taxable'`,
     );
+    // Kept coherent with the mutated group, the way a real correction would be: `#reconstitute`
+    // does not run `assertDocumentAddsUp` today, so this test is not what stops totals and the
+    // recapitulative from disagreeing — it is only proving the recapitulative is read from
+    // storage, not recomputed, and an invoice whose totals disagree with its own lines proves
+    // nothing about that.
     await tx.client.query(
-      `UPDATE billing.invoices SET due_date = '2099-01-01' WHERE id = 'invoice-1'`,
+      `UPDATE billing.invoices
+          SET due_date = '2099-01-01', total_tax_cents = total_tax_cents + 999,
+              total_ttc_cents = total_ttc_cents + 999
+        WHERE id = 'invoice-1'`,
     );
 
     const reloaded = await repo().findById('invoice-1', parisManager);
 
-    // The line is 21 days at 65 000 cents/day, taxed at 20 %: 1 365 000 HT, 273 000 VAT.
+    expect(reloaded!.vatBreakdown.map((group) => group.key)).toStrictEqual(orderBeforeReload);
+    expect(reloaded!.vatBreakdown).toHaveLength(2);
+
+    // The taxable line is 21 days at 65 000 cents/day, taxed at 20 %: 1 365 000 HT, 273 000 VAT.
     // Recomputing from the (unchanged) lines would answer 273 000 — the mutated, stored value is
     // 273 999, and that is what a faithful reload has to answer instead.
-    expect(reloaded!.vatBreakdown).toHaveLength(1);
-    expect(reloaded!.vatBreakdown[0]!.baseCents).toBe(1_365_000);
-    expect(reloaded!.vatBreakdown[0]!.vatCents).toBe(273_999);
+    const taxable = reloaded!.vatBreakdown.find((group) => group.key === 'taxable:2000');
+    expect(taxable?.baseCents).toBe(1_365_000);
+    expect(taxable?.vatCents).toBe(273_999);
+    expect(taxable?.mention).toBeNull();
+
+    // The not-charged line: no tax amount at all — `null`, not the `0` a lossy round-trip through
+    // the pre-migration `tax_cents ?? 0` write would have produced — and a mention derived from
+    // the frozen `reason`.
+    const notCharged = reloaded!.vatBreakdown.find(
+      (group) => group.key === 'notCharged:reverseChargeEuB2b',
+    );
+    expect(notCharged?.baseCents).toBe(50_000);
+    expect(notCharged?.vatCents).toBeNull();
+    expect(notCharged?.mention).toContain('Autoliquidation');
+
     expect(reloaded!.dueDate).toBe('2099-01-01');
   });
 

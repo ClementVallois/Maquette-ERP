@@ -9,10 +9,14 @@
 -- and terms using the *current* code, rather than loading the frozen output the way `totals`
 -- already does.
 --
--- `NOT NULL` with no default, the same way migration 005 added `office_id`: this project always
--- migrates an empty database (there is no persisted production instance, and
--- `migrations-replayed-twice` in CI runs the migrator twice with no seed step between), so there
--- is never a pre-existing row for a defaultless `NOT NULL` to reject.
+-- `NOT NULL` with no default, the same way migration 005 added `office_id`: every CI job that
+-- migrates (`migrations-replayed-twice`, `test-integration`, and Playwright's e2e job) does so
+-- against a service container it just started, before any seed step runs, so a defaultless
+-- `NOT NULL` never meets a pre-existing row there. It does on a developer's own machine if the
+-- local Postgres volume already holds seeded data from before this migration — verified by
+-- hitting exactly that error locally. `pnpm run db:reset` (drop the volume, migrate, reseed) is
+-- the fix, not a default: this mockup has no persisted production instance to protect, so there is
+-- no reason to carry a placeholder value a real row would never read.
 
 -- Seller snapshot — copied at drafting, the same shape and the same timing as billed_to_*.
 ALTER TABLE billing.invoices ADD COLUMN seller_name TEXT NOT NULL;

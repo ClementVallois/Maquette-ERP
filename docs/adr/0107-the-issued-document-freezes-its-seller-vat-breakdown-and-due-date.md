@@ -136,4 +136,9 @@ migration this one already extends.
   `packages/billing/src/infrastructure/pg-invoice-repository.int.test.ts` gained coherence tests
   for the two new frozen fields and a same-instrument-as-`totals` proof: seed a stored value that
   disagrees with what recomputing from the (unchanged) lines/terms would produce, and assert the
-  reload reports the stored one.
+  reload reports the stored one. The repository test uses two VAT groups (one taxable, one not) and
+  asserts the reloaded group order matches `issue()`'s own in-memory order — `vatBreakdownOf` sorts
+  with `localeCompare`, `#loadVatBreakdown` with SQL's `ORDER BY group_key`, two different
+  comparators that happen to agree for this schema's ASCII-only group keys; confirmed empirically,
+  not assumed. If a future group key ever made them diverge, the fix is sorting in JS after the
+  read rather than trusting the column order.
