@@ -33,3 +33,10 @@ export type {
   AssignmentSaved,
 } from './staffing.ts';
 export type { ConsultantEconomics, MissionEconomics } from './economics.ts';
+export type {
+  DeclineReason,
+  PreFacturierCraRow,
+  PreFacturierInvoiceRow,
+  PreFacturierResponse,
+  PreFacturierSummary,
+} from './pre-facturier.ts';

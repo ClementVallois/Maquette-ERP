@@ -1,3 +1,4 @@
+import type { PreFacturierResponse } from '@erp/contracts';
 import { isoDateInFirmTimeZone, periodFromIso } from '@erp/platform';
 import { workingCalendar } from '@erp/timesheet';
 import type { FastifyInstance } from 'fastify';
@@ -12,6 +13,17 @@ import { malformed, parseInput } from '../validation.ts';
 
 import { blockingReasonsOf } from './cra.ts';
 import { ConsultantParams, notFound, PeriodQuery, PreFacturierParams } from './schemas.ts';
+
+/**
+ * `InvoiceListItem.status` (`@erp/billing`) is `string` on the repository's own interface —
+ * accurate for a value that crosses the module boundary as an opaque string, but wider than
+ * `billing.invoices`' own `CHECK (status IN (...))` actually allows. The cast is the one place
+ * that narrows it back to the wire union, the same reasoning `dashboard.ts`'s own
+ * `craActivityStatus`/`invoiceActivityStatus` give for the identical gap on that route.
+ */
+function invoiceRowStatus(status: string): 'draft' | 'issued' | 'cancelledByCreditNote' {
+  return status as 'draft' | 'issued' | 'cancelledByCreditNote';
+}
 
 export function registerPreFacturierRoutes(
   app: FastifyInstance,
@@ -107,7 +119,7 @@ export function registerPreFacturierRoutes(
         }),
       );
 
-      return {
+      const preFacturierResponse: PreFacturierResponse = {
         period: composition.period,
         offeredPeriods: composition.offeredPeriods,
         summary: {
@@ -121,7 +133,10 @@ export function registerPreFacturierRoutes(
           lateDays: composition.lateQuarterDays,
           craCount: composition.pagination.cras.total,
         },
-        invoices: composition.invoices,
+        invoices: composition.invoices.map((row) => ({
+          ...row,
+          status: invoiceRowStatus(row.status),
+        })),
         cras: composition.cras.map((row) => ({
           craId: row.craId,
           consultantId: row.consultantId,
@@ -134,6 +149,7 @@ export function registerPreFacturierRoutes(
         })),
         pagination: composition.pagination,
       };
+      return preFacturierResponse;
     },
   );
 }

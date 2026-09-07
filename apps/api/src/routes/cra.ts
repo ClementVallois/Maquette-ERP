@@ -1,3 +1,4 @@
+import type { DeclineReason } from '@erp/billing';
 import { daysOf, periodFromIso } from '@erp/platform';
 import { workingCalendar } from '@erp/timesheet';
 import type { FastifyInstance } from 'fastify';
@@ -114,7 +115,7 @@ function gridResponseOf(
  * has its own field on the row (`status`, `late`), so it is not repeated here as a string nobody
  * would parse back into those two facts — only a validated Cra's typed decline reasons are.
  */
-export function blockingReasonsOf(row: CraRow): string[] {
+export function blockingReasonsOf(row: CraRow): readonly DeclineReason[] {
   return row.blocking
     .filter(
       (item): item is { quarterDays: number; why: Extract<Blocking, { kind: 'declined' }> } =>
