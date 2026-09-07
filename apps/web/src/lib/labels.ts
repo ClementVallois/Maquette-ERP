@@ -763,7 +763,11 @@ export const LABELS = {
     searchPlaceholder: 'Client ou numéro de facture…',
     searchAction: 'Rechercher',
     year: 'Année',
-    allYears: 'Toutes',
+    /** Item 4, QA round 6: "Toutes" was a `placeholder` on a captioned number input; it is now
+     * the whole visible text of a `Select` trigger, and this screen's status pills already offer
+     * a "Toutes" of their own right below it. Spelled out, which also makes it the same string
+     * `/cra`'s own year filter shows — the `w-48` trigger was sized for exactly this one. */
+    allYears: 'Toutes les années',
     clearFilters: 'Effacer les filtres',
     emptyTitle: 'Aucune facture',
     emptyBody:
