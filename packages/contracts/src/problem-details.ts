@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 /**
  * RFC 9457 `application/problem+json`.
  *
@@ -26,6 +28,27 @@ export interface ProblemDetails {
   /** The chain this refusal belongs to, so a report can be matched to a log line. */
   readonly correlationId?: string;
 }
+
+/**
+ * Package 09: the runtime half of `ProblemDetails` above — kept next to it so a field added to
+ * one is visible beside the other. A non-2xx response with `Content-Type: application/
+ * problem+json` is not, on its own, proof the body is a `ProblemDetails`: an intermediary proxy
+ * (or a future route that gets the header right and the body wrong) can send that content type
+ * over anything. `apps/web/src/lib/api-client.ts` runs every parsed error body through this
+ * schema before trusting `.type` — the field every caller branches on — rather than casting
+ * arbitrary JSON straight to the interface.
+ */
+export const problemDetailsSchema = z.object({
+  type: z.string(),
+  title: z.string(),
+  status: z.number(),
+  detail: z.string().optional(),
+  instance: z.string().optional(),
+  invariant: z.string().optional(),
+  deniedBy: z.string().optional(),
+  errors: z.record(z.string(), z.array(z.string())).optional(),
+  correlationId: z.string().optional(),
+});
 
 /**
  * The refusals the **API** owns, as opposed to the ones a module owns. A domain refusal carries

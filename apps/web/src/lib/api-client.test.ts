@@ -48,6 +48,28 @@ describe('apiFetch', () => {
     expect(result).toStrictEqual({ ok: false, problem });
   });
 
+  it('package 09: does not trust a problem+json body that does not have the shape of a ProblemDetails', async () => {
+    // Content-type says `application/problem+json` and the body parses as JSON — but it is
+    // missing `title`/`status` and `type` is not even a string. This is exactly what an
+    // arbitrary proxy in front of the API (or a future route that gets the shape wrong) can
+    // produce: correct headers, wrong payload. Trusting it unchecked lets a caller branch on
+    // `problem.type` — the whole reason `ProblemDetails.type` exists — against a value nothing
+    // ever validated as a string, let alone a known problem type.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(jsonResponse({ type: 42, oops: true }, 500, 'application/problem+json')),
+      ),
+    );
+
+    const result = await apiFetch('/api/v1/cras');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.problem.type).toBe(CLIENT_PROBLEM_TYPES.unparsableResponse);
+    expect(result.problem.status).toBe(500);
+  });
+
   it('does not throw on a 2xx whose body is not JSON, which Vite’s SPA fallback produces', async () => {
     // A path missing from `vite.config.ts`'s `PROXIED_PATHS` is answered by the dev server itself:
     // status 200, body `index.html`. Parsed as JSON that is a `SyntaxError`, and before this was

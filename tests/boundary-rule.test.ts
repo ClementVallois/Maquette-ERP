@@ -9,6 +9,7 @@ const DEPCRUISE = 'node_modules/.bin/depcruise';
 // this test's "accepts the code that is actually shipped" case pass without ever cruising it.
 const SHIPPED = ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts', 'apps/*/src/**/*.tsx'];
 const DECLARED_ARROW_FIXTURE = ['packages/billing/src/__boundary-fixture__/**/*.ts'];
+const CONTRACTS_ARROW_FIXTURE = ['packages/contracts/src/__boundary-fixture__/**/*.ts'];
 const UNDECLARED_MODULE_FIXTURE = ['packages/__boundary-fixture__/**/*.ts'];
 const APP_FIXTURE = ['apps/__boundary-fixture__/src/**/*.ts'];
 const MODULE_TO_APP_FIXTURE = ['packages/timesheet/src/__boundary-fixture__/**/*.ts'];
@@ -54,6 +55,14 @@ describe('the module boundary rule', { timeout: 30_000 }, () => {
 
     expect(summary.violations.map((violation) => violation.rule.name)).toContain(
       'billing-not-to-timesheet',
+    );
+  });
+
+  it('rejects an import from the shared contract into a business module (package 09, ADR-0110)', () => {
+    const { summary } = cruise(CONTRACTS_ARROW_FIXTURE, '.dependency-cruiser.fixture.cjs');
+
+    expect(summary.violations.map((violation) => violation.rule.name)).toContain(
+      'contracts-has-no-business-dependency',
     );
   });
 

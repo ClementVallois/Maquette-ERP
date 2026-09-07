@@ -29,6 +29,17 @@ module.exports = {
       to: { path: '^(packages/(timesheet|billing|contracts)|apps)/' },
     },
     {
+      name: 'contracts-has-no-business-dependency',
+      severity: 'error',
+      comment:
+        'The wire contract both apps read is not a place either module reaches back into. A ' +
+        'DTO copies a shape at the boundary; it does not import the domain that produces it. ' +
+        'Package 09 of docs/clean-up-audit.consolidated.local.md makes this a named rule rather ' +
+        'than the closed whitelist below enforcing it silently.',
+      from: { path: '^packages/contracts/' },
+      to: { path: '^packages/(timesheet|billing)/' },
+    },
+    {
       name: 'domain-has-no-external-dependency',
       severity: 'error',
       comment:

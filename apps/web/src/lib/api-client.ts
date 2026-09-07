@@ -1,4 +1,4 @@
-import type { ProblemDetails } from '@erp/contracts';
+import { problemDetailsSchema, type ProblemDetails } from '@erp/contracts';
 
 /**
  * A thin, typed fetch wrapper (frontend-plan.md task 3.1). Same-origin (empty base — the Vite
@@ -116,11 +116,27 @@ export async function apiFetch<T>(path: string, request: ApiRequest = {}): Promi
     return { ok: false, problem: unparsableResponseProblem(path, response.status) };
   }
 
+  let errorBody: unknown;
   try {
-    return { ok: false, problem: await parseJson<ProblemDetails>(response) };
+    errorBody = await response.json();
   } catch {
     return { ok: false, problem: unparsableResponseProblem(path, response.status) };
   }
+
+  // Package 09: the content type is not proof of the shape. An intermediary answering the right
+  // header over the wrong body — or a future route this repository gets wrong — must not let an
+  // unvalidated `.type` reach a caller that branches on it as if the API had said it.
+  const parsed = problemDetailsSchema.safeParse(errorBody);
+  if (!parsed.success)
+    return { ok: false, problem: unparsableResponseProblem(path, response.status) };
+
+  // `parsed.data`'s inferred type spells every optional field `T | undefined` — zod cannot know
+  // from the schema alone that a key merely absent from real JSON never carries a literal
+  // `undefined` — where `ProblemDetails`, under this repository's `exactOptionalPropertyTypes`,
+  // spells the same field `T`, present or absent, never explicitly `undefined`. Both describe the
+  // same runtime object; the cast (not a widening one — `parsed.success` just proved the shape)
+  // is the one place that reconciles the two, the same reasoning `parseJson`'s own comment gives.
+  return { ok: false, problem: parsed.data as ProblemDetails };
 }
 
 /**
