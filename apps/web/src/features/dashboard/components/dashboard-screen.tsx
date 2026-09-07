@@ -25,13 +25,9 @@ import type {
   ManagerDashboard,
 } from '../types';
 
-import { BillingChartsPlaceholder } from './billing-charts-placeholder';
 import { CompanyNewsPanel } from './company-news-panel';
 import { ManagerStaffingPanel } from './manager-staffing-panel';
 import { OrgChartPanel } from './org-chart-panel';
-
-/** The dense months the seed actually fills — what an empty period offers as its way out. */
-const MONTHS_WITH_DATA = ['2026-06', '2026-07', '2026-08'] as const;
 
 function DashboardSkeleton(): ReactElement {
   return (
@@ -223,9 +219,15 @@ function RecentActivity({ data }: { readonly data: DashboardResponse }): ReactEl
 /** A5: today's wall-clock month is deliberately blank in the seed (September, reserved for the
  * interactive create/submit/validate journey) — rather than fake data into it, every empty
  * dashboard names the month it is showing and links to the months the seed actually filled. */
-function SeeMonthsWithData({ period }: { readonly period: string }): ReactElement {
+function SeeMonthsWithData({
+  period,
+  availablePeriods,
+}: {
+  readonly period: string;
+  readonly availablePeriods: readonly string[];
+}): ReactElement {
   const labels = LABELS.dashboard.queue;
-  const offered = MONTHS_WITH_DATA.filter((month) => month !== period);
+  const offered = availablePeriods.filter((month) => month !== period).slice(0, 3);
 
   return (
     <div className="flex flex-col gap-2 rounded-xl bg-card p-4 shadow-card ring-1 ring-border">
@@ -524,7 +526,9 @@ export function DashboardScreen({ role, period, personaKey }: DashboardScreenPro
           : {})}
       />
 
-      {isEmpty(data) && <SeeMonthsWithData period={data.period} />}
+      {isEmpty(data) && (
+        <SeeMonthsWithData period={data.period} availablePeriods={data.availablePeriods} />
+      )}
 
       <section className="flex flex-col gap-4">
         <h2 className="text-card-title">{LABELS.dashboard.queue.thisMonth}</h2>
@@ -538,8 +542,6 @@ export function DashboardScreen({ role, period, personaKey }: DashboardScreenPro
       {data.role === 'manager' && (
         <ManagerStaffingPanel personaKey={personaKey} staffing={data.staffing} />
       )}
-      {data.role === 'billing' && <BillingChartsPlaceholder />}
-
       {(data.role === 'consultant' || data.role === 'manager') && <OrgChartPanel />}
 
       <RecentActivity data={data} />

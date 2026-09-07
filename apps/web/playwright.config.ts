@@ -103,7 +103,7 @@ export default defineConfig({
           // (front-end plan Phase 9.6). The build is chained in rather than left to the caller —
           // a `dist/` older than the sources is precisely the failure this Gate exists to catch,
           // and it would pass silently against a stale one.
-          command: `${process.env['CI'] ? '' : 'pnpm run db:reset && '}pnpm --filter @erp/web build && pnpm run api`,
+          command: `${process.env['CI'] ? '' : 'pnpm run db:reset && '}VITE_DEV_ROUTES=1 pnpm --filter @erp/web build && pnpm run api`,
           cwd: '../..',
           url: `${API_URL}/readyz`,
           // `API_PUBLIC_ORIGIN` must be the **browser's** origin, which is 3000 here and 5173 in

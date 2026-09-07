@@ -10,11 +10,11 @@ coverage/
 .DS_Store
 .idea/
 
-# Playwright's own output (apps/web/playwright.config.ts): traces, retries, the HTML report.
-# `tests/visual/review/` is NOT here — those screenshots are for human review (rule 0bis.10 of
-# docs/frontend-plan.md) and are meant to be committed.
+# Playwright's generated output: traces, reports, and local review captures. Only the visual
+# regression baseline is versioned.
 apps/web/tests/visual/test-results/
 apps/web/tests/visual/report/
+apps/web/tests/visual/review/
 apps/web/.playwright-cache/
 
 # Stryker's own working directory and the HTML mutation report it writes (ADR-0027, Phase 7):
@@ -46,3 +46,4 @@ docs/images/
 # figures, the client's name. The repository is public (ADR-0086) and deliberately anonymised
 # ("a cybersecurity consulting firm"); `*.local.md` exists so a stray `git add .` cannot undo that.
 *.local.md
+docs/HANDOFF-qa-round-3.md

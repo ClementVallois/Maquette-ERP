@@ -618,12 +618,9 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     });
   });
 
-  test('a manager refusal (via the pre-existing SSR endpoint) shows the reason, matrix re-editable', async ({
+  test('a manager refusal through the JSON API shows the reason, matrix re-editable', async ({
     page,
   }) => {
-    // `docs/frontend-plan.md` Annexe A names no `/api/v1` refusal route yet (Phase 7 gives the
-    // SPA its own) — the domain and its HTTP surface for a refusal already exist and are already
-    // tested, so driving that real endpoint here is evidence from the real chain.
     await choosePersona(page, 'consultant-paris');
     const before = await fetchGrid(page, EDIT_PERIOD);
     expect(before.status).toBe('submitted');
@@ -634,12 +631,11 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
 
     await switchPersonaViaApi(page, 'manager-paris');
     const reason = 'Le 03/09 doit être reventilé sur un seul projet — motif de démonstration e2e.';
-    const refusal = await page.request.post(`${API_ORIGIN}/pre-facturier/refus/${craId}`, {
-      form: { reason, periode: EDIT_PERIOD },
+    const refusal = await page.request.post(`${API_ORIGIN}/api/v1/cras/${craId}/refusal`, {
+      data: { reason },
       headers: { origin: browserOrigin() },
-      maxRedirects: 0,
     });
-    expect(refusal.status()).toBe(303);
+    expect(refusal.status()).toBe(200);
 
     await switchPersonaViaApi(page, 'consultant-paris');
     await page.goto(`/cra/${EDIT_PERIOD}`);
