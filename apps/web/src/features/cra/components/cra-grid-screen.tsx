@@ -233,6 +233,17 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   }
 
   const saveMonth = useSaveMonth(period);
+  // Package 11's Work item, "make edits during an in-flight save either impossible or safely
+  // preserved": chose impossible, over preserving them, because the alternative is a genuine
+  // correctness hazard, not a UX nicety. `handleSubmitMonth` snapshots `matrix` into `entries`
+  // before the request goes out, then clears `dirty` only once that request *resolves* — an edit
+  // made in between (while `saveMonth.isPending`) would set `dirty` back to `true`, immediately
+  // overwritten `false` by that same resolution moments later, so `decideGridResync` would treat
+  // the still-unsent newer edit as safely saved and let the save's own refetch (reflecting the
+  // *older* snapshot) silently replace it — exactly "a response resets edits the request never
+  // contained." Locking every edit path below on `canEdit` instead of `data.editable` alone
+  // closes the window entirely rather than trying to merge two matrices afterwards.
+  const canEdit = data.editable && !saveMonth.isPending;
 
   // task 6.3's own instruction: "une modification non enregistrée bloque la navigation par une
   // confirmation" — `window.confirm` inside `shouldBlockFn` is a synchronous yes/no, which is
@@ -421,7 +432,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
         <CraProgress completed={completeWorkableDayCount} total={workableGridDays.length} />
       )}
 
-      {data.editable && (
+      {canEdit && (
         <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
           {availableToAdd.length > 0 ? (
             <AddActivityControl missions={availableToAdd} onAdd={handleAddActivity} />
@@ -482,7 +493,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
             </Button>
           </div>
         )}
-        {data.editable && (
+        {canEdit && (
           <div className="flex flex-col gap-2">
             <MobileWeekFill
               key={period}
@@ -518,12 +529,12 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
             days={mobileDays}
             rows={rows}
             matrix={matrix}
-            editable={data.editable}
+            editable={canEdit}
             totalLabel={LABELS.cra.weekTotal}
             cellIdPrefix="mobile"
             flaggedDays={flaggedDays}
             missingDays={missingDays}
-            onChangeCell={data.editable ? updateCell : undefined}
+            onChangeCell={canEdit ? updateCell : undefined}
           />
         </div>
       </div>
@@ -564,19 +575,19 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
           days={desktopView === 'week' ? desktopDays : data.days}
           rows={rows}
           matrix={matrix}
-          editable={data.editable}
+          editable={canEdit}
           compact={desktopView === 'week'}
           totalLabel={desktopView === 'week' ? LABELS.cra.weekTotal : LABELS.cra.monthTotal}
           cellIdPrefix={desktopView === 'week' ? 'desktop-week' : 'month'}
           flaggedDays={flaggedDays}
           missingDays={missingDays}
-          onChangeCell={data.editable ? updateCell : undefined}
+          onChangeCell={canEdit ? updateCell : undefined}
           renderRowTools={
             // Fill/clear/remove act on the whole month (`handleFillRow` reads `workableDays`,
             // `clearRow`/`removeRow` wipe the row month-wide) — offered only on the month view, so
             // a "Total semaine" the user is looking at never moves by more than the row action's
             // own visible effect implies.
-            data.editable && desktopView === 'month'
+            canEdit && desktopView === 'month'
               ? (row) => (
                   <RowTools
                     row={row}
