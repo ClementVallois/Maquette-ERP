@@ -85,6 +85,23 @@ export interface CraRepository {
   count(query: Omit<CraListQuery, 'limit' | 'offset'>): Promise<number>;
   /** Every distinct period visible to the actor, newest first; never derived from a page. */
   listPeriods(actor: Actor): Promise<readonly string[]>;
+  /**
+   * Package 08: one consultant's own distinct refused periods, newest first — `listPeriods`'s
+   * own guarantee, narrowed to one consultant and the `refused` status, never derived from a
+   * page. A `consultantId` outside `own` scope answers empty rather than raising (ADR-0003's
+   * "filtered, not refused" — the same shape every list read already gives).
+   */
+  refusedPeriods(consultantId: ConsultantId, actor: Actor): Promise<readonly string[]>;
+  /**
+   * Package 08: the N most recently status-changed Cras visible to the actor, newest first,
+   * sorted and limited in SQL — never a page's own first N rows re-sorted in the application.
+   */
+  recentActivity(actor: Actor, limit: number): Promise<readonly CraListItem[]>;
+  /**
+   * Package 08: the N oldest-submitted Cras awaiting a decision, visible to the actor, sorted
+   * and limited in SQL for the same reason as `recentActivity`.
+   */
+  awaitingDecision(actor: Actor, limit: number): Promise<readonly CraListItem[]>;
   findByConsultantAndPeriod(
     consultantId: ConsultantId,
     period: Period,

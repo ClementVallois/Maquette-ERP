@@ -190,19 +190,7 @@ export class PgCraRepository implements CraRepository {
       ],
     );
 
-    return rows.map((row) => ({
-      id: row.id,
-      consultantId: row.consultant_id,
-      officeId: row.office_id,
-      period: row.period,
-      status: row.status,
-      // `::int` in the query rather than a string-to-integer helper here: `SUM` is `bigint` and
-      // `pg` hands a `bigint` back as a string, while an `int` arrives as a number. A month of
-      // quarter-days cannot approach the 32-bit bound, and `quarterDays` refuses anything that is
-      // not a whole non-negative count if the cast ever stops holding.
-      recordedQuarterDays: quarterDays(row.recorded_quarter_days),
-      statusChangedAt: row.status_changed_at === null ? null : row.status_changed_at.toISOString(),
-    }));
+    return rows.map(toCraListItem);
   }
 
   /** Rank A12: `list`'s own `WHERE`, minus the join/aggregation a count does not need. */
@@ -257,6 +245,85 @@ export class PgCraRepository implements CraRepository {
     );
 
     return rows.map((row) => row.period);
+  }
+
+  /**
+   * Package 08: the consultant's own distinct refused periods, never derived from a page —
+   * `listPeriods`'s own reasoning, narrowed to one consultant and one status. `own` scope
+   * requires `consultantId` to be the actor's own; a manager or billing actor asking about
+   * someone else answers an empty result rather than raising, the same "filtered, not refused"
+   * shape `list` already gives for a query that reaches outside what the actor may see.
+   */
+  async refusedPeriods(consultantId: ConsultantId, actor: Actor): Promise<readonly string[]> {
+    const scope = readScope(actor, 'cra');
+    if (scope === 'none') return [];
+    if (scope === 'own' && consultantId !== actor.consultantId) return [];
+
+    const { rows } = await this.#client.query<{ period: string }>(
+      `SELECT DISTINCT c.period
+       FROM timesheet.cras c
+       WHERE c.office_id = $1 AND c.consultant_id = $2 AND c.status = 'refused'
+       ORDER BY c.period DESC`,
+      [actor.officeId, consultantId],
+    );
+
+    return rows.map((row) => row.period);
+  }
+
+  /**
+   * Package 08: the dashboard's "recent activity" feed, sorted and limited in SQL rather than
+   * sliced from `list`'s own page — the fix for the audit's "manager counts... derived from
+   * those pages" finding applied to a queue rather than a count.
+   */
+  async recentActivity(actor: Actor, limit: number): Promise<readonly CraListItem[]> {
+    const scope = readScope(actor, 'cra');
+    if (scope === 'none') return [];
+
+    const { rows } = await this.#client.query<CraListRow>(
+      `SELECT c.id, c.consultant_id, c.office_id, c.period, c.status,
+              COALESCE(SUM(l.quarter_days), 0)::int AS recorded_quarter_days,
+              COALESCE(c.validated_at, c.refusal_at, c.submitted_at) AS status_changed_at
+       FROM timesheet.cras c
+       LEFT JOIN timesheet.cra_lines l ON l.cra_id = c.id
+       WHERE c.office_id = $1
+         AND ($2::text IS NULL OR c.consultant_id = $2)
+         AND COALESCE(c.validated_at, c.refusal_at, c.submitted_at) IS NOT NULL
+       GROUP BY c.id, c.consultant_id, c.office_id, c.period, c.status,
+                c.validated_at, c.refusal_at, c.submitted_at
+       ORDER BY status_changed_at DESC
+       LIMIT $3`,
+      [actor.officeId, scope === 'own' ? actor.consultantId : null, limit],
+    );
+
+    return rows.map(toCraListItem);
+  }
+
+  /**
+   * Package 08: the manager's "awaiting a decision" queue, oldest first, sorted and limited in
+   * SQL — the same fix as `recentActivity`, for the other list the dashboard used to slice off
+   * a 200-row page rather than the whole office.
+   */
+  async awaitingDecision(actor: Actor, limit: number): Promise<readonly CraListItem[]> {
+    const scope = readScope(actor, 'cra');
+    if (scope === 'none') return [];
+
+    const { rows } = await this.#client.query<CraListRow>(
+      `SELECT c.id, c.consultant_id, c.office_id, c.period, c.status,
+              COALESCE(SUM(l.quarter_days), 0)::int AS recorded_quarter_days,
+              COALESCE(c.validated_at, c.refusal_at, c.submitted_at) AS status_changed_at
+       FROM timesheet.cras c
+       LEFT JOIN timesheet.cra_lines l ON l.cra_id = c.id
+       WHERE c.office_id = $1
+         AND ($2::text IS NULL OR c.consultant_id = $2)
+         AND c.status = 'submitted'
+       GROUP BY c.id, c.consultant_id, c.office_id, c.period, c.status,
+                c.validated_at, c.refusal_at, c.submitted_at
+       ORDER BY status_changed_at ASC
+       LIMIT $3`,
+      [actor.officeId, scope === 'own' ? actor.consultantId : null, limit],
+    );
+
+    return rows.map(toCraListItem);
   }
 
   async save(cra: Cra): Promise<void> {
@@ -385,6 +452,23 @@ interface CraListRow {
   status: string;
   recorded_quarter_days: number;
   status_changed_at: Date | null;
+}
+
+/** Shared by `list`, `recentActivity` and `awaitingDecision`: one row shape, one mapping. */
+function toCraListItem(row: CraListRow): CraListItem {
+  return {
+    id: row.id,
+    consultantId: row.consultant_id,
+    officeId: row.office_id,
+    period: row.period,
+    status: row.status,
+    // `::int` in the query rather than a string-to-integer helper here: `SUM` is `bigint` and
+    // `pg` hands a `bigint` back as a string, while an `int` arrives as a number. A month of
+    // quarter-days cannot approach the 32-bit bound, and `quarterDays` refuses anything that is
+    // not a whole non-negative count if the cast ever stops holding.
+    recordedQuarterDays: quarterDays(row.recorded_quarter_days),
+    statusChangedAt: row.status_changed_at === null ? null : row.status_changed_at.toISOString(),
+  };
 }
 
 interface CraLineRow {

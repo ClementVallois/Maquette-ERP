@@ -437,6 +437,73 @@ describe('PgCraRepository', () => {
     expect(overOldCap).toHaveLength(65);
   });
 
+  describe('package 08 — scoped aggregates over the complete office, never a page', () => {
+    it("lists every one of a consultant's own refused periods, past the 200-row cap", async () => {
+      await seedOffices();
+      // 210 > MAX_PAGE_SIZE (200): a page-derived `refusedPeriods` (list, filter, map) would drop
+      // the ten oldest — the ones `ORDER BY period DESC` pushes past row 200.
+      await tx.client.query(`
+        INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+        SELECT 'refused-' || g, 'consultant-1', 'office-paris',
+               to_char(DATE '2000-01-01' + (g || ' month')::interval, 'YYYY-MM'), 'refused'
+        FROM generate_series(1, 210) AS g
+      `);
+
+      const periods = await repo().refusedPeriods('consultant-1', parisManager);
+
+      expect(periods).toHaveLength(210);
+      // g=1 -> 2000-02, the oldest — the exact row a 200-row page ordered newest-first would drop.
+      expect(periods).toContain('2000-02');
+    });
+
+    it("answers empty for a consultant outside the actor's own scope", async () => {
+      await seedOffices();
+      await tx.client.query(`
+        INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status)
+        VALUES ('cra-other', 'manager-1', 'office-paris', '2026-06', 'refused')
+      `);
+
+      expect(await repo().refusedPeriods('manager-1', alice)).toStrictEqual([]);
+    });
+
+    it('finds the true most recently status-changed Cra, past the 200-row cap, on its own time axis', async () => {
+      await seedOffices();
+      // Period and `submitted_at` deliberately run in *opposite* directions: `list`'s own page is
+      // ordered by period, not by `statusChangedAt` — a recent-activity feed sliced from that page
+      // would be sorted on the wrong axis entirely, on top of the same cap defect.
+      await tx.client.query(`
+        INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status, submitted_at)
+        SELECT 'recent-' || g, 'consultant-1', 'office-paris',
+               to_char(DATE '2000-01-01' + (g || ' month')::interval, 'YYYY-MM'), 'submitted',
+               TIMESTAMPTZ '2000-01-01' + (g || ' day')::interval
+        FROM generate_series(1, 210) AS g
+      `);
+
+      const recent = await repo().recentActivity(parisManager, 3);
+
+      // g=210 has the latest `submitted_at` — the true most recent, invisible to any read capped
+      // at 200 rows ordered by period (the same axis, ascending here, that g itself walks).
+      expect(recent.map((row) => row.id)).toStrictEqual(['recent-210', 'recent-209', 'recent-208']);
+    });
+
+    it('finds the true oldest-submitted Cra awaiting a decision, past the 200-row cap', async () => {
+      await seedOffices();
+      await tx.client.query(`
+        INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status, submitted_at)
+        SELECT 'await-' || g, 'consultant-1', 'office-paris',
+               to_char(DATE '2000-01-01' + (g || ' month')::interval, 'YYYY-MM'), 'submitted',
+               TIMESTAMPTZ '2000-01-01' + (g || ' day')::interval
+        FROM generate_series(1, 210) AS g
+      `);
+
+      const awaiting = await repo().awaitingDecision(parisManager, 3);
+
+      // g=1 has the earliest `submitted_at` — the oldest decision still pending, the one a
+      // 200-row page (whichever 200 of the 210 it happened to keep) is not guaranteed to contain.
+      expect(awaiting.map((row) => row.id)).toStrictEqual(['await-1', 'await-2', 'await-3']);
+    });
+  });
+
   it('round-trips a refusal, with who refused it and why', async () => {
     // This test used to save a fresh draft and assert its refusal was null, under this name. The
     // three refusal columns of migration 002 were written by nothing and read by nothing.

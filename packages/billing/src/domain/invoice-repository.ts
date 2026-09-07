@@ -79,6 +79,26 @@ export interface InvoiceRepository {
    */
   count(query: Omit<InvoiceListQuery, 'limit' | 'offset'>): Promise<number>;
   /**
+   * Package 08: the exact sum of `totalTtcCents` over `count`'s own filter — never a page's own
+   * arithmetic. Only an `issued` invoice has a frozen `totalTtcCents`; the caller decides which
+   * statuses to include, the same way `count` already leaves that choice to its own caller.
+   */
+  sumTtcCents(query: Omit<InvoiceListQuery, 'limit' | 'offset'>): Promise<number>;
+  /** Package 08: every distinct supply period visible to the actor, newest first; never derived from a page. */
+  listPeriods(actor: Actor): Promise<readonly string[]>;
+  /**
+   * Package 08: the N oldest drafts across every period, sorted and limited in SQL rather than
+   * filtered out of one page ordered newest-first — the defect the audit reproduced by name.
+   * `sourceCraId` is the first Cra that produced this invoice, if any (ADR-0038: an invoice can
+   * have several; the dashboard's own queue names one consultant per row).
+   */
+  oldestDrafts(
+    actor: Actor,
+    limit: number,
+  ): Promise<readonly (InvoiceListItem & { readonly sourceCraId: CraId | null })[]>;
+  /** Package 08: the N most recently issued invoices visible to the actor, sorted and limited in SQL. */
+  recentIssued(actor: Actor, limit: number): Promise<readonly InvoiceListItem[]>;
+  /**
    * `issuanceIdempotencyKey` is written only by an issuance, and only once: the unique index in
    * migration 009 is what makes a retry visible rather than a second numbered document (ADR-0044).
    */

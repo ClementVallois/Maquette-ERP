@@ -268,6 +268,179 @@ describe('PgInvoiceRepository', () => {
     expect(asked).toHaveLength(10);
   });
 
+  /** Package 08: fills every `NOT NULL` column a bulk `generate_series` row needs, one status. */
+  async function bulkInsertInvoices(options: {
+    readonly idPrefix: string;
+    readonly count: number;
+    readonly status: 'draft' | 'issued';
+    readonly supplyPeriod: (g: number) => string;
+    readonly totalTtcCents?: (g: number) => number;
+    readonly issueDate?: (g: number) => string;
+  }): Promise<void> {
+    const rows = Array.from({ length: options.count }, (_unused, index) => {
+      const g = index + 1;
+      const totalTtcCents = options.totalTtcCents?.(g) ?? null;
+      const issueDate = options.issueDate?.(g) ?? null;
+      return { g, supplyPeriod: options.supplyPeriod(g), totalTtcCents, issueDate };
+    });
+
+    for (const row of rows) {
+      await tx.client.query(
+        `INSERT INTO billing.invoices (
+          id, office_id, seller_id, status, supply_period,
+          seller_name, seller_legal_form, seller_share_capital_cents, seller_siren,
+          seller_intra_community_vat_number, seller_rcs_registration,
+          seller_address_street, seller_address_postal_code, seller_address_city,
+          seller_address_country, seller_number_prefix,
+          billed_to_client_id, billed_to_name,
+          billed_to_billing_street, billed_to_billing_postal_code,
+          billed_to_billing_city, billed_to_billing_country,
+          billed_to_delivery_street, billed_to_delivery_postal_code,
+          billed_to_delivery_city, billed_to_delivery_country,
+          payment_terms_kind, payment_terms_days,
+          mentions_operation_category, mentions_early_payment_kind,
+          mentions_late_penalty_rate, mentions_recovery_indemnity, mentions_vat_on_debits,
+          total_ht_cents, total_tax_cents, total_ttc_cents, issue_date
+        )
+        VALUES (
+          $1, 'office-paris', 'entity-fr', $2, $3,
+          'Sécurité & Conseil', 'SAS', 15000000, '493296529', 'FR23493296529',
+          'RCS Paris 493 296 529', '12 rue de la Boétie', '75008', 'Paris', 'FR', 'TST',
+          'client-1', 'Client Test',
+          '1 rue Test', '75001', 'Paris', 'France',
+          '1 rue Test', '75001', 'Paris', 'France',
+          'net', 30, 'services', 'none', 1000, 4000, false,
+          $4, $4, $4, $5
+        )`,
+        [
+          `${options.idPrefix}-${String(row.g)}`,
+          options.status,
+          row.supplyPeriod,
+          row.totalTtcCents,
+          row.issueDate,
+        ],
+      );
+    }
+  }
+
+  describe('package 08 — scoped aggregates over the complete office, never a page', () => {
+    it('sums and counts an office holding more than one page of issued invoices', async () => {
+      await seedReferenceData();
+      // 60 > MAX_PAGE_SIZE (50): a page-derived sum would silently drop ten of these.
+      await bulkInsertInvoices({
+        idPrefix: 'sum',
+        count: 60,
+        status: 'issued',
+        supplyPeriod: () => '2026-03',
+        totalTtcCents: (g) => g * 1000,
+        issueDate: () => '2026-04-01',
+      });
+
+      expect(await repo().count({ actor: parisManager, status: 'issued' })).toBe(60);
+      // Sum of 1000..60000 step 1000 = 1000 * (60 * 61 / 2) = 1_830_000.
+      expect(await repo().sumTtcCents({ actor: parisManager, status: 'issued' })).toBe(1_830_000);
+    });
+
+    it("lists every distinct period, including the office's oldest, past a page of invoices", async () => {
+      await seedReferenceData();
+      // One invoice per period, 60 periods, ordered newest-first by `list` — the 50-newest page
+      // a page-derived `availablePeriods` used to read from would never contain 2020-01..2020-09.
+      await bulkInsertInvoices({
+        idPrefix: 'period',
+        count: 60,
+        status: 'draft',
+        supplyPeriod: (g) =>
+          `${String(2020 + Math.floor((g - 1) / 12))}-${String(((g - 1) % 12) + 1).padStart(2, '0')}`,
+      });
+
+      const periods = await repo().listPeriods(parisManager);
+
+      expect(periods).toHaveLength(60);
+      expect(periods).toContain('2020-01');
+      // Newest first: g=60 -> 2020 + floor(59/12) = 2024, month (59 % 12) + 1 = 12 -> '2024-12'.
+      expect(periods[0]).toBe('2024-12');
+    });
+
+    it('finds the true oldest draft, past a page ordered newest-first', async () => {
+      await seedReferenceData();
+      // 60 distinct periods, oldest is 2020-01 (g=1). The old dashboard code read only the 50
+      // newest (ordered `supply_period DESC`) and sorted *within* that page — the true oldest ten
+      // rows (2020-01..2020-10) never appeared in it.
+      await bulkInsertInvoices({
+        idPrefix: 'oldest',
+        count: 60,
+        status: 'draft',
+        supplyPeriod: (g) =>
+          `${String(2020 + Math.floor((g - 1) / 12))}-${String(((g - 1) % 12) + 1).padStart(2, '0')}`,
+      });
+
+      const oldest = await repo().oldestDrafts(parisManager, 10);
+
+      expect(oldest.map((row) => row.supplyPeriod)).toStrictEqual([
+        '2020-01',
+        '2020-02',
+        '2020-03',
+        '2020-04',
+        '2020-05',
+        '2020-06',
+        '2020-07',
+        '2020-08',
+        '2020-09',
+        '2020-10',
+      ]);
+    });
+
+    it('finds the true most recent issued invoice, past a page ordered newest-first by supply period', async () => {
+      await seedReferenceData();
+      // `list`'s own order is by supply period, not issue date — a page-derived recent-activity
+      // feed built from it would use the wrong axis entirely, on top of the same cap defect.
+      await bulkInsertInvoices({
+        idPrefix: 'recent',
+        count: 60,
+        status: 'issued',
+        supplyPeriod: () => '2026-03',
+        totalTtcCents: (g) => g * 100,
+        issueDate: (g) =>
+          `20${String(20 + Math.floor((g - 1) / 12)).padStart(2, '0')}-${String(((g - 1) % 12) + 1).padStart(2, '0')}-01`,
+      });
+
+      const recent = await repo().recentIssued(parisManager, 3);
+
+      // g=60 is the latest issue date (2024-12-01) — the true most recent, invisible to any read
+      // ordered by supply period (every row here shares the same one).
+      expect(recent.map((row) => row.issueDate)).toStrictEqual([
+        '2024-12-01',
+        '2024-11-01',
+        '2024-10-01',
+      ]);
+    });
+
+    it('paginates a supply-period/client-name tie deterministically — no row skipped or repeated', async () => {
+      await seedReferenceData();
+      // Five invoices sharing (supply_period, billed_to_name): without a unique key in `ORDER
+      // BY`, Postgres makes no ordering guarantee across two separate queries over a tie — this
+      // test did not actually flip red on this small, single-transaction fixture (a stable plan
+      // over an unchanging table tends to return the same physical order regardless), so the
+      // guarantee this proves is by inspection of `ORDER BY`'s own total order (`i.id` is the
+      // primary key, so appending it makes every row comparable and the sort total), not by an
+      // observed race — the `Done when` clause names the property, not a reproduction technique.
+      await bulkInsertInvoices({
+        idPrefix: 'tie',
+        count: 5,
+        status: 'draft',
+        supplyPeriod: () => '2026-03',
+      });
+
+      const page1 = await repo().list({ actor: parisManager, limit: 2, offset: 0 });
+      const page2 = await repo().list({ actor: parisManager, limit: 2, offset: 2 });
+      const page3 = await repo().list({ actor: parisManager, limit: 2, offset: 4 });
+
+      const seenIds = [...page1, ...page2, ...page3].map((row) => row.id);
+      expect(new Set(seenIds).size).toBe(5); // No duplicate.
+      expect(seenIds).toHaveLength(5); // No row missing (2 + 2 + 1).
+    });
+  });
+
   it('list items do not expose Tjm, Cjm or margin', async () => {
     await seedReferenceData();
 

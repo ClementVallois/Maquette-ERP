@@ -124,7 +124,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
            i.billed_to_name ILIKE '%' || $7 || '%'
            OR COALESCE(i.invoice_number, '') ILIKE '%' || $7 || '%'
          ))
-       ORDER BY i.supply_period DESC, i.billed_to_name
+       ORDER BY i.supply_period DESC, i.billed_to_name, i.id
        LIMIT $2 OFFSET $3`,
       [
         actor.officeId,
@@ -166,6 +166,108 @@ export class PgInvoiceRepository implements InvoiceRepository {
     );
 
     return exactInteger('count', rows[0]!.count);
+  }
+
+  /** Package 08: `count`'s own filter, summed instead of counted — one row, however large. */
+  async sumTtcCents(query: Omit<InvoiceListQuery, 'limit' | 'offset'>): Promise<number> {
+    const { actor } = query;
+
+    if (readScope(actor, 'invoice') === 'none') return 0;
+
+    const { rows } = await this.#client.query<{ sum: string | null }>(
+      `SELECT COALESCE(SUM(i.total_ttc_cents), 0) AS sum
+       FROM billing.invoices i
+       WHERE i.office_id = $1
+         AND ($2::text IS NULL OR i.supply_period = $2)
+         AND ($3::text IS NULL OR i.status = $3)
+         AND ($4::text IS NULL OR left(i.supply_period, 4) = $4)
+         AND ($5::text IS NULL OR (
+           i.billed_to_name ILIKE '%' || $5 || '%'
+           OR COALESCE(i.invoice_number, '') ILIKE '%' || $5 || '%'
+         ))`,
+      [
+        actor.officeId,
+        query.period ?? null,
+        query.status ?? null,
+        query.year === undefined ? null : String(query.year),
+        query.search ?? null,
+      ],
+    );
+
+    return exactInteger('sum', rows[0]!.sum ?? '0');
+  }
+
+  /** Package 08: never derived from a page — `PgCraRepository.listPeriods`'s own guarantee. */
+  async listPeriods(actor: Actor): Promise<readonly string[]> {
+    if (readScope(actor, 'invoice') === 'none') return [];
+
+    const { rows } = await this.#client.query<{ supply_period: string }>(
+      `SELECT DISTINCT i.supply_period
+       FROM billing.invoices i
+       WHERE i.office_id = $1
+       ORDER BY i.supply_period DESC`,
+      [actor.officeId],
+    );
+
+    return rows.map((row) => row.supply_period);
+  }
+
+  /**
+   * Package 08: the oldest drafts across every period, sorted and limited in SQL — the defect
+   * the audit reproduced by name (a page ordered newest-first, filtered and re-sorted after the
+   * cap already dropped the true oldest rows). A dedicated `SELECT` rather than
+   * `INVOICE_LIST_SELECT`, which also backs `list`/`findDraftedFrom`/`findIssuedWithKey`, none of
+   * which need `source_cra_ids[1]` — Postgres's 1-based first element, `NULL` on the empty array
+   * `text[] NOT NULL DEFAULT '{}'` (migration 003) guarantees, matching `sourceCraId`'s `| null`.
+   */
+  async oldestDrafts(
+    actor: Actor,
+    limit: number,
+  ): Promise<readonly (InvoiceListItem & { readonly sourceCraId: CraId | null })[]> {
+    if (readScope(actor, 'invoice') === 'none') return [];
+
+    const { rows } = await this.#client.query<
+      InvoiceListRow & { total_ttc_cents: string | null; source_cra_id: string | null }
+    >(
+      `SELECT i.id, i.status, i.supply_period, i.billed_to_name, i.invoice_number, i.issue_date,
+              COALESCE(lt.ht_cents, 0) + COALESCE(vt.tax_cents, 0) AS total_ttc_cents,
+              i.source_cra_ids[1] AS source_cra_id
+       FROM billing.invoices i
+       LEFT JOIN (
+         SELECT invoice_id, SUM(amount_cents) AS ht_cents
+         FROM billing.invoice_lines
+         GROUP BY invoice_id
+       ) lt ON lt.invoice_id = i.id
+       LEFT JOIN (
+         SELECT invoice_id, SUM(tax_cents) AS tax_cents
+         FROM billing.invoice_vat_groups
+         GROUP BY invoice_id
+       ) vt ON vt.invoice_id = i.id
+       WHERE i.office_id = $1 AND i.status = 'draft'
+       ORDER BY i.supply_period ASC, i.billed_to_name ASC, i.id ASC
+       LIMIT $2`,
+      [actor.officeId, limit],
+    );
+
+    return rows.map((row) => ({
+      ...toListItem(row),
+      sourceCraId: row.source_cra_id as CraId | null,
+    }));
+  }
+
+  /** Package 08: the most recently issued invoices, sorted and limited in SQL. */
+  async recentIssued(actor: Actor, limit: number): Promise<readonly InvoiceListItem[]> {
+    if (readScope(actor, 'invoice') === 'none') return [];
+
+    const { rows } = await this.#client.query<InvoiceListRow>(
+      `${INVOICE_LIST_SELECT}
+       WHERE i.office_id = $1 AND i.issue_date IS NOT NULL
+       ORDER BY i.issue_date DESC, i.id DESC
+       LIMIT $2`,
+      [actor.officeId, limit],
+    );
+
+    return rows.map(toListItem);
   }
 
   async save(invoice: Invoice, options?: { issuanceIdempotencyKey: string }): Promise<void> {
