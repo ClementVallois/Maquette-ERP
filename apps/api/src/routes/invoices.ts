@@ -1,11 +1,20 @@
 import { vatGroupKey } from '@erp/billing';
-import { API_PROBLEM_TYPES } from '@erp/contracts';
+import {
+  API_PROBLEM_TYPES,
+  type InvoiceDetail,
+  type InvoiceHistoryResponse,
+  type InvoiceListItem,
+  type InvoiceListResponse,
+  type InvoiceStatus,
+  type IssuanceResponse,
+} from '@erp/contracts';
 import { isoDateInFirmTimeZone } from '@erp/platform';
 import type { FastifyInstance } from 'fastify';
 
 import { issueInvoice } from '../chain/issue-invoice.ts';
 import { preFacturierComposition } from '../composition/pre-facturier.ts';
 import type { ServerDependencies } from '../dependencies.ts';
+import { ApiFailure } from '../errors.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
 import { PgReferenceReader } from '../persistence/reference-reader.ts';
 import { forRoles, requireActor } from '../personas/access.ts';
@@ -21,6 +30,16 @@ import {
   notFound,
 } from './schemas.ts';
 
+/**
+ * `PgInvoiceRepository.list`'s own `InvoiceListItem.status` is `string` — accurate for a value
+ * that crosses the module boundary as an opaque string, but wider than `billing.invoices`' own
+ * `CHECK (status IN (...))` actually allows. The cast is the one place that narrows it back to
+ * the wire union, the same reasoning `dashboard.ts`/`pre-facturier.ts` give for the identical gap.
+ */
+function invoiceRowStatus(status: string): InvoiceStatus {
+  return status as InvoiceStatus;
+}
+
 export function registerInvoiceRoutes(
   app: FastifyInstance,
   dependencies: ServerDependencies,
@@ -33,7 +52,10 @@ export function registerInvoiceRoutes(
       const actor = requireActor(request);
 
       return dependencies.transactionally(async (unit) => {
-        const byYearAndStatus = await unit.invoices.countByYearAndStatus(actor);
+        const byYearAndStatus = (await unit.invoices.countByYearAndStatus(actor)).map((row) => ({
+          ...row,
+          status: invoiceRowStatus(row.status),
+        }));
 
         // `preFacturierComposition` already computes a period's billable HT from the live
         // aggregate rather than a stored (and, for a draft, absent) total — reused here rather
@@ -56,7 +78,8 @@ export function registerInvoiceRoutes(
           });
         }
 
-        return { byYearAndStatus, denseMonths };
+        const historyResponse: InvoiceHistoryResponse = { byYearAndStatus, denseMonths };
+        return historyResponse;
       });
     },
   );
@@ -106,7 +129,7 @@ export function registerInvoiceRoutes(
         // lookup per row's single source Cra (`saveDraft` records exactly one). Sequential, not
         // `Promise.all`: every read here shares the one checked-out client this transaction is
         // (`validate-cra.ts`'s own header explains why overlapping them buys nothing).
-        const invoices = [];
+        const invoices: InvoiceListItem[] = [];
         for (const item of page) {
           const invoice = await unit.invoices.findById(item.id, actor);
           const sourceCraId = invoice?.lines[0]?.origin.craId;
@@ -126,6 +149,7 @@ export function registerInvoiceRoutes(
 
           invoices.push({
             ...item,
+            status: invoiceRowStatus(item.status),
             consultantName:
               sourceCra === null
                 ? '—'
@@ -136,13 +160,14 @@ export function registerInvoiceRoutes(
           });
         }
 
-        return {
+        const listResponse: InvoiceListResponse = {
           invoices,
           total,
           limit: query.value.limit,
           offset: query.value.offset,
           statusCounts,
         };
+        return listResponse;
       });
     },
   );
@@ -215,7 +240,7 @@ export function registerInvoiceRoutes(
         };
       });
 
-      return {
+      const invoiceDetail: InvoiceDetail = {
         id: invoice.id,
         status: invoice.status,
         supplyPeriod: invoice.supplyPeriod,
@@ -236,6 +261,7 @@ export function registerInvoiceRoutes(
         timeline,
         lineage,
       };
+      return invoiceDetail;
     },
   );
   app.post(
@@ -284,13 +310,29 @@ export function registerInvoiceRoutes(
         });
       }
 
-      return reply.code(200).send({
+      // `IssueInvoiceOutcome`'s fields are `| null` on the flat interface because `notFound` and
+      // `keyReused` carry none — both are excluded by the two guards above, and `issueInvoice`'s
+      // own `issued`/`replayed` branches never construct one of these three fields without the
+      // other two. The type does not express that pairing; the check does, loudly, rather than
+      // casting past a `null` that should be structurally impossible here.
+      if (
+        outcome.invoiceNumber === null ||
+        outcome.issueDate === null ||
+        outcome.totalTtcCents === null
+      ) {
+        throw new ApiFailure(
+          `issueInvoice returned kind '${outcome.kind}' with no invoiceNumber/issueDate/totalTtcCents`,
+        );
+      }
+
+      const issuanceResponse: IssuanceResponse = {
         invoiceId: outcome.invoiceId,
         replayed: outcome.kind === 'replayed',
         invoiceNumber: outcome.invoiceNumber,
         issueDate: outcome.issueDate,
         totalTtcCents: outcome.totalTtcCents,
-      });
+      };
+      return reply.code(200).send(issuanceResponse);
     },
   );
 }

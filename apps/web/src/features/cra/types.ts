@@ -1,4 +1,4 @@
-import type { InvoiceListItem } from '@/features/factures/types';
+import type { InvoiceListItem } from '@erp/contracts';
 
 /**
  * `Annexe A — Timesheet`. Shapes verified against the route handlers themselves
@@ -177,12 +177,14 @@ export interface DeclinedDay {
  * convenient: `POST /api/v1/cras/:id/validation` genuinely answers with the invoices the
  * validation drafted (ADR-0038 — one validation drafts one invoice per client), because the
  * composition root is what holds both modules and hands the caller the result of the whole chain.
- * `InvoiceListItem` therefore lives in `features/factures/types.ts`, which owns the invoice, and
- * is imported here — never the reverse. `features/factures` names nothing from this feature, which
- * is the direction that matters: it is the arrow `docs/adr/0001` and the CI boundary rule forbid
- * between the sealed packages, and the SPA's feature folders do not get to invert it for
- * convenience just because dependency-cruiser only polices `packages/`.
- * See `docs/open-questions.md`, row of 24/08/2026.
+ *
+ * `InvoiceListItem` is `@erp/billing`'s record, projected by `packages/contracts/src/invoices.ts`
+ * (package 09, ADR-0111) — imported from `@erp/contracts` directly, not through
+ * `features/factures/types.ts`, which now only re-exports the same contract. Importing another
+ * feature merely to reach a shared wire type is exactly what package 09's own "Done when" clause
+ * rules out; going straight to the contract both features already depend on removes the
+ * cross-feature edge entirely rather than merely documenting why it was one-directional.
+ * See `docs/open-questions.md`, row of 24/08/2026, for the history of that documented arrow.
  */
 export interface ValidationResponse {
   readonly craId: string;
