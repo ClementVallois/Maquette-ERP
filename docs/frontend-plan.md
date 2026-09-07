@@ -77,8 +77,11 @@ MSW, faker, Framer Motion and TanStack Virtual are deliberately excluded.
 ## 2. Cross-phase architecture principles
 
 - **`apps/web` speaks to the backend only over HTTP.** Dependency-cruiser forbids importing
-  `apps/api`. It may import `ProblemDetails` and `API_PROBLEM_TYPES` from the public
-  `@erp/contracts` index.
+  `apps/api`. It may import from the public `@erp/contracts` index — originally just
+  `ProblemDetails` and `API_PROBLEM_TYPES` at the time this plan was written, and since the
+  cleanup audit's package 09 (ADR-0111, 2026-09-07) every resource's response DTOs as well
+  (`session`, `dashboard`, `staffing`, `economics`, `pre-facturier`, `invoices`, `cra`): each
+  feature's `types.ts` now re-exports its shapes from there instead of restating them by hand.
 - Errors are RFC 9457 `application/problem+json`. Branch on `type`, never `status`. Render the
   applicable `detail`, `invariant`, `deniedBy`, field `errors` and `correlationId`.
 - One `src/lib/labels.ts` module holds visible French copy with English keys and `as const`. It is a
@@ -345,7 +348,7 @@ Manager and billing only, scoped to the actor's office. Return:
 ```ts
 {
   period,
-  summary: { billableCents, lateDays, craCount },
+  summary: { billableCents, lateQuarterDays, craCount },
   invoices: [InvoiceListItem],
   cras: [{
     craId, consultantId, consultantName, status, late, recordedQuarterDays,
@@ -353,6 +356,9 @@ Manager and billing only, scoped to the actor's office. Return:
   }]
 }
 ```
+
+> Renamed from `lateDays` to `lateQuarterDays` by the cleanup audit's package 09 (ADR-0111,
+> 2026-09-07): the field always carried quarter-days, never a count of full days.
 
 Assert exact seeded values, no-persona 401, consultant role 403 and Lyon/Paris scope.
 
