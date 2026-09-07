@@ -36,6 +36,7 @@ import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 import { cn } from '@/lib/utils';
 
+import { decideGridResync } from '../grid-resync';
 import { useCraGrid, useSaveMonth } from '../hooks';
 import {
   ABSENCE_ROW_KEY,
@@ -190,7 +191,19 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   // in-memory edit is rebuilt from the server's own answer whenever `data` changes reference — a
   // fresh fetch for a new period, or the refetch a successful save triggers.
   const [syncedWith, setSyncedWith] = useState(data);
-  if (data !== syncedWith) {
+  // Package 11: a fresh `data` reference is no longer proof that this grid's own save is what
+  // produced it — package 10's cross-tab sweep can invalidate this query for a reason that has
+  // nothing to do with these edits. `decideGridResync` (kept pure, its own test file) is the one
+  // place that decides whether to run the reset above unconditionally as before, or to hold the
+  // new reference instead of silently discarding unsaved work.
+  const [pendingRemoteData, setPendingRemoteData] = useState<CraGridResponse | null>(null);
+  const resyncDecision = decideGridResync({
+    incoming: data,
+    syncedWith,
+    dirty,
+    pendingRemoteData,
+  });
+  if (resyncDecision.kind === 'adopt') {
     setSyncedWith(data);
     setMatrix(initMatrix(data));
     setDirty(false);
@@ -198,6 +211,25 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
     setDesktopWeekIndex(0);
     setUndo(null);
     setCopyingPreviousMonth(false);
+    if (pendingRemoteData !== null) setPendingRemoteData(null);
+  } else if (resyncDecision.kind === 'holdAsConflict') {
+    setPendingRemoteData(data);
+  }
+
+  function handleDiscardEditsAndReload(): void {
+    if (pendingRemoteData === null) return;
+    setSyncedWith(pendingRemoteData);
+    setMatrix(initMatrix(pendingRemoteData));
+    setDirty(false);
+    setMobileWeekIndex(0);
+    setDesktopWeekIndex(0);
+    setUndo(null);
+    setCopyingPreviousMonth(false);
+    setPendingRemoteData(null);
+  }
+
+  function handleKeepEditsDismissRemoteConflict(): void {
+    setPendingRemoteData(null);
   }
 
   const saveMonth = useSaveMonth(period);
@@ -585,6 +617,28 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
             setCopyingPreviousMonth(false);
           }}
         />
+      )}
+
+      {pendingRemoteData !== null && (
+        <Alert>
+          <AlertTitle>{LABELS.cra.matrix.remoteUpdateConflictTitle}</AlertTitle>
+          <AlertDescription>
+            <p>{LABELS.cra.matrix.remoteUpdateConflictBody}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button type="button" size="sm" onClick={handleDiscardEditsAndReload}>
+                {LABELS.cra.matrix.remoteUpdateConflictReload}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleKeepEditsDismissRemoteConflict}
+              >
+                {LABELS.cra.matrix.remoteUpdateConflictKeep}
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
       )}
 
       {mutationProblem !== null && (

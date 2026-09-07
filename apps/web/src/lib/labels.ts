@@ -470,6 +470,15 @@ export const LABELS = {
       },
       unsavedChangesConfirm:
         'Des modifications ne sont pas enregistrées sur ce mois. Changer de mois maintenant les perdra. Continuer ?',
+      /** Package 11: a newer answer arrived from the server (another tab, a reconnection, any
+       * invalidation not caused by this grid's own save) while the grid held unsaved edits. The
+       * render-time resync (`ADR-0067`) refuses to overwrite them silently — this banner is the
+       * explicit choice the audit's Work item asks for instead. */
+      remoteUpdateConflictTitle: 'Des données plus récentes sont arrivées du serveur',
+      remoteUpdateConflictBody:
+        'Ce mois a changé côté serveur pendant que vous le modifiiez ici — un autre onglet, ou une reconnexion. Vos modifications non enregistrées ne sont pas perdues, mais elles ne sont pas non plus à jour.',
+      remoteUpdateConflictReload: 'Recharger la version du serveur (perdre mes modifications)',
+      remoteUpdateConflictKeep: 'Garder mes modifications',
       /** A9's progress bar — `{completed}`/`{total}` interpolated, counted over workable days only
        * (`isDayComplete`, `matrix.ts`). */
       workdaysComplete: '{completed}/{total} jours ouvrés complets',

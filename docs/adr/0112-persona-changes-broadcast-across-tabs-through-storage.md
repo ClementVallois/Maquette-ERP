@@ -119,6 +119,23 @@ against the concrete failure, rather than building one now against a hypothetica
 - `App.tsx` gains a second module-load side effect (`installCrossTabPersonaSync(queryClient)`)
   alongside `installSessionGuard`, with the same "wired once, not inside a component body" comment
   extended to cover both.
+- **Amendment, same day, found before the next commit landed:** `invalidateOnPersonaChange` and
+  `installCrossTabPersonaSync` both invalidate _every_ query, by design (`hooks.ts`'s own comment,
+  quoted above, on why there is no per-feature key list) — and `CraGridBody`
+  (`features/cra/components/cra-grid-screen.tsx`) had, until this same day, resynced its whole
+  editable matrix from any new `data` reference on its query unconditionally, on the strength of
+  ADR-0067's assumption that nothing but this grid's own save ever produced one. This package's
+  own blanket sweep broke that assumption: a consultant with unsaved edits, a second tab, and a
+  persona pick in that second tab would have had this tab's grid refetch and silently discard the
+  edit — not a pre-existing gap package 11 was going to find, but a regression this ADR's own
+  decision opened, caught by review before it reached a commit rather than after. Fixed the same
+  day, in the same commit as this ADR: `features/cra/grid-resync.ts`'s `decideGridResync` (its own
+  test file) is the one decision point that now tells `CraGridBody` to hold a conflicting
+  reference instead of adopting it whenever the grid is dirty — package 11's own "preserve dirty
+  state or present an explicit conflict when newer server data arrives," done here, first, because
+  this ADR is what made it reachable. Package 11 itself still owns the same question for every
+  other mutation's invalidation list (dashboard, history, economics) and any other screen that
+  might hold unsaved state the same way.
 - A tab reacting to another tab's broadcast has no way to distinguish a select from a clear (a
   `storage` event's `newValue` is a timestamp, not the mutation's own outcome) — deliberately: it
   reacts the same way either time (`refetchType: 'active'`, then whatever refetches under the new
