@@ -63,6 +63,43 @@ export class PgInvoiceRepository implements InvoiceRepository {
     return this.#reconstitute(row);
   }
 
+  async prepareIssuance(
+    id: InvoiceId,
+    idempotencyKey: string,
+    actor: Actor,
+  ): Promise<{ readonly invoice: Invoice | null; readonly keyOwnerId: InvoiceId | null }> {
+    // The advisory transaction lock closes the race between checking a globally unique key and
+    // writing it. Hash collisions only serialize unrelated requests; they cannot weaken safety.
+    await this.#client.query(
+      `SELECT pg_advisory_xact_lock(hashtext('billing.invoice.issuance'), hashtext($1))`,
+      [idempotencyKey],
+    );
+
+    const { rows: keyRows } = await this.#client.query<{ id: string }>(
+      `SELECT id FROM billing.invoices WHERE issuance_idempotency_key = $1`,
+      [idempotencyKey],
+    );
+    const { rows } = await this.#client.query<InvoiceRow>(
+      `SELECT * FROM billing.invoices WHERE id = $1 FOR UPDATE`,
+      [id],
+    );
+
+    if (rows.length === 0) {
+      return {
+        invoice: null,
+        keyOwnerId: (keyRows[0]?.id as InvoiceId | undefined) ?? null,
+      };
+    }
+
+    const row = rows[0]!;
+    assertMayRead(actor, 'invoice', { officeId: row.office_id, subjectId: null });
+
+    return {
+      invoice: await this.#reconstitute(row),
+      keyOwnerId: (keyRows[0]?.id as InvoiceId | undefined) ?? null,
+    };
+  }
+
   /** Filtered, never refused — the first of ADR-0003's two beats. See `PgCraRepository.list`. */
   async list(query: InvoiceListQuery): Promise<readonly InvoiceListItem[]> {
     const limit = Math.min(query.limit, MAX_PAGE_SIZE);
@@ -238,10 +275,11 @@ export class PgInvoiceRepository implements InvoiceRepository {
     return rows[0]!.found;
   }
 
-  // `source_cra_ids` is deliberately absent from the ON CONFLICT SET list above. It is written by
-  // the INSERT and never updated: `save` does not carry it, so `EXCLUDED.source_cra_ids` is `'{}'`
-  // there, and updating the column would blank the provenance of every invoice at issuance —
-  // taking `hasCraBeenProcessed` and the partial unique index of migration 006 with it.
+  /**
+   * The document a previous issuance already produced under this key, if this actor may see it.
+   * Office-scoped on purpose (ADR-0044); `prepareIssuance` is the issuance-side, globally scoped
+   * check that the unique index actually enforces.
+   */
   async findIssuedWithKey(key: string, actor: Actor): Promise<InvoiceListItem | null> {
     if (readScope(actor, 'invoice') === 'none') return null;
 
@@ -255,6 +293,10 @@ export class PgInvoiceRepository implements InvoiceRepository {
     return row === undefined ? null : toListItem(row);
   }
 
+  // `source_cra_ids` is deliberately absent from the ON CONFLICT SET list below. It is written by
+  // the INSERT and never updated: `save` does not carry it, so `EXCLUDED.source_cra_ids` is `'{}'`
+  // there, and updating the column would blank the provenance of every invoice at issuance —
+  // taking `hasCraBeenProcessed` and the partial unique index of migration 006 with it.
   async #upsertInvoice(
     invoice: Invoice,
     sourceCraIds?: readonly string[],

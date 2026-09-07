@@ -62,6 +62,15 @@ export interface InvoiceRepository {
    * `OutOfScopeError` (ADR-0003, ADR-0023).
    */
   findById(id: InvoiceId, actor: Actor): Promise<Invoice | null>;
+  /**
+   * Serialize one issuance key and lock the target invoice before returning its current state.
+   * `keyOwnerId` is global because the database uniqueness constraint is global too.
+   */
+  prepareIssuance(
+    id: InvoiceId,
+    idempotencyKey: string,
+    actor: Actor,
+  ): Promise<{ readonly invoice: Invoice | null; readonly keyOwnerId: InvoiceId | null }>;
   list(query: InvoiceListQuery): Promise<readonly InvoiceListItem[]>;
   /**
    * Rank A12: `list`'s own `WHERE`, minus `limit`/`offset` — what makes truncation observable
@@ -74,7 +83,10 @@ export interface InvoiceRepository {
    * migration 009 is what makes a retry visible rather than a second numbered document (ADR-0044).
    */
   save(invoice: Invoice, options?: { issuanceIdempotencyKey: string }): Promise<void>;
-  /** The document a previous issuance already produced under this key, if this actor may see it. */
+  /**
+   * The document a previous issuance already produced under this key, if this actor may see it.
+   * Read side only — issuance itself goes through `prepareIssuance`, which is not office-scoped.
+   */
   findIssuedWithKey(key: string, actor: Actor): Promise<InvoiceListItem | null>;
   saveDraft(invoice: Invoice, craId: string): Promise<void>;
   /**
