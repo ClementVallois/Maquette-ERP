@@ -66,6 +66,13 @@ interface ApiRequest {
   readonly method?: ApiMethod;
   readonly body?: unknown;
   readonly headers?: Readonly<Record<string, string>>;
+  /**
+   * Package 10: forwarded verbatim to `fetch()`. Every read hook passes its `queryFn` context's
+   * own `signal` here, so TanStack Query's `cancelRefetch` (on by default whenever a persona
+   * switch invalidates an active query — see `features/session/hooks.ts`) actually aborts the
+   * superseded network request instead of only marking it logically stale while it keeps running.
+   */
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -80,7 +87,7 @@ async function parseJson<T>(response: Response): Promise<T> {
 }
 
 export async function apiFetch<T>(path: string, request: ApiRequest = {}): Promise<ApiResult<T>> {
-  const { method = 'GET', body, headers = {} } = request;
+  const { method = 'GET', body, headers = {}, signal } = request;
 
   let response: Response;
   try {
@@ -93,8 +100,18 @@ export async function apiFetch<T>(path: string, request: ApiRequest = {}): Promi
         ...headers,
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      ...(signal === undefined ? {} : { signal }),
     });
   } catch {
+    // An aborted fetch (TanStack Query's own `cancelRefetch`, once it can reach the network via
+    // `signal`) rejects the same way a genuine network failure does, and is reported the same
+    // way: the caller that owns the signal is the query whose retryer already discarded this
+    // fetch before it could settle (`query-core`'s `resolve`/`reject` are both guarded by
+    // `isResolved()`, set synchronously by `cancel()`), so nothing downstream ever reads this
+    // `ApiResult` — it is manufactured and thrown away. Special-casing abort here to avoid
+    // producing it would only be for a reader's benefit, and this module's own header already
+    // promises "never throws"; adding a second exception to that for a value nobody consumes
+    // is not worth breaking the promise a reader can otherwise take at face value.
     return { ok: false, problem: networkFailureProblem(path) };
   }
 

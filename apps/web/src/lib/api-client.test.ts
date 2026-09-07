@@ -94,6 +94,26 @@ describe('apiFetch', () => {
     expect(result.problem.status).toBe(200);
   });
 
+  it('package 10: forwards a caller-supplied AbortSignal to the underlying fetch', async () => {
+    // Package 10's evidence: `apiFetch` accepted no `AbortSignal`, so TanStack Query's own
+    // cancellation of a superseded persona-scoped fetch (`cancelRefetch`, on by default) never
+    // reached the real network call — the request kept running on the wire after the query that
+    // wanted it had already moved on. This is the one place that closes that gap: whatever signal
+    // the caller passes must be the exact signal `fetch()` receives, not a copy or a new one.
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(jsonResponse({ persona: null }, 200, 'application/json')),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+
+    await apiFetch('/api/v1/session', { signal: controller.signal });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/session',
+      expect.objectContaining({ signal: controller.signal }),
+    );
+  });
+
   it('reports a rejected fetch as the network-failure sentinel, with no status to report', async () => {
     class Refused extends Error {}
     vi.stubGlobal(
