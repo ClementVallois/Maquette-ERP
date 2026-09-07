@@ -149,11 +149,18 @@ test('manager day cards are read-only and the timeline joins dot centres', async
   await choosePersona(page, 'manager-paris');
   // `/cra` filters on `year`/`month`, never `period` (`routes/_shell/cra.index.tsx`'s
   // `CraListSearch`) — and an unknown key degrades silently to "no filter", so `?period=2026-08`
-  // listed every month and `.first()` opened whichever sorted first. It was August the day this
-  // was written and October by the time it ran, which is how a test asserting on `lundi 03`
-  // reached a month whose 3rd is a Saturday. The href is pinned for the same reason.
+  // listed every month and opened whichever sorted first. It was August the day this was written
+  // and October by the time it ran, which is how a test asserting on `lundi 03` reached a month
+  // whose 3rd is a Saturday.
   await page.goto('/cra?year=2026&month=8');
-  await page.locator('a[href^="/cra/2026-08/"]').first().click();
+  // Both halves are pinned, and for one reason: the `lundi 03` assertion below is about one
+  // consultant's August, so both the month and the consultant have to be chosen rather than
+  // inherited from list ordering. `.first()` on either took whatever sorted first.
+  await page
+    .getByRole('row')
+    .filter({ hasText: 'Alice Martin' })
+    .locator('a[href^="/cra/2026-08/"]')
+    .click();
   const cards = page.locator('[data-cra-day-cards]');
   await expect(cards).toBeVisible();
   await expect(cards.getByRole('combobox')).toHaveCount(0);

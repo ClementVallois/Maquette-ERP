@@ -153,13 +153,7 @@ export function DataTable<TData>({
   // One shared origin, not one per row: pointer input is one contact at a time, and `pointerId`
   // below is what ties a row's `pointerup` back to the `pointerdown` that started on that same
   // row, so a drag that starts on one row and releases over another activates neither.
-  const activationOrigin = useRef<{
-    readonly x: number;
-    readonly y: number;
-    readonly t: number;
-    readonly pointerId: number;
-    readonly rowId: string;
-  } | null>(null);
+  const activationOrigin = useRef<RowActivationOrigin | null>(null);
   // `react-hooks/incompatible-library` flags `useReactTable` by name for every caller, React
   // Compiler or not: it is one of three libraries the rule hardcodes (React Hook Form's
   // `useForm`, TanStack Table's `useReactTable`, TanStack Virtual's `useVirtualizer`) because each
