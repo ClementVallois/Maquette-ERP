@@ -360,10 +360,10 @@ describe('PgInvoiceRepository', () => {
     expect(rows[0]!.source_cra_ids).toStrictEqual(['cra-1']);
   });
 
-  it('still reports a CRA as processed after its invoice is issued', async () => {
+  it('still finds the invoice by its source Cra after it is issued', async () => {
     // The consequence of the line above, stated as the invariant rather than as the column:
-    // the idempotency guard has to survive issuance, or a replayed event drafts a duplicate of a
-    // document that has already left.
+    // `source_cra_ids` has to survive issuance, or a replayed validation stops finding the
+    // document it already drafted and reaches the immutable aggregate instead (ADR-0104).
     await seedReferenceData();
 
     const invoice = makeDraftInvoice();
@@ -371,7 +371,8 @@ describe('PgInvoiceRepository', () => {
     invoice.issue({ by: 'claire', sequence: 8, issueDate: '2026-04-02' });
     await repo().save(invoice);
 
-    expect(await repo().hasCraBeenProcessed('cra-1')).toBe(true);
+    const found = await repo().findDraftedFrom('cra-1', parisManager);
+    expect(found.map((item) => item.id)).toStrictEqual([invoice.id]);
   });
 
   it('refuses a second draft from the same CRA after the first was issued', async () => {
@@ -437,23 +438,6 @@ describe('PgInvoiceRepository', () => {
     expect(found!.seller.siren).toBe('493296529');
     expect(found!.seller.numberPrefix).toBe('TST');
     expect(found!.seller.shareCapitalCents).toBe(15_000_000);
-  });
-
-  // ---------------------------------------------------------------------------
-  // Idempotency — ADR-0021
-  // ---------------------------------------------------------------------------
-
-  it('hasCraBeenProcessed returns false for a CRA with no invoice', async () => {
-    await seedReferenceData();
-    expect(await repo().hasCraBeenProcessed('cra-never-seen')).toBe(false);
-  });
-
-  it('hasCraBeenProcessed returns true after saveDraft', async () => {
-    await seedReferenceData();
-
-    const invoice = makeDraftInvoice();
-    await repo().saveDraft(invoice, 'cra-1');
-    expect(await repo().hasCraBeenProcessed('cra-1')).toBe(true);
   });
 
   it('saveDraft throws CraAlreadyProcessedError on duplicate CRA + same client', async () => {

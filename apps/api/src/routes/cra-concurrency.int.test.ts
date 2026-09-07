@@ -193,6 +193,23 @@ async function seedSubmittedCra(id: string): Promise<void> {
   );
 }
 
+/** A 'submitted' Cra with no worked line: `draftInvoicesFrom` produces no invoice at all
+ * (package 03 / ADR-0104's own reproduction case). */
+async function seedSubmittedAbsenceOnlyCra(id: string): Promise<void> {
+  const pool = getPool();
+  craIds.push(id);
+  await pool.query(
+    `INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status, submitted_at)
+     VALUES ($1, $2, $3, '2026-06', 'submitted', '2026-06-30T09:00:00Z')`,
+    [id, CONSULTANT, OFFICE],
+  );
+  await pool.query(
+    `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, quarter_days)
+     VALUES ($1, $2, '2026-06-02', 'absence', NULL, 4)`,
+    [uuidv7(), id],
+  );
+}
+
 async function seedDraftCra(id: string): Promise<void> {
   const pool = getPool();
   craIds.push(id);
@@ -357,6 +374,27 @@ describe('validating a Cra twice — two real connections racing (ADR-0021, ADR-
     expect([first.body.replayed, second.body.replayed].toSorted()).toStrictEqual([false, true]);
 
     expect(await domainEventCount('cra-cc-vv-1')).toBe(1);
+  });
+
+  it('the same, for a Cra whose validation drafts no invoice at all (ADR-0104)', async () => {
+    // The replay check reads `cra.status`, not whether `billing` produced a row (ADR-0104): this
+    // is the case that check has to get right and `hasCraBeenProcessed` could not — a
+    // successful validation with an empty billing outcome, raced against itself.
+    await seedSubmittedAbsenceOnlyCra('cra-cc-vv-2');
+
+    const [first, second] = await Promise.all([
+      post<{ replayed: boolean }>('/api/v1/cras/cra-cc-vv-2/validation', writingAs('manager')),
+      post<{ replayed: boolean }>('/api/v1/cras/cra-cc-vv-2/validation', writingAs('manager')),
+    ]);
+
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(200);
+    expect([first.body.replayed, second.body.replayed].toSorted()).toStrictEqual([false, true]);
+
+    expect(await domainEventCount('cra-cc-vv-2')).toBe(1);
+
+    const cra = await getCra('cra-cc-vv-2');
+    expect(cra.status).toBe('validated');
   });
 });
 

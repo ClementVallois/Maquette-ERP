@@ -78,8 +78,16 @@ export async function validateCraAndDraftInvoices(
 
     // ADR-0021, layer one: the application guard. Replaying answers the **original result**, not
     // a rejection — which needs the documents, and is why the port gained `findDraftedFrom`.
-    // Layer two is the unique index, which only a race can reach.
-    if (await unit.invoices.hasCraBeenProcessed(command.craId)) {
+    // Layer two is `Cra.validate()`'s own immutability check, which only a race can reach now
+    // that this read is locked (ADR-0103) — and which answers *some* status that is not
+    // `submitted`, never specifically "already validated", the day a `refused` Cra reaches here.
+    //
+    // The receipt is the Cra's own persisted status (ADR-0104), not whether `billing` produced a
+    // row: `validate()` is the only path to `status: 'validated'`, so the status already IS the
+    // durable, unique fact ADR-0021 needs — one that is true for a mixed-billing, all-Forfait,
+    // all-declined, or absence-only Cra alike, where "did an invoice appear" is true for exactly
+    // one of those four.
+    if (cra.status === 'validated') {
       return {
         kind: 'replayed',
         craId: command.craId,

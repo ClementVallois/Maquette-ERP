@@ -265,16 +265,6 @@ export class PgInvoiceRepository implements InvoiceRepository {
     }));
   }
 
-  async hasCraBeenProcessed(craId: string): Promise<boolean> {
-    const { rows } = await this.#client.query<{ found: boolean }>(
-      `SELECT EXISTS (
-        SELECT 1 FROM billing.invoices WHERE $1 = ANY(source_cra_ids)
-      ) AS found`,
-      [craId],
-    );
-    return rows[0]!.found;
-  }
-
   /**
    * The document a previous issuance already produced under this key, if this actor may see it.
    * Office-scoped on purpose (ADR-0044); `prepareIssuance` is the issuance-side, globally scoped
@@ -296,7 +286,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
   // `source_cra_ids` is deliberately absent from the ON CONFLICT SET list below. It is written by
   // the INSERT and never updated: `save` does not carry it, so `EXCLUDED.source_cra_ids` is `'{}'`
   // there, and updating the column would blank the provenance of every invoice at issuance —
-  // taking `hasCraBeenProcessed` and the partial unique index of migration 006 with it.
+  // taking `findDraftedFrom` and the partial unique index of migration 006 with it.
   async #upsertInvoice(
     invoice: Invoice,
     sourceCraIds?: readonly string[],

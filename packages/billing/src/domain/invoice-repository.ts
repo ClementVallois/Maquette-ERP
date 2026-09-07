@@ -90,12 +90,6 @@ export interface InvoiceRepository {
   findIssuedWithKey(key: string, actor: Actor): Promise<InvoiceListItem | null>;
   saveDraft(invoice: Invoice, craId: string): Promise<void>;
   /**
-   * Internal invariant check — returns whether any invoice has already been drafted from this CRA.
-   * Not office-scoped: it is a boolean, exposes no data, and scoping it would let a replayed event
-   * draft duplicates in another office's transaction (ADR-0021).
-   */
-  hasCraBeenProcessed(craId: string): Promise<boolean>;
-  /**
    * The invoices already drafted from this Cra. ADR-0021's contract is "replay → original result,
    * not rejection", and a boolean cannot return the original result — this is what lets a replayed
    * validation answer with the documents the first one produced.
