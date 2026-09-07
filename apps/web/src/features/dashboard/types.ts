@@ -52,6 +52,7 @@ export interface DashboardActivity {
 
 export interface ConsultantDashboard {
   readonly period: string;
+  readonly availablePeriods: readonly string[];
   readonly role: 'consultant';
   readonly myMonthStatus: DashboardCraStatus | null;
   readonly recordedQuarterDays: number;
@@ -88,6 +89,7 @@ export interface ManagerStaffing {
 
 export interface ManagerDashboard {
   readonly period: string;
+  readonly availablePeriods: readonly string[];
   readonly role: 'manager';
   readonly pendingDecisions: number;
   readonly billableCents: number;
@@ -114,6 +116,7 @@ export interface BillingQueueRow {
 
 export interface BillingDashboard {
   readonly period: string;
+  readonly availablePeriods: readonly string[];
   readonly role: 'billing';
   readonly draftInvoices: number;
   readonly issuedInvoices: number;

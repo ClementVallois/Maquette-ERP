@@ -247,6 +247,7 @@ describe('GET /api/v1/dashboard — consultant', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toStrictEqual({
       period: '2026-06',
+      availablePeriods: ['2026-06'],
       role: 'consultant',
       myMonthStatus: 'draft',
       recordedQuarterDays: 20,
@@ -285,6 +286,7 @@ describe('GET /api/v1/dashboard — manager', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toStrictEqual({
       period: '2026-06',
+      availablePeriods: ['2026-06'],
       role: 'manager',
       pendingDecisions: 1,
       billableCents: 0,
@@ -328,6 +330,7 @@ describe('GET /api/v1/dashboard — manager', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toStrictEqual({
       period: '2026-06',
+      availablePeriods: ['2026-06'],
       role: 'manager',
       pendingDecisions: 0,
       // 22 days × 800 € = 17 600 € HT.
@@ -522,6 +525,7 @@ describe('GET /api/v1/dashboard — billing', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toStrictEqual({
       period: '2026-06',
+      availablePeriods: ['2026-06'],
       role: 'billing',
       draftInvoices: 0,
       issuedInvoices: 1,

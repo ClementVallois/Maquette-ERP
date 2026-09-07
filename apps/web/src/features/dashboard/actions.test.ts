@@ -5,6 +5,7 @@ import type { BillingDashboard, ConsultantDashboard, ManagerDashboard } from './
 
 const consultant = (overrides: Partial<ConsultantDashboard> = {}): ConsultantDashboard => ({
   period: '2026-06',
+  availablePeriods: ['2026-06'],
   role: 'consultant',
   myMonthStatus: null,
   recordedQuarterDays: 0,
@@ -16,6 +17,7 @@ const consultant = (overrides: Partial<ConsultantDashboard> = {}): ConsultantDas
 
 const manager = (overrides: Partial<ManagerDashboard> = {}): ManagerDashboard => ({
   period: '2026-06',
+  availablePeriods: ['2026-06'],
   role: 'manager',
   pendingDecisions: 0,
   billableCents: 0,
@@ -28,6 +30,7 @@ const manager = (overrides: Partial<ManagerDashboard> = {}): ManagerDashboard =>
 
 const billing = (overrides: Partial<BillingDashboard> = {}): BillingDashboard => ({
   period: '2026-06',
+  availablePeriods: ['2026-06'],
   role: 'billing',
   draftInvoices: 0,
   issuedInvoices: 0,

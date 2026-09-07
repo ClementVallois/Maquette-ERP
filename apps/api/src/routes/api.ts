@@ -85,13 +85,6 @@ const Pagination = z.object({
  */
 const CRA_LIST_MAX_PAGE_SIZE = 200;
 
-/**
- * The three months the seed actually fills densely (`CLAUDE.md`'s dataset-shape section) — Rank
- * A2's history chart names them explicitly rather than deriving "the last three months", which
- * would silently start rendering zeros the day the wall clock moves past August 2026.
- */
-const DENSE_MONTHS = ['2026-06', '2026-07', '2026-08'] as const;
-
 const PeriodQuery = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u) });
 const PreFacturierParams = PeriodQuery.extend({
   craLimit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
@@ -535,7 +528,8 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         // than reimplemented, for the three months the seed actually fills.
         const today = isoDateInFirmTimeZone(dependencies.clock.now());
         const denseMonths = [];
-        for (const period of DENSE_MONTHS) {
+        const recentPeriods = (await unit.cras.listPeriods(actor)).slice(0, 3).toReversed();
+        for (const period of recentPeriods) {
           const composition = await preFacturierComposition(unit, {
             actor,
             requestedPeriod: period,
@@ -932,6 +926,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         return {
           period: query.value.period,
           role: 'consultant' as const,
+          availablePeriods: [...new Set(allCras.map((row) => row.period))].toSorted().toReversed(),
           myMonthStatus: cra?.status ?? null,
           recordedQuarterDays: cra?.lines.reduce((total, line) => total + line.quarterDays, 0) ?? 0,
           // A day short of its four quarter-days still counts as not entered — a day recorded
@@ -1004,6 +999,7 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
         return {
           period: query.value.period,
           role: 'manager' as const,
+          availablePeriods: [...new Set(allCras.map((row) => row.period))].toSorted().toReversed(),
           pendingDecisions: awaitingDecision.length,
           billableCents: composition.billable.reduce(
             (total, row) => total + row.totalExcludingVatCents,
@@ -1097,6 +1093,9 @@ export function registerApiRoutes(app: FastifyInstance, dependencies: ServerDepe
       return {
         period: query.value.period,
         role: 'billing' as const,
+        availablePeriods: [...new Set(everyPeriod.map((invoice) => invoice.supplyPeriod))]
+          .toSorted()
+          .toReversed(),
         draftInvoices: invoices.filter((invoice) => invoice.status === 'draft').length,
         issuedInvoices: invoices.filter((invoice) => invoice.status === 'issued').length,
         totalTtcIssuedCents: invoices

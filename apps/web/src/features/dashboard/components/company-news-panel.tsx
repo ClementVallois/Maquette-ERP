@@ -4,13 +4,12 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { VisibilityToggle } from '@/components/visibility-toggle';
+import { recentCompanyNews } from '@/demo/company-news';
 import { frenchDate } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { readLocalPreference, writeLocalPreference } from '@/lib/local-preference';
 import { useReducedMotion } from '@/lib/use-reduced-motion';
 import { cn } from '@/lib/utils';
-
-import { recentCompanyNews } from '../company-news';
 
 const ROTATE_MS = 6000;
 
