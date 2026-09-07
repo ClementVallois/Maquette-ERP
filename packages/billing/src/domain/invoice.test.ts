@@ -412,6 +412,16 @@ describe('issuing an invoice', () => {
     });
   });
 
+  it('is immune to a cast-based field mutation on the frozen totals (package 07, ADR-0108)', () => {
+    const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
+    invoice.issue({ by: 'claire', sequence: 1, issueDate: '2026-04-02' });
+
+    const stolenTotals = invoice.totals as { totalIncludingVatCents: number };
+    stolenTotals.totalIncludingVatCents = 1;
+
+    expect(invoice.totals.totalIncludingVatCents).toBe(78_000);
+  });
+
   it('is cancelled only from issued, and keeps everything it printed', () => {
     const draft = invoiceOf([lineOf(65_000, STANDARD)]);
 
@@ -591,6 +601,17 @@ describe('Invoice.reconstitute', () => {
     });
 
     expect(issued.vatBreakdown).toHaveLength(1);
+  });
+
+  it('does not alias the totals row supplied to reconstitute (package 07, ADR-0108)', () => {
+    // The "in" direction of the same claim `vatBreakdown` already covers above: a caller mutating
+    // the row it handed to the repository after the call must not reach the aggregate either.
+    const totals = { ...ISSUED.totals };
+    const issued = persistedInvoice({ ...ISSUED, totals });
+
+    (totals as { totalIncludingVatCents: number }).totalIncludingVatCents = 1;
+
+    expect(issued.totals.totalIncludingVatCents).toBe(120_000);
   });
 
   it('names every missing field at once, not the first one', () => {

@@ -127,12 +127,22 @@ directly — `seller`, `billedTo`, `terms`, `mentions`, `lines`, `vatBreakdown` 
 built the same way, matching the shape `get lines()`/`get validatedBy()` already had for arrays
 before this ADR.
 
-`DocumentTotals` (`invoice.totals`) is deliberately **not** added to this list: the audit's "Done
-when" clause names addresses, line origins, VAT treatments and timestamps, not totals, and unlike
-the others `#totals` is never assigned from a caller-supplied reference — `issue()` stores a value
-it just computed itself (`totalsOf(this.#lines)`), and reconstitution stores a value the repository
-row-mapper builds fresh per read. There is no code path today that hands a `DocumentTotals` object
-to two owners. If one appears, this is the same shape of gap and the same fix.
+**Self-correction (per ADR-0045):** an earlier version of this ADR left `DocumentTotals`
+(`invoice.totals`) out of the list above, reasoning that the audit's "Done when" clause names
+addresses, line origins, VAT treatments and timestamps, not totals, and that `#totals` is never
+assigned from a caller-supplied reference. That reasoning addressed only the "in" direction. The
+lead clause the audit actually states is broader — "mutating supplied inputs or **returned values**
+cannot change a validated CRA or issued invoice" — and the list of examples is introduced with
+"including," which is illustrative, not exhaustive. `get totals()` returned `this.#totals` directly
+once issued, the exact object the private field points at, on every call: `(invoice.totals as {
+totalIncludingVatCents: number }).totalIncludingVatCents = 1` reached and changed the issued
+aggregate's own frozen total with no cast on the field itself, only on the object the getter handed
+out — the same class of bug this whole ADR exists to close, on the fifth surface rather than four.
+A probe test written against it failed immediately, the same way the `Invoice.billedTo`-side probe
+did in the second pass above. Fixed the same way as `vatBreakdown`: `get totals()` now returns
+`{ ...this.#totals }` once frozen (a fresh object from `totalsOf` before issuance needs no copy),
+and `reconstitute` copies `input.totals` on the way in rather than aliasing the repository
+row-mapper's object, closing both directions symmetrically with the rest of this ADR.
 
 ## Rejected option
 
@@ -181,3 +191,8 @@ option above should be revisited instead.
   back; the upsert regression test gained the same assertion for `submittedAt`.
 - `CreditNote` needed no change of its own — reviewed and confirmed to carry no `Date` and to source
   every array/object field from `Invoice` getters, all of which now copy.
+- Two more probes were added for the self-correction: a cast-based mutation of `invoice.totals`
+  after `issue()` (confirmed failing before the `get totals()` fix, passing after), and an "in the
+  door" test mutating a `totals` object handed to `Invoice.reconstitute` after the call (confirmed
+  failing before the `reconstitute` fix, passing after) — the same in/out pair the rest of this ADR
+  proves for every other value shape.

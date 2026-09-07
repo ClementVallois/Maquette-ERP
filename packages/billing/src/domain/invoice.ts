@@ -214,7 +214,7 @@ export class Invoice {
     invoice.#number = input.number;
     invoice.#issueDate = input.issueDate;
     invoice.#series = input.series;
-    invoice.#totals = input.totals;
+    invoice.#totals = input.totals === null ? null : { ...input.totals };
     invoice.#vatBreakdown =
       input.vatBreakdown === null ? null : input.vatBreakdown.map(copyVatGroup);
     invoice.#dueDate = input.dueDate;
@@ -299,7 +299,9 @@ export class Invoice {
    * issued, and a total that recomputes is a total that can change.
    */
   get totals(): DocumentTotals {
-    return this.#totals ?? totalsOf(this.#lines);
+    // Copied (package 07): once issued, `#totals` is the same flat object on every call.
+    // `totalsOf` below computes a fresh object before issuance, so only the frozen branch needs it.
+    return this.#totals === null ? totalsOf(this.#lines) : { ...this.#totals };
   }
 
   get number(): string | null {
