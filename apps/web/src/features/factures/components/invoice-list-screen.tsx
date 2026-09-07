@@ -20,6 +20,7 @@ import { frenchEuros, frenchMonth } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 
+import { invoiceDestination } from '../destination';
 import { useInvoiceList } from '../hooks';
 import type { InvoiceListItem, InvoiceStatus } from '../types';
 
@@ -50,26 +51,6 @@ function TableSkeleton(): ReactElement {
       <Skeleton className="h-11 w-full" />
     </div>
   );
-}
-
-/**
- * The one destination a row of this table can open, shared between the `actions` column's own
- * `Link` (the keyboard/screen-reader path) and `DataTable`'s `onRowActivate` (the pointer-tap
- * convenience on top of it) — one place, so the two can never point two different directions.
- */
-function invoiceDestination(
-  row: InvoiceListItem,
-  returnTo: string,
-): {
-  readonly to: '/factures/$id';
-  readonly params: { readonly id: string };
-  readonly search: { readonly client: string; readonly period: string; readonly from: string };
-} {
-  return {
-    to: '/factures/$id',
-    params: { id: row.id },
-    search: { client: row.billedToName, period: row.supplyPeriod, from: returnTo },
-  };
 }
 
 function columns(returnTo: string): ColumnDef<InvoiceListItem>[] {

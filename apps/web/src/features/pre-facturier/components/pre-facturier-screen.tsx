@@ -32,6 +32,7 @@ import {
 import { ValidateResultDialog } from '@/features/cra/components/validate-result-dialog';
 import { useValidateCra } from '@/features/cra/hooks';
 import type { CraStatus, ValidationResponse } from '@/features/cra/types';
+import { invoiceDestination } from '@/features/factures/destination';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
 import { frenchDate, frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
@@ -108,26 +109,6 @@ function PeriodSelector({ period, offered }: PeriodSelectorProps): ReactElement 
       </Select>
     </div>
   );
-}
-
-/**
- * The one destination the "billable" table's row opens, shared between the `open` column's own
- * `Link` (the keyboard/screen-reader path) and `DataTable`'s `onRowActivate` (the pointer-tap
- * convenience) — one place, so the two can never point two different directions.
- */
-function invoiceDestination(
-  row: PreFacturierInvoiceRow,
-  returnTo: string,
-): {
-  readonly to: '/factures/$id';
-  readonly params: { readonly id: string };
-  readonly search: { readonly client: string; readonly period: string; readonly from: string };
-} {
-  return {
-    to: '/factures/$id',
-    params: { id: row.id },
-    search: { client: row.billedToName, period: row.supplyPeriod, from: returnTo },
-  };
 }
 
 function invoiceColumns(returnTo: string): ColumnDef<PreFacturierInvoiceRow>[] {
