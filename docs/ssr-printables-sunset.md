@@ -121,4 +121,6 @@ Revisit if **any** of these becomes true:
 
 Whether the invoice printable's `table.lines` should scroll or reflow at 360px — it currently
 overflows the viewport horizontally (found 06/09/2026, pre-existing, untouched). That is a bug in a
-page we are keeping, and it is tracked separately from this question.
+page we may be keeping, and it is tracked as its own row in
+[`docs/open-questions.md`](open-questions.md) dated 07/09/2026 — tied to this question rather than
+separate from it, because a printable being replaced does not get a responsive fix.
