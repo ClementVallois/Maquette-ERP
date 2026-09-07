@@ -65,13 +65,13 @@ export function BusinessTimeline({
             {index < items.length - 1 && (
               <span
                 aria-hidden="true"
-                className="absolute top-4 bottom-0 left-[0.4375rem] w-px bg-border"
+                className="absolute top-2.5 -bottom-2.5 left-2 w-px -translate-x-1/2 bg-border"
               />
             )}
             <span
               aria-hidden="true"
               className={cn(
-                'relative mt-1 size-3 rounded-full ring-4 ring-background',
+                'relative mt-1 size-3 justify-self-center rounded-full ring-4 ring-background',
                 item.dotClassName ?? 'bg-primary',
               )}
             />

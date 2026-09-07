@@ -30,7 +30,7 @@ import { CompanyNewsPanel } from './company-news-panel';
 import { ManagerStaffingPanel } from './manager-staffing-panel';
 import { OrgChartPanel } from './org-chart-panel';
 
-/** The dense months the seed actually fills — A5's escape hatch off a genuinely blank one. */
+/** The dense months the seed actually fills — what an empty period offers as its way out. */
 const MONTHS_WITH_DATA = ['2026-06', '2026-07', '2026-08'] as const;
 
 function DashboardSkeleton(): ReactElement {
@@ -222,18 +222,20 @@ function RecentActivity({ data }: { readonly data: DashboardResponse }): ReactEl
 
 /** A5: today's wall-clock month is deliberately blank in the seed (September, reserved for the
  * interactive create/submit/validate journey) — rather than fake data into it, every empty
- * dashboard offers a direct link to a month the seed actually filled. */
+ * dashboard names the month it is showing and links to the months the seed actually filled. */
 function SeeMonthsWithData({ period }: { readonly period: string }): ReactElement {
   const labels = LABELS.dashboard.queue;
   const offered = MONTHS_WITH_DATA.filter((month) => month !== period);
 
   return (
     <div className="flex flex-col gap-2 rounded-xl bg-card p-4 shadow-card ring-1 ring-border">
-      <p className="text-sm text-muted-foreground">{labels.emptyMonthNotice}</p>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">{labels.seeMonthsWithData}</span>
+      <p className="text-sm text-muted-foreground">
+        {labels.emptyMonthNotice.replace('{month}', frenchMonth(period))}
+      </p>
+      <span className="text-xs text-muted-foreground">{labels.seeAnotherPeriod}</span>
+      <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-3 sm:flex sm:flex-wrap">
         {offered.map((month) => (
-          <Button asChild key={month} size="sm" variant="outline">
+          <Button asChild key={month} size="sm" variant="outline" className="min-h-11 sm:min-h-8">
             <Link to="/tableau-de-bord" search={{ period: month }}>
               {frenchMonth(month)}
             </Link>

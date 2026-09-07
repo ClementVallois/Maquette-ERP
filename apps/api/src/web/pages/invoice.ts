@@ -235,7 +235,6 @@ function mentionsBlock(invoice: Invoice): Html {
 function originBlock(invoice: Invoice): Html {
   return html`<section class="origin">
     <h2>${LABELS.invoice.origin}</h2>
-    <p class="hint">${LABELS.invoice.originNote}</p>
     <ul>
       ${invoice.lines.map(
         (line) =>
@@ -264,7 +263,6 @@ function issuanceForm(view: InvoiceView): Html | null {
   }
 
   return html`<section class="no-print">
-    <p class="hint">${LABELS.invoice.issueNote}</p>
     <form method="post" action="${`${PATHS.issueInvoice}/${view.invoice.id}`}">
       <input type="hidden" name="idempotencyKey" value="${key}" />
       <button type="submit">${LABELS.invoice.issue}</button>
@@ -279,7 +277,14 @@ export function invoicePage(view: InvoiceView, persona: Persona | undefined): Ht
     number === null ? LABELS.invoice.draftHeading : `${LABELS.invoice.heading} ${number}`;
 
   return shell(
-    { title: heading, persona },
+    {
+      title: heading,
+      persona,
+      crumb: {
+        href: `${PATHS.preFacturier}?period=${invoice.supplyPeriod}`,
+        label: LABELS.preFacturier.nav,
+      },
+    },
     html`<article class="document">
       <div class="letterhead">
         <h1>${heading}</h1>
@@ -306,11 +311,6 @@ export function invoicePage(view: InvoiceView, persona: Persona | undefined): Ht
       <div class="parties">${sellerBlock(invoice.seller)} ${billedToBlock(invoice)}</div>
       ${lineTable(invoice)} ${vatTable(invoice.vatBreakdown, invoice)} ${mentionsBlock(invoice)}
       ${originBlock(invoice)} ${issuanceForm(view)}
-      <p class="actions no-print">
-        <a href="${`${PATHS.preFacturier}?period=${invoice.supplyPeriod}`}"
-          >${LABELS.margin.back}</a
-        >
-      </p>
     </article>`,
   );
 }

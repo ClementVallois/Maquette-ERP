@@ -46,7 +46,7 @@ export function ErrorState({
   }
 
   return (
-    <div className="flex w-full max-w-md flex-col items-center gap-3 rounded-xl bg-card p-8 text-center shadow-card ring-1 ring-border">
+    <div className="mx-auto flex w-full max-w-md flex-col items-center gap-3 rounded-xl bg-card p-8 text-center shadow-card ring-1 ring-border">
       <OctagonAlertIcon aria-hidden="true" className="size-8 text-destructive" />
       <h1 className="text-card-title">{title}</h1>
       <p className="text-sm text-muted-foreground">{body}</p>

@@ -57,7 +57,7 @@ test.beforeAll(async ({ baseURL }) => {
   }
 });
 
-const WIDTHS = [375, 768, 1024, 1440] as const;
+const WIDTHS = [360, 375, 768, 1024, 1440] as const;
 
 /**
  * Every screen reachable without writing anything, per persona. The two parameterised routes are
@@ -199,7 +199,7 @@ async function settle(page: Page): Promise<void> {
 
 for (const width of WIDTHS) {
   test.describe(`nothing overflows the shell at ${String(width)}px`, () => {
-    test.use({ viewport: { width, height: 812 } });
+    test.use({ viewport: { width, height: width === 360 ? 760 : 812 } });
 
     for (const [persona, routes] of ROUTES) {
       test(`${persona}: ${routes.join(', ')}`, async ({ page }) => {
@@ -215,7 +215,7 @@ for (const width of WIDTHS) {
   });
 
   test.describe(`the two parameterised screens at ${String(width)}px`, () => {
-    test.use({ viewport: { width, height: 812 } });
+    test.use({ viewport: { width, height: width === 360 ? 760 : 812 } });
 
     test('an invoice, opened from the list it belongs to', async ({ page }) => {
       await choosePersona(page, 'billing-paris');

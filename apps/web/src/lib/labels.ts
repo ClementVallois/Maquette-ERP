@@ -116,6 +116,7 @@ export const LABELS = {
     sessionInvalidatedTitle: 'Session interrompue',
     heading: 'Choisir un persona',
     choose: 'Prendre ce rôle',
+    loading: 'Ouverture…',
     current: 'Persona en cours',
     change: 'Changer de persona',
     none: 'Aucun persona sélectionné',
@@ -212,9 +213,12 @@ export const LABELS = {
       ageToday: 'Aujourd’hui',
       ageOneDay: 'Depuis 1 jour',
       ageManyDays: 'Depuis {days} jours',
-      emptyMonthNotice:
-        'Ce mois ne contient aucune donnée : c’est un mois en cours, pas un défaut.',
-      seeMonthsWithData: 'Voir un mois avec des données',
+      /** `{month}` interpolated at the call site, and never at the start of the sentence:
+       * `frenchMonth` returns a lowercase month name. States a fact about the data and nothing
+       * about the mockup — an empty month in progress is what a real ERP shows, and it does not
+       * reassure the reader that the emptiness is not a bug. */
+      emptyMonthNotice: 'Aucune donnée pour {month}.',
+      seeAnotherPeriod: 'Consulter une autre période',
       /** F10: billing's own queue is bounded — "the ten oldest drafts", not every draft — so the
        * heading needs to say so and point at where the rest live. */
       oldestDraftsNote: 'Les dix brouillons les plus anciens, toutes périodes.',
@@ -401,9 +405,30 @@ export const LABELS = {
       previousWeek: 'Semaine précédente',
       nextWeek: 'Semaine suivante',
       weekPosition: 'Semaine {current} sur {count}',
+      /** The same fact in the width the mobile action bar has for it — `3/5`. Visible text only:
+       * `weekPosition` above stays the accessible name, so a screen reader never reads a bare
+       * fraction. */
+      weekPositionShort: '{current}/{count}',
       fillEmptyWorkdays: 'Remplir les jours ouvrés vides',
+      fillWeek: 'Remplir cette semaine',
+      fillWeekActivity: 'Activité à remplir',
+      fillWeekHint:
+        '1 j par jour ouvré vide et affecté, dans la semaine affichée. Les saisies existantes sont conservées.',
+      fillWeekCountOne: '1 jour à remplir',
+      fillWeekCountMany: '{count} jours à remplir',
+      fillWeekEmpty: 'Aucun jour ouvré vide à remplir pour cette activité cette semaine.',
+      emptyMonth: 'Le mois est vide',
+      copyMonthPrompt: 'Reprendre les missions de {month} ?',
+      previewPreviousMonth: 'Voir la proposition',
       clearRow: 'Vider la ligne',
       removeRow: 'Retirer la ligne',
+      /** Mobile counterpart of the desktop row tools, which hang off a table row the day cards do
+       * not have. The hint states the rule the trash button's `disabled` otherwise leaves
+       * unexplained — desktop hides the button instead, and a hidden control is what the reader
+       * reported as "no way to remove a mission". */
+      manageRows: 'Gérer les lignes de la grille',
+      removeRowHint:
+        'Une mission ne peut être retirée que si elle ne porte aucune saisie sur le mois.',
       addActivity: 'Ajouter une activité',
       addActivityPlaceholder: 'Ajouter une mission…',
       noActivityToAdd: 'Toutes les missions affectées ce mois-ci figurent déjà dans la grille.',
@@ -461,9 +486,10 @@ export const LABELS = {
       viewLabel: 'Affichage du tableau',
       viewMonth: 'Mois',
       viewWeek: 'Semaine',
-      /** O7: single-level undo on the row tools' own "remplir"/"vider" — the button reads
-       * "{undo} — {action}", `action` being `fillEmptyWorkdays`/`clearRow` re-used verbatim with
-       * the row's name appended, so this key stays the one bare word. */
+      /** O7: single-level undo on the row tools' own "remplir"/"vider". The button reads
+       * "{undo} : {action}", `action` being `fillEmptyWorkdays`/`clearRow`/`fillWeek` re-used
+       * verbatim; the row it applied to is appended to the accessible name only, so the visible
+       * text stays short enough to read on a phone. */
       undo: 'Annuler',
       /** O6 — "Copier le mois précédent", with a preview (`copy-previous-month-dialog.tsx`): never
        * overwrites a cell already carrying something, built on the row tools' own
@@ -561,7 +587,7 @@ export const LABELS = {
     summaryLate: 'Jours en retard',
     summaryCras: 'CRA du mois',
     lateNote:
-      'Jours saisis sur un mois clos dont le CRA n’est pas encore validé. Le mois en cours affiche zéro : rien n’y est en retard, puisque rien n’y est encore dû.',
+      'Jours saisis sur un mois clos dont le CRA n’est pas encore validé. Le mois en cours affiche zéro : rien n’est en retard, puisque rien n’est encore dû.',
     lateNoneYet: 'Mois en cours — rien n’est encore dû.',
     lateTag: 'En retard',
     awaitingManager: 'En attente de validation par le manager',
@@ -651,7 +677,7 @@ export const LABELS = {
     open: 'Ouvrir la facture',
     openFor: 'de {name}',
     draftNotice:
-      'Ce document n’est pas une facture : il n’a ni numéro ni date d’émission. Il est produit à partir d’un CRA validé, donc déjà figé — mais son statut et ses montants restent provisoires tant qu’il n’est pas émis. Il devient une facture à l’émission, et plus rien n’y bouge ensuite.',
+      'Ce document n’est pas une facture : il n’a ni numéro ni date d’émission. Il est produit à partir d’un CRA validé, donc déjà figé — mais son statut et ses montants restent provisoires tant qu’il n’est pas émis. Il devient une facture à l’émission, et plus rien ne bouge ensuite.',
     seller: 'Émetteur',
     billedTo: 'Facturé à',
     deliveryAddress: 'Adresse de livraison',
@@ -693,9 +719,8 @@ export const LABELS = {
     shareCapital: 'Capital social',
     origin: 'Origine des lignes',
     originLine: 'CRA {cra} — {period} — {mission}',
-    originNote:
-      'Chaque ligne porte le CRA dont elle vient : c’est ce lien, et non une déclaration, qui matérialise la piste d’audit fiable (art. 289-VII du CGI).',
     lineage: {
+      sourceDates: '{count} dates travaillées',
       heading: 'Filiation des montants',
       lead: 'Dépliez une ligne pour suivre son calcul depuis les jours saisis jusqu’au total de la facture.',
       line: 'Ligne {number}',
@@ -710,8 +735,6 @@ export const LABELS = {
     validatedBy: 'Validé par',
     notCharged: 'Non soumis à TVA',
     issue: 'Émettre la facture',
-    issueNote:
-      'L’émission alloue un numéro dans une série sans trou et fige le document : rien n’y bouge ensuite. Le formulaire porte sa clé d’idempotence, pour qu’un renvoi ne brûle pas un second numéro.',
     cannotIssue:
       'Cette facture est déjà émise : elle porte un numéro et une date, et une facture émise ne se modifie pas.',
 
@@ -783,6 +806,15 @@ export const LABELS = {
     from: 'Du',
     to: 'Au',
     chooseConsultant: 'Choisir un consultant…',
+    searchConsultant: 'Rechercher un consultant',
+    searchPlaceholder: 'Nom du consultant…',
+    noSearchResults: 'Aucun consultant ne correspond à cette recherche.',
+    clearConsultant: 'Effacer le consultant sélectionné',
+    consultantRequired: 'Choisissez un consultant avant d’enregistrer.',
+    selection: 'Consultant et mission',
+    dates: 'Période d’affectation',
+    endHint: 'Facultatif : laissez vide pour une affectation sans date de fin.',
+    missionDates: 'Dates de la mission',
     chooseMission: 'Choisir une mission…',
     create: 'Affecter',
     save: 'Enregistrer',
@@ -901,7 +933,7 @@ export const LABELS = {
 
       // @erp/timesheet
       '/problems/unknown-calendar-year':
-        'Le calendrier ouvré ne couvre pas cette année : les jours fériés n’y sont pas connus.',
+        'Le calendrier ouvré ne couvre pas cette année : les jours fériés ne sont pas connus.',
       '/problems/mission-required': 'Un jour travaillé doit porter une mission.',
       '/problems/mission-not-allowed': 'Une absence ne porte pas de mission.',
       '/problems/day-outside-period': 'Ce jour n’appartient pas au mois saisi.',

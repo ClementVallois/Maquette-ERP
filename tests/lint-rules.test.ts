@@ -171,6 +171,10 @@ describe('the scopes the money rules apply to', () => {
     expect(messages.some((message) => message.includes('No decimal literal'))).toBe(false);
   });
 
+  // The one test in this file that does not read the memoised report: `--print-config` asks
+  // ESLint which rules apply to a path, which the report cannot answer, so it pays a second
+  // type-aware ESLint start of its own. Same cost the `beforeAll` above budgets for, and the same
+  // reason it cannot sit at Vitest's 5 s default.
   it('holds a shared fixture builder to the domain rules, because it is shipped code', () => {
     // `testing/` is not a test: it is in its package's tsconfig, it compiles, and it is where
     // every seeded `tjmCents` of this module is written. It was borrowing the exemption
@@ -190,5 +194,5 @@ describe('the scopes the money rules apply to', () => {
     expect(held.some((message) => message.includes('No `new Date()` without an argument'))).toBe(
       true,
     );
-  });
+  }, 60_000);
 });

@@ -32,6 +32,7 @@ import {
 import { ValidateResultDialog } from '@/features/cra/components/validate-result-dialog';
 import { useValidateCra } from '@/features/cra/hooks';
 import type { CraStatus, ValidationResponse } from '@/features/cra/types';
+import { invoiceDestination } from '@/features/factures/destination';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
 import { frenchDate, frenchDays, frenchEuros, frenchMonth } from '@/lib/format';
@@ -64,7 +65,7 @@ const DECLINE_REASON_VARIANT: Record<DeclineReason, StatusBadgeVariant> = {
 function TableSkeleton(): ReactElement {
   return (
     <div className="flex flex-col gap-2" aria-hidden="true">
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-24 w-full" />
@@ -199,13 +200,7 @@ function invoiceColumns(returnTo: string): ColumnDef<PreFacturierInvoiceRow>[] {
       header: () => <span className="sr-only">{LABELS.action.tableActions}</span>,
       cell: ({ row }) => (
         <Link
-          to="/factures/$id"
-          params={{ id: row.original.id }}
-          search={{
-            client: row.original.billedToName,
-            period: row.original.supplyPeriod,
-            from: returnTo,
-          }}
+          {...invoiceDestination(row.original, returnTo)}
           className="ml-auto block w-fit text-sm text-primary hover:underline"
         >
           {LABELS.preFacturier.invoiceOpen}
@@ -238,6 +233,24 @@ function validateFactsFor(row: PreFacturierCraRow, period: string): ValidateConf
         : LABELS.preFacturier.validateConfirmDialog.no,
     },
   ];
+}
+
+/**
+ * The one destination the CRA-decision table's row opens (the read-only view, never
+ * validate/refuse) — shared between the `actions` column's own "Ouvrir" `Link` (the
+ * keyboard/screen-reader path) and `DataTable`'s `onRowActivate` (the pointer-tap convenience).
+ */
+function craRowDestination(
+  period: string,
+  row: PreFacturierCraRow,
+): {
+  readonly to: '/cra/$period/$consultantId';
+  readonly params: { readonly period: string; readonly consultantId: string };
+} {
+  return {
+    to: '/cra/$period/$consultantId',
+    params: { period, consultantId: row.consultantId },
+  };
 }
 
 function craColumns(
@@ -340,12 +353,7 @@ function craColumns(
       cell: ({ row }) => (
         <div className="ml-auto flex w-fit items-center gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link
-              to="/cra/$period/$consultantId"
-              params={{ period, consultantId: row.original.consultantId }}
-            >
-              {LABELS.cra.show}
-            </Link>
+            <Link {...craRowDestination(period, row.original)}>{LABELS.cra.show}</Link>
           </Button>
           {row.original.decidable && (
             <>
@@ -570,7 +578,7 @@ export function PreFacturierScreen({
         )}
       </form>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           label={LABELS.preFacturier.summaryBillable}
           value={frenchEuros(data.summary.billableCents)}
@@ -592,6 +600,7 @@ export function PreFacturierScreen({
           numericColumns={['lineCount', 'totalTtc']}
           // F06/A7: server-paginated (see `DataTable`'s own `sortable` doc comment).
           sortable={false}
+          onRowActivate={(row) => void navigate(invoiceDestination(row, returnTo))}
           emptyState={
             invoicesOutOfRange ? (
               <EmptyState
@@ -666,6 +675,14 @@ export function PreFacturierScreen({
           getRowId={(row) => row.craId}
           numericColumns={['recorded']}
           sortable={false}
+          // Billing renders no `actions` column at all (`craColumns`'s own `.filter()` above) —
+          // there is no destination its own row could open, so no handler for that role either.
+          {...(role === 'manager'
+            ? {
+                onRowActivate: (row: PreFacturierCraRow) =>
+                  void navigate(craRowDestination(period, row)),
+              }
+            : {})}
           emptyState={
             crasOutOfRange ? (
               <EmptyState

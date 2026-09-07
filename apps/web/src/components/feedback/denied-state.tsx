@@ -26,7 +26,7 @@ interface DeniedStateProps {
  */
 export function DeniedState({ deniedBy, role }: DeniedStateProps): ReactElement {
   return (
-    <div className="flex w-full max-w-md flex-col items-center gap-3 rounded-xl bg-card p-8 text-center shadow-card ring-1 ring-border">
+    <div className="mx-auto flex w-full max-w-md flex-col items-center gap-3 rounded-xl bg-card p-8 text-center shadow-card ring-1 ring-border">
       <span className="flex size-10 items-center justify-center rounded-full bg-destructive/10">
         <ShieldAlertIcon aria-hidden="true" className="size-5 text-destructive" />
       </span>

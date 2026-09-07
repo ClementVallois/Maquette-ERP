@@ -8,83 +8,86 @@ import { PATHS } from './paths.ts';
 import { html, type Html } from './render/html.ts';
 
 /**
- * The chrome every screen sits in: one document, one stylesheet, one navigation.
+ * The chrome every screen sits in: one document, one stylesheet, one topbar.
  *
  * The header is where a reader learns the two facts that make the rest of the mockup legible —
  * **which persona they are** and **that it is not a login**. Both are in the page rather than only
  * in the README, because the README is not open while the screen is.
+ *
+ * Shape matches `apps/web`'s own topbar (`direction-visuelle.md` §6, `components/shell/topbar.tsx`)
+ * rather than inventing a second one: a single 56px bar, the page's own crumb and title on the
+ * left, the persona block on the right. There is no second navigation row here any more — this
+ * chrome now serves only the two printables (ADR-0055, ADR-0056), and the SPA's own sidebar is
+ * where a role's navigation lives since front-end plan Phase 9.3.
  */
 
 export interface Chrome {
   readonly title: string;
   readonly persona: Persona | undefined;
-  /** Sections of the main navigation the current persona may reach. */
-  readonly nav?: readonly NavItem[];
-}
-
-export interface NavItem {
-  readonly href: string;
-  readonly label: string;
-  readonly current?: boolean;
-}
-
-/**
- * What each role may navigate to. It is a table rather than a chain of conditionals for the reason
- * ADR-0023 gives about route declarations: a permission expressed as data can be read off the page,
- * and this one is the *navigational* echo of the route's `Access` — never its source. A link
- * missing here hides a screen; only the route's declaration refuses it.
- */
-const NAV_BY_ROLE: Readonly<Record<Role, readonly NavItem[]>> = {
-  // `PATHS.spaCra`, not `PATHS.consultantCra`: the latter is a registered route again since
-  // Phase 9.3, but only for the POST that saves a month — the SPA reads and renders the grid at
-  // `/cra`, and this chrome (used only by the two printables now) links a visitor there.
-  consultant: [{ href: PATHS.spaCra, label: LABELS.cra.nav }],
-  manager: [{ href: PATHS.preFacturier, label: LABELS.preFacturier.nav }],
-  billing: [{ href: PATHS.preFacturier, label: LABELS.preFacturier.nav }],
-};
-
-export function navFor(persona: Persona | undefined): readonly NavItem[] {
-  return persona === undefined ? [] : NAV_BY_ROLE[persona.role];
+  /**
+   * The one parent crumb shown left of the title — this shell's answer to the SPA's `PageHeader`
+   * breadcrumb, which is the SPA's own back affordance (there is no client-side history to go
+   * back to here, no JavaScript runs). `undefined` on a page with no natural parent —
+   * `problem-page.ts`'s refusals, which already carry their own "Revenir à l'accueil" link in the
+   * body.
+   */
+  readonly crumb?: { readonly href: string; readonly label: string };
 }
 
 function roleTag(role: Role): Html {
   return html`<span class="tag role-${role}">${LABELS.roles[role]}</span>`;
 }
 
-function whoBar(persona: Persona | undefined): Html {
+/**
+ * First initial + last initial, uppercased — byte-identical to the SPA's own `initialsOf`
+ * (`components/shell/persona-block.tsx`), so the same display name reads the same abbreviation on
+ * both sides of this application.
+ */
+function initialsOf(displayName: string): string {
+  const words = displayName.trim().split(/\s+/u);
+  const first = words[0]?.charAt(0) ?? '';
+  const last = words.length > 1 ? (words[words.length - 1]?.charAt(0) ?? '') : '';
+
+  return `${first}${last}`.toUpperCase();
+}
+
+/**
+ * The topbar's right-hand identity block (direction-visuelle.md §6): an avatar carrying initials
+ * — never a photo, there are no users here, only personas — the display name, then the role badge
+ * and the office. `.tag.role-*` already carries ADR-0076's colours; this only restyles what sits
+ * around it, not the tag itself.
+ *
+ * No dropdown: the SPA's is a `DropdownMenu` and this shell runs no JavaScript at all (ADR-0009),
+ * so "Changer de persona" stays the plain `<form method="post">` button it always was, set quietly
+ * beside the identity rather than behind a menu that cannot exist here.
+ */
+function personaBlock(persona: Persona | undefined): Html {
   if (persona === undefined) {
-    return html`<p class="who">${LABELS.persona.none}</p>`;
+    return html`<p class="persona-block">${LABELS.persona.none}</p>`;
   }
 
-  return html`<div class="who">
-    <span>${LABELS.persona.current} :</span>
-    <strong>${persona.displayName}</strong>
-    ${roleTag(persona.role)}
-    <span>${persona.officeName}</span>
+  return html`<div class="persona-block">
+    <span class="avatar" aria-hidden="true">${initialsOf(persona.displayName)}</span>
+    <span class="persona-id">
+      <strong>${persona.displayName}</strong>
+      <span class="persona-meta">${roleTag(persona.role)} · ${persona.officeName}</span>
+    </span>
     <form class="inline no-print" method="post" action="${PATHS.clearPersona}">
       <button class="quiet" type="submit">${LABELS.persona.change}</button>
     </form>
   </div>`;
 }
 
-function navigation(items: readonly NavItem[]): Html | null {
-  if (items.length === 0) return null;
+/** The topbar's left-hand content: the page's own crumb (when it has a parent) and its title. */
+function crumbAndTitle(chrome: Chrome): Html {
+  if (chrome.crumb === undefined) {
+    return html`<p class="topbar-title">${chrome.title}</p>`;
+  }
 
-  return html`<nav class="bar no-print" aria-label="${LABELS.nav.main}">
-    <ul class="navlist">
-      ${items.map(
-        (item) =>
-          // `aria-current="false"` rather than omitting the attribute: a hole between two
-          // attributes lands in attribute-name position, which the renderer refuses outright
-          // (ADR-0025), and "false" is the value the ARIA specification gives for "not current".
-          html`<li>
-            <a href="${item.href}" aria-current="${item.current === true ? 'page' : 'false'}"
-              >${item.label}</a
-            >
-          </li>`,
-      )}
-    </ul>
-  </nav>`;
+  return html`<p class="topbar-title">
+    <a class="crumb" href="${chrome.crumb.href}">${chrome.crumb.label}</a
+    ><span class="crumb-sep" aria-hidden="true">›</span>${chrome.title}
+  </p>`;
 }
 
 export function shell(chrome: Chrome, body: Html): Html {
@@ -99,13 +102,7 @@ export function shell(chrome: Chrome, body: Html): Html {
       <body>
         <a class="skip" href="#contenu">${LABELS.nav.skipToContent}</a>
         <header class="site">
-          <div class="bar">
-            <a class="wordmark" href="${PATHS.home}"
-              >${LABELS.appName}<small>${LABELS.appTagline}</small></a
-            >
-            ${whoBar(chrome.persona)}
-          </div>
-          ${navigation(chrome.nav ?? navFor(chrome.persona))}
+          <div class="topbar">${crumbAndTitle(chrome)} ${personaBlock(chrome.persona)}</div>
         </header>
         <main id="contenu">${body}</main>
         <footer class="site">

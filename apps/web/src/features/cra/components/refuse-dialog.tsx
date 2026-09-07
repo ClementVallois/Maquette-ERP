@@ -116,7 +116,8 @@ export function RefuseDialog({ period, cra, onClose, onRefused }: RefuseDialogPr
             <Button
               type="button"
               variant="destructive"
-              disabled={!canSubmit || refuseMutation.isPending}
+              disabled={!canSubmit}
+              pending={refuseMutation.isPending}
               onClick={() => {
                 void handleSubmit();
               }}

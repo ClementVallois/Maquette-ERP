@@ -43,7 +43,12 @@ function cruise(globs: string[], config: string): CruiseResult {
   }
 }
 
-describe('the module boundary rule', () => {
+// The budget is the suite's, not one test's: every case below spawns a real `depcruise`, and the
+// last one cruises the whole repository (~2.5 s idle, against Vitest's 5 s default). `test:cov` —
+// what the pre-push hook runs — roughly doubles each spawn under V8 instrumentation, and the hook
+// runs this beside `typecheck` and `boundaries`. At the default, the suite failed on the clock
+// rather than on a violation, which reads as a boundary break that is not one.
+describe('the module boundary rule', { timeout: 30_000 }, () => {
   it('rejects an import from billing into timesheet', () => {
     const { summary } = cruise(DECLARED_ARROW_FIXTURE, '.dependency-cruiser.fixture.cjs');
 
@@ -148,11 +153,8 @@ describe('the module boundary rule', () => {
     );
   });
 
-  // The one case that cruises the whole repository rather than a fixture: ~2.5 s on an idle
-  // machine, against Vitest's 5 s default. That margin disappears under any parallel load — the
-  // pre-push hook's own three jobs, or a `stryker run` — and the test then fails on the clock
-  // rather than on a violation, which reads as a boundary break that is not one. The explicit
-  // timeout removes the false red; it changes nothing about what is asserted below.
+  // The one case that cruises the whole repository rather than a fixture, and the reason the
+  // suite's timeout above is the size it is.
   it('accepts the code that is actually shipped', () => {
     const { summary } = cruise(SHIPPED, '.dependency-cruiser.cjs');
 
@@ -160,5 +162,5 @@ describe('the module boundary rule', () => {
     // green run would otherwise prove nothing. This is the failure this suite exists to catch.
     expect(summary.totalCruised).toBeGreaterThan(0);
     expect(summary.violations).toStrictEqual([]);
-  }, 30_000);
+  });
 });

@@ -81,43 +81,80 @@ header.site {
   background: var(--panel);
 }
 
-.bar {
+/* One 56px bar (direction-visuelle.md §6), matching apps/web's own topbar proportions on this
+   stylesheet's own tokens (--panel, --rule) rather than importing the SPA's Tailwind ones — the
+   two stylesheets stay separate on purpose (ADR-0009). Below 640px the persona block (avatar,
+   name, role · office, and the "Changer de persona" form — none of which the SPA's own compact,
+   dropdown-based block has to fit inline) no longer fits next to the title at a fixed 56px, so the
+   bar grows instead of clipping either side; the SPA's own mobile breakpoint (`lg`, 1024px) governs
+   a sidebar this shell does not have and does not apply here. */
+.topbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space);
+  align-items: center;
   justify-content: space-between;
+  gap: var(--space);
+  min-height: 56px;
   margin: 0 auto;
   max-width: 72rem;
-  padding: 0.75rem var(--space);
+  padding: 0.5rem var(--space);
 }
 
-.wordmark {
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--ink);
-  text-decoration: none;
+.topbar-title {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
-.wordmark small {
-  display: block;
+.crumb {
   font-weight: 400;
-  font-size: 0.75rem;
   color: var(--ink-soft);
-  letter-spacing: 0;
 }
 
-.who {
+.crumb-sep {
+  margin: 0 0.4em;
+  color: var(--ink-soft);
+}
+
+/* The topbar's right-hand identity block (direction-visuelle.md §6): avatar, name, role · office,
+   and the "Changer de persona" form — the no-JS equivalent of the SPA's `PersonaBlock`. */
+.persona-block {
   display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
-  color: var(--ink-soft);
 }
 
-.who strong {
+.avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.persona-id {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  line-height: 1.2;
+}
+
+.persona-id strong {
   color: var(--ink);
+}
+
+.persona-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--ink-soft);
 }
 
 main {
@@ -145,26 +182,6 @@ h2 {
 
 a {
   color: var(--accent);
-}
-
-nav.bar {
-  padding-top: 0;
-  padding-bottom: 0.5rem;
-}
-
-ul.navlist {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space);
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  font-size: 0.9375rem;
-}
-
-ul.navlist a[aria-current='page'] {
-  font-weight: 600;
-  text-decoration-thickness: 2px;
 }
 
 /* Panels ------------------------------------------------------------------ */
@@ -285,9 +302,17 @@ footer.site p {
 
 @media print {
   header.site,
-  footer.site,
-  .no-print {
+  footer.site {
     display: none;
+  }
+
+  /* `!important`, deliberately: `.no-print`'s whole contract is "hidden in print, no matter what
+     else targets this element" (specificity 0,1,0), and any element+class rule in this sheet
+     (0,1,1) wins over that by specificity alone, source order notwithstanding. The rule that
+     surfaced it, `p.actions`, has since gone with the markup it styled; this stays because the
+     next such rule would silently defeat a utility whose only job is to always win. */
+  .no-print {
+    display: none !important;
   }
 
   body {
@@ -375,12 +400,6 @@ select {
 table.totals {
   max-width: 32rem;
   margin-top: calc(var(--space) * 1.5);
-}
-
-p.actions {
-  display: flex;
-  gap: 0.5rem;
-  margin: var(--space) 0;
 }
 
 form.filter {

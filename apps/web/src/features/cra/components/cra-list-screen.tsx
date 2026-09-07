@@ -90,6 +90,30 @@ function ListSkeleton(): ReactElement {
   );
 }
 
+/**
+ * The one destination a CRA list row opens, shared between the `actions` column's own `Link` (the
+ * keyboard/screen-reader path) and `DataTable`'s `onRowActivate` (the pointer-tap convenience) —
+ * one place, so the two can never point two different directions. A consultant's own row reaches
+ * their editable grid; a manager's row reaches ADR-0071's read-only view of that consultant's
+ * period.
+ */
+function craDestination(
+  role: Role,
+  row: CraListItem,
+):
+  | { readonly to: '/cra/$period'; readonly params: { readonly period: string } }
+  | {
+      readonly to: '/cra/$period/$consultantId';
+      readonly params: { readonly period: string; readonly consultantId: string };
+    } {
+  return role === 'consultant'
+    ? { to: '/cra/$period', params: { period: row.period } }
+    : {
+        to: '/cra/$period/$consultantId',
+        params: { period: row.period, consultantId: row.consultantId },
+      };
+}
+
 function columnsFor(role: Role): ColumnDef<CraListItem>[] {
   const columns: ColumnDef<CraListItem>[] = [];
 
@@ -138,18 +162,7 @@ function columnsFor(role: Role): ColumnDef<CraListItem>[] {
       header: () => <span className="sr-only">{LABELS.action.tableActions}</span>,
       cell: ({ row }) => (
         <Button asChild variant="outline" size="sm" className="ml-auto flex w-fit">
-          {role === 'consultant' ? (
-            <Link to="/cra/$period" params={{ period: row.original.period }}>
-              {LABELS.cra.show}
-            </Link>
-          ) : (
-            <Link
-              to="/cra/$period/$consultantId"
-              params={{ period: row.original.period, consultantId: row.original.consultantId }}
-            >
-              {LABELS.cra.show}
-            </Link>
-          )}
+          <Link {...craDestination(role, row.original)}>{LABELS.cra.show}</Link>
         </Button>
       ),
     });
@@ -345,6 +358,7 @@ export function CraListScreen({
               numericColumns={['recordedQuarterDays']}
               // F06/A7: server-paginated (see `DataTable`'s own `sortable` doc comment).
               sortable={false}
+              onRowActivate={(row) => void navigate(craDestination(role, row))}
               emptyState={emptyState}
             />
           </div>
@@ -356,6 +370,11 @@ export function CraListScreen({
           getRowId={(row) => row.id}
           numericColumns={['recordedQuarterDays']}
           sortable={false}
+          // Billing renders no `actions` column at all (`columnsFor`, ADR-0071) — there is no
+          // destination its own row could open, so no handler is passed for that role either.
+          {...(role === 'billing'
+            ? {}
+            : { onRowActivate: (row: CraListItem) => void navigate(craDestination(role, row)) })}
           emptyState={emptyState}
         />
       )}

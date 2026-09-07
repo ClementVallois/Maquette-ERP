@@ -1,6 +1,6 @@
 import { AlertTriangleIcon, ChevronDownIcon, CircleDashedIcon } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 
 import {
   dayTotal,
+  isDayComplete,
   isDayIncomplete,
   isDayOverbooked,
   rowTotal,
@@ -448,6 +449,188 @@ export function CraMatrixTable({
         </tfoot>
       </table>
     </div>
+  );
+}
+
+/**
+ * A day keeps its activity names, quantities and total together on narrow screens.
+ *
+ * `renderRowTools` and `compact` are excluded rather than ignored: both are table-shaped — one
+ * hangs controls off a `<tr>`, the other narrows column headers — and there is no row and no
+ * column here. `cra-grid-screen.tsx`'s `MobileRowTools` is what the phone gets instead.
+ */
+export function CraDayCards({
+  period,
+  days,
+  rows,
+  matrix,
+  editable,
+  flaggedDays,
+  missingDays,
+  onChangeCell,
+  cellIdPrefix = 'mobile',
+  totalLabel = LABELS.cra.weekTotal,
+}: Omit<CraMatrixTableProps, 'renderRowTools' | 'compact'>): ReactElement {
+  const [expandedDays, setExpandedDays] = useState<ReadonlyMap<string, boolean>>(() => new Map());
+
+  return (
+    <section
+      aria-label={LABELS.cra.matrix.caption.replace('{month}', frenchMonth(period))}
+      className="relative flex min-w-0 flex-col gap-3"
+      data-cra-day-cards
+    >
+      {days.map((day) => {
+        const total = dayTotal(matrix, day.date);
+        const open =
+          expandedDays.get(day.date) ??
+          (!isDayComplete(matrix, day.date) && (day.nonWorkable === null || total > 0));
+        const tone = isDayOverbooked(matrix, day.date)
+          ? 'overbooked'
+          : day.nonWorkable === null &&
+              isDayIncomplete(matrix, day.date, missingDays?.has(day.date) ?? false)
+            ? 'incomplete'
+            : null;
+        const visibleRows = rows.filter((row) =>
+          editable
+            ? row.assignableDays === null ||
+              row.assignableDays.has(day.date) ||
+              valueAt(matrix, row.key, day.date) > 0
+            : valueAt(matrix, row.key, day.date) > 0,
+        );
+        const heading = (
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold capitalize">
+                {frenchWeekday(day.date)} {day.date.slice(8, 10)}
+              </span>
+              {day.nonWorkable !== null && (
+                <span className="block text-xs text-muted-foreground">
+                  {LABELS.cra.nonWorkable[day.nonWorkable]}
+                </span>
+              )}
+              {flaggedDays.has(day.date) && (
+                <span className="block text-xs text-status-late-text">{LABELS.cra.flagged}</span>
+              )}
+            </div>
+            {/* Both boxes are a fixed width and are always rendered, empty day included: the day
+                name beside them varies from "lundi 01" to "mercredi 03", and with the box sized to
+                its contents that variation moved the dots and the total sideways from one card to
+                the next. */}
+            <span className="flex w-12 shrink-0 flex-wrap items-center gap-1">
+              {rows
+                .filter((row) => valueAt(matrix, row.key, day.date) > 0)
+                .map((row) => (
+                  <span key={row.key}>
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'block size-2 rounded-full',
+                        row.toneIndex === null
+                          ? 'bg-absence-dot'
+                          : missionTone(row.toneIndex).dotClass,
+                      )}
+                    />
+                    <span className="sr-only">
+                      {row.label} : {frenchDays(valueAt(matrix, row.key, day.date))}.{' '}
+                    </span>
+                  </span>
+                ))}
+            </span>
+            <span
+              className="w-12 shrink-0 text-right text-sm font-semibold tabular-nums"
+              aria-label={`${LABELS.cra.dayTotal} — ${frenchDate(day.date)}`}
+            >
+              {frenchDays(total)}
+            </span>
+          </div>
+        );
+        const activities = (
+          <div className="border-t border-border px-3">
+            {visibleRows.length === 0 && (
+              <p className="py-3 text-sm text-muted-foreground">{LABELS.cra.nothing}</p>
+            )}
+            {visibleRows.map((row) => (
+              <div
+                key={row.key}
+                className="grid grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-3 border-b border-border py-2 last:border-0"
+              >
+                <span className="flex min-w-0 items-start gap-2 text-sm">
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'mt-1.5 size-2 shrink-0 rounded-full',
+                      row.toneIndex === null
+                        ? 'bg-absence-dot'
+                        : missionTone(row.toneIndex).dotClass,
+                    )}
+                  />
+                  <span className="min-w-0 break-words">{row.label}</span>
+                </span>
+                <CraQuantityCell
+                  rowKey={`${cellIdPrefix}-${row.key}`}
+                  activityLabel={row.label}
+                  day={day.date}
+                  dayLabel={frenchDate(day.date)}
+                  value={valueAt(matrix, row.key, day.date)}
+                  editable={editable}
+                  assignable={row.assignableDays === null || row.assignableDays.has(day.date)}
+                  onChange={(value) => {
+                    // Completing a focused day must not hide its select mid-edit (ADR-0100).
+                    setExpandedDays((previous) => new Map(previous).set(day.date, true));
+                    onChangeCell?.(row.key, day.date, value);
+                  }}
+                  mobile
+                  dayDataAttribute={day.date}
+                />
+              </div>
+            ))}
+          </div>
+        );
+        const className = cn(
+          'min-w-0 rounded-xl bg-card shadow-card ring-1 ring-border',
+          dayTint(day),
+        );
+        return (
+          <details
+            key={day.date}
+            className={className}
+            open={open}
+            onToggle={(event) => {
+              const nextOpen = event.currentTarget.open;
+              // Native toggle also fires for React's automatic open/close updates.
+              if (nextOpen === open) return;
+              setExpandedDays((previous) => new Map(previous).set(day.date, nextOpen));
+            }}
+          >
+            <summary
+              className={cn(
+                'min-h-11 cursor-pointer list-none rounded-xl p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden',
+                tone !== null && TOTAL_TONES[tone].headerClass,
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <ChevronDownIcon
+                  aria-hidden="true"
+                  className={cn(
+                    'size-4 shrink-0 text-muted-foreground transition-transform',
+                    !open && '-rotate-90',
+                  )}
+                />
+                <div className="min-w-0 flex-1">{heading}</div>
+              </div>
+              {tone !== null && <p className="mt-1 text-xs">{TOTAL_TONES[tone].sentence}</p>}
+            </summary>
+            {activities}
+          </details>
+        );
+      })}
+      <p className="flex items-center justify-between gap-3 rounded-lg bg-muted p-3 text-sm font-semibold">
+        <span>{totalLabel}</span>
+        <span className="tabular-nums">
+          {frenchDays(days.reduce((total, day) => total + dayTotal(matrix, day.date), 0))}
+        </span>
+      </p>
+    </section>
   );
 }
 

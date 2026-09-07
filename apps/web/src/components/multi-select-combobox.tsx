@@ -1,17 +1,12 @@
 import { ChevronDownIcon, XIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
-import { useState } from 'react';
 
+import { ComboboxShell, type ComboboxOption } from '@/components/combobox-shell';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
 
-export interface MultiSelectOption {
-  readonly value: string;
-  readonly label: string;
-}
+/** The pre-extraction name, kept so nothing importing it has to change. */
+export type MultiSelectOption = ComboboxOption;
 
 interface MultiSelectComboboxProps {
   readonly label: string;
@@ -19,7 +14,7 @@ interface MultiSelectComboboxProps {
   readonly noMatchLabel: string;
   readonly noneSelectedLabel: string;
   readonly clearLabel: string;
-  readonly options: readonly MultiSelectOption[];
+  readonly options: readonly ComboboxOption[];
   readonly selected: readonly string[];
   readonly onChange: (next: string[]) => void;
   readonly className?: string;
@@ -34,7 +29,15 @@ interface MultiSelectComboboxProps {
  * A search field filters the option list client-side (the option list itself — consultant names —
  * is already in memory, fetched once; this never re-fetches per keystroke). Selection is
  * checkboxes, not a second click-to-close-per-item pattern, because "these three consultants" is
- * the brief's own example of what has to stay selectable at once without the popover closing.
+ * the brief's own example of what has to stay selectable at once without the popover closing —
+ * `ComboboxShell`'s `renderOption` below never calls the `close` it is handed, unlike the
+ * single-select consultant picker (`single-select-combobox.tsx`) that shares this same shell.
+ *
+ * The `Popover`/`Input`/scrollable-`<ul>` mechanics live in `ComboboxShell` now, extracted so the
+ * single-select variant did not copy-paste them; this component's own props and behaviour are
+ * unchanged, including the plain `toLowerCase().includes()` match (not the accent-insensitive
+ * `normalize` the single-select uses) — moving to the shell was not licence to change what a
+ * caller of this one already relies on.
  */
 export function MultiSelectCombobox({
   label,
@@ -47,15 +50,7 @@ export function MultiSelectCombobox({
   onChange,
   className,
 }: MultiSelectComboboxProps): ReactElement {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
-
   const selectedSet = new Set(selected);
-  const query = search.trim().toLowerCase();
-  const filtered =
-    query.length === 0
-      ? options
-      : options.filter((option) => option.label.toLowerCase().includes(query));
 
   function toggle(value: string): void {
     onChange(
@@ -68,64 +63,46 @@ export function MultiSelectCombobox({
     .map((option) => option.label);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          aria-label={label}
-          className={cn('w-fit min-w-40 justify-between font-normal', className)}
-        >
-          {/* A count, never the selected names themselves: joined names would duplicate
-              whatever the filtered table already shows them against (and grow without bound
-              well before 40+ consultants), so "3 consultants" is what a manager reads here —
-              item 11 (QA round 2) removed the popover's own repeat of those same names, the
-              checkbox state below already being the one place that answers "which". */}
+    <ComboboxShell
+      ariaLabel={label}
+      {...(className === undefined ? {} : { triggerClassName: className })}
+      triggerContent={
+        // A count, never the selected names themselves: joined names would duplicate whatever
+        // the filtered table already shows them against (and grow without bound well before
+        // 40+ consultants), so "3 consultants" is what a manager reads here — item 11
+        // (QA round 2) removed the popover's own repeat of those same names, the checkbox
+        // state below already being the one place that answers "which".
+        <>
           <span className="truncate">
             {selectedLabels.length === 0
               ? noneSelectedLabel
               : `${label} (${String(selectedLabels.length)})`}
           </span>
           <ChevronDownIcon aria-hidden="true" className="size-3.5 shrink-0 opacity-60" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-2" aria-label={label}>
-        <Input
-          value={search}
-          onChange={(event) => {
-            setSearch(event.target.value);
-          }}
-          placeholder={placeholder}
-          aria-label={placeholder}
-          autoFocus
-        />
-        {/* A checkbox group, not a listbox: `role="listbox"` demands `role="option"` children
-            (axe: `aria-required-children`, impact critical), and a plain `<li>` only ever carries
-            the implicit `listitem` role. This list is a set of checkboxes with labels — `<ul>` is
-            layout only, no ARIA role needed on it. */}
-        <ul className="mt-1.5 flex max-h-64 flex-col gap-0.5 overflow-y-auto">
-          {filtered.length === 0 && (
-            <li className="px-2 py-1.5 text-sm text-muted-foreground">{noMatchLabel}</li>
-          )}
-          {filtered.map((option) => {
-            const checked = selectedSet.has(option.value);
+        </>
+      }
+      searchLabel={placeholder}
+      searchPlaceholder={placeholder}
+      noMatchLabel={noMatchLabel}
+      options={options}
+      matches={(option, query) => option.label.toLowerCase().includes(query.toLowerCase())}
+      renderOption={(option) => {
+        const checked = selectedSet.has(option.value);
 
-            return (
-              <li key={option.value}>
-                <label className="group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
-                  <Checkbox
-                    checked={checked}
-                    onCheckedChange={() => {
-                      toggle(option.value);
-                    }}
-                  />
-                  <span className="flex-1 truncate">{option.label}</span>
-                </label>
-              </li>
-            );
-          })}
-        </ul>
-        {selected.length > 0 && (
+        return (
+          <label className="group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
+            <Checkbox
+              checked={checked}
+              onCheckedChange={() => {
+                toggle(option.value);
+              }}
+            />
+            <span className="flex-1 truncate">{option.label}</span>
+          </label>
+        );
+      }}
+      footer={
+        selected.length > 0 && (
           <Button
             variant="ghost"
             size="sm"
@@ -137,8 +114,8 @@ export function MultiSelectCombobox({
             <XIcon aria-hidden="true" />
             {clearLabel}
           </Button>
-        )}
-      </PopoverContent>
-    </Popover>
+        )
+      }
+    />
   );
 }

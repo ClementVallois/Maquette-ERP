@@ -15,11 +15,9 @@
  */
 export const LABELS = {
   appName: 'Maquette ERP',
-  appTagline: 'Maquette d’un module ERP interne',
 
   nav: {
     skipToContent: 'Aller au contenu',
-    main: 'Navigation principale',
   },
 
   persona: {
@@ -28,7 +26,6 @@ export const LABELS = {
     warning:
       'Ce n’est pas une connexion. Aucun mot de passe n’est demandé, aucune identité n’est vérifiée, et le sélecteur remplace un fournisseur d’identité pour rendre les règles d’autorisation démontrables en trois clics.',
     choose: 'Prendre ce rôle',
-    current: 'Persona en cours',
     change: 'Changer de persona',
     none: 'Aucun persona sélectionné',
     office: 'Implantation',
@@ -116,7 +113,6 @@ export const LABELS = {
     signatureDate: 'Date',
     signatureMark: 'Signature',
     nothingRecorded: 'Aucun jour saisi sur ce mois.',
-    back: 'Revenir au CRA',
   },
 
   preFacturier: {
@@ -158,7 +154,7 @@ export const LABELS = {
     summaryLate: 'Jours en retard',
     summaryCras: 'CRA du mois',
     lateNote:
-      'Jours saisis sur un mois clos dont le CRA n’est pas encore validé. Le mois en cours affiche zéro : rien n’y est en retard, puisque rien n’y est encore dû.',
+      'Jours saisis sur un mois clos dont le CRA n’est pas encore validé. Le mois en cours affiche zéro : rien n’est en retard, puisque rien n’est encore dû.',
     lateNoneYet: 'Mois en cours — rien n’est encore dû.',
     lateTag: 'En retard',
     awaitingManager: 'En attente de validation par le manager',
@@ -183,7 +179,7 @@ export const LABELS = {
     open: 'Ouvrir la facture',
     openFor: 'de {name}',
     draftNotice:
-      'Ce document n’est pas une facture : il n’a ni numéro ni date d’émission. Il est produit à partir d’un CRA validé, donc déjà figé — mais son statut et ses montants restent provisoires tant qu’il n’est pas émis. Il devient une facture à l’émission, et plus rien n’y bouge ensuite.',
+      'Ce document n’est pas une facture : il n’a ni numéro ni date d’émission. Il est produit à partir d’un CRA validé, donc déjà figé — mais son statut et ses montants restent provisoires tant qu’il n’est pas émis. Il devient une facture à l’émission, et plus rien ne bouge ensuite.',
     seller: 'Émetteur',
     billedTo: 'Facturé à',
     deliveryAddress: 'Adresse de livraison',
@@ -223,31 +219,11 @@ export const LABELS = {
     shareCapital: 'Capital social',
     origin: 'Origine des lignes',
     originLine: 'CRA {cra} — {period} — {mission}',
-    originNote:
-      'Chaque ligne porte le CRA dont elle vient : c’est ce lien, et non une déclaration, qui matérialise la piste d’audit fiable (art. 289-VII du CGI).',
     validatedBy: 'Validé par',
     notCharged: 'Non soumis à TVA',
     issue: 'Émettre la facture',
-    issueNote:
-      'L’émission alloue un numéro dans une série sans trou et fige le document : rien n’y bouge ensuite. Le formulaire porte sa clé d’idempotence, pour qu’un renvoi ne brûle pas un second numéro.',
     cannotIssue:
       'Cette facture est déjà émise : elle porte un numéro et une date, et une facture émise ne se modifie pas.',
-  },
-
-  margin: {
-    heading: 'Marge',
-    lead: 'Ces trois valeurs ne figurent dans aucune liste. Elles ne s’obtiennent que par cette lecture, et chaque ouverture est journalisée : qui a lu, quels champs, sur qui.',
-    back: 'Revenir au pré-facturier',
-    mission: 'Mission',
-    quantity: 'Quantité',
-    tjm: 'TJM',
-    cjm: 'CJM',
-    revenue: 'Chiffre d’affaires',
-    cost: 'Coût',
-    margin: 'Marge',
-    total: 'Total du mois',
-    noMission:
-      'Aucune mission en régie sur ce mois : une mission au forfait n’a pas de TJM daté, et elle est écartée plutôt que comptée à zéro.',
   },
 
   problem: {
@@ -294,7 +270,7 @@ export const LABELS = {
 
       // @erp/timesheet
       '/problems/unknown-calendar-year':
-        'Le calendrier ouvré ne couvre pas cette année : les jours fériés n’y sont pas connus.',
+        'Le calendrier ouvré ne couvre pas cette année : les jours fériés ne sont pas connus.',
       '/problems/mission-required': 'Un jour travaillé doit porter une mission.',
       '/problems/mission-not-allowed': 'Une absence ne porte pas de mission.',
       '/problems/day-outside-period': 'Ce jour n’appartient pas au mois saisi.',
