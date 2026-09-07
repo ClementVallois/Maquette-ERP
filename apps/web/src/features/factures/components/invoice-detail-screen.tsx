@@ -430,7 +430,6 @@ export function InvoiceDetailScreen({
 
       <section className="flex flex-col gap-2">
         <h3 className="text-card-title">{LABELS.invoice.lines}</h3>
-        <p className="text-sm text-muted-foreground">{LABELS.invoice.originNote}</p>
         <DataTable
           columns={lineColumns()}
           data={data.lines}

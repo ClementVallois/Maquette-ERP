@@ -235,7 +235,6 @@ function mentionsBlock(invoice: Invoice): Html {
 function originBlock(invoice: Invoice): Html {
   return html`<section class="origin">
     <h2>${LABELS.invoice.origin}</h2>
-    <p class="hint">${LABELS.invoice.originNote}</p>
     <ul>
       ${invoice.lines.map(
         (line) =>
@@ -264,7 +263,6 @@ function issuanceForm(view: InvoiceView): Html | null {
   }
 
   return html`<section class="no-print">
-    <p class="hint">${LABELS.invoice.issueNote}</p>
     <form method="post" action="${`${PATHS.issueInvoice}/${view.invoice.id}`}">
       <input type="hidden" name="idempotencyKey" value="${key}" />
       <button type="submit">${LABELS.invoice.issue}</button>

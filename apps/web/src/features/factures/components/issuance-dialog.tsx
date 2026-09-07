@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -72,7 +71,6 @@ export function IssuanceDialog({ invoice, onClose }: IssuanceDialogProps): React
           <DialogTitle>
             {LABELS.invoice.issueDialog.title.replace('{name}', invoice.billedTo.name)}
           </DialogTitle>
-          {issued === null && <DialogDescription>{LABELS.invoice.issueNote}</DialogDescription>}
         </DialogHeader>
 
         {issued === null ? (
