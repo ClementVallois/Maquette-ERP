@@ -1,12 +1,10 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
-import { LABELS } from './labels.ts';
-import { html, type Html, renderToString } from './render/html.ts';
+import { type Html, renderToString } from './render/html.ts';
 
 export const HTML = 'text/html; charset=utf-8';
 
 const OK = 200;
-const SEE_OTHER = 303;
 
 /**
  * The Content-Security-Policy this application can honestly claim.
@@ -77,21 +75,4 @@ export function registerSecurityHeaders(app: FastifyInstance): void {
 
 export function sendPage(reply: FastifyReply, page: Html, status: number = OK): FastifyReply {
   return reply.code(status).type(HTML).send(renderToString(page));
-}
-
-/**
- * POST-then-redirect. Every write in these screens is a form submission, and answering one with a
- * page means the browser re-submits it on refresh — a second validation, a second issuance. 303
- * (rather than 302) is what makes the follow-up request a GET on every client, which is the whole
- * point of using it here.
- *
- * The location is always a path this application owns: it comes from `PATHS`, never from a query
- * parameter or a `Referer`, so there is no open redirect to close.
- */
-export function redirectTo(reply: FastifyReply, path: string): FastifyReply {
-  return reply
-    .code(SEE_OTHER)
-    .header('location', path)
-    .type(HTML)
-    .send(renderToString(html`<p><a href="${path}">${LABELS.action.continue}</a></p>`));
 }

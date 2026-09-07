@@ -1,18 +1,4 @@
-/**
- * Every string a visitor reads, in one file.
- *
- * The point is not translation — there is one language and there will be one. It is **review**: a
- * screen's wording is the part of it a non-developer can judge, and wording scattered across
- * fifteen template functions cannot be read as a whole. Here it can, and a term that contradicts
- * `CONTEXT.md` is visible next to the one that does not.
- *
- * The keys are English because they are code; the values are French because they are the screen.
- * That split is the whole of ADR-0026.
- *
- * The apostrophes are typographic (`’`, U+2019), and not out of fussiness: a straight `'` is one of
- * the five characters the renderer escapes, so it reaches the page as `&#39;` — correct, and ugly
- * in the one file whose job is to be read.
- */
+/** French copy for the printable documents, their shell, and HTML problem pages. */
 export const LABELS = {
   appName: 'Maquette ERP',
 
@@ -21,15 +7,8 @@ export const LABELS = {
   },
 
   persona: {
-    heading: 'Choisir un persona',
-    lead: 'Cette maquette n’a pas d’authentification : on choisit une identité, et tout le monde peut choisir n’importe laquelle.',
-    warning:
-      'Ce n’est pas une connexion. Aucun mot de passe n’est demandé, aucune identité n’est vérifiée, et le sélecteur remplace un fournisseur d’identité pour rendre les règles d’autorisation démontrables en trois clics.',
-    choose: 'Prendre ce rôle',
     change: 'Changer de persona',
     none: 'Aucun persona sélectionné',
-    office: 'Implantation',
-    role: 'Rôle',
   },
 
   roles: {
@@ -39,44 +18,12 @@ export const LABELS = {
   },
 
   cra: {
-    heading: 'Mon CRA',
-    listHeading: 'Mes CRA',
     nav: 'Mes CRA',
-    day: 'Jour',
-    morning: 'Matin',
-    afternoon: 'Après-midi',
-    mission: 'Mission',
-    quantity: 'Quantité',
-    totals: 'Totaux du mois',
-    slotsNote:
-      'Les deux colonnes sont deux demi-journées. Le CRA enregistre « une demi-journée sur A, une demi-journée sur B » : l’ordre matin/après-midi n’est pas conservé, parce qu’il ne change ni la facture ni les totaux.',
-    totalsAsOf: 'Totaux à jour du dernier enregistrement.',
     nothing: '—',
     absence: 'Absence',
-    flagged: 'Signalé',
-    save: 'Enregistrer',
-    submit: 'Soumettre au manager',
-    period: 'Mois',
-    status: 'Statut',
-    show: 'Ouvrir',
-    notStartedYet: 'Ce mois n’a pas encore été commencé. Remplissez-le, puis enregistrez.',
-    nothingRecorded: 'Rien n’est encore saisi sur ce mois.',
-    refused: 'Ce CRA a été refusé par le manager. Corrigez-le, puis soumettez-le à nouveau.',
-    emptyList: 'Aucun CRA sur cette période.',
-    emptyListHint:
-      'Ce n’est pas un refus : la liste est bien la vôtre, elle ne contient simplement rien pour ce mois.',
-    filter: 'Filtrer par mois',
-    apply: 'Filtrer',
-    allPeriods: 'Tous les mois',
     nonWorkable: {
       weekend: 'Week-end',
       publicHoliday: 'Férié',
-    },
-    readOnly: {
-      submitted: 'CRA soumis : il est entre les mains du manager et n’est plus modifiable.',
-      validated: 'CRA validé : un relevé de temps validé est immuable.',
-      draft: '',
-      refused: '',
     },
     statuses: {
       draft: 'Brouillon',
@@ -88,8 +35,6 @@ export const LABELS = {
 
   craPrint: {
     heading: 'Relevé d’activité',
-    open: 'Version imprimable',
-    openFor: 'du CRA de {name}',
     notValidated:
       'Ce relevé n’est pas signable : le CRA n’a pas encore été validé par le manager, et son contenu peut encore changer.',
     consultant: 'Consultant',
@@ -103,7 +48,6 @@ export const LABELS = {
     quantity: 'Quantité',
     totals: 'Totaux du mois',
     total: 'Total',
-    flagged: 'Jours signalés',
     flaggedNote:
       'Jours saisis alors que le calendrier ne les dit pas ouvrés. Ils ne sont pas refusés : le manager les a acceptés en validant.',
     signature: 'Bon pour accord',
@@ -116,68 +60,12 @@ export const LABELS = {
   },
 
   preFacturier: {
-    heading: 'Pré-facturier',
     nav: 'Pré-facturier',
-    lead: 'Ce qui est facturable sur le mois, et pour tout le reste la raison qui bloque. Rien ne se décide ici : l’écran ne fait qu’assembler ce que les deux modules savent.',
-    noPeriod: 'Aucun CRA dans cette implantation, sur aucun mois.',
-    noPeriodHint:
-      'Ce n’est pas un refus : la liste est bien celle de votre implantation, elle est vide.',
-    billable: 'À facturer',
-    billableEmpty:
-      'Aucune facture en brouillon sur ce mois : soit aucun CRA n’a été validé, soit les jours validés ne sont pas facturables. Le tableau ci-dessous dit lequel des deux.',
-    client: 'Client',
-    invoiceStatus: 'Statut',
-    invoiceNumber: 'N° de facture',
-    totalExcludingVat: 'Total HT',
-    totalIncludingVat: 'Total TTC',
-    notNumberedYet: '—',
-    cras: 'Les CRA du mois',
-    consultant: 'Consultant',
-    craStatus: 'Statut du CRA',
-    recorded: 'Jours saisis',
-    blocking: 'Ce qui n’est pas facturable',
-    nothingBlocking: 'Rien : tous les jours validés sont partis en facture.',
-    crasEmpty: 'Aucun CRA sur ce mois dans cette implantation.',
-    crasEmptyHint:
-      'Ce n’est pas un refus : la liste est bien celle de votre implantation, elle ne contient rien pour ce mois.',
-    validate: 'Valider',
-    refuse: 'Refuser',
-    refusalReason: 'Motif du refus',
-    refusalPlaceholder: 'Ce que le consultant doit corriger',
-    decide: 'Décision',
-    reveal: 'Marge',
-    /** Appended to the visible link text, `sr-only`, so nine identical links are nine distinct ones. */
-    revealFor: 'de {name}',
-    revealNote:
-      'Ouvrir une marge affiche le CJM, le TJM et la marge du consultant, et chaque ouverture est journalisée.',
-    summaryBillable: 'Facturable ce mois',
-    summaryLate: 'Jours en retard',
-    summaryCras: 'CRA du mois',
-    lateNote:
-      'Jours saisis sur un mois clos dont le CRA n’est pas encore validé. Le mois en cours affiche zéro : rien n’est en retard, puisque rien n’est encore dû.',
-    lateNoneYet: 'Mois en cours — rien n’est encore dû.',
-    lateTag: 'En retard',
-    awaitingManager: 'En attente de validation par le manager',
-    awaitingConsultant: 'En attente du consultant',
-    invoiceStatuses: {
-      draft: 'Brouillon',
-      issued: 'Émise',
-      cancelledByCreditNote: 'Annulée par un avoir',
-    },
-    declineReasons: {
-      notRegie: 'Hors régie — mission au forfait ou interne',
-      unknownMission: 'Mission inconnue de la facturation',
-      noAgreedRate: 'Aucun TJM en vigueur à cette date',
-      unknownClient: 'Client inconnu',
-    },
   },
 
   invoice: {
     heading: 'Facture',
     draftHeading: 'Facture en brouillon',
-    nav: 'Factures',
-    open: 'Ouvrir la facture',
-    openFor: 'de {name}',
     draftNotice:
       'Ce document n’est pas une facture : il n’a ni numéro ni date d’émission. Il est produit à partir d’un CRA validé, donc déjà figé — mais son statut et ses montants restent provisoires tant qu’il n’est pas émis. Il devient une facture à l’émission, et plus rien ne bouge ensuite.',
     seller: 'Émetteur',
@@ -219,11 +107,7 @@ export const LABELS = {
     shareCapital: 'Capital social',
     origin: 'Origine des lignes',
     originLine: 'CRA {cra} — {period} — {mission}',
-    validatedBy: 'Validé par',
     notCharged: 'Non soumis à TVA',
-    issue: 'Émettre la facture',
-    cannotIssue:
-      'Cette facture est déjà émise : elle porte un numéro et une date, et une facture émise ne se modifie pas.',
   },
 
   problem: {
@@ -318,10 +202,6 @@ export const LABELS = {
     correlationHint:
       'À citer en cas de signalement : il relie cette page à la ligne de journal qui la décrit.',
     back: 'Revenir à l’accueil',
-  },
-
-  action: {
-    continue: 'Continuer',
   },
 
   footer: {
