@@ -44,7 +44,7 @@ jobs:
       # `stryker.config.json` breaks the job below the domain's own first measured score — see the
       # ADR for what that score was and why it is not lowered to make this pass.
       - name: Stryker mutation testing on the domain
-        run: pnpm exec stryker run
+        run: pnpm run mutation
 
       - name: Upload the mutation HTML report
         if: ${{ !cancelled() }}

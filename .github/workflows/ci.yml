@@ -158,15 +158,7 @@ jobs:
       # to `docker/postgres/init/01-roles.sh`, and for the same reason: before the migrations, so
       # tables created afterwards inherit the default privileges.
       - name: Create app role, as the local init script does
-        run: |
-          psql "postgres://erp_migration:erp_local_dev@localhost:5433/erp" <<'EOSQL'
-            CREATE ROLE erp_app WITH LOGIN PASSWORD 'erp_local_dev';
-            GRANT CONNECT ON DATABASE erp TO erp_app;
-            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
-              GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO erp_app;
-            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
-              GRANT USAGE, SELECT ON SEQUENCES TO erp_app;
-          EOSQL
+        run: scripts/bootstrap-ci-role.sh
         env:
           PGPASSWORD: erp_local_dev
 
@@ -234,15 +226,7 @@ jobs:
       # `billing` are migration 001's job, and this workflow used to repeat them in a later step,
       # which meant a broken grant block in the migration merged green.
       - name: Create app role, as the local init script does
-        run: |
-          psql "postgres://erp_migration:erp_local_dev@localhost:5433/erp" <<'EOSQL'
-            CREATE ROLE erp_app WITH LOGIN PASSWORD 'erp_local_dev';
-            GRANT CONNECT ON DATABASE erp TO erp_app;
-            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
-              GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO erp_app;
-            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
-              GRANT USAGE, SELECT ON SEQUENCES TO erp_app;
-          EOSQL
+        run: scripts/bootstrap-ci-role.sh
         env:
           PGPASSWORD: erp_local_dev
 
@@ -370,31 +354,7 @@ jobs:
           set -a
           . ./.env
           set +a
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" <<'EOSQL'
-            DO $$
-            DECLARE
-              expected CONSTANT text[][] := ARRAY[
-                ['public.offices','4'], ['public.practices','5'], ['public.personas','4'],
-                ['public.consultants','49'], ['public.clients','5'], ['public.missions','7'],
-                ['timesheet.cras','148'], ['billing.invoices','66'], ['public.domain_events','147']
-              ];
-              found bigint;
-              mismatches text[] := ARRAY[]::text[];
-            BEGIN
-              FOR i IN 1 .. array_length(expected, 1) LOOP
-                EXECUTE format('SELECT count(*) FROM %s', expected[i][1]) INTO found;
-                IF found <> expected[i][2]::bigint THEN
-                  mismatches := mismatches || format('%s reads %s rows, expected %s',
-                    expected[i][1], found, expected[i][2]);
-                END IF;
-              END LOOP;
-              IF array_length(mismatches, 1) IS NOT NULL THEN
-                RAISE EXCEPTION 'erp_app: %', array_to_string(mismatches, '; ');
-              END IF;
-              RAISE NOTICE 'erp_app reads every seeded table at the expected volume.';
-            END
-            $$;
-          EOSQL
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/assert-seed-counts.sql
 
   secrets:
     name: Secret scan
