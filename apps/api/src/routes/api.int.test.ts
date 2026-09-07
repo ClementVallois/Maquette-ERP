@@ -47,6 +47,10 @@ const CRA = 'api-cra';
 const MISSION_TWO = 'api-mission-2';
 const CLIENT_TWO = 'api-client-2';
 const CRA_TWO = 'api-cra-2';
+// A billing actor of the **other** office (Lyon), used only to prove that the issuance key check
+// is global rather than office-scoped: `prepareIssuance`'s `keyOwnerId` lookup has no office
+// filter, because the unique index it mirrors (migration 009) has none either.
+const LEA = 'api-lea';
 
 const config: ApiConfig = {
   databaseUrl: 'unused: every read goes through the injected unit of work',
@@ -97,6 +101,14 @@ const personas: readonly Persona[] = [
     officeId: PARIS,
     officeName: 'Paris',
     displayName: 'Chloé Dubois',
+  },
+  {
+    key: 'billing-lyon',
+    role: 'billing',
+    consultantId: LEA,
+    officeId: LYON,
+    officeName: 'Lyon',
+    displayName: 'Léa Petit',
   },
 ];
 
@@ -158,8 +170,9 @@ beforeEach(async () => {
             ($2, 'Bruno', 'Leroy', 'api-b@t', $5, 'api-practice', 'manager'),
             ($3, 'Emma', 'Robert', 'api-e@t', $6, 'api-practice', 'manager'),
             ($4, 'Henri', 'Laurent', 'api-h@t', $5, 'api-practice', 'director'),
-            ($7, 'Chloé', 'Dubois', 'api-c@t', $5, 'api-practice', 'consultant')`,
-    [ALICE, BRUNO, EMMA, HENRI, PARIS, LYON, CHLOE],
+            ($7, 'Chloé', 'Dubois', 'api-c@t', $5, 'api-practice', 'consultant'),
+            ($8, 'Léa', 'Petit', 'api-l@t', $6, 'api-practice', 'director')`,
+    [ALICE, BRUNO, EMMA, HENRI, PARIS, LYON, CHLOE, LEA],
   );
   await client.query(
     `INSERT INTO public.consultants
@@ -959,6 +972,75 @@ describe('the refusal, through the API', () => {
       method: 'GET',
       url: `/api/v1/invoices/${second!.id}`,
       headers: as('billing-paris'),
+    });
+
+    expect(untouched.json<{ status: string }>().status).toBe('draft');
+    expect(untouched.json<{ invoiceNumber: string | null }>().invoiceNumber).toBeNull();
+  });
+
+  it('refuses a key already used by an invoice of a different office, without leaking it', async () => {
+    // `prepareIssuance`'s key lookup carries no office filter (ADR-0044, ADR-0102): the unique
+    // index it mirrors is global, so the collision must be caught before either actor's scope is
+    // even asked. Seeded directly rather than through a second office's whole CRA workflow.
+    await transaction.client.query(
+      `INSERT INTO billing.invoices (
+         id, office_id, seller_id, supply_period,
+         billed_to_client_id, billed_to_name,
+         billed_to_billing_street, billed_to_billing_postal_code, billed_to_billing_city,
+         billed_to_billing_country,
+         billed_to_delivery_street, billed_to_delivery_postal_code, billed_to_delivery_city,
+         billed_to_delivery_country,
+         payment_terms_kind, payment_terms_days,
+         mentions_operation_category, mentions_early_payment_kind, mentions_late_penalty_rate,
+         mentions_recovery_indemnity
+       ) VALUES (
+         'api-invoice-lyon', $1, 'api-entity', '2026-06',
+         $2, 'Zenith Industries',
+         '2 rue', '69002', 'Lyon', 'France',
+         '2 rue', '69002', 'Lyon', 'France',
+         'net', 30,
+         'services', 'none', 3000, 4000
+       )`,
+      [LYON, CLIENT_TWO],
+    );
+
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/validation`,
+      headers: writingAs('manager-paris'),
+    });
+    const invoices = await app.inject({
+      method: 'GET',
+      url: '/api/v1/invoices',
+      headers: as('billing-paris'),
+    });
+    const parisInvoiceId = invoices.json<{ invoices: { id: string }[] }>().invoices[0]!.id;
+    const key = 'issuance-key-cross-office';
+
+    const issued = await app.inject({
+      method: 'POST',
+      url: `/api/v1/invoices/${parisInvoiceId}/issuance`,
+      headers: { ...writingAs('billing-paris'), 'idempotency-key': key },
+    });
+    expect(issued.statusCode).toBe(200);
+
+    // A Lyon billing actor reuses the same key on their own office's invoice.
+    const reused = await app.inject({
+      method: 'POST',
+      url: '/api/v1/invoices/api-invoice-lyon/issuance',
+      headers: { ...writingAs('billing-lyon'), 'idempotency-key': key },
+    });
+
+    expect(reused.statusCode).toBe(409);
+    expect(reused.json()).toMatchObject({ type: '/problems/idempotency-key-reused' });
+    // Not the Paris invoice's number under the Lyon invoice's id, and no hint of which invoice
+    // the key belongs to — the response carries nothing about the invoice out of Lyon's scope.
+    expect(reused.json<{ invoiceNumber?: string }>().invoiceNumber).toBeUndefined();
+
+    const untouched = await app.inject({
+      method: 'GET',
+      url: '/api/v1/invoices/api-invoice-lyon',
+      headers: as('billing-lyon'),
     });
 
     expect(untouched.json<{ status: string }>().status).toBe('draft');
