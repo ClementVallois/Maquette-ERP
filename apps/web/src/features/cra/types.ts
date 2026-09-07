@@ -165,11 +165,6 @@ export interface ManagerCraGridResponse extends CraGridResponse {
   readonly consultantName: string;
 }
 
-/** `GET /api/v1/calendar` — the working calendar's own year coverage (ADR-0004). */
-export interface CalendarResponse {
-  readonly years: readonly number[];
-}
-
 export interface DeclinedDay {
   readonly craId: string;
   readonly missionId: string;

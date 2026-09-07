@@ -11,7 +11,6 @@ import { unwrap } from '@/lib/api-client';
 
 import {
   type CraListFilters,
-  fetchCalendar,
   fetchConsultantRoster,
   fetchCraGrid,
   fetchCraList,
@@ -21,7 +20,6 @@ import {
   saveMonth,
 } from './api';
 import type {
-  CalendarResponse,
   ConsultantRosterResponse,
   CraGridResponse,
   CraListResponse,
@@ -33,7 +31,6 @@ import type {
 } from './types';
 
 const CRA_LIST_QUERY_KEY = ['cra', 'list'] as const;
-const CALENDAR_QUERY_KEY = ['cra', 'calendar'] as const;
 const CONSULTANT_ROSTER_QUERY_KEY = ['cra', 'consultant-roster'] as const;
 
 /**
@@ -160,16 +157,6 @@ export function useManagerCraGrid(
   return useQuery({
     queryKey: managerCraGridQueryKey(consultantId, period),
     queryFn: async () => unwrap(await fetchManagerCraGrid(consultantId, period)),
-  });
-}
-
-/** The working calendar's own year coverage (ADR-0004) — bounds the "open a future month" picker.
- * Effectively static within a session (the calendar table is code, not data), so the default
- * `staleTime` is left alone rather than tuned per query. */
-export function useCalendar(): UseQueryResult<CalendarResponse> {
-  return useQuery({
-    queryKey: CALENDAR_QUERY_KEY,
-    queryFn: async () => unwrap(await fetchCalendar()),
   });
 }
 

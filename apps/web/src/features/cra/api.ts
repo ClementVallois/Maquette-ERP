@@ -1,7 +1,6 @@
 import { apiFetch, type ApiResult } from '@/lib/api-client';
 
 import type {
-  CalendarResponse,
   ConsultantRosterResponse,
   CraGridResponse,
   CraListResponse,
@@ -87,11 +86,6 @@ export function fetchManagerCraGrid(
   return apiFetch<ManagerCraGridResponse>(
     `/api/v1/consultants/${consultantId}/cras/${period}/grid`,
   );
-}
-
-/** The working calendar's own coverage (ADR-0004) — what bounds the "open a future month" picker. */
-export function fetchCalendar(): Promise<ApiResult<CalendarResponse>> {
-  return apiFetch<CalendarResponse>('/api/v1/calendar');
 }
 
 export function saveMonth(

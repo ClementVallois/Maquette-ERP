@@ -14,6 +14,7 @@ import { TogglePillGroup } from '@/components/toggle-pill-group';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { YearFilterSelect } from '@/components/year-filter-select';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
 import { frenchEuros, frenchMonth } from '@/lib/format';
@@ -267,27 +268,14 @@ export function InvoiceListScreen({
             placeholder={LABELS.invoice.searchPlaceholder}
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          {LABELS.invoice.year}
-          <Input
-            className="w-32"
-            type="number"
-            min={2000}
-            max={2100}
-            value={year ?? ''}
-            placeholder={LABELS.invoice.allYears}
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              void navigate({
-                to: '/factures',
-                search: searchState({
-                  year: value === '' ? undefined : Number.parseInt(value, 10),
-                  page: 1,
-                }),
-              });
-            }}
-          />
-        </label>
+        <YearFilterSelect
+          value={year}
+          onChange={(next) => {
+            void navigate({ to: '/factures', search: searchState({ year: next, page: 1 }) });
+          }}
+          label={LABELS.invoice.year}
+          allLabel={LABELS.invoice.allYears}
+        />
         <Button type="submit" variant="outline">
           {LABELS.invoice.searchAction}
         </Button>
