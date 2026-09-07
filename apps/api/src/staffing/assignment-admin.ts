@@ -1,40 +1,13 @@
-import { STAFFING_PROBLEM_TYPES, type StaffingProblemType } from '@erp/contracts';
+import {
+  STAFFING_PROBLEM_TYPES,
+  type AssignmentCatalogue,
+  type AssignmentInput,
+  type StaffingProblemType,
+} from '@erp/contracts';
 import { isoDate, isoDateOf, toDayNumber, type Actor, type IsoDate } from '@erp/platform';
 
 import type { PgReadClient } from '../persistence/pg-client.ts';
 import { PgReferenceReader } from '../persistence/reference-reader.ts';
-
-export interface AssignmentInput {
-  readonly consultantId: string;
-  readonly missionId: string;
-  readonly fromDate: string;
-  readonly toDate: string | null;
-}
-
-export interface AssignmentView extends AssignmentInput {
-  readonly id: string;
-  readonly consultantName: string;
-  readonly missionName: string;
-  readonly clientName: string;
-}
-
-export interface AssignmentCatalogue {
-  readonly today: string;
-  readonly assignments: readonly AssignmentView[];
-  readonly consultants: readonly {
-    readonly id: string;
-    readonly name: string;
-    readonly departureDate: string | null;
-  }[];
-  readonly missions: readonly {
-    readonly id: string;
-    readonly name: string;
-    readonly clientName: string;
-    readonly startDate: string;
-    readonly endDate: string | null;
-    readonly requiredHabilitations: readonly string[];
-  }[];
-}
 
 export type AssignmentWriteOutcome =
   | { readonly kind: 'saved'; readonly id: string }

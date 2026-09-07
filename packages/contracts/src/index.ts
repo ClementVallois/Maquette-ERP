@@ -26,3 +26,9 @@ export type {
   OrgChartMember,
   OrgChartResponse,
 } from './dashboard.ts';
+export type {
+  Assignment,
+  AssignmentCatalogue,
+  AssignmentInput,
+  AssignmentSaved,
+} from './staffing.ts';

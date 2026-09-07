@@ -1,10 +1,11 @@
+import type { AssignmentInput } from '@erp/contracts';
 import type { Actor } from '@erp/platform';
 import { closePool, getPool, useTestTransaction } from '@erp/test-harness';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { uuidv7 } from '../ids/uuidv7.ts';
 
-import { createAssignment, updateAssignment, type AssignmentInput } from './assignment-admin.ts';
+import { createAssignment, updateAssignment } from './assignment-admin.ts';
 
 /**
  * `validateAssignment` had no direct test anywhere in the repository before this file (package 04
