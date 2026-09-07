@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router';
 import { CalendarRangeIcon, PencilIcon, PlusIcon } from 'lucide-react';
 import type { ReactElement, SyntheticEvent } from 'react';
 import { useRef, useState } from 'react';
@@ -23,7 +24,8 @@ import { assignmentFormRefusal } from '../form';
 import { useAssignments, useSaveAssignment } from '../hooks';
 import type { Assignment, AssignmentInput } from '../types';
 
-type ViewFilter = 'current' | 'all';
+type ViewFilter = 'current' | 'upcoming' | 'ended' | 'all';
+type StaffingFilter = 'on-mission' | 'intercontrat';
 
 const EMPTY_FORM: AssignmentInput = {
   consultantId: '',
@@ -40,9 +42,18 @@ function isUpcoming(assignment: Assignment, today: string): boolean {
   return assignment.fromDate > today;
 }
 
-export function AssignmentScreen(): ReactElement {
+interface AssignmentScreenProps {
+  readonly view: ViewFilter;
+  readonly staffing?: StaffingFilter;
+}
+
+export function AssignmentScreen({
+  view,
+  staffing: _staffing,
+}: AssignmentScreenProps): ReactElement {
   const query = useAssignments();
   const save = useSaveAssignment();
+  const navigate = useNavigate();
   const [form, setForm] = useState<AssignmentInput>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   // No native `<select required>` backs the consultant picker any more (a `Button`+`Popover`
@@ -51,7 +62,10 @@ export function AssignmentScreen(): ReactElement {
   // mission and dates are filled but no consultant is chosen.
   const [consultantMissing, setConsultantMissing] = useState(false);
   const formHeading = useRef<HTMLHeadingElement>(null);
-  const [filter, setFilter] = useState<ViewFilter>('current');
+
+  function setView(next: ViewFilter): void {
+    void navigate({ to: '/affectations', search: (prev) => ({ ...prev, view: next }) });
+  }
 
   if (query.isPending) {
     return (
@@ -76,7 +90,7 @@ export function AssignmentScreen(): ReactElement {
   const data = query.data;
   const current = data.assignments.filter((assignment) => isCurrent(assignment, data.today));
   const upcoming = data.assignments.filter((assignment) => isUpcoming(assignment, data.today));
-  const visible = filter === 'current' ? current : data.assignments;
+  const visible = view === 'current' ? current : data.assignments;
   const selectedMission = data.missions.find((mission) => mission.id === form.missionId);
   const selectedConsultant = data.consultants.find(
     (consultant) => consultant.id === form.consultantId,
@@ -340,9 +354,9 @@ export function AssignmentScreen(): ReactElement {
                 key={value}
                 type="button"
                 size="sm"
-                variant={filter === value ? 'secondary' : 'ghost'}
+                variant={view === value ? 'secondary' : 'ghost'}
                 onClick={() => {
-                  setFilter(value);
+                  setView(value);
                 }}
               >
                 {LABELS.assignment.filters[value]}
