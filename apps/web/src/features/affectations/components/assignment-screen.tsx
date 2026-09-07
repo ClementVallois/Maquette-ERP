@@ -9,6 +9,7 @@ import { ErrorState } from '@/components/feedback/error-state';
 import { GlossaryTerm } from '@/components/glossary-term';
 import { SingleSelectCombobox } from '@/components/single-select-combobox';
 import { StatCard } from '@/components/stat-card';
+import { TogglePillGroup } from '@/components/toggle-pill-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,8 @@ import type { Assignment, AssignmentInput } from '../types';
 type ViewFilter = 'current' | 'upcoming' | 'ended' | 'all';
 type StaffingFilter = 'on-mission' | 'intercontrat';
 
+const VIEW_ORDER: readonly ViewFilter[] = ['current', 'upcoming', 'ended', 'all'];
+
 const EMPTY_FORM: AssignmentInput = {
   consultantId: '',
   missionId: '',
@@ -40,6 +43,12 @@ function isCurrent(assignment: Assignment, today: string): boolean {
 
 function isUpcoming(assignment: Assignment, today: string): boolean {
   return assignment.fromDate > today;
+}
+
+/** Neither current nor upcoming — the third of the three mutually-exclusive, exhaustive buckets
+ * `all`'s count has to sum from. */
+function isEnded(assignment: Assignment, today: string): boolean {
+  return !isCurrent(assignment, today) && !isUpcoming(assignment, today);
 }
 
 interface AssignmentScreenProps {
@@ -91,7 +100,15 @@ export function AssignmentScreen({
   const data = query.data;
   const current = data.assignments.filter((assignment) => isCurrent(assignment, data.today));
   const upcoming = data.assignments.filter((assignment) => isUpcoming(assignment, data.today));
-  const visible = view === 'current' ? current : data.assignments;
+  const ended = data.assignments.filter((assignment) => isEnded(assignment, data.today));
+  const visible =
+    view === 'current'
+      ? current
+      : view === 'upcoming'
+        ? upcoming
+        : view === 'ended'
+          ? ended
+          : data.assignments;
   const selectedMission = data.missions.find((mission) => mission.id === form.missionId);
   const selectedConsultant = data.consultants.find(
     (consultant) => consultant.id === form.consultantId,
@@ -371,21 +388,26 @@ export function AssignmentScreen({
             <h2 className="text-card-title">{LABELS.assignment.list}</h2>
             <p className="text-sm text-muted-foreground">{LABELS.assignment.listLead}</p>
           </div>
-          <div className="flex rounded-lg bg-muted p-1">
-            {(['current', 'all'] as const).map((value) => (
-              <Button
-                key={value}
-                type="button"
-                size="sm"
-                variant={view === value ? 'secondary' : 'ghost'}
-                onClick={() => {
-                  setView(value);
-                }}
-              >
-                {LABELS.assignment.filters[value]}
-              </Button>
-            ))}
-          </div>
+          <TogglePillGroup
+            label={LABELS.assignment.filterGroupLabel}
+            exclusive
+            options={VIEW_ORDER.map((value) => ({
+              value,
+              label: LABELS.assignment.filters[value],
+              count:
+                value === 'current'
+                  ? current.length
+                  : value === 'upcoming'
+                    ? upcoming.length
+                    : value === 'ended'
+                      ? ended.length
+                      : data.assignments.length,
+            }))}
+            selected={[view]}
+            onChange={([next]) => {
+              setView(next === undefined ? 'current' : (next as ViewFilter));
+            }}
+          />
         </div>
 
         {visible.length === 0 ? (
