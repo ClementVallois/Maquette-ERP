@@ -216,6 +216,30 @@ describe('the SPA build assets (Phase 9.1)', () => {
   });
 });
 
+/**
+ * Package 12 of the cleanup audit: "removed paths do not still accept writes." Literal path
+ * strings, not `PATHS` constants — `PATHS` no longer names any of these (Work item 4, "prune
+ * obsolete path constants"), which is itself part of what this proves: nothing in the current
+ * source can even construct these paths by accident any more. Verified as a genuine regression
+ * guard, not a tautology, by temporarily re-registering one of them (`POST /persona`, copied from
+ * `git show 495cfa5^:apps/api/src/web/routes.ts`) and confirming this test fails against that
+ * tree before removing it again.
+ */
+describe('package 12: the retired legacy HTML mutations', () => {
+  it.each([
+    ['POST', '/persona'],
+    ['POST', '/persona/retrait'],
+    ['POST', '/consultant/cra/2026-06'],
+    ['POST', '/pre-facturier/validation/some-id'],
+    ['POST', '/pre-facturier/refus/some-id'],
+    ['POST', '/facture/emission/some-id'],
+  ] as const)('%s %s no longer matches any route', async (method, url) => {
+    const response = await app.inject({ method, url, headers: { origin: ORIGIN } });
+
+    expect(response.statusCode).toBe(404);
+  });
+});
+
 describe('security headers', () => {
   it("sends exactly the string frozen in ADR-0072, admitting only the SPA's own bundle", async () => {
     // The stylesheet and not `PATHS.home`: since Phase 9.3 no route in this file answers `/`, and
