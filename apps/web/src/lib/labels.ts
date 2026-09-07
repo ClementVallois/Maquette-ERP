@@ -253,6 +253,12 @@ export const LABELS = {
       empty: 'Aucun consultant actif dans cette implantation.',
       hide: 'Masquer la répartition de l’équipe',
       show: 'Afficher la répartition de l’équipe',
+      /** Item 3, QA round 6: the legend entries double as the entry point into `/affectations`,
+       * filtered — the accessible name of each `Link` (`aria-label`/`title`), since the visible
+       * legend text (`onMission`/`intercontrat` above) also carries the raw count and is not on
+       * its own a sentence describing where the link goes. */
+      openOnMission: 'Voir les consultants en mission',
+      openIntercontrat: 'Voir les consultants en intercontrat',
     },
     /** Item 3, QA round 5: billing's deliberate empty state where the invoice-history charts used
      * to render — a stated absence, not a silent hole in the layout. */
@@ -839,6 +845,10 @@ export const LABELS = {
     endedBadge: 'Terminée',
     openEnded: 'sans date de fin',
     editFor: 'Modifier l’affectation de {name}',
+    staffingFilterOnMission: 'En mission',
+    staffingFilterIntercontrat: 'Intercontrat',
+    staffingFilterCount: '{count} consultants',
+    staffingFilterClear: 'Effacer ce filtre',
   },
 
   margin: {

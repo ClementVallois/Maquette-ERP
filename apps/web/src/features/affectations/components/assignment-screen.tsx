@@ -23,7 +23,7 @@ import { headingFor, sentenceFor } from '@/lib/problems';
 
 import { assignmentFormRefusal } from '../form';
 import { useAssignments, useSaveAssignment } from '../hooks';
-import type { Assignment, AssignmentInput } from '../types';
+import { INTERCONTRAT_MISSION_NAME, type Assignment, type AssignmentInput } from '../types';
 
 type ViewFilter = 'current' | 'upcoming' | 'ended' | 'all';
 type StaffingFilter = 'on-mission' | 'intercontrat';
@@ -51,15 +51,34 @@ function isEnded(assignment: Assignment, today: string): boolean {
   return !isCurrent(assignment, today) && !isUpcoming(assignment, today);
 }
 
+/**
+ * The client-side twin of `managerStaffingSnapshot`
+ * (`apps/api/src/staffing/staffing-snapshot.ts`): a consultant with any assignment active today
+ * whose mission is not `Intercontrat` is `'on-mission'`, even if they also hold an `Intercontrat`
+ * row today — staffed on real work takes precedence. A consultant with no assignment active today
+ * is in neither bucket (`null`), never naively read off assignment rows alone.
+ */
+function staffingBucketOf(
+  assignments: readonly Assignment[],
+  consultantId: string,
+  today: string,
+): StaffingFilter | null {
+  const active = assignments.filter(
+    (assignment) => assignment.consultantId === consultantId && isCurrent(assignment, today),
+  );
+  if (active.length === 0) return null;
+
+  return active.some((assignment) => assignment.missionName !== INTERCONTRAT_MISSION_NAME)
+    ? 'on-mission'
+    : 'intercontrat';
+}
+
 interface AssignmentScreenProps {
   readonly view: ViewFilter;
   readonly staffing?: StaffingFilter;
 }
 
-export function AssignmentScreen({
-  view,
-  staffing: _staffing,
-}: AssignmentScreenProps): ReactElement {
+export function AssignmentScreen({ view, staffing }: AssignmentScreenProps): ReactElement {
   const query = useAssignments();
   const save = useSaveAssignment();
   const navigate = useNavigate();
@@ -101,7 +120,7 @@ export function AssignmentScreen({
   const current = data.assignments.filter((assignment) => isCurrent(assignment, data.today));
   const upcoming = data.assignments.filter((assignment) => isUpcoming(assignment, data.today));
   const ended = data.assignments.filter((assignment) => isEnded(assignment, data.today));
-  const visible =
+  const byStatus =
     view === 'current'
       ? current
       : view === 'upcoming'
@@ -109,6 +128,32 @@ export function AssignmentScreen({
         : view === 'ended'
           ? ended
           : data.assignments;
+  // Item 3, QA round 6: the manager dashboard's staffing chart deep-links here with a consultant
+  // bucket, not an assignment property — `staffingBucketOf` replicates the server's own
+  // per-consultant precedence (`managerStaffingSnapshot`) rather than filtering rows by mission
+  // name, which would diverge from it (a consultant on-mission but with an idle `Intercontrat`
+  // row would otherwise count twice, once in each bucket).
+  const staffingConsultantIds =
+    staffing === undefined
+      ? null
+      : new Set(
+          data.consultants
+            .filter((consultant) => consultant.departureDate === null)
+            .filter(
+              (consultant) =>
+                staffingBucketOf(data.assignments, consultant.id, data.today) === staffing,
+            )
+            .map((consultant) => consultant.id),
+        );
+  const visible =
+    staffingConsultantIds === null
+      ? byStatus
+      : byStatus
+          .filter((assignment) => staffingConsultantIds.has(assignment.consultantId))
+          .filter(
+            (assignment) =>
+              staffing !== 'on-mission' || assignment.missionName !== INTERCONTRAT_MISSION_NAME,
+          );
   const selectedMission = data.missions.find((mission) => mission.id === form.missionId);
   const selectedConsultant = data.consultants.find(
     (consultant) => consultant.id === form.consultantId,
@@ -409,6 +454,29 @@ export function AssignmentScreen({
             }}
           />
         </div>
+
+        {staffingConsultantIds !== null && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm">
+            <span>
+              {staffing === 'on-mission'
+                ? LABELS.assignment.staffingFilterOnMission
+                : LABELS.assignment.staffingFilterIntercontrat}
+              {' · '}
+              {LABELS.assignment.staffingFilterCount.replace(
+                '{count}',
+                String(staffingConsultantIds.size),
+              )}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => void navigate({ to: '/affectations', search: { view: 'current' } })}
+            >
+              {LABELS.assignment.staffingFilterClear}
+            </Button>
+          </div>
+        )}
 
         {visible.length === 0 ? (
           <EmptyState
