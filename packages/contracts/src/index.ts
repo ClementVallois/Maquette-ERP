@@ -11,3 +11,18 @@ export type {
   SelectPersonaResponse,
   SessionResponse,
 } from './session.ts';
+export type {
+  BillingDashboard,
+  BillingQueueRow,
+  ConsultantDashboard,
+  ConsultantOrgChart,
+  DashboardActivity,
+  DashboardCraStatus,
+  DashboardResponse,
+  ManagerDashboard,
+  ManagerOrgChart,
+  ManagerQueueRow,
+  ManagerStaffing,
+  OrgChartMember,
+  OrgChartResponse,
+} from './dashboard.ts';

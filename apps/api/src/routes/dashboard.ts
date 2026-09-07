@@ -1,3 +1,11 @@
+import type {
+  BillingDashboard,
+  ConsultantDashboard,
+  ConsultantOrgChart,
+  DashboardCraStatus,
+  ManagerDashboard,
+  ManagerOrgChart,
+} from '@erp/contracts';
 import { daysOf, isoDateInFirmTimeZone, periodFromIso, QUARTER_DAYS_PER_DAY } from '@erp/platform';
 import { CRA_STATUSES, workingCalendar } from '@erp/timesheet';
 import type { FastifyInstance } from 'fastify';
@@ -11,6 +19,23 @@ import { managerStaffingSnapshot } from '../staffing/staffing-snapshot.ts';
 import { malformed, parseInput } from '../validation.ts';
 
 import { CRA_LIST_MAX_PAGE_SIZE, PeriodQuery } from './schemas.ts';
+
+/**
+ * `CraListItem.status` is `string` on the repository's own interface — accurate for a value that
+ * crosses the module boundary as an opaque string, but wider than `timesheet.cras`' own `CHECK
+ * (status IN (...))` actually allows. The cast is the one place that narrows it back to
+ * `DashboardCraStatus`, which is otherwise identical to `@erp/timesheet`'s `CraStatus` — package
+ * 09 is about the wire contract two apps share, not a wider retyping of every repository's own
+ * `string`-typed status column, which stays a separate, larger decision.
+ */
+function craActivityStatus(status: string): DashboardCraStatus {
+  return status as DashboardCraStatus;
+}
+
+/** The same narrowing as `craActivityStatus`, for `InvoiceListItem.status`'s own `string`. */
+function invoiceActivityStatus(status: string): 'issued' | 'cancelledByCreditNote' {
+  return status as 'issued' | 'cancelledByCreditNote';
+}
 
 export function registerDashboardRoutes(
   app: FastifyInstance,
@@ -46,14 +71,18 @@ export function registerDashboardRoutes(
             ? null
             : { id: managerId, displayName: names.get(managerId) ?? managerId };
 
-        if (actor.role === 'consultant') return { role: 'consultant' as const, manager };
+        if (actor.role === 'consultant') {
+          const consultantOrgChart: ConsultantOrgChart = { role: 'consultant', manager };
+          return consultantOrgChart;
+        }
 
         const officeRoster = await reader.consultantsOfOffice(actor.officeId);
         const reports = officeRoster.filter(
           (consultant) => chain.managerOn(consultant.id, today) === actor.consultantId,
         );
 
-        return { role: 'manager' as const, manager, reports };
+        const managerOrgChart: ManagerOrgChart = { role: 'manager', manager, reports };
+        return managerOrgChart;
       });
     },
   );
@@ -103,9 +132,9 @@ export function registerDashboardRoutes(
           recordedByDay.set(line.day, (recordedByDay.get(line.day) ?? 0) + line.quarterDays);
         }
 
-        return {
+        const consultantDashboard: ConsultantDashboard = {
           period: query.value.period,
-          role: 'consultant' as const,
+          role: 'consultant',
           availablePeriods,
           myMonthStatus: cra?.status ?? null,
           recordedQuarterDays: cra?.lines.reduce((total, line) => total + line.quarterDays, 0) ?? 0,
@@ -124,12 +153,13 @@ export function registerDashboardRoutes(
               key: row.id,
               kind: 'cra' as const,
               recordId: row.id,
-              status: row.status,
+              status: craActivityStatus(row.status),
               period: row.period,
               name: null,
               at: row.statusChangedAt,
             })),
         };
+        return consultantDashboard;
       }
 
       if (actor.role === 'manager') {
@@ -208,9 +238,9 @@ export function registerDashboardRoutes(
           statusChangedAt: row.statusChangedAt,
         }));
 
-        return {
+        const managerDashboard: ManagerDashboard = {
           period: query.value.period,
-          role: 'manager' as const,
+          role: 'manager',
           availablePeriods,
           pendingDecisions,
           billableCents: composition.billable.reduce(
@@ -229,13 +259,14 @@ export function registerDashboardRoutes(
               key: row.id,
               kind: 'cra' as const,
               recordId: row.id,
-              status: row.status,
+              status: craActivityStatus(row.status),
               period: row.period,
               name: consultantNames.get(row.consultantId) ?? row.consultantId,
               at: row.statusChangedAt,
               consultantId: row.consultantId,
             })),
         };
+        return managerDashboard;
       }
 
       // Package 08: `draftInvoices`, `issuedInvoices` and `totalTtcIssuedCents` each get their
@@ -307,9 +338,9 @@ export function registerDashboardRoutes(
         };
       });
 
-      return {
+      const billingDashboard: BillingDashboard = {
         period: query.value.period,
-        role: 'billing' as const,
+        role: 'billing',
         availablePeriods,
         draftInvoices,
         issuedInvoices,
@@ -324,12 +355,13 @@ export function registerDashboardRoutes(
             key: invoice.id,
             kind: 'invoice' as const,
             recordId: invoice.id,
-            status: invoice.status,
+            status: invoiceActivityStatus(invoice.status),
             period: invoice.supplyPeriod,
             name: invoice.billedToName,
             at: invoice.issueDate,
           })),
       };
+      return billingDashboard;
     },
   );
 
