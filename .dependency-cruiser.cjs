@@ -94,9 +94,11 @@ module.exports = {
   allowed: [
     // Inside one package. `$1` is the capture group from `from.path`.
     { from: { path: '^packages/([^/]+)/' }, to: { path: '^packages/$1/' } },
-    // The two modules may use the shared kernel, and only through its public entry point.
+    // The two modules and the shared wire contract may use the shared kernel, and only through
+    // its public entry point (ADR-0110/ADR-0111: contracts reaching for platform's Role or
+    // IsoDate is not the same act as reaching for a business module).
     {
-      from: { path: '^packages/(timesheet|billing)/' },
+      from: { path: '^packages/(timesheet|billing|contracts)/' },
       to: { path: '^packages/platform/src/index\\.ts$' },
     },
     // Inside one app.
