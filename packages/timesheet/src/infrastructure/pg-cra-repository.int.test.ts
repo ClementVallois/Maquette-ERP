@@ -152,6 +152,31 @@ describe('PgCraRepository', () => {
     expect(found!.consultantId).toBe('consultant-1');
   });
 
+  it('batch-loads scoped list rows by id and complete period', async () => {
+    await seedOffices();
+    await repo().save(makeCra());
+
+    const byId = await repo().findListItemsByIds(['cra-001'], parisManager);
+    const byPeriod = await repo().listPeriod(parisManager, '2026-06');
+
+    expect(byId).toStrictEqual(byPeriod);
+    expect(byId[0]).toMatchObject({
+      id: 'cra-001',
+      consultantId: 'consultant-1',
+      officeId: PARIS,
+      period: '2026-06',
+      status: 'draft',
+    });
+  });
+
+  it('returns no batch projection outside the actor scope', async () => {
+    await seedOffices();
+    await repo().save(makeCra());
+
+    expect(await repo().findListItemsByIds(['cra-001'], lyonManager)).toStrictEqual([]);
+    expect(await repo().listPeriod(lyonManager, '2026-06')).toStrictEqual([]);
+  });
+
   it("lists a consultant's own CRAs only, where the manager lists the whole office", async () => {
     await seedOffices();
     await repo().save(makeCra());

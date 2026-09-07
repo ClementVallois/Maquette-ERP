@@ -121,6 +121,8 @@ function writingAs(key: string): { cookie: string; origin: string } {
 }
 
 let app: FastifyInstance;
+let databaseQueryCount = 0;
+type CountedQuery = (text: string, values?: unknown[]) => Promise<unknown>;
 
 /** Every workable day of June 2026 on one mission — the shape `submit` requires. */
 function workedDaysOfJune(): string[] {
@@ -149,13 +151,28 @@ function workedDaysOfJuly(): string[] {
 
 beforeEach(async () => {
   const { client } = transaction;
+  const countedClient = new Proxy(client, {
+    get(target, property) {
+      if (property !== 'query') {
+        const value: unknown = Reflect.get(target, property);
+        return value;
+      }
+
+      const query = target.query.bind(target) as CountedQuery;
+
+      return (...args: Parameters<typeof query>) => {
+        databaseQueryCount += 1;
+        return query(...args);
+      };
+    },
+  });
 
   app = buildServer({
     config,
     clock: { now: () => new Date('2026-07-02T09:00:00.000Z') },
     probeDatabase: () => Promise.resolve(),
     personas: inMemoryPersonas(personas),
-    transactionally: savepointTransactionally(client, uuidv7),
+    transactionally: savepointTransactionally(countedClient, uuidv7),
     newId: uuidv7,
   });
 
@@ -258,6 +275,7 @@ beforeEach(async () => {
       [uuidv7(), CRA, day, MISSION, uuidv7(), CRA_TWO, MISSION_TWO],
     );
   }
+  databaseQueryCount = 0;
 });
 
 afterEach(async () => {
@@ -302,6 +320,39 @@ describe('GET /api/v1/cras — consultantName (ADR-0071)', () => {
     expect(cras).toContainEqual(
       expect.objectContaining({ consultantId: CHLOE, consultantName: 'Chloé Dubois' }),
     );
+  });
+});
+
+describe('GET /api/v1/invoices — bounded query count (package 15)', () => {
+  it('uses the same number of database queries for one row and two rows', async () => {
+    for (const cra of [CRA, CRA_TWO]) {
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/cras/${cra}/validation`,
+        headers: writingAs('manager-paris'),
+      });
+    }
+
+    databaseQueryCount = 0;
+    const oneRow = await app.inject({
+      method: 'GET',
+      url: '/api/v1/invoices?limit=1',
+      headers: as('billing-paris'),
+    });
+    const oneRowQueryCount = databaseQueryCount;
+
+    databaseQueryCount = 0;
+    const twoRows = await app.inject({
+      method: 'GET',
+      url: '/api/v1/invoices?limit=2',
+      headers: as('billing-paris'),
+    });
+    const twoRowQueryCount = databaseQueryCount;
+
+    expect(oneRow.statusCode).toBe(200);
+    expect(twoRows.statusCode).toBe(200);
+    expect(twoRows.json<{ invoices: unknown[] }>().invoices).toHaveLength(2);
+    expect(twoRowQueryCount).toBe(oneRowQueryCount);
   });
 });
 

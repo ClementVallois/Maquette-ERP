@@ -7,12 +7,10 @@ import {
   type InvoiceListResponse,
   type IssuanceResponse,
 } from '@erp/contracts';
-import { isoDateInFirmTimeZone } from '@erp/platform';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { issueInvoice } from '../chain/issue-invoice.ts';
-import { preFacturierComposition } from '../composition/pre-facturier.ts';
 import type { ServerDependencies } from '../dependencies.ts';
 import { ApiFailure } from '../errors.ts';
 import { contextOf, sendProblem } from '../http/reply.ts';
@@ -48,24 +46,12 @@ export function registerInvoiceRoutes(
       return dependencies.transactionally(async (unit) => {
         const byYearAndStatus = await unit.invoices.countByYearAndStatus(actor);
 
-        // `preFacturierComposition` already computes a period's billable HT from the live
-        // aggregate rather than a stored (and, for a draft, absent) total — reused here rather
-        // than reimplemented, for the three months the seed actually fills.
-        const today = isoDateInFirmTimeZone(dependencies.clock.now());
         const denseMonths = [];
         const recentPeriods = (await unit.cras.listPeriods(actor)).slice(0, 3).toReversed();
         for (const period of recentPeriods) {
-          const composition = await preFacturierComposition(unit, {
-            actor,
-            requestedPeriod: period,
-            today,
-          });
           denseMonths.push({
             period,
-            billableCents: composition.billable.reduce(
-              (total, row) => total + row.totalExcludingVatCents,
-              0,
-            ),
+            billableCents: await unit.invoices.sumHtCents({ actor, period }),
           });
         }
 
@@ -94,7 +80,7 @@ export function registerInvoiceRoutes(
           ...sharedFilters,
           ...(query.value.status === undefined ? {} : { status: query.value.status }),
         };
-        const page = await unit.invoices.list({
+        const page = await unit.invoices.listProjection({
           ...filters,
           limit: query.value.limit,
           offset: query.value.offset,
@@ -111,44 +97,38 @@ export function registerInvoiceRoutes(
         };
 
         const reference = new PgReferenceReader(unit.client);
-        const consultantNames = await reference.consultantNames();
-        const missionNames = await reference.missionNames();
+        const sourceCras = await unit.cras.findListItemsByIds(
+          page.flatMap((item) => (item.sourceCraId === null ? [] : [item.sourceCraId])),
+          actor,
+        );
+        const consultantNames = await reference.consultantNames(
+          sourceCras.map((cra) => cra.consultantId),
+        );
+        const missionNames = await reference.missionNames(page.flatMap((item) => item.missionIds));
+        const sourceCrasById = new Map(sourceCras.map((cra) => [cra.id, cra]));
 
-        // Rank A7: the same discriminant the pré-facturier already carries
-        // (`PreFacturierInvoiceRow`) — a draft's client and period alone do not tell two invoices
-        // to the same client apart. One more read per row, bounded by the page, plus one Cra
-        // lookup per row's single source Cra (`saveDraft` records exactly one). Sequential, not
-        // `Promise.all`: every read here shares the one checked-out client this transaction is
-        // (`validate-cra.ts`'s own header explains why overlapping them buys nothing).
-        const invoices: InvoiceListItem[] = [];
-        for (const item of page) {
-          const invoice = await unit.invoices.findById(item.id, actor);
-          const sourceCraId = invoice?.lines[0]?.origin.craId;
+        const invoices: InvoiceListItem[] = page.map((item) => {
           const sourceCra =
-            sourceCraId === undefined ? null : await unit.cras.findById(sourceCraId, actor);
-          const lineMissionIds = [
-            ...new Set((invoice?.lines ?? []).map((line) => line.origin.missionId)),
-          ];
-          const createdAt =
-            sourceCra === null
-              ? null
-              : ((
-                  sourceCra.validatedAt ??
-                  sourceCra.refusal?.at ??
-                  sourceCra.submittedAt
-                )?.toISOString() ?? null);
+            item.sourceCraId === null ? null : (sourceCrasById.get(item.sourceCraId) ?? null);
 
-          invoices.push({
-            ...item,
+          return {
+            id: item.id,
+            status: item.status,
+            supplyPeriod: item.supplyPeriod,
+            billedToName: item.billedToName,
+            invoiceNumber: item.invoiceNumber,
+            issueDate: item.issueDate,
+            totalTtcCents: item.totalTtcCents,
+            totalsAreProvisional: item.totalsAreProvisional,
             consultantName:
               sourceCra === null
                 ? '—'
                 : (consultantNames.get(sourceCra.consultantId) ?? sourceCra.consultantId),
-            missionNames: lineMissionIds.map((id) => missionNames.get(id) ?? id),
-            lineCount: invoice?.lines.length ?? 0,
-            createdAt,
-          });
-        }
+            missionNames: item.missionIds.map((id) => missionNames.get(id) ?? id),
+            lineCount: item.lineCount,
+            createdAt: sourceCra?.statusChangedAt ?? null,
+          };
+        });
 
         const listResponse: InvoiceListResponse = {
           invoices,
@@ -178,8 +158,12 @@ export function registerInvoiceRoutes(
         const sourceCra =
           sourceCraId === undefined ? null : await unit.cras.findById(sourceCraId, actor);
         const reference = new PgReferenceReader(unit.client);
-        const consultantNames = await reference.consultantNames();
-        const missionNames = await reference.missionNames();
+        const consultantNames = await reference.consultantNames(
+          sourceCra === null ? [] : [sourceCra.consultantId],
+        );
+        const missionNames = await reference.missionNames(
+          invoice.lines.map((line) => line.origin.missionId),
+        );
         return { invoice, sourceCra, consultantNames, missionNames };
       });
       if (detail === null) return sendProblem(reply, notFound(request, 'invoice'));

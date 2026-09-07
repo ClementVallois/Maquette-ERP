@@ -230,6 +230,36 @@ describe('PgInvoiceRepository', () => {
     expect(lyonResults).toHaveLength(0);
   });
 
+  it('projects list enrichment and exact HT without reconstituting the invoice', async () => {
+    await seedReferenceData();
+    await repo().saveDraft(makeDraftInvoice(), 'cra-1');
+
+    const projected = await repo().listProjection({ actor: parisManager, limit: 10, offset: 0 });
+    const periodProjected = await repo().listPeriodProjection(parisManager, '2026-03');
+
+    expect(projected).toStrictEqual(periodProjected);
+    expect(projected[0]).toMatchObject({
+      id: 'invoice-1',
+      sourceCraId: 'cra-1',
+      missionIds: ['mission-audit'],
+      lineCount: 1,
+      totalExcludingVatCents: 1_365_000,
+      totalTtcCents: 1_638_000,
+    });
+    expect(await repo().sumHtCents({ actor: parisManager, period: '2026-03' })).toBe(1_365_000);
+  });
+
+  it('scopes every package 15 projection by role and office', async () => {
+    await seedReferenceData();
+    await repo().saveDraft(makeDraftInvoice(), 'cra-1');
+
+    for (const actor of [lyonManager, parisConsultant]) {
+      expect(await repo().listProjection({ actor, limit: 10, offset: 0 })).toStrictEqual([]);
+      expect(await repo().listPeriodProjection(actor, '2026-03')).toStrictEqual([]);
+      expect(await repo().sumHtCents({ actor, period: '2026-03' })).toBe(0);
+    }
+  });
+
   it('caps pagination at MAX_PAGE_SIZE, however large the caller asks', async () => {
     // Seeded past the cap on purpose. Asking for 1000 against an empty table also returns "no
     // more than 50" and proves nothing — the cap has to be the reason the answer is short.

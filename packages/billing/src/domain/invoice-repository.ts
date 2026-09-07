@@ -21,6 +21,13 @@ export interface InvoiceListItem {
   readonly totalsAreProvisional: boolean;
 }
 
+export interface InvoiceListProjection extends InvoiceListItem {
+  readonly sourceCraId: CraId | null;
+  readonly missionIds: readonly MissionId[];
+  readonly lineCount: number;
+  readonly totalExcludingVatCents: number;
+}
+
 export interface InvoiceListQuery {
   readonly actor: Actor;
   readonly limit: number;
@@ -72,6 +79,8 @@ export interface InvoiceRepository {
     actor: Actor,
   ): Promise<{ readonly invoice: Invoice | null; readonly keyOwnerId: InvoiceId | null }>;
   list(query: InvoiceListQuery): Promise<readonly InvoiceListItem[]>;
+  listProjection(query: InvoiceListQuery): Promise<readonly InvoiceListProjection[]>;
+  listPeriodProjection(actor: Actor, period: string): Promise<readonly InvoiceListProjection[]>;
   /**
    * Rank A12: `list`'s own `WHERE`, minus `limit`/`offset` — what makes truncation observable
    * (`total` vs. the page length actually returned) instead of indistinguishable from "there were
@@ -84,6 +93,7 @@ export interface InvoiceRepository {
    * statuses to include, the same way `count` already leaves that choice to its own caller.
    */
   sumTtcCents(query: Omit<InvoiceListQuery, 'limit' | 'offset'>): Promise<number>;
+  sumHtCents(query: Omit<InvoiceListQuery, 'limit' | 'offset'>): Promise<number>;
   /** Package 08: every distinct supply period visible to the actor, newest first; never derived from a page. */
   listPeriods(actor: Actor): Promise<readonly string[]>;
   /**

@@ -75,6 +75,43 @@ export class PgCraRepository implements CraRepository {
     return this.#reconstitute(row);
   }
 
+  async findListItemsByIds(ids: readonly CraId[], actor: Actor): Promise<readonly CraListItem[]> {
+    if (ids.length === 0) return [];
+    const scope = readScope(actor, 'cra');
+    if (scope === 'none') return [];
+
+    const { rows } = await this.#client.query<CraListRow>(
+      `${CRA_LIST_SELECT}
+       WHERE c.office_id = $1
+         AND ($2::text IS NULL OR c.consultant_id = $2)
+         AND c.id = ANY($3::text[])
+       GROUP BY c.id, c.consultant_id, c.office_id, c.period, c.status,
+                c.validated_at, c.refusal_at, c.submitted_at
+       ORDER BY c.period DESC, c.consultant_id`,
+      [actor.officeId, scope === 'own' ? actor.consultantId : null, ids],
+    );
+
+    return rows.map(toCraListItem);
+  }
+
+  async listPeriod(actor: Actor, period: string): Promise<readonly CraListItem[]> {
+    const scope = readScope(actor, 'cra');
+    if (scope === 'none') return [];
+
+    const { rows } = await this.#client.query<CraListRow>(
+      `${CRA_LIST_SELECT}
+       WHERE c.office_id = $1
+         AND ($2::text IS NULL OR c.consultant_id = $2)
+         AND c.period = $3
+       GROUP BY c.id, c.consultant_id, c.office_id, c.period, c.status,
+                c.validated_at, c.refusal_at, c.submitted_at
+       ORDER BY c.period DESC, c.consultant_id`,
+      [actor.officeId, scope === 'own' ? actor.consultantId : null, period],
+    );
+
+    return rows.map(toCraListItem);
+  }
+
   async findByConsultantAndPeriod(
     consultantId: ConsultantId,
     period: Period,
@@ -150,11 +187,7 @@ export class PgCraRepository implements CraRepository {
       // `c.office_id = $1` (and, for a consultant, `$2`) runs first and unconditionally — `$6`
       // (consultantIds) and `$7` (statuses) are ANDed onto it, never substituted for it, so
       // neither can widen what the actor may see, only narrow it further (item 7, QA round 1).
-      `SELECT c.id, c.consultant_id, c.office_id, c.period, c.status,
-              COALESCE(SUM(l.quarter_days), 0)::int AS recorded_quarter_days,
-              COALESCE(c.validated_at, c.refusal_at, c.submitted_at) AS status_changed_at
-       FROM timesheet.cras c
-       LEFT JOIN timesheet.cra_lines l ON l.cra_id = c.id
+      `${CRA_LIST_SELECT}
        WHERE c.office_id = $1
          AND ($2::text IS NULL OR c.consultant_id = $2)
          AND ($5::text IS NULL OR c.period = $5)
@@ -453,6 +486,14 @@ interface CraListRow {
   recorded_quarter_days: number;
   status_changed_at: Date | null;
 }
+
+const CRA_LIST_SELECT = `
+  SELECT c.id, c.consultant_id, c.office_id, c.period, c.status,
+         COALESCE(SUM(l.quarter_days), 0)::int AS recorded_quarter_days,
+         COALESCE(c.validated_at, c.refusal_at, c.submitted_at) AS status_changed_at
+  FROM timesheet.cras c
+  LEFT JOIN timesheet.cra_lines l ON l.cra_id = c.id
+`;
 
 /** Shared by `list`, `recentActivity` and `awaitingDecision`: one row shape, one mapping. */
 function toCraListItem(row: CraListRow): CraListItem {

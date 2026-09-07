@@ -227,12 +227,17 @@ export class PgReferenceReader {
   }
 
   /** Consultant names, for the rows the pré-facturier lists. Presentation, not a rule. */
-  async consultantNames(): Promise<ReadonlyMap<string, string>> {
+  async consultantNames(ids?: readonly string[]): Promise<ReadonlyMap<string, string>> {
+    if (ids?.length === 0) return new Map();
     const { rows } = await this.#client.query<{
       id: string;
       first_name: string;
       last_name: string;
-    }>(`SELECT id, first_name, last_name FROM public.consultants`);
+    }>(
+      `SELECT id, first_name, last_name FROM public.consultants
+       WHERE ($1::text[] IS NULL OR id = ANY($1))`,
+      [ids ?? null],
+    );
 
     return new Map(rows.map((row) => [row.id, `${row.first_name} ${row.last_name}`]));
   }
@@ -277,9 +282,11 @@ export class PgReferenceReader {
   }
 
   /** Mission names, for the designation a line prints. Presentation, not a rule. */
-  async missionNames(): Promise<ReadonlyMap<string, string>> {
+  async missionNames(ids?: readonly string[]): Promise<ReadonlyMap<string, string>> {
+    if (ids?.length === 0) return new Map();
     const { rows } = await this.#client.query<{ id: string; name: string }>(
-      `SELECT id, name FROM public.missions`,
+      `SELECT id, name FROM public.missions WHERE ($1::text[] IS NULL OR id = ANY($1))`,
+      [ids ?? null],
     );
 
     return new Map(rows.map((row) => [row.id, row.name]));

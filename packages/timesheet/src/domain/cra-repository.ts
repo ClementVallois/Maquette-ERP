@@ -76,7 +76,9 @@ export interface CraRepository {
    * API call refused with a 403 that names the rule that denied it", and a `null` names nothing.
    */
   findById(id: CraId, actor: Actor): Promise<Cra | null>;
+  findListItemsByIds(ids: readonly CraId[], actor: Actor): Promise<readonly CraListItem[]>;
   list(query: CraListQuery): Promise<readonly CraListItem[]>;
+  listPeriod(actor: Actor, period: string): Promise<readonly CraListItem[]>;
   /**
    * Rank A12: the same `WHERE` predicate `list` applies, minus `limit`/`offset` — what makes
    * truncation observable (`total` vs. the page length) and what a page-size selector's own

@@ -21,6 +21,7 @@ import type { InvoiceLine, LineOrigin } from '../domain/invoice-line.ts';
 import type {
   DeclinedDaysRecord,
   InvoiceListItem,
+  InvoiceListProjection,
   InvoiceListQuery,
   InvoiceRepository,
   InvoiceYearStatusCount,
@@ -140,6 +141,54 @@ export class PgInvoiceRepository implements InvoiceRepository {
     return rows.map(toListItem);
   }
 
+  async listProjection(query: InvoiceListQuery): Promise<readonly InvoiceListProjection[]> {
+    const limit = Math.min(query.limit, MAX_PAGE_SIZE);
+    const { actor } = query;
+
+    if (readScope(actor, 'invoice') === 'none') return [];
+
+    const { rows } = await this.#client.query<InvoiceProjectionRow>(
+      `${INVOICE_PROJECTION_SELECT}
+       WHERE i.office_id = $1
+         AND ($4::text IS NULL OR i.supply_period = $4)
+         AND ($5::text IS NULL OR i.status = $5)
+         AND ($6::text IS NULL OR left(i.supply_period, 4) = $6)
+         AND ($7::text IS NULL OR (
+           i.billed_to_name ILIKE '%' || $7 || '%'
+           OR COALESCE(i.invoice_number, '') ILIKE '%' || $7 || '%'
+         ))
+       ORDER BY i.supply_period DESC, i.billed_to_name, i.id
+       LIMIT $2 OFFSET $3`,
+      [
+        actor.officeId,
+        limit,
+        query.offset,
+        query.period ?? null,
+        query.status ?? null,
+        query.year === undefined ? null : String(query.year),
+        query.search ?? null,
+      ],
+    );
+
+    return rows.map(toProjection);
+  }
+
+  async listPeriodProjection(
+    actor: Actor,
+    period: string,
+  ): Promise<readonly InvoiceListProjection[]> {
+    if (readScope(actor, 'invoice') === 'none') return [];
+
+    const { rows } = await this.#client.query<InvoiceProjectionRow>(
+      `${INVOICE_PROJECTION_SELECT}
+       WHERE i.office_id = $1 AND i.supply_period = $2
+       ORDER BY i.supply_period DESC, i.billed_to_name, i.id`,
+      [actor.officeId, period],
+    );
+
+    return rows.map(toProjection);
+  }
+
   async count(query: Omit<InvoiceListQuery, 'limit' | 'offset'>): Promise<number> {
     const { actor } = query;
 
@@ -177,6 +226,39 @@ export class PgInvoiceRepository implements InvoiceRepository {
     const { rows } = await this.#client.query<{ sum: string | null }>(
       `SELECT COALESCE(SUM(i.total_ttc_cents), 0) AS sum
        FROM billing.invoices i
+       WHERE i.office_id = $1
+         AND ($2::text IS NULL OR i.supply_period = $2)
+         AND ($3::text IS NULL OR i.status = $3)
+         AND ($4::text IS NULL OR left(i.supply_period, 4) = $4)
+         AND ($5::text IS NULL OR (
+           i.billed_to_name ILIKE '%' || $5 || '%'
+           OR COALESCE(i.invoice_number, '') ILIKE '%' || $5 || '%'
+         ))`,
+      [
+        actor.officeId,
+        query.period ?? null,
+        query.status ?? null,
+        query.year === undefined ? null : String(query.year),
+        query.search ?? null,
+      ],
+    );
+
+    return exactInteger('sum', rows[0]!.sum ?? '0');
+  }
+
+  async sumHtCents(query: Omit<InvoiceListQuery, 'limit' | 'offset'>): Promise<number> {
+    const { actor } = query;
+
+    if (readScope(actor, 'invoice') === 'none') return 0;
+
+    const { rows } = await this.#client.query<{ sum: string | null }>(
+      `SELECT COALESCE(SUM(COALESCE(i.total_ht_cents, lt.ht_cents, 0)), 0) AS sum
+       FROM billing.invoices i
+       LEFT JOIN LATERAL (
+         SELECT SUM(amount_cents) AS ht_cents
+         FROM billing.invoice_lines
+         WHERE invoice_id = i.id
+       ) lt ON true
        WHERE i.office_id = $1
          AND ($2::text IS NULL OR i.supply_period = $2)
          AND ($3::text IS NULL OR i.status = $3)
@@ -830,6 +912,23 @@ interface InvoiceListRow {
   total_ttc_cents: string | number | null;
 }
 
+interface InvoiceProjectionRow extends InvoiceListRow {
+  source_cra_id: string | null;
+  mission_ids: string[];
+  line_count: string | number;
+  total_ht_cents: string | number;
+}
+
+function toProjection(row: InvoiceProjectionRow): InvoiceListProjection {
+  return {
+    ...toListItem(row),
+    sourceCraId: row.source_cra_id as CraId | null,
+    missionIds: row.mission_ids as MissionId[],
+    lineCount: exactInteger('line_count', row.line_count),
+    totalExcludingVatCents: exactInteger('total_ht_cents', row.total_ht_cents),
+  };
+}
+
 /**
  * Every list-shaped read joins two aggregated subqueries onto `billing.invoices` so a draft's
  * (still-null) `total_ttc_cents` reads as the sum of its lines instead of `NULL` — the same
@@ -852,6 +951,29 @@ const INVOICE_LIST_SELECT = `
     FROM billing.invoice_vat_groups
     GROUP BY invoice_id
   ) vt ON vt.invoice_id = i.id
+`;
+
+const INVOICE_PROJECTION_SELECT = `
+  SELECT i.id, i.status, i.supply_period, i.billed_to_name, i.invoice_number, i.issue_date,
+         COALESCE(i.total_ht_cents, COALESCE(lt.ht_cents, 0)) AS total_ht_cents,
+         COALESCE(i.total_ttc_cents, COALESCE(lt.ht_cents, 0) + COALESCE(vt.tax_cents, 0))
+           AS total_ttc_cents,
+         i.source_cra_ids[1] AS source_cra_id,
+         COALESCE(lt.mission_ids, ARRAY[]::text[]) AS mission_ids,
+         COALESCE(lt.line_count, 0) AS line_count
+  FROM billing.invoices i
+  LEFT JOIN LATERAL (
+    SELECT SUM(amount_cents) AS ht_cents,
+           ARRAY_REMOVE(ARRAY_AGG(DISTINCT origin_mission_id), NULL) AS mission_ids,
+           COUNT(*)::int AS line_count
+    FROM billing.invoice_lines
+    WHERE invoice_id = i.id
+  ) lt ON true
+  LEFT JOIN LATERAL (
+    SELECT SUM(tax_cents) AS tax_cents
+    FROM billing.invoice_vat_groups
+    WHERE invoice_id = i.id
+  ) vt ON true
 `;
 
 interface InvoiceLineRow {

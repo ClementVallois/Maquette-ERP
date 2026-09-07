@@ -45,7 +45,8 @@ export function registerDashboardRoutes(
 
       return dependencies.transactionally(async (unit) => {
         const reader = new PgReferenceReader(unit.client);
-        const [chain, names] = await Promise.all([reader.hierarchy(), reader.consultantNames()]);
+        const chain = await reader.hierarchy();
+        const names = await reader.consultantNames();
 
         const managerId = chain.managerOn(actor.consultantId, today);
         const manager =
@@ -290,15 +291,21 @@ export function registerDashboardRoutes(
         // F10: the same consultant discriminator A7/A13 already added to the invoice and
         // pré-facturier lists — without it, several rows of this "ten oldest drafts" block can
         // share a client, a month and an amount with nothing to tell them apart.
-        const consultantNames = await new PgReferenceReader(unit.client).consultantNames();
-        const oldestWithConsultant = [];
-        for (const item of oldestDraftRowsResult) {
-          // Sequential, not `Promise.all`, for the same reason the invoice list route's own A7
-          // comment gives: every read here shares the one checked-out client this transaction is.
+        const sourceCras = await unit.cras.findListItemsByIds(
+          oldestDraftRowsResult.flatMap((item) =>
+            item.sourceCraId === null ? [] : [item.sourceCraId],
+          ),
+          actor,
+        );
+        const sourceCrasById = new Map(sourceCras.map((cra) => [cra.id, cra]));
+        const consultantNames = await new PgReferenceReader(unit.client).consultantNames(
+          sourceCras.map((cra) => cra.consultantId),
+        );
+        const oldestWithConsultant = oldestDraftRowsResult.map((item) => {
           const sourceCra =
-            item.sourceCraId === null ? null : await unit.cras.findById(item.sourceCraId, actor);
+            item.sourceCraId === null ? null : (sourceCrasById.get(item.sourceCraId) ?? null);
 
-          oldestWithConsultant.push({
+          return {
             invoiceId: item.id,
             billedToName: item.billedToName,
             supplyPeriod: item.supplyPeriod,
@@ -307,8 +314,8 @@ export function registerDashboardRoutes(
               sourceCra === null
                 ? '—'
                 : (consultantNames.get(sourceCra.consultantId) ?? sourceCra.consultantId),
-          });
-        }
+          };
+        });
 
         return {
           draftInvoices: draftInvoicesResult,
