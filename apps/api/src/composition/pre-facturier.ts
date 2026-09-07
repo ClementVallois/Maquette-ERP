@@ -281,7 +281,7 @@ export async function preFacturierComposition(
   const periodClosed = lastDayOf(periodFromIso(period)) < today;
 
   const rows: CraRow[] = cras.map((cra) => {
-    const status = cra.status as CraStatus;
+    const status = cra.status;
 
     return {
       craId: cra.id,

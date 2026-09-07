@@ -2,7 +2,6 @@ import type {
   BillingDashboard,
   ConsultantDashboard,
   ConsultantOrgChart,
-  DashboardCraStatus,
   ManagerDashboard,
   ManagerOrgChart,
 } from '@erp/contracts';
@@ -19,23 +18,6 @@ import { managerStaffingSnapshot } from '../staffing/staffing-snapshot.ts';
 import { malformed, parseInput } from '../validation.ts';
 
 import { CRA_LIST_MAX_PAGE_SIZE, PeriodQuery } from './schemas.ts';
-
-/**
- * `CraListItem.status` is `string` on the repository's own interface — accurate for a value that
- * crosses the module boundary as an opaque string, but wider than `timesheet.cras`' own `CHECK
- * (status IN (...))` actually allows. The cast is the one place that narrows it back to
- * `DashboardCraStatus`, which is otherwise identical to `@erp/timesheet`'s `CraStatus` — package
- * 09 is about the wire contract two apps share, not a wider retyping of every repository's own
- * `string`-typed status column, which stays a separate, larger decision.
- */
-function craActivityStatus(status: string): DashboardCraStatus {
-  return status as DashboardCraStatus;
-}
-
-/** The same narrowing as `craActivityStatus`, for `InvoiceListItem.status`'s own `string`. */
-function invoiceActivityStatus(status: string): 'issued' | 'cancelledByCreditNote' {
-  return status as 'issued' | 'cancelledByCreditNote';
-}
 
 export function registerDashboardRoutes(
   app: FastifyInstance,
@@ -153,7 +135,7 @@ export function registerDashboardRoutes(
               key: row.id,
               kind: 'cra' as const,
               recordId: row.id,
-              status: craActivityStatus(row.status),
+              status: row.status,
               period: row.period,
               name: null,
               at: row.statusChangedAt,
@@ -259,7 +241,7 @@ export function registerDashboardRoutes(
               key: row.id,
               kind: 'cra' as const,
               recordId: row.id,
-              status: craActivityStatus(row.status),
+              status: row.status,
               period: row.period,
               name: consultantNames.get(row.consultantId) ?? row.consultantId,
               at: row.statusChangedAt,
@@ -355,7 +337,7 @@ export function registerDashboardRoutes(
             key: invoice.id,
             kind: 'invoice' as const,
             recordId: invoice.id,
-            status: invoiceActivityStatus(invoice.status),
+            status: invoice.status,
             period: invoice.supplyPeriod,
             name: invoice.billedToName,
             at: invoice.issueDate,

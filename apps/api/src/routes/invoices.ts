@@ -5,7 +5,6 @@ import {
   type InvoiceHistoryResponse,
   type InvoiceListItem,
   type InvoiceListResponse,
-  type InvoiceStatus,
   type IssuanceResponse,
 } from '@erp/contracts';
 import { isoDateInFirmTimeZone } from '@erp/platform';
@@ -30,16 +29,6 @@ import {
   notFound,
 } from './schemas.ts';
 
-/**
- * `PgInvoiceRepository.list`'s own `InvoiceListItem.status` is `string` — accurate for a value
- * that crosses the module boundary as an opaque string, but wider than `billing.invoices`' own
- * `CHECK (status IN (...))` actually allows. The cast is the one place that narrows it back to
- * the wire union, the same reasoning `dashboard.ts`/`pre-facturier.ts` give for the identical gap.
- */
-function invoiceRowStatus(status: string): InvoiceStatus {
-  return status as InvoiceStatus;
-}
-
 export function registerInvoiceRoutes(
   app: FastifyInstance,
   dependencies: ServerDependencies,
@@ -52,10 +41,7 @@ export function registerInvoiceRoutes(
       const actor = requireActor(request);
 
       return dependencies.transactionally(async (unit) => {
-        const byYearAndStatus = (await unit.invoices.countByYearAndStatus(actor)).map((row) => ({
-          ...row,
-          status: invoiceRowStatus(row.status),
-        }));
+        const byYearAndStatus = await unit.invoices.countByYearAndStatus(actor);
 
         // `preFacturierComposition` already computes a period's billable HT from the live
         // aggregate rather than a stored (and, for a draft, absent) total — reused here rather
@@ -149,7 +135,7 @@ export function registerInvoiceRoutes(
 
           invoices.push({
             ...item,
-            status: invoiceRowStatus(item.status),
+            status: item.status,
             consultantName:
               sourceCra === null
                 ? '—'

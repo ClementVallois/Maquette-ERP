@@ -7,7 +7,7 @@ import type { Invoice } from './invoice.ts';
 
 export interface InvoiceListItem {
   readonly id: InvoiceId;
-  readonly status: string;
+  readonly status: InvoiceStatus;
   readonly supplyPeriod: string;
   readonly billedToName: string;
   readonly invoiceNumber: string | null;
@@ -52,7 +52,7 @@ export interface DeclinedDaysRecord {
  */
 export interface InvoiceYearStatusCount {
   readonly year: string;
-  readonly status: string;
+  readonly status: InvoiceStatus;
   readonly count: number;
 }
 

@@ -1,5 +1,11 @@
 import type { Actor, Clock, IsoDate, Period } from '@erp/platform';
-import { Cra, type CraFlag, type RecordedDayType, workingCalendar } from '@erp/timesheet';
+import {
+  Cra,
+  type CraFlag,
+  type CraStatus,
+  type RecordedDayType,
+  workingCalendar,
+} from '@erp/timesheet';
 
 import { PgReferenceReader } from '../persistence/reference-reader.ts';
 import type { Transactionally } from '../persistence/unit-of-work.ts';
@@ -51,7 +57,7 @@ export interface RecordMonthCommand {
 
 export interface RecordMonthOutcome {
   readonly craId: string;
-  readonly status: string;
+  readonly status: CraStatus;
   readonly flags: readonly CraFlag[];
 }
 

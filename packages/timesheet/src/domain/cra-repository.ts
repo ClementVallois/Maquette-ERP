@@ -9,7 +9,7 @@ export interface CraListItem {
   readonly consultantId: ConsultantId;
   readonly officeId: OfficeId;
   readonly period: string;
-  readonly status: string;
+  readonly status: CraStatus;
   /**
    * The quarter-days the Cra records, summed. A quantity and not a rate, so it does not reach the
    * line `Cjm`, `Tjm` and margin are held behind (BUILD-RULES § Authorization); it is here so the

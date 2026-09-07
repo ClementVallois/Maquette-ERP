@@ -461,7 +461,14 @@ function toCraListItem(row: CraListRow): CraListItem {
     consultantId: row.consultant_id,
     officeId: row.office_id,
     period: row.period,
-    status: row.status,
+    // The `crm.status` column carries a `CHECK (status IN (...))` matching `CraStatus` exactly
+    // (migration 002) — `pg` still hands every column back as `string`, so this is the one place
+    // that narrows it back to the domain's own union. Package 14: this replaced a wider
+    // `CraListItem.status: string` that made every reader re-derive the same narrowing (API's own
+    // `craRowStatus`, `dashboard.ts`'s `craActivityStatus`) — moving the cast here let those
+    // call-site casts delete themselves; `pnpm run -s typecheck` cascading no further than this
+    // one row mapper is what confirmed the column, not the interface, was the only place lying.
+    status: row.status as CraStatus,
     // `::int` in the query rather than a string-to-integer helper here: `SUM` is `bigint` and
     // `pg` hands a `bigint` back as a string, while an `int` arrives as a number. A month of
     // quarter-days cannot approach the 32-bit bound, and `quarterDays` refuses anything that is

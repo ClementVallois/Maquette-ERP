@@ -369,7 +369,9 @@ export class PgInvoiceRepository implements InvoiceRepository {
 
     return rows.map((row) => ({
       year: row.year,
-      status: row.status,
+      // Same SQL-boundary narrowing as `toListItem`/`toInvoice` above — `billing.invoices`' own
+      // `CHECK (status IN (...))` is what makes this safe, `pg` just cannot say so.
+      status: row.status as InvoiceStatus,
       count: exactInteger('count', row.count),
     }));
   }
@@ -797,7 +799,10 @@ interface InvoiceRow {
 function toListItem(row: InvoiceListRow): InvoiceListItem {
   return {
     id: row.id as InvoiceId,
-    status: row.status,
+    // Same narrowing as `toInvoice` (line 683) at the true SQL boundary, so `InvoiceListItem`
+    // could carry the domain's own union instead of the wider `string` every reader used to
+    // re-derive — package 14's discriminator confirmed the column, not the interface, was lying.
+    status: row.status as InvoiceStatus,
     supplyPeriod: row.supply_period,
     billedToName: row.billed_to_name,
     invoiceNumber: row.invoice_number,

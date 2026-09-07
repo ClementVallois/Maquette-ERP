@@ -3,9 +3,7 @@ import type {
   CraDetail,
   CraGridResponse,
   CraListResponse,
-  CraStatus,
   GridDay,
-  InvoiceStatus,
   ManagerCraGridResponse,
   MonthEntriesResponse,
   RefusalResponse,
@@ -38,29 +36,22 @@ import {
 } from './schemas.ts';
 
 /**
- * `CraListItem.status` (`@erp/timesheet`) is `string` on the repository's own interface —
- * accurate for a value that crosses the module boundary as an opaque string, but wider than
- * `timesheet.cras`' own `CHECK (status IN (...))` actually allows. The cast is the one place that
- * narrows it back to the wire union, the same reasoning `dashboard.ts`/`pre-facturier.ts`/
- * `invoices.ts` give for the identical gap on each of those routes.
- */
-function craRowStatus(status: string): CraStatus {
-  return status as CraStatus;
-}
-
-/**
- * `CraLine.quarterDays` (`@erp/timesheet`) is `QuarterDays` (`number`) — wider than the wire's
- * `1 | 2 | 3 | 4`, which every value it actually carries already satisfies (a quarter-day count
- * per calendar day cannot exceed four). The cast is the one place that narrows it.
+ * `CraLine.quarterDays` (`@erp/timesheet`) is `QuarterDays` (`number`) — deliberately: it is the
+ * same type an aggregate month total carries, and a total is not bounded to four. A single line's
+ * own domain constructor (`craLine`, `packages/timesheet/src/domain/cra-line.ts`) enforces one to
+ * four at construction, but nothing in `QuarterDays` itself can say so — unlike `CraStatus`/
+ * `InvoiceStatus` below, this is not a repository leaking a narrower type back to `string`; it is
+ * one genuinely wider type reused in two contexts. Package 14's own audit named this cast as one
+ * of five to reconsider: `craRowStatus`, `invoiceRowStatus`, `craActivityStatus` and
+ * `invoiceActivityStatus` all turned out to be dead (deleted here and in `dashboard.ts`/
+ * `invoices.ts`/`pre-facturier.ts` — `CraListItem.status`/`InvoiceListItem.status`/
+ * `InvoiceYearStatusCount.status` now carry their real domain union, narrowed once at the
+ * PostgreSQL row mapper that is the actual source of the widening). This one stays: narrowing it
+ * would need a distinct `1 | 2 | 3 | 4` type split off from the aggregate `QuarterDays`, which is
+ * a real domain-modelling decision, not a call-site cleanup — out of this package's scope.
  */
 function craLineQuarterDays(quarterDays: number): 1 | 2 | 3 | 4 {
   return quarterDays as 1 | 2 | 3 | 4;
-}
-
-/** The same narrowing as `craRowStatus`, for `InvoiceListItem.status`'s own `string`
- * (`@erp/billing`) — the invoices a validation drafted, on the wire this route answers. */
-function invoiceRowStatus(status: string): InvoiceStatus {
-  return status as InvoiceStatus;
 }
 
 /** Every day of the month, workable or not — the calendar half of front-end plan Phase 5.2's grid read. */
@@ -184,7 +175,7 @@ export function registerCraRoutes(app: FastifyInstance, dependencies: ServerDepe
         const craListResponse: CraListResponse = {
           cras: cras.map((cra) => ({
             ...cra,
-            status: craRowStatus(cra.status),
+            status: cra.status,
             consultantName: consultantNames.get(cra.consultantId) ?? cra.consultantId,
           })),
           total,
@@ -319,7 +310,7 @@ export function registerCraRoutes(app: FastifyInstance, dependencies: ServerDepe
 
       const monthEntriesResponse: MonthEntriesResponse = {
         craId: outcome.craId,
-        status: craRowStatus(outcome.status),
+        status: outcome.status,
         flags: outcome.flags,
       };
       return reply.code(200).send(monthEntriesResponse);
@@ -356,7 +347,7 @@ export function registerCraRoutes(app: FastifyInstance, dependencies: ServerDepe
         replayed: outcome.kind === 'replayed',
         invoices: outcome.invoices.map((invoice) => ({
           ...invoice,
-          status: invoiceRowStatus(invoice.status),
+          status: invoice.status,
         })),
         declined: outcome.declined,
       };
