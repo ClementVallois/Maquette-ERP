@@ -1,13 +1,8 @@
 /**
  * Every French string the SPA renders, in one file.
  *
- * A **deliberate copy** of `apps/api/src/web/labels.ts` (frontend-plan.md Annexe C.8: "labels.ts
- * et format.ts sont des copies dans apps/web — pas de nouveau packages/, pas d'import cross-app").
- * Copied whole rather than trimmed to Phase 3's own screens: the copy deck is already written —
- * 357 lines the API's ADR-0026 already argued for — and every later phase (session selector, Cra
- * grid, pré-facturier, factures, marge) draws from the same sections, so trimming now would only
- * mean re-copying them one phase at a time. It is a copy, not a share: this file may diverge from
- * the API's as the SPA's own screens need, and nothing re-synchronises the two automatically.
+ * This is the SPA's copy deck. It is intentionally independent from the printable documents'
+ * server-side labels because the two presentation surfaces evolve separately.
  *
  * The point is not translation — there is one language and there will be one (ADR-0026's own
  * argument, unchanged here). It is **review**: a screen's wording is the part of it a
@@ -16,20 +11,17 @@
  *
  * The keys are English because they are code; the values are French because they are the screen.
  *
- * `problem.sentences` is the SPA's own equivalent of ADR-0060 ("the screens name a refusal in
- * French, keyed by its `type`, never `problem.title`") — ported unchanged, plus two entries this
- * file adds that the API's copy does not carry: `/problems/client-unparsable-response` and
+ * `problem.sentences` names failures in French by stable problem `type`, never by server title.
+ * The two client-only entries `/problems/client-unparsable-response` and
  * `/problems/client-network-failure` (`lib/api-client.ts`'s `CLIENT_PROBLEM_TYPES`) are
- * synthesized **client-side**, for a failure that never reached a server to have an RFC 9457 body
- * at all — a Vite proxy error page, an HTML error document, offline, DNS. `labels.test.ts` asserts
+ * cover failures that never produced an RFC 9457 response. `labels.test.ts` asserts
  * this table is exhaustive against `@erp/contracts`' `API_PROBLEM_TYPES`, against every domain
  * `problemType` declared under `packages/` (scanned the same way `apps/api/src/http/problem.test.ts`
  * does, not copied as a second list that could drift from the one it checks), and against the two
  * client sentinels.
  *
- * The apostrophes are typographic (’, U+2019) and the em dash is real, matching the source file —
- * this SPA renders through React/JSX, which does not escape into HTML entities the way the SSR
- * screens' hand-written renderer does, but the typographic choice is the API copy's and is kept.
+ * Apostrophes and dashes use their typographic Unicode characters because React renders them
+ * directly.
  */
 export const LABELS = {
   appName: 'Maquette ERP',

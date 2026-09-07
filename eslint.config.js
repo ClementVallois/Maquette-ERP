@@ -69,6 +69,73 @@ const NO_BARE_ERROR = [
   },
 ];
 
+const NO_DOMAIN_CLOCK = [
+  {
+    selector: 'NewExpression[callee.name="Date"]',
+    message: 'No `new Date()` in the domain: time comes from the injected `Clock` port.',
+  },
+  {
+    selector: 'MemberExpression[object.name="Date"][property.name="now"]',
+    message: 'No `Date.now()` in the domain: use the injected `Clock` port.',
+  },
+];
+
+const NO_PUBLIC_SETTER = [
+  {
+    selector: 'MethodDefinition[kind="set"]',
+    message:
+      'No public setter: an object must not be able to exist in an invalid state. Invariants belong in the factory or the constructor.',
+  },
+];
+
+const RESTRICTED_SYNTAX_SCOPES = [
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    restrictions: [...NO_BARE_ERROR, ...NO_FLOAT_MONEY_CALLS],
+  },
+  {
+    files: ['packages/*/src/domain/**/*.ts', 'packages/platform/src/**/*.ts'],
+    restrictions: [
+      ...NO_BARE_ERROR,
+      ...NO_FLOAT_MONEY_CALLS,
+      ...NO_DECIMAL_LITERAL,
+      ...NO_DOMAIN_CLOCK,
+      ...NO_PUBLIC_SETTER,
+    ],
+  },
+  {
+    files: ['**/testing/**/*.ts'],
+    restrictions: [
+      ...NO_BARE_ERROR,
+      ...NO_WALL_CLOCK,
+      ...NO_FLOAT_MONEY_CALLS,
+      ...NO_DECIMAL_LITERAL,
+      ...NO_PUBLIC_SETTER,
+    ],
+  },
+  {
+    files: ['**/*.test.ts', '**/*.int.test.ts'],
+    restrictions: [...NO_BARE_ERROR, ...NO_WALL_CLOCK, ...NO_FLOAT_MONEY_CALLS],
+  },
+  {
+    files: ['packages/*/src/infrastructure/**/*.ts', 'apps/*/src/persistence/**/*.ts'],
+    ignores: ['**/*.test.ts', '**/*.int.test.ts'],
+    restrictions: [...NO_BARE_ERROR, ...NO_WALL_CLOCK, ...NO_FLOAT_MONEY_CALLS],
+  },
+  {
+    files: ['tests/harness/**/*.ts'],
+    restrictions: [...NO_BARE_ERROR, ...NO_WALL_CLOCK, ...NO_FLOAT_MONEY_CALLS],
+  },
+];
+
+const restrictedSyntaxConfigs = RESTRICTED_SYNTAX_SCOPES.map(
+  ({ files, ignores, restrictions }) => ({
+    files,
+    ...(ignores === undefined ? {} : { ignores }),
+    rules: { 'no-restricted-syntax': ['error', ...restrictions] },
+  }),
+);
+
 export default tseslint.config(
   {
     ignores: [
@@ -154,13 +221,6 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/only-throw-error': 'error',
-      // The three call bans are repository-wide, which is how BUILD-RULES § Money states them and
-      // is not how they were first written: scoped to `domain/`, they exempted `application/` —
-      // the layer that reads a rate off the reference and hands it to a line. That is the failure
-      // family the boundary rules already name, one directory down. The decimal-LITERAL ban stays
-      // narrow, in the block below, for the reason ADR-0035 gives.
-      'no-restricted-syntax': ['error', ...NO_BARE_ERROR, ...NO_FLOAT_MONEY_CALLS],
-
       // Not in strictTypeChecked: a missing `case` on a union has to break the build.
       '@typescript-eslint/switch-exhaustiveness-check': 'error',
 
@@ -202,14 +262,7 @@ export default tseslint.config(
   },
 
   {
-    // `apps/web` (ADR-0062, frontend-plan.md Phase 1.3). Browser globals: the base block above
-    // sets only `globals.node`, and flat config merges `languageOptions.globals` across cascading
-    // blocks rather than replacing it, so this adds `document`/`window`/… without losing `process`
-    // et al. in `vite.config.ts`/`playwright.config.ts`. `no-restricted-syntax` is deliberately
-    // NOT set here: the rule does not merge across config blocks (see the comment on
-    // `NATIVE_ERROR_CTORS` above), and setting it here would silently drop `NO_BARE_ERROR` +
-    // `NO_FLOAT_MONEY_CALLS` for every file this block matches — the base `**/*.ts`/`**/*.tsx`
-    // block already carries both and this block inherits them unchanged.
+    // Browser globals extend the Node globals used by Vite and Playwright configuration files.
     files: ['apps/web/**/*.ts', 'apps/web/**/*.tsx'],
     ...reactHooks.configs.flat.recommended,
     languageOptions: {
@@ -233,73 +286,27 @@ export default tseslint.config(
   },
 
   {
-    // The kernel is in this list for the reason ADR-0033 gives: it holds domain-grade code and
-    // has no `domain/` directory to be matched by the first glob.
-    files: ['packages/*/src/domain/**/*.ts', 'packages/platform/src/**/*.ts'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        ...NO_BARE_ERROR,
-        ...NO_FLOAT_MONEY_CALLS,
-        ...NO_DECIMAL_LITERAL,
-        {
-          selector: 'NewExpression[callee.name="Date"]',
-          message: 'No `new Date()` in the domain: time comes from the injected `Clock` port.',
-        },
-        {
-          selector: 'MemberExpression[object.name="Date"][property.name="now"]',
-          message: 'No `Date.now()` in the domain: use the injected `Clock` port.',
-        },
-        {
-          selector: 'MethodDefinition[kind="set"]',
-          message:
-            'No public setter: an object must not be able to exist in an invalid state. Invariants belong in the factory or the constructor.',
-        },
-      ],
-    },
-  },
-
-  {
     // Shared fixtures, and NOT tests. BUILD-RULES justifies the test exemption on "it is not
-    // shipped"; a `testing/` file is in its package's tsconfig, compiles to `dist`, and — since
-    // Phase 2 — is where every seeded `tjmCents` in `billing` is written. It therefore keeps the
+    // shipped"; a `testing/` file is in its package's tsconfig, compiles to `dist`, and is where
+    // every seeded `tjmCents` in `billing` is written. It therefore keeps the
     // domain list, with the single narrowing a fixture actually needs: a fake clock is built from
     // a literal instant, so the absolute `new Date(...)` ban becomes the wall-clock ban.
     files: ['**/testing/**/*.ts'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
-      'no-restricted-syntax': [
-        'error',
-        ...NO_BARE_ERROR,
-        ...NO_WALL_CLOCK,
-        ...NO_FLOAT_MONEY_CALLS,
-        ...NO_DECIMAL_LITERAL,
-        {
-          selector: 'MethodDefinition[kind="set"]',
-          message:
-            'No public setter: an object must not be able to exist in an invalid state. Invariants belong in the factory or the constructor.',
-        },
-      ],
       'import-x/no-extraneous-dependencies': ['error', { devDependencies: true }],
     },
   },
+
+  // Flat-config rule lists replace rather than merge. Generate every restricted-syntax scope
+  // from one table so a selector family cannot silently disappear from a later glob.
+  ...restrictedSyntaxConfigs,
 
   {
     files: ['**/*.test.ts', '**/*.int.test.ts'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
-      // Replaces the domain block's list for test files — `no-restricted-syntax` does not merge.
-      // A fake clock is built from a literal instant, so the absolute ban on `new Date(...)` is
-      // narrowed here to the wall clock, and the ban on bare errors is re-injected unchanged.
-      // Same shape for money: the calls stay banned, the decimal LITERAL does not — a negative
-      // test proves a factory refuses a float by handing it one, and `halfDays(1.5)` is that test.
-      'no-restricted-syntax': [
-        'error',
-        ...NO_BARE_ERROR,
-        ...NO_WALL_CLOCK,
-        ...NO_FLOAT_MONEY_CALLS,
-      ],
       // No `packageDir`: each test is judged against the package.json of ITS OWN package, so a
       // domain test importing an ORM fails here.
       'import-x/no-extraneous-dependencies': ['error', { devDependencies: true }],
@@ -337,12 +344,6 @@ export default tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
-      'no-restricted-syntax': [
-        'error',
-        ...NO_BARE_ERROR,
-        ...NO_WALL_CLOCK,
-        ...NO_FLOAT_MONEY_CALLS,
-      ],
     },
   },
 
@@ -355,12 +356,6 @@ export default tseslint.config(
     // `errors.ts`, which is local on purpose — the harness carries no workspace dependency.
     files: ['tests/harness/**/*.ts'],
     rules: {
-      'no-restricted-syntax': [
-        'error',
-        ...NO_BARE_ERROR,
-        ...NO_WALL_CLOCK,
-        ...NO_FLOAT_MONEY_CALLS,
-      ],
       'import-x/no-extraneous-dependencies': ['error', { devDependencies: true }],
     },
   },
