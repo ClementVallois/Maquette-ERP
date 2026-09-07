@@ -439,6 +439,33 @@ describe('PgInvoiceRepository', () => {
       expect(new Set(seenIds).size).toBe(5); // No duplicate.
       expect(seenIds).toHaveLength(5); // No row missing (2 + 2 + 1).
     });
+
+    it('answers nothing for another office, and nothing for a consultant, on every new read', async () => {
+      // The audit's own "Done when" for package 08 closes with "and all queries retain
+      // role/office scope" — the same claim `findDraftedFrom`/`findDeclinedDays` already carry a
+      // dedicated negative test for, extended here to the four new reads.
+      await seedReferenceData();
+      await bulkInsertInvoices({
+        idPrefix: 'scope',
+        count: 5,
+        status: 'issued',
+        supplyPeriod: () => '2026-03',
+        totalTtcCents: (g) => g * 1000,
+        issueDate: () => '2026-04-01',
+      });
+
+      expect(await repo().listPeriods(lyonManager)).toStrictEqual([]);
+      expect(await repo().listPeriods(parisConsultant)).toStrictEqual([]);
+
+      expect(await repo().sumTtcCents({ actor: lyonManager })).toBe(0);
+      expect(await repo().sumTtcCents({ actor: parisConsultant })).toBe(0);
+
+      expect(await repo().oldestDrafts(lyonManager, 10)).toStrictEqual([]);
+      expect(await repo().oldestDrafts(parisConsultant, 10)).toStrictEqual([]);
+
+      expect(await repo().recentIssued(lyonManager, 10)).toStrictEqual([]);
+      expect(await repo().recentIssued(parisConsultant, 10)).toStrictEqual([]);
+    });
   });
 
   it('list items do not expose Tjm, Cjm or margin', async () => {

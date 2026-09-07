@@ -1,5 +1,5 @@
 import { daysOf, isoDateInFirmTimeZone, periodFromIso, QUARTER_DAYS_PER_DAY } from '@erp/platform';
-import { workingCalendar } from '@erp/timesheet';
+import { CRA_STATUSES, workingCalendar } from '@erp/timesheet';
 import type { FastifyInstance } from 'fastify';
 
 import { preFacturierComposition } from '../composition/pre-facturier.ts';
@@ -170,7 +170,9 @@ export function registerDashboardRoutes(
           const pendingDecisionsResult = await unit.cras.count({ actor, statuses: ['submitted'] });
           const lateCrasResult = await unit.cras.count({
             actor,
-            statuses: ['draft', 'submitted', 'refused'],
+            // Every status but `validated` — derived from `CRA_STATUSES`, not hand-listed, so a
+            // fifth status added there does not silently fall out of "actionable" here.
+            statuses: CRA_STATUSES.filter((status) => status !== 'validated'),
             beforePeriod: cutoffPeriod,
           });
           // `CRA_LIST_MAX_PAGE_SIZE`, not unbounded: a genuine ceiling on a real queue (ADR-0081's

@@ -502,6 +502,39 @@ describe('PgCraRepository', () => {
       // 200-row page (whichever 200 of the 210 it happened to keep) is not guaranteed to contain.
       expect(awaiting.map((row) => row.id)).toStrictEqual(['await-1', 'await-2', 'await-3']);
     });
+
+    it('recentActivity and awaitingDecision answer nothing for another office', async () => {
+      // The audit's own "Done when" for package 08 closes with "and all queries retain
+      // role/office scope" — the same claim every pre-existing list read here already carries a
+      // dedicated negative test for, extended to these two new reads.
+      await seedOffices();
+      await tx.client.query(`
+        INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status, submitted_at)
+        VALUES ('cra-scope', 'consultant-1', 'office-paris', '2026-06', 'submitted', '2026-06-01')
+      `);
+
+      expect(await repo().recentActivity(lyonManager, 10)).toStrictEqual([]);
+      expect(await repo().awaitingDecision(lyonManager, 10)).toStrictEqual([]);
+    });
+
+    it("recentActivity and awaitingDecision narrow to a consultant's own Cras, never widen to the office", async () => {
+      await seedOffices();
+      await tx.client.query(`
+        INSERT INTO public.consultants (id, first_name, last_name, email, office_id, practice_id, role)
+        VALUES ('consultant-2', 'Chloé', 'Nguyen', 'chloe@test.com', 'office-paris', 'practice-audit', 'consultant')
+      `);
+      await tx.client.query(`
+        INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status, submitted_at)
+        VALUES ('cra-alice', 'consultant-1', 'office-paris', '2026-06', 'submitted', '2026-06-01'),
+               ('cra-chloe', 'consultant-2', 'office-paris', '2026-06', 'submitted', '2026-06-02')
+      `);
+
+      const recent = await repo().recentActivity(alice, 10);
+      const awaiting = await repo().awaitingDecision(alice, 10);
+
+      expect(recent.map((row) => row.id)).toStrictEqual(['cra-alice']);
+      expect(awaiting.map((row) => row.id)).toStrictEqual(['cra-alice']);
+    });
   });
 
   it('round-trips a refusal, with who refused it and why', async () => {
