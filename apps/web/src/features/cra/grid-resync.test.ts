@@ -12,6 +12,14 @@ import type { CraGridResponse } from './types';
  * second tab, a reconnection. `decideGridResync` is the one decision point, kept pure so it is
  * tested directly rather than through a rendered tree (`matrix.ts`'s own header gives the same
  * reasoning for the same separation, applied here to a sibling concern).
+ *
+ * The `savePending` cases below were added after an advisor review of the first version of this
+ * file caught a second-order regression: that version held any dirty-and-changed reference as a
+ * conflict, including the grid's own successful save — `cra/hooks.ts`'s
+ * `invalidateAfterSaveMonth` resolves strictly after the invalidated grid query's own refetch has
+ * already reached this component (`query-core`'s mutation dispatches `success` only once
+ * `onSuccess` settles), which is strictly before `handleSubmitMonth` gets to call
+ * `setDirty(false)`. A consultant who successfully saved would have seen the conflict banner.
  */
 
 function fakeData(): CraGridResponse {
@@ -24,7 +32,13 @@ describe('decideGridResync', () => {
     const data = fakeData();
 
     expect(
-      decideGridResync({ incoming: data, syncedWith: data, dirty: false, pendingRemoteData: null }),
+      decideGridResync({
+        incoming: data,
+        syncedWith: data,
+        dirty: false,
+        pendingRemoteData: null,
+        savePending: false,
+      }),
     ).toStrictEqual({ kind: 'unchanged' });
   });
 
@@ -33,20 +47,54 @@ describe('decideGridResync', () => {
     const incoming = fakeData();
 
     expect(
-      decideGridResync({ incoming, syncedWith, dirty: false, pendingRemoteData: null }),
+      decideGridResync({
+        incoming,
+        syncedWith,
+        dirty: false,
+        pendingRemoteData: null,
+        savePending: false,
+      }),
     ).toStrictEqual({ kind: 'adopt' });
   });
 
   it(
     'holds a new reference as a conflict instead of adopting it, when there are unsaved edits ' +
-      '(the case that was silently overwriting them before this package)',
+      'and no save of this grid’s own is in flight (the case that was silently overwriting them ' +
+      'before this package)',
     () => {
       const syncedWith = fakeData();
       const incoming = fakeData();
 
       expect(
-        decideGridResync({ incoming, syncedWith, dirty: true, pendingRemoteData: null }),
+        decideGridResync({
+          incoming,
+          syncedWith,
+          dirty: true,
+          pendingRemoteData: null,
+          savePending: false,
+        }),
       ).toStrictEqual({ kind: 'holdAsConflict' });
+    },
+  );
+
+  it(
+    'adopts a new reference even while dirty, when this grid’s own save is still in flight ' +
+      '(the second-order regression an advisor review caught in the first version of this ' +
+      "function: a successful save's own refetch would otherwise be held as a conflict, " +
+      'because setDirty(false) has not run yet at the moment this data arrives)',
+    () => {
+      const syncedWith = fakeData();
+      const incoming = fakeData();
+
+      expect(
+        decideGridResync({
+          incoming,
+          syncedWith,
+          dirty: true,
+          pendingRemoteData: null,
+          savePending: true,
+        }),
+      ).toStrictEqual({ kind: 'adopt' });
     },
   );
 
@@ -60,6 +108,7 @@ describe('decideGridResync', () => {
         syncedWith,
         dirty: true,
         pendingRemoteData,
+        savePending: false,
       }),
     ).toStrictEqual({ kind: 'unchanged' });
   });
@@ -75,6 +124,7 @@ describe('decideGridResync', () => {
         syncedWith,
         dirty: true,
         pendingRemoteData: firstPending,
+        savePending: false,
       }),
     ).toStrictEqual({ kind: 'holdAsConflict' });
   });

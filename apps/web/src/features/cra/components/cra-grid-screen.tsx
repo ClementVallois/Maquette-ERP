@@ -191,17 +191,35 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   // in-memory edit is rebuilt from the server's own answer whenever `data` changes reference — a
   // fresh fetch for a new period, or the refetch a successful save triggers.
   const [syncedWith, setSyncedWith] = useState(data);
+
+  const saveMonth = useSaveMonth(period);
+  // Package 11's Work item, "make edits during an in-flight save either impossible or safely
+  // preserved": chose impossible, over preserving them, because the alternative is a genuine
+  // correctness hazard, not a UX nicety. `handleSubmitMonth` snapshots `matrix` into `entries`
+  // before the request goes out, then clears `dirty` only once that request *resolves* — an edit
+  // made in between (while `saveMonth.isPending`) would set `dirty` back to `true`, immediately
+  // overwritten `false` by that same resolution moments later, so `decideGridResync` would treat
+  // the still-unsent newer edit as safely saved and let the save's own refetch (reflecting the
+  // *older* snapshot) silently replace it — exactly "a response resets edits the request never
+  // contained." Locking every edit path below on `canEdit` instead of `data.editable` alone
+  // closes the window entirely rather than trying to merge two matrices afterwards.
+  const canEdit = data.editable && !saveMonth.isPending;
+
   // Package 11: a fresh `data` reference is no longer proof that this grid's own save is what
   // produced it — package 10's cross-tab sweep can invalidate this query for a reason that has
   // nothing to do with these edits. `decideGridResync` (kept pure, its own test file) is the one
   // place that decides whether to run the reset above unconditionally as before, or to hold the
-  // new reference instead of silently discarding unsaved work.
+  // new reference instead of silently discarding unsaved work. `savePending: saveMonth.isPending`
+  // is what tells it a reference arriving while `dirty` is still `true` is this grid's *own*
+  // save settling — `setDirty(false)` below has not run yet at that point (confirmed empirically,
+  // see `grid-resync.ts`'s own comment on `savePending`) — rather than an unrelated invalidation.
   const [pendingRemoteData, setPendingRemoteData] = useState<CraGridResponse | null>(null);
   const resyncDecision = decideGridResync({
     incoming: data,
     syncedWith,
     dirty,
     pendingRemoteData,
+    savePending: saveMonth.isPending,
   });
   if (resyncDecision.kind === 'adopt') {
     setSyncedWith(data);
@@ -231,19 +249,6 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   function handleKeepEditsDismissRemoteConflict(): void {
     setPendingRemoteData(null);
   }
-
-  const saveMonth = useSaveMonth(period);
-  // Package 11's Work item, "make edits during an in-flight save either impossible or safely
-  // preserved": chose impossible, over preserving them, because the alternative is a genuine
-  // correctness hazard, not a UX nicety. `handleSubmitMonth` snapshots `matrix` into `entries`
-  // before the request goes out, then clears `dirty` only once that request *resolves* — an edit
-  // made in between (while `saveMonth.isPending`) would set `dirty` back to `true`, immediately
-  // overwritten `false` by that same resolution moments later, so `decideGridResync` would treat
-  // the still-unsent newer edit as safely saved and let the save's own refetch (reflecting the
-  // *older* snapshot) silently replace it — exactly "a response resets edits the request never
-  // contained." Locking every edit path below on `canEdit` instead of `data.editable` alone
-  // closes the window entirely rather than trying to merge two matrices afterwards.
-  const canEdit = data.editable && !saveMonth.isPending;
 
   // task 6.3's own instruction: "une modification non enregistrée bloque la navigation par une
   // confirmation" — `window.confirm` inside `shouldBlockFn` is a synchronous yes/no, which is

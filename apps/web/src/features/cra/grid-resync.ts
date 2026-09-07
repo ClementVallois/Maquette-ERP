@@ -28,6 +28,20 @@ export interface GridResyncInput {
   /** A previously-held conflict, if `decideGridResync` already returned `'holdAsConflict'` for
    * an earlier render and the consultant has not yet resolved it. */
   readonly pendingRemoteData: CraGridResponse | null;
+  /**
+   * Whether this grid's own save mutation (`useSaveMonth`) is currently in flight — including
+   * its own `onSuccess`, which awaits `invalidateAfterSaveMonth` before resolving
+   * (`cra/hooks.ts`). That await is exactly the window this function has to reason about: the
+   * grid's own query observer sees the refetched `data` — and this component re-renders with it
+   * — *before* `handleSubmitMonth`'s `await saveMonth.mutateAsync(...)` continuation runs and
+   * calls `setDirty(false)`, confirmed empirically (`grid-resync.test.ts`'s own "own save still
+   * in flight" case: `query-core`'s mutation dispatches `success` only after `onSuccess`
+   * settles, per `mutation.ts`, so the observer notification the invalidated refetch triggers
+   * happens strictly first). Without this field, that render sees `dirty: true` for data this
+   * grid's own save just produced and would wrongly hold it as a conflict — a real regression
+   * caught after the first version of this function shipped, not a hypothetical.
+   */
+  readonly savePending: boolean;
 }
 
 /**
@@ -37,17 +51,21 @@ export interface GridResyncInput {
  * component re-renders for any unrelated reason, since object identity alone cannot tell "already
  * flagged" from "flag again" without this comparison).
  *
- * `'holdAsConflict'`: `incoming` is a genuinely new reference and the grid has unsaved edits —
- * the caller must not touch `matrix`/`syncedWith`, only record `incoming` as the pending
- * conflict for the consultant to resolve explicitly.
+ * `'holdAsConflict'`: `incoming` is a genuinely new reference, the grid has unsaved edits, and no
+ * save of this grid's own is in flight to explain where `incoming` came from — the caller must
+ * not touch `matrix`/`syncedWith`, only record `incoming` as the pending conflict for the
+ * consultant to resolve explicitly.
  *
- * `'adopt'`: `incoming` is new and there is nothing unsaved to protect — the caller performs
- * the existing ADR-0067 reset (`syncedWith`, `matrix`, `dirty`, and every other per-period UI
- * state) exactly as it always has.
+ * `'adopt'`: either there is nothing unsaved to protect, or `savePending` says this grid's own
+ * save produced `incoming` — the caller performs the existing ADR-0067 reset (`syncedWith`,
+ * `matrix`, `dirty`, and every other per-period UI state) exactly as it always has. Adopting
+ * while `savePending` is still `true` is safe specifically because `canEdit`
+ * (`cra-grid-screen.tsx`) has already locked every edit path for the same window — there is no
+ * newer, unsaved edit this render could be discarding.
  */
 export function decideGridResync(input: GridResyncInput): GridResyncDecision {
   if (input.incoming === input.syncedWith) return { kind: 'unchanged' };
-  if (!input.dirty) return { kind: 'adopt' };
+  if (!input.dirty || input.savePending) return { kind: 'adopt' };
   if (input.incoming === input.pendingRemoteData) return { kind: 'unchanged' };
   return { kind: 'holdAsConflict' };
 }
