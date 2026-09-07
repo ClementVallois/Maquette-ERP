@@ -4,10 +4,14 @@ import {
   type AssignmentInput,
   type StaffingProblemType,
 } from '@erp/contracts';
-import { isoDate, isoDateOf, toDayNumber, type Actor, type IsoDate } from '@erp/platform';
+import { isoDate, isoDateOf, type Actor, type IsoDate } from '@erp/platform';
+import {
+  assignmentIntervalOrder,
+  assignmentPolicy,
+  type AssignmentPolicyRefusal,
+} from '@erp/timesheet';
 
 import type { PgReadClient } from '../persistence/pg-client.ts';
-import { PgReferenceReader } from '../persistence/reference-reader.ts';
 
 export type AssignmentWriteOutcome =
   | { readonly kind: 'saved'; readonly id: string }
@@ -62,42 +66,13 @@ interface HeldHabilitationRow {
   expires_at: Date | string | null;
 }
 
+interface PolicyMissionRow {
+  start_date: Date | string;
+  end_date: Date | string | null;
+}
+
 function nullableDate(value: Date | string | null): IsoDate | null {
   return value === null ? null : isoDateOf(value);
-}
-
-/** `null` reads as unbounded — a day number no real date reaches. */
-function dayNumberOrOpenEnd(date: IsoDate | null): number {
-  return date === null ? Number.POSITIVE_INFINITY : toDayNumber(date);
-}
-
-/**
- * Whether the union of `periods` (each inclusive, `to: null` meaning open-ended) covers every day
- * of `[from, to]` with no gap — merging touching or overlapping periods rather than checking only
- * the two endpoints (ADR-0105). `periods` need not already be sorted or merged; this does both.
- */
-function fullyCovers(
-  periods: readonly { from: IsoDate; to: IsoDate | null }[],
-  from: IsoDate,
-  to: IsoDate | null,
-): boolean {
-  const targetFrom = toDayNumber(from);
-  const targetTo = dayNumberOrOpenEnd(to);
-
-  const sorted = [...periods]
-    .map((period) => ({ from: toDayNumber(period.from), to: dayNumberOrOpenEnd(period.to) }))
-    .sort((left, right) => left.from - right.from);
-
-  // The last day number known covered so far, one day before the target's own start — so the
-  // first period is accepted exactly when it starts on or before that start, with no gap.
-  let coveredThrough = targetFrom - 1;
-  for (const period of sorted) {
-    if (period.from > coveredThrough + 1) return false;
-    coveredThrough = Math.max(coveredThrough, period.to);
-    if (coveredThrough >= targetTo) return true;
-  }
-
-  return coveredThrough >= targetTo;
 }
 
 export async function assignmentCatalogue(
@@ -175,6 +150,27 @@ function refused(
   return { kind: 'refused', problemType, details };
 }
 
+function policyRefusal(
+  outcome: Exclude<AssignmentPolicyRefusal, { readonly kind: 'missingHabilitations' }>,
+): AssignmentWriteOutcome {
+  switch (outcome.kind) {
+    case 'invalidRange':
+      return refused(STAFFING_PROBLEM_TYPES.invalidRange, {
+        fromDate: outcome.from,
+        toDate: outcome.to,
+      });
+    case 'departure':
+      return refused(STAFFING_PROBLEM_TYPES.departure, {
+        departureDate: outcome.departureDate,
+      });
+    case 'missionDates':
+      return refused(STAFFING_PROBLEM_TYPES.missionDates, {
+        missionStartDate: outcome.missionStartDate,
+        missionEndDate: outcome.missionEndDate ?? '',
+      });
+  }
+}
+
 async function validateAssignment(
   client: PgReadClient,
   actor: Actor,
@@ -183,12 +179,8 @@ async function validateAssignment(
 ): Promise<AssignmentWriteOutcome | null> {
   const from = isoDate(input.fromDate);
   const to = input.toDate === null ? null : isoDate(input.toDate);
-  if (to !== null && to < from) {
-    return refused(STAFFING_PROBLEM_TYPES.invalidRange, {
-      fromDate: from,
-      toDate: to,
-    });
-  }
+  const invalidRange = assignmentIntervalOrder(from, to);
+  if (invalidRange !== null) return policyRefusal(invalidRange);
 
   // ADR-0106: serializes every create/update for this (consultant, mission) pair before the
   // overlap check below reads anything, closing the check-then-insert race two concurrent
@@ -212,68 +204,51 @@ async function validateAssignment(
   if (consultant === undefined) return { kind: 'notFound' };
 
   const departure = nullableDate(consultant.departure_date);
-  // `departure` is the first date the consultant is no longer staffable (ADR-0079's own wording),
-  // so `>=` refuses the departure day itself, not only the days after it. An **open** end (`to ===
-  // null`) is refused unconditionally once a departure is known: an unbounded assignment reaches
-  // every future day by construction, and a known departure means at least one of them is already
-  // not staffable — this was the gap the audit reproduced (an open end never compared to anything).
-  if (departure !== null && (from >= departure || to === null || to >= departure)) {
-    return refused(STAFFING_PROBLEM_TYPES.departure, { departureDate: departure });
-  }
 
-  const reference = await new PgReferenceReader(client).timesheet();
-  const mission = reference.mission(input.missionId);
-  if (mission === null) return { kind: 'notFound' };
-  if (
-    !reference.runsOn(input.missionId, from) ||
-    (to !== null && !reference.runsOn(input.missionId, to))
-  ) {
-    return refused(STAFFING_PROBLEM_TYPES.missionDates, {
-      missionStartDate: mission.startDate,
-      missionEndDate: mission.endDate ?? '',
-    });
-  }
-  if (to === null && mission.endDate !== null) {
-    return refused(STAFFING_PROBLEM_TYPES.missionDates, {
-      missionStartDate: mission.startDate,
-      missionEndDate: mission.endDate,
-    });
-  }
+  const { rows: missions } = await client.query<PolicyMissionRow>(
+    `SELECT start_date, end_date FROM public.missions WHERE id = $1`,
+    [input.missionId],
+  );
+  const mission = missions[0];
+  if (mission === undefined) return { kind: 'notFound' };
 
-  // `TimesheetReference.missingHabilitations` answers one day at a time — right for a Cra
-  // submission check, which asks about one recorded day, but not enough here: an assignment
-  // covers every day of `[from, to]`, and checking only the endpoints missed a held-then-lapsed-
-  // then-renewed habilitation with a gap in the middle (reproduced: held July 1-5 and July 20-31,
-  // assignment July 1-31, accepted). The raw dated rows are read directly and merged.
-  const required = mission.requiredHabilitations;
-  const missingNames: string[] = [];
-  if (required.length > 0) {
-    const { rows: heldRows } = await client.query<HeldHabilitationRow>(
-      `SELECT habilitation_id, obtained_at, expires_at
-         FROM public.consultant_habilitations
-        WHERE consultant_id = $1 AND habilitation_id = ANY($2::text[])`,
-      [input.consultantId, required],
-    );
-    const held = heldRows.map((row) => ({
-      habilitationId: row.habilitation_id,
+  const { rows: requirementRows } = await client.query<{ habilitation_id: string }>(
+    `SELECT habilitation_id FROM public.mission_habilitations WHERE mission_id = $1`,
+    [input.missionId],
+  );
+  const required = requirementRows.map((row) => row.habilitation_id);
+  const { rows: heldRows } = await client.query<HeldHabilitationRow>(
+    `SELECT habilitation_id, obtained_at, expires_at
+       FROM public.consultant_habilitations
+      WHERE consultant_id = $1 AND habilitation_id = ANY($2::text[])`,
+    [input.consultantId, required],
+  );
+
+  const policy = assignmentPolicy({
+    from,
+    to,
+    departureDate: departure,
+    mission: {
+      startDate: isoDateOf(mission.start_date),
+      endDate: nullableDate(mission.end_date),
+      requiredHabilitations: required,
+    },
+    heldHabilitations: heldRows.map((row) => ({
+      id: row.habilitation_id,
       from: isoDateOf(row.obtained_at),
       to: nullableDate(row.expires_at),
-    }));
-
-    for (const habilitationId of required) {
-      const periods = held.filter((row) => row.habilitationId === habilitationId);
-      if (!fullyCovers(periods, from, to)) missingNames.push(habilitationId);
-    }
-  }
-  if (missingNames.length > 0) {
+    })),
+  });
+  if (policy?.kind === 'missingHabilitations') {
     const { rows: names } = await client.query<{ id: string; name: string }>(
       `SELECT id, name FROM public.habilitations WHERE id = ANY($1::text[]) ORDER BY name`,
-      [missingNames],
+      [policy.ids],
     );
     return refused(STAFFING_PROBLEM_TYPES.missingHabilitation, {
       habilitations: names.map((row) => row.name).join(', '),
     });
   }
+  if (policy !== null) return policyRefusal(policy);
 
   const { rows: overlaps } = await client.query<ExistsRow>(
     `SELECT EXISTS (

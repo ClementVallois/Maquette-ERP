@@ -361,6 +361,24 @@ describe('validateAssignment — overlap and range', () => {
     }
   });
 
+  it('refuses an invalid range before looking up the consultant', async () => {
+    const outcome = await createAssignment(
+      transaction.client,
+      manager,
+      uuidv7,
+      assignment({
+        consultantId: 'missing-consultant',
+        fromDate: '2026-07-31',
+        toDate: '2026-07-01',
+      }),
+    );
+
+    expect(outcome).toMatchObject({
+      kind: 'refused',
+      problemType: '/problems/assignment-invalid-range',
+    });
+  });
+
   it('refuses a second assignment overlapping an existing one on the same mission', async () => {
     await seed(null);
     const first = await createAssignment(
