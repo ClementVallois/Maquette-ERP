@@ -10,7 +10,7 @@ import {
 import { contextOf, CORRELATION_ID_HEADER, correlationIdOf, sendProblem } from './http/reply.ts';
 import { loggerOptions } from './logging.ts';
 import { registerAccessControl, registerOriginCheck } from './personas/access.ts';
-import { registerApiRoutes } from './routes/api.ts';
+import { registerApiRoutes } from './routes/index.ts';
 import { registerOpsRoutes } from './routes/ops.ts';
 import { registerSessionRoutes } from './routes/session.ts';
 import { registerSecurityHeaders } from './web/reply.ts';
