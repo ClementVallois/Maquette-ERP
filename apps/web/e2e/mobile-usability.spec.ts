@@ -147,8 +147,13 @@ for (const width of [360, 1440]) {
 
 test('manager day cards are read-only and the timeline joins dot centres', async ({ page }) => {
   await choosePersona(page, 'manager-paris');
-  await page.goto('/cra?period=2026-08');
-  await page.locator('a[href^="/cra/2026-"]').first().click();
+  // `/cra` filters on `year`/`month`, never `period` (`routes/_shell/cra.index.tsx`'s
+  // `CraListSearch`) — and an unknown key degrades silently to "no filter", so `?period=2026-08`
+  // listed every month and `.first()` opened whichever sorted first. It was August the day this
+  // was written and October by the time it ran, which is how a test asserting on `lundi 03`
+  // reached a month whose 3rd is a Saturday. The href is pinned for the same reason.
+  await page.goto('/cra?year=2026&month=8');
+  await page.locator('a[href^="/cra/2026-08/"]').first().click();
   const cards = page.locator('[data-cra-day-cards]');
   await expect(cards).toBeVisible();
   await expect(cards.getByRole('combobox')).toHaveCount(0);
