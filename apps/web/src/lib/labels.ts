@@ -426,7 +426,7 @@ export const LABELS = {
        * not have. The hint states the rule the trash button's `disabled` otherwise leaves
        * unexplained — desktop hides the button instead, and a hidden control is what the reader
        * reported as "no way to remove a mission". */
-      manageRows: 'Gérer les missions de la grille',
+      manageRows: 'Gérer les lignes de la grille',
       removeRowHint:
         'Une mission ne peut être retirée que si elle ne porte aucune saisie sur le mois.',
       addActivity: 'Ajouter une activité',

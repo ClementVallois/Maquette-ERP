@@ -452,7 +452,13 @@ export function CraMatrixTable({
   );
 }
 
-/** A day keeps its activity names, quantities and total together on narrow screens. */
+/**
+ * A day keeps its activity names, quantities and total together on narrow screens.
+ *
+ * `renderRowTools` and `compact` are excluded rather than ignored: both are table-shaped — one
+ * hangs controls off a `<tr>`, the other narrows column headers — and there is no row and no
+ * column here. `cra-grid-screen.tsx`'s `MobileRowTools` is what the phone gets instead.
+ */
 export function CraDayCards({
   period,
   days,
@@ -464,7 +470,7 @@ export function CraDayCards({
   onChangeCell,
   cellIdPrefix = 'mobile',
   totalLabel = LABELS.cra.weekTotal,
-}: CraMatrixTableProps): ReactElement {
+}: Omit<CraMatrixTableProps, 'renderRowTools' | 'compact'>): ReactElement {
   const [expandedDays, setExpandedDays] = useState<ReadonlyMap<string, boolean>>(() => new Map());
 
   return (

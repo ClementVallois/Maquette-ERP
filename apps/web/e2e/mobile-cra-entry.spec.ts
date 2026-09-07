@@ -248,7 +248,7 @@ test('the mobile row tools clear a row and only then let it be removed', async (
   await openGrid(page, {
     lines: [{ day: '2026-07-01', dayType: 'worked', missionId: 'alpha', quarterDays: 4 }],
   });
-  await page.getByRole('button', { name: 'Gérer les missions de la grille' }).click();
+  await page.getByRole('button', { name: 'Gérer les lignes de la grille' }).click();
   const remove = page.getByRole('button', { name: `Retirer la ligne — ${alpha}` });
   const clear = page.getByRole('button', { name: `Vider la ligne — ${alpha}` });
 
@@ -286,9 +286,7 @@ test('read-only CRA exposes complete summaries and errors without editing tools'
   });
   await expect(page.getByRole('button', { name: 'Remplir cette semaine' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Voir la proposition' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Gérer les missions de la grille' })).toHaveCount(
-    0,
-  );
+  await expect(page.getByRole('button', { name: 'Gérer les lignes de la grille' })).toHaveCount(0);
   // The week navigator is not editing, so it stays: a submitted month is still read week by week.
   await expect(page.getByRole('button', { name: 'Semaine suivante' })).toBeVisible();
   await expect(dayCard(page, '01/07/2026')).not.toHaveAttribute('open');

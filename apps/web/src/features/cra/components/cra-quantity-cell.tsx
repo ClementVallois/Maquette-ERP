@@ -122,10 +122,10 @@ export function CraQuantityCell({
         onChange(parseQuantity(event.target.value));
       }}
       onKeyDown={(event) => {
+        if (onNavigate === undefined) return;
         // A modifier means the key belongs to the browser or the OS, never to the grid: Ctrl/Cmd+0
         // is the zoom reset, Alt+ArrowDown opens the native dropdown. Handling those below would
         // both swallow them and, for Ctrl+0, write a 0 into the focused cell.
-        if (onNavigate === undefined) return;
         if (event.altKey || event.ctrlKey || event.metaKey) return;
 
         // Same reasoning as the two-slot control it replaces (ADR-0068): a closed, focused native

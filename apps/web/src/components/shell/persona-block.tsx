@@ -48,6 +48,12 @@ export function PersonaBlock({ persona }: { readonly persona: PersonaSummary }):
     }
   };
 
+  // Radix's `modal` defaults to `true`, and that default is not a visual choice: it focus-traps the
+  // menu, `aria-hidden`s every sibling, disables pointer events on the rest of the document
+  // (`pointer-events: none` on `<body>`) and locks scroll — all of it undone on unmount
+  // (`MenuRootContentModal`, @radix-ui/react-menu). Choosing a persona unmounts this menu and
+  // navigates, so `false` is deliberate: a topbar menu that leaves the page it sits on live has no
+  // document-level state to unwind on the way out.
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
