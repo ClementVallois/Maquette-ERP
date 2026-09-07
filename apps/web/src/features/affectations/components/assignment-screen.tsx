@@ -56,11 +56,12 @@ export function AssignmentScreen({
   const navigate = useNavigate();
   const [form, setForm] = useState<AssignmentInput>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
-  // No native `<select required>` backs the consultant picker any more (a `Button`+`Popover`
-  // pair, `single-select-combobox.tsx`) — this is what replaces the browser's own "please fill
-  // this field" gate, since without it "Affecter" would otherwise silently do nothing when
-  // mission and dates are filled but no consultant is chosen.
+  // No native `<select required>` backs the consultant or mission pickers any more (both a
+  // `Button`+`Popover` pair, `single-select-combobox.tsx`) — this is what replaces the browser's
+  // own "please fill this field" gate, since without it "Affecter" would otherwise silently do
+  // nothing when the rest of the form is filled but one of the two is not chosen.
   const [consultantMissing, setConsultantMissing] = useState(false);
+  const [missionMissing, setMissionMissing] = useState(false);
   const formHeading = useRef<HTMLHeadingElement>(null);
 
   function setView(next: ViewFilter): void {
@@ -101,6 +102,11 @@ export function AssignmentScreen({
   const consultantOptions = data.consultants
     .filter((consultant) => consultant.departureDate === null)
     .map((consultant) => ({ value: consultant.id, label: consultant.name }));
+  // No departed-consultant analogue here: `data.missions` is offered unfiltered.
+  const missionOptions = data.missions.map((mission) => ({
+    value: mission.id,
+    label: `${mission.clientName} — ${mission.name}`,
+  }));
   const mutationProblem = save.error instanceof ApiProblemError ? save.error.problem : null;
 
   const startEditing = (assignment: Assignment): void => {
@@ -120,6 +126,7 @@ export function AssignmentScreen({
     setEditingId(null);
     setForm(EMPTY_FORM);
     setConsultantMissing(false);
+    setMissionMissing(false);
     save.reset();
   };
 
@@ -129,6 +136,11 @@ export function AssignmentScreen({
     if (refusal === 'consultant') {
       setConsultantMissing(true);
       document.getElementById('assignment-consultant')?.focus();
+      return;
+    }
+    if (refusal === 'mission') {
+      setMissionMissing(true);
+      document.getElementById('assignment-mission')?.focus();
       return;
     }
     if (refusal !== null) return;
@@ -220,22 +232,33 @@ export function AssignmentScreen({
                   </div>
                   <div className="flex min-w-0 flex-col gap-2">
                     <Label htmlFor="assignment-mission">{LABELS.assignment.mission}</Label>
-                    <select
+                    <SingleSelectCombobox
                       id="assignment-mission"
-                      className="h-11 w-full min-w-0 rounded-lg border border-input bg-background px-2.5 text-base md:text-sm"
+                      label={LABELS.assignment.mission}
+                      searchLabel={LABELS.assignment.searchMission}
+                      searchPlaceholder={LABELS.assignment.missionSearchPlaceholder}
+                      noneSelectedLabel={LABELS.assignment.chooseMission}
+                      noMatchLabel={LABELS.assignment.noMissionSearchResults}
+                      clearLabel={LABELS.assignment.clearMission}
+                      options={missionOptions}
                       value={form.missionId}
-                      required
-                      onChange={(event) => {
-                        setForm({ ...form, missionId: event.target.value });
+                      onChange={(next) => {
+                        setForm({ ...form, missionId: next });
+                        setMissionMissing(false);
                       }}
-                    >
-                      <option value="">{LABELS.assignment.chooseMission}</option>
-                      {data.missions.map((mission) => (
-                        <option key={mission.id} value={mission.id}>
-                          {mission.clientName} — {mission.name}
-                        </option>
-                      ))}
-                    </select>
+                      className="h-11 w-full"
+                      invalid={missionMissing}
+                      {...(missionMissing ? { describedById: 'assignment-mission-error' } : {})}
+                    />
+                    {missionMissing && (
+                      <p
+                        id="assignment-mission-error"
+                        role="alert"
+                        className="text-sm text-destructive"
+                      >
+                        {LABELS.assignment.missionRequired}
+                      </p>
+                    )}
                   </div>
                 </>
               ) : (
