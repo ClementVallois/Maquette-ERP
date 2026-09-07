@@ -131,7 +131,6 @@ export function ManagerStaffingPanel({
                   be. */}
               <Link
                 {...linkOf(ON_MISSION_LINK)}
-                aria-label={labels.openOnMission}
                 className="flex items-center gap-1.5 rounded-sm hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
               >
                 <span
@@ -140,10 +139,14 @@ export function ManagerStaffingPanel({
                   style={{ backgroundColor: 'var(--primary)' }}
                 />
                 {labels.onMission} — {staffing.onMission}
+                {/* Content, not `aria-label` — an `aria-label` here would override the visible
+                    text above rather than extend it, dropping the count from the accessible name
+                    (axe's label-in-name). Same pattern as `invoice-list-screen.tsx`'s own
+                    `LABELS.invoice.openFor` span. */}
+                <span className="sr-only"> — {labels.openOnMission}</span>
               </Link>
               <Link
                 {...linkOf(INTERCONTRAT_LINK)}
-                aria-label={labels.openIntercontrat}
                 className="flex items-center gap-1.5 rounded-sm hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
               >
                 <span
@@ -152,6 +155,7 @@ export function ManagerStaffingPanel({
                   style={{ backgroundColor: 'var(--border)' }}
                 />
                 {labels.intercontrat} — {staffing.intercontrat}
+                <span className="sr-only"> — {labels.openIntercontrat}</span>
               </Link>
             </div>
           </div>

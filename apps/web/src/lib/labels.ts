@@ -254,9 +254,10 @@ export const LABELS = {
       hide: 'Masquer la répartition de l’équipe',
       show: 'Afficher la répartition de l’équipe',
       /** Item 3, QA round 6: the legend entries double as the entry point into `/affectations`,
-       * filtered — the accessible name of each `Link` (`aria-label`/`title`), since the visible
-       * legend text (`onMission`/`intercontrat` above) also carries the raw count and is not on
-       * its own a sentence describing where the link goes. */
+       * filtered — appended as an `sr-only` span onto each `Link`'s own visible text
+       * (`onMission`/`intercontrat` above plus the count), not an `aria-label` overriding it,
+       * since the visible legend text is not on its own a sentence describing where the link
+       * goes. */
       openOnMission: 'Voir les consultants en mission',
       openIntercontrat: 'Voir les consultants en intercontrat',
     },
