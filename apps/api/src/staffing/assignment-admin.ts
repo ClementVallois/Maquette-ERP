@@ -217,6 +217,18 @@ async function validateAssignment(
     });
   }
 
+  // ADR-0106: serializes every create/update for this (consultant, mission) pair before the
+  // overlap check below reads anything, closing the check-then-insert race two concurrent
+  // requests could otherwise both pass. Held for the rest of this transaction (`_xact_lock`), so
+  // it also covers `updateAssignment`'s recorded-days check, which runs after this function
+  // returns but inside the same transaction. The `':'`-joined key relies on both ids being
+  // UUIDs (no colon can appear in one), so two distinct pairs can never concatenate to the same
+  // string and coalesce onto one lock.
+  await client.query(
+    `SELECT pg_advisory_xact_lock(hashtext('staffing.assignment.write'), hashtext($1 || ':' || $2))`,
+    [input.consultantId, input.missionId],
+  );
+
   const { rows: consultants } = await client.query<ScopedConsultantRow>(
     `SELECT departure_date
        FROM public.consultants
@@ -347,15 +359,31 @@ export async function updateAssignment(
   const refusal = await validateAssignment(client, actor, input, id);
   if (refusal !== null) return refusal;
 
+  // A recorded day is only at risk if this edit's own new range no longer covers it AND no
+  // *other* assignment on the same (consultant, mission) covers it either (package 05): the
+  // original query compared every recorded day only to this assignment's own new range, so a
+  // disjoint historical assignment on the same mission (e.g. January, still covering its own
+  // recorded days unchanged) blocked an edit to an unrelated one (e.g. July). Two assignments on
+  // the same mission cannot overlap in time (the overlap check above forbids it), so "another
+  // assignment covers this day" and "this edit's own new range covers this day" are mutually
+  // exclusive by construction — this query is still exactly the "would this day lose its only
+  // covering assignment" question the audit asked for.
   const { rows: recordedDays } = await client.query<ExistsRow>(
     `SELECT EXISTS (
        SELECT 1
          FROM timesheet.cra_lines line
          JOIN timesheet.cras cra ON cra.id = line.cra_id
         WHERE cra.consultant_id = $1 AND line.mission_id = $2
-          AND (line.day < $3::date OR ($4::date IS NOT NULL AND line.day > $4::date))
+          AND NOT (line.day >= $3::date AND line.day <= COALESCE($4::date, 'infinity'::date))
+          AND NOT EXISTS (
+            SELECT 1 FROM public.assignments other
+             WHERE other.consultant_id = $1 AND other.mission_id = $2
+               AND other.id <> $5
+               AND other.from_date <= line.day
+               AND COALESCE(other.to_date, 'infinity'::date) >= line.day
+          )
      ) AS exists`,
-    [input.consultantId, input.missionId, input.fromDate, input.toDate],
+    [input.consultantId, input.missionId, input.fromDate, input.toDate, id],
   );
   if (recordedDays[0]?.exists === true) {
     return refused(STAFFING_PROBLEM_TYPES.recordedDays, {});
