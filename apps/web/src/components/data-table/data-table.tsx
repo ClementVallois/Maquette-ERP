@@ -88,6 +88,57 @@ const ACTIVATION_MAX_DWELL_MS = 500;
  * focusable element a column renders) owns its own click — the row must not double-handle it. */
 const INTERACTIVE_DESCENDANT_SELECTOR = 'a,button,input,select,textarea,label,[role="button"]';
 
+/** Where and when a `pointerdown` landed, kept until that same pointer is released. */
+export interface RowActivationOrigin {
+  readonly x: number;
+  readonly y: number;
+  readonly t: number;
+  readonly pointerId: number;
+  readonly rowId: string;
+}
+
+/**
+ * The release, with the two facts the predicate cannot read for itself: the document's current
+ * selection text and whether the release landed inside an interactive descendant. Both are DOM
+ * reads, taken at the call site so this stays a pure function — the same split
+ * `pagination-controls.tsx` uses, and the reason `apps/web` can unit-test either at all.
+ */
+export interface RowActivationRelease {
+  readonly x: number;
+  readonly y: number;
+  readonly t: number;
+  readonly pointerId: number;
+  readonly rowId: string;
+  readonly selectionText: string;
+  readonly onInteractiveDescendant: boolean;
+}
+
+/**
+ * Whether a `pointerdown`/`pointerup` pair reads as a tap on the row, rather than as a scroll, a
+ * hold, a text drag, a press on a control the row nests, or a release that crossed into a
+ * neighbouring row. Every one of those releases would otherwise navigate.
+ */
+export function shouldActivateRow(
+  origin: RowActivationOrigin | null,
+  release: RowActivationRelease,
+): boolean {
+  // Both the pointer (no cross-pointer mixup) and the row (a press near a boundary must not
+  // release into the neighbour and activate it) have to match the one this `pointerup` fired on.
+  if (origin === null) return false;
+  if (origin.pointerId !== release.pointerId) return false;
+  if (origin.rowId !== release.rowId) return false;
+  if (release.t - origin.t >= ACTIVATION_MAX_DWELL_MS) return false;
+  if (
+    Math.abs(release.x - origin.x) >= ACTIVATION_MOVE_THRESHOLD_PX ||
+    Math.abs(release.y - origin.y) >= ACTIVATION_MOVE_THRESHOLD_PX
+  ) {
+    return false;
+  }
+  if (release.selectionText !== '') return false;
+
+  return !release.onInteractiveDescendant;
+}
+
 export function DataTable<TData>({
   columns,
   data,
@@ -226,26 +277,19 @@ export function DataTable<TData>({
                     onPointerUp: (event: ReactPointerEvent<HTMLTableRowElement>) => {
                       const origin = activationOrigin.current;
                       activationOrigin.current = null;
-                      // Both the pointer (no cross-pointer mixup) and the row (a press near a
-                      // boundary must not release into the neighbour and activate it) have to
-                      // match the one this same `pointerup` fired on.
-                      if (origin?.pointerId !== event.pointerId || origin.rowId !== row.id) return;
-                      if (Date.now() - origin.t >= ACTIVATION_MAX_DWELL_MS) return;
-                      if (
-                        Math.abs(event.clientX - origin.x) >= ACTIVATION_MOVE_THRESHOLD_PX ||
-                        Math.abs(event.clientY - origin.y) >= ACTIVATION_MOVE_THRESHOLD_PX
-                      ) {
-                        return;
-                      }
-                      if ((document.getSelection()?.toString() ?? '') !== '') return;
                       const target = event.target;
-                      if (
-                        target instanceof Element &&
-                        target.closest(INTERACTIVE_DESCENDANT_SELECTOR) !== null
-                      ) {
-                        return;
-                      }
-                      onRowActivate(row.original);
+                      const release = {
+                        x: event.clientX,
+                        y: event.clientY,
+                        t: Date.now(),
+                        pointerId: event.pointerId,
+                        rowId: row.id,
+                        selectionText: document.getSelection()?.toString() ?? '',
+                        onInteractiveDescendant:
+                          target instanceof Element &&
+                          target.closest(INTERACTIVE_DESCENDANT_SELECTOR) !== null,
+                      };
+                      if (shouldActivateRow(origin, release)) onRowActivate(row.original);
                     },
                     onPointerCancel: () => {
                       activationOrigin.current = null;
