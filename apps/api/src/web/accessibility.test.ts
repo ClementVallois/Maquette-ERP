@@ -175,12 +175,13 @@ function blockAfter(css: string, openIndex: number): string {
 
 describe('the print stylesheet', () => {
   it('gives .no-print !important, so no element+class rule elsewhere can out-specificity it', () => {
-    // Regression for the bug the user reported live: `p.actions { display: flex }` has
+    // Regression for the bug the user reported live: `p.actions { display: flex }` had
     // specificity (0,1,1), which beats a bare `.no-print` (0,1,0) regardless of source order, so
-    // `<p class="actions no-print">` printed anyway. `!important` is the fix that holds for every
-    // future `.no-print` user, not a one-off tweak to `p.actions` — CSS's cascade puts `!important`
-    // ahead of specificity, so this is the one form of the rule that cannot lose to a future
-    // element+class rule this sheet has not been written yet.
+    // `<p class="actions no-print">` printed anyway. That markup and its rule are both gone now,
+    // which is exactly why this test is not written against them: `!important` is the fix that
+    // holds for every future `.no-print` user — CSS's cascade puts `!important` ahead of
+    // specificity, so this is the one form of the rule that cannot lose to an element+class rule
+    // this sheet has not been written yet.
     const printBlocks = [...STYLESHEET.body.matchAll(/@media print\s*\{/gu)].map((match) =>
       blockAfter(STYLESHEET.body, match.index + match[0].length),
     );

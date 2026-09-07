@@ -230,22 +230,6 @@ export const LABELS = {
       'Cette facture est déjà émise : elle porte un numéro et une date, et une facture émise ne se modifie pas.',
   },
 
-  margin: {
-    heading: 'Marge',
-    lead: 'Ces trois valeurs ne figurent dans aucune liste. Elles ne s’obtiennent que par cette lecture, et chaque ouverture est journalisée : qui a lu, quels champs, sur qui.',
-    back: 'Revenir au pré-facturier',
-    mission: 'Mission',
-    quantity: 'Quantité',
-    tjm: 'TJM',
-    cjm: 'CJM',
-    revenue: 'Chiffre d’affaires',
-    cost: 'Coût',
-    margin: 'Marge',
-    total: 'Total du mois',
-    noMission:
-      'Aucune mission en régie sur ce mois : une mission au forfait n’a pas de TJM daté, et elle est écartée plutôt que comptée à zéro.',
-  },
-
   problem: {
     heading: {
       denied: 'Accès refusé',

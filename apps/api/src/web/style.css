@@ -307,10 +307,10 @@ footer.site p {
   }
 
   /* `!important`, deliberately: `.no-print`'s whole contract is "hidden in print, no matter what
-     else targets this element" (specificity 0,1,0), and an element+class rule elsewhere in this
-     sheet — `p.actions` (0,1,1) is the one that surfaced it — wins over that by specificity alone,
-     source order notwithstanding. Without `!important` a future rule of equal or higher
-     specificity silently defeats a utility whose only job is to always win. */
+     else targets this element" (specificity 0,1,0), and any element+class rule in this sheet
+     (0,1,1) wins over that by specificity alone, source order notwithstanding. The rule that
+     surfaced it, `p.actions`, has since gone with the markup it styled; this stays because the
+     next such rule would silently defeat a utility whose only job is to always win. */
   .no-print {
     display: none !important;
   }
@@ -400,12 +400,6 @@ select {
 table.totals {
   max-width: 32rem;
   margin-top: calc(var(--space) * 1.5);
-}
-
-p.actions {
-  display: flex;
-  gap: 0.5rem;
-  margin: var(--space) 0;
 }
 
 form.filter {
