@@ -36,6 +36,39 @@ export interface CraRefusal {
   readonly reason: string;
 }
 
+/**
+ * `Date` is the one mutable value this aggregate carries — every other field is a string, a
+ * number, or a plain object built from those. `readonly` stops a caller from reassigning a field,
+ * but says nothing about calling a mutating *method* on the value already in it
+ * (`someDate.setUTCFullYear(...)`), which needs no type cast at all. Copied at every boundary this
+ * aggregate crosses — reconstitute's input, a transition's own clock read, and every getter —
+ * because the direction the alias runs (a caller mutating what they were handed, or the aggregate
+ * outliving a reference someone else still holds) is not something this class can predict.
+ *
+ * `structuredClone`, not `new Date(date.getTime())`: the domain's own lint rule bans `new Date(…)`
+ * outright ("time comes from the injected `Clock` port"), on purpose — it cannot tell a clone from
+ * a read of the wall clock, and a syntactic carve-out for "this one is fine" is the kind of
+ * exception that erodes a rule until nobody trusts it. `structuredClone` copies a `Date` without
+ * that syntax at all, so the rule stays absolute and this is not an exception to it.
+ */
+function copyDate(date: Date | null): Date | null {
+  return date === null ? null : structuredClone(date);
+}
+
+function copyRefusal(refusal: CraRefusal | null): CraRefusal | null {
+  return refusal === null ? null : { ...refusal, at: structuredClone(refusal.at) };
+}
+
+/**
+ * `CraLine` holds only strings and a number — no mutating method to reach the way `Date` has one
+ * — but a cast still defeats `readonly` by reassigning a field directly (package 07, ADR-0108):
+ * `(cra.lines[0] as { quarterDays: number }).quarterDays = 4` needs no method call at all. A
+ * shallow copy is enough because `CraLine` nests nothing further.
+ */
+function copyLine(line: CraLine): CraLine {
+  return { ...line };
+}
+
 export interface RecordDayInput {
   readonly day: IsoDate;
   readonly dayType: RecordedDayType;
@@ -108,12 +141,12 @@ export class Cra {
 
     const cra = new Cra(input.id, input.consultantId, input.officeId, input.period);
     cra.#status = input.status;
-    cra.#lines.push(...input.lines);
+    cra.#lines.push(...input.lines.map(copyLine));
     cra.#flags = input.flags;
-    cra.#submittedAt = input.submittedAt;
+    cra.#submittedAt = copyDate(input.submittedAt);
     cra.#validatedBy = input.validatedBy;
-    cra.#validatedAt = input.validatedAt;
-    cra.#refusal = input.refusal;
+    cra.#validatedAt = copyDate(input.validatedAt);
+    cra.#refusal = copyRefusal(input.refusal);
 
     return cra;
   }
@@ -139,7 +172,7 @@ export class Cra {
   }
 
   get lines(): readonly CraLine[] {
-    return [...this.#lines];
+    return this.#lines.map(copyLine);
   }
 
   /** Days the calendar says are not workable and that carry an entry anyway. Computed at submission. */
@@ -148,7 +181,7 @@ export class Cra {
   }
 
   get submittedAt(): Date | null {
-    return this.#submittedAt;
+    return copyDate(this.#submittedAt);
   }
 
   get validatedBy(): ConsultantId | null {
@@ -156,11 +189,11 @@ export class Cra {
   }
 
   get validatedAt(): Date | null {
-    return this.#validatedAt;
+    return copyDate(this.#validatedAt);
   }
 
   get refusal(): CraRefusal | null {
-    return this.#refusal;
+    return copyRefusal(this.#refusal);
   }
 
   /** Quarter-days recorded on one day, all missions and absences together. */
@@ -224,7 +257,9 @@ export class Cra {
     });
 
     this.#status = 'submitted';
-    this.#submittedAt = input.clock.now();
+    // Copied, not stored as-is: `Clock.now()` promises a `Date`, not a fresh instance every call
+    // — this codebase's own `fixedClock` test double returns the identical reference each time.
+    this.#submittedAt = copyDate(input.clock.now());
     this.#refusal = null;
   }
 
@@ -261,7 +296,7 @@ export class Cra {
 
     this.#status = 'validated';
     this.#validatedBy = input.by;
-    this.#validatedAt = input.clock.now();
+    this.#validatedAt = copyDate(input.clock.now());
 
     return {
       craId: this.#id,
@@ -320,7 +355,11 @@ export class Cra {
     }
 
     this.#status = 'refused';
-    this.#refusal = { by: input.by, at: input.clock.now(), reason: input.reason };
+    this.#refusal = {
+      by: input.by,
+      at: structuredClone(input.clock.now()),
+      reason: input.reason,
+    };
   }
 
   #assertEditable(attempted: string): void {

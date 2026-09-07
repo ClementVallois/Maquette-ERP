@@ -459,6 +459,10 @@ describe('PgCraRepository', () => {
     expect(found!.refusal!.by).toBe('manager-1');
     expect(found!.refusal!.reason).toBe('mission-1 was not staffed that week');
     expect(found!.refusal!.at).toBeInstanceOf(Date);
+    // Not just "is a Date" (package 07): the round trip goes through `TIMESTAMPTZ` storage and
+    // the aggregate's own defensive-copy boundary (ADR-0108) on the way back out — this proves the
+    // instant survives both, not only that some `Date` came back.
+    expect(found!.refusal!.at.getTime()).toBe(fixedClock.now().getTime());
   });
 
   it('round-trips a validated Cra, with who validated it', async () => {
@@ -476,6 +480,8 @@ describe('PgCraRepository', () => {
     expect(found!.status).toBe('validated');
     expect(found!.validatedBy).toBe('manager-1');
     expect(found!.validatedAt).toBeInstanceOf(Date);
+    // Same instant-preservation proof as the refusal round trip above (package 07, ADR-0108).
+    expect(found!.validatedAt!.getTime()).toBe(fixedClock.now().getTime());
   });
 
   it('finds by consultant and period', async () => {
@@ -556,6 +562,9 @@ describe('PgCraRepository', () => {
     const second = await repo().findById('cra-001', parisManager);
     expect(second!.status).toBe('submitted');
     expect(second!.lines).toHaveLength(workableDays);
+    // Instant-preservation proof for `submittedAt`, the third of the three copied `Date` fields
+    // (package 07, ADR-0108) — `validatedAt`/`refusal.at` have their own dedicated tests above.
+    expect(second!.submittedAt!.getTime()).toBe(fixedClock.now().getTime());
 
     // The rows are replaced, not appended: `#replaceLines` deletes before it inserts.
     const { rows } = await tx.client.query<{ count: string }>(
