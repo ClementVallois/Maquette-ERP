@@ -51,6 +51,15 @@ module" rather than "not in allowed", and the fixture at
 than merely implied, the same way `packages/billing/src/__boundary-fixture__/` already does for
 its own rule.
 
+The rule names only `timesheet` and `billing` as forbidden targets, deliberately leaving
+`packages/platform` reachable from `packages/contracts` (today unused, but not walled off). The
+rule's own name says "business dependency," and `platform` is the one package whose status is not
+obviously one or the other: ADR-0033 makes it the shared kernel both business modules already
+read through their own public entry point, not a business module of its own — a DTO reaching for
+`platform`'s `IsoDate` or `Actor` is the same act as `apps/api` or `apps/web` doing so, not the
+same act as reaching for `Invoice` or `Cra`. If `@erp/contracts` ever needs one of those shared
+primitives, importing `packages/platform/src/index.ts` is not this decision's concern to forbid.
+
 ## Rejected option
 
 **Leave problem-details validation to TypeScript alone.** The type already exists; the gap is
