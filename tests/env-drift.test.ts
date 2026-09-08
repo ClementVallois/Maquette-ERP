@@ -72,6 +72,43 @@ describe('the environment drift guard', () => {
     expect(problems[0]).toContain('Read no variable at all out of .env.example');
   });
 
+  // The defect these three close: `env:check` was green on a .env whose POSTGRES_PORT had been
+  // changed to dodge a port collision while MIGRATION_DATABASE_URL still carried the old one, so
+  // `pnpm run setup` migrated and seeded a *different* database than the one it had just started.
+  // Seeding truncates three schemas, so the cost of the gap was someone else's data.
+  it('rejects a database URL whose port disagrees with POSTGRES_PORT', () => {
+    const local =
+      'POSTGRES_USER=erp_migration\nPOSTGRES_PORT=5434\n' +
+      'DATABASE_URL=postgres://erp_app:pw@localhost:5433/erp\n';
+    const example = `${EXAMPLE}DATABASE_URL=postgres://erp_app:pw@localhost:5433/erp\n`;
+
+    const problems = envProblems({ ...agreeing, example, local });
+
+    expect(problems.join('\n')).toContain('DATABASE_URL');
+    expect(problems.join('\n')).toContain('5434');
+  });
+
+  it('names every disagreeing URL, not just the first', () => {
+    const urls =
+      'DATABASE_URL=postgres://erp_app:pw@localhost:5433/erp\n' +
+      'MIGRATION_DATABASE_URL=postgres://erp_migration:pw@localhost:5433/erp\n';
+    const local = `POSTGRES_USER=erp_migration\nPOSTGRES_PORT=5434\n${urls}`;
+
+    const problems = envProblems({ ...agreeing, example: `${EXAMPLE}${urls}`, local });
+
+    expect(problems.join('\n')).toContain('MIGRATION_DATABASE_URL');
+    expect(problems.filter((p) => p.includes('5434'))).toHaveLength(2);
+  });
+
+  it('accepts URLs that carry the configured port', () => {
+    const urls =
+      'DATABASE_URL=postgres://erp_app:pw@localhost:5434/erp\n' +
+      'MIGRATION_DATABASE_URL=postgres://erp_migration:pw@localhost:5434/erp\n';
+    const local = `POSTGRES_USER=erp_migration\nPOSTGRES_PORT=5434\n${urls}`;
+
+    expect(envProblems({ ...agreeing, example: `${EXAMPLE}${urls}`, local })).toStrictEqual([]);
+  });
+
   it('ignores `$$VAR`, which compose expands inside the container', () => {
     // The healthcheck line in the fixture. Read as a host variable, it would demand a
     // POSTGRES_USER declaration for the wrong reason and pass for the wrong reason too.

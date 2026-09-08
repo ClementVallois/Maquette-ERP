@@ -19,7 +19,7 @@ pointer to it (task 0.6). If this plan and an ADR disagree, the ADR wins and thi
    a cold reader cannot open it. This plan names decisions by **subject and by ADR**, and the
    coverage appendix keys to row titles with the private repository named as their source.
 2. **The date moves, the scope does not.** `BUILD-RULES.md` already said so; it is now applied
-   rather than quoted. Every retained item in `CHOIX.md` gets built. The 24/08 date is no longer a
+   rather than quoted. Every retained item of the triage gets built. The 24/08 date is no longer a
    scope constraint — see "Calendar" below.
 3. **The mockup is hosted, and the deploy is pull-based.** `erp.clementvallois.fr` on the personal
    VPS. The CI holds **no** VPS credential: the host pulls a signed image digest on a timer. This
@@ -31,7 +31,8 @@ pointer to it (task 0.6). If this plan and an ADR disagree, the ADR wins and thi
 Eleven phases, 0 through 10, sequenced by dependency. Sized honestly, this is **10–14 working days**, not 4. The
 implied finish is therefore **early September 2026**, not 21/08.
 
-What that means for the 24/08 conversation: phases 0–6 plus 8 constitute a **demonstrable chain in
+24/08/2026 was the date this repository was first to be shown to a reader outside it. What that
+means for it: phases 0–6 plus 8 constitute a **demonstrable chain in
 production** — the CRA-to-invoice chain, the enforced boundary, authorization by role and scope, and the
 **seven** screens Phase 6 shipped — which Phase 8 would put at `https://erp.clementvallois.fr`.
 **Phase 8 landed on 02/09/2026 and that host serves the chain**; the sentence above described an
@@ -809,7 +810,7 @@ screen → the live instance.
 ### 9.2 bis — Going public, and the eight checkboxes that come free with it
 
 The **disclosure decision** — whether this repository becomes public, and what saying so about
-"the 24/08 conversation" discloses — is Clement's and is the open question of 18/08/2026. It is
+the 24/08 showing discloses — is the owner's, and is the open question of 18/08/2026. It is
 named here rather than in 9.2 because 9.2 is about a reading path, not about publication.
 
 If the answer is yes, two things follow in the same act and neither costs anything: branch

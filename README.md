@@ -16,20 +16,20 @@ se parcourt dans cet ordre :
    qu'est un CRA et pourquoi il décide du chiffre d'affaires d'un cabinet de conseil.
 2. **Une décision** — [ADR-0010](docs/adr/0010-vat-rounded-per-rate.md) : la TVA est arrondie
    **par taux**, jamais par ligne ni sur le total. Chaque ADR nomme l'option écartée et le seuil
-   auquel on y reviendrait ; il y en a 119 (`ls docs/adr/0*.md | wc -l`, moins le gabarit `0000`).
+   auquel on y reviendrait ; il y en a 120 (`ls docs/adr/0*.md | wc -l`, moins le gabarit `0000`).
 3. **La preuve mécanique** — [`tests/boundary-rule.test.ts`](tests/boundary-rule.test.ts) : la
    frontière `timesheet`/`billing` n'est pas une convention de nommage, c'est un job de CI qui
    rejoue une violation délibérée et exige qu'elle soit refusée.
 4. **L'écran** — <https://erp.clementvallois.fr> : choisir _Bruno Leroy (manager)_, ouvrir
-   **`/pre-facturier?period=2026-06`**, valider le CRA de Claire Dubois, voir la facture
-   apparaître. ⚠️ Le mois est obligatoire dans l'URL : le pré-facturier s'ouvre par défaut sur le
-   mois le plus récent, où tout est déjà validé — il n'y aurait rien à valider. Le script complet,
-   avec le test qui prouve chaque étape :
-   [`docs/demo-checklist.md`](docs/demo-checklist.md).
-5. **Le lancer soi-même** — section « [Démarrer](#démarrer) » : `pnpm install`, `pnpm run setup`,
-   puis **`pnpm --filter @erp/web build`** — sans ce dernier, `/` répond 404.
+   « Pré-facturier », **choisir la période 2026-06** dans le sélecteur de mois, valider le CRA en
+   attente, voir la facture apparaître. Le mois affiché par défaut est le mois courant, qui est
+   volontairement vide — c'est celui qu'on remplit soi-même. Le script complet, avec le test qui
+   prouve chaque étape : [`docs/demo-checklist.md`](docs/demo-checklist.md).
+5. **Le lancer soi-même** — section « [Démarrer](#démarrer) », quatre commandes :
+   `pnpm install --frozen-lockfile`, `pnpm run setup`, `pnpm --filter @erp/web build`, `pnpm run api`.
+   Le build front n'est pas optionnel : sans lui, `/` renvoie un 404 ordinaire.
 
-Le reste de ce fichier dit **pourquoi** chacune de ces quatre choses est comme elle est, et ce que
+Le reste de ce fichier dit **pourquoi** chacune de ces étapes est comme elle est, et ce que
 je n'ai délibérément pas construit.
 
 ## Où en est cette maquette
@@ -59,7 +59,7 @@ lancer : section « Démarrer » plus bas.
 
 Les compteurs de tests se recomptent plutôt qu'ils ne se croient : `pnpm run test` pour les tests
 unitaires, `pnpm run test:int` pour ceux qui tournent contre un vrai PostgreSQL. Au **08/09/2026**,
-690 et 300.
+693 et 300.
 
 **La chaîne franchit déjà la frontière** : `billing` réagit à `timesheet.TimesheetValidated` et
 produit un projet de facture par client. **Aucun fichier livré de `billing` — tests compris —
@@ -128,31 +128,28 @@ moment ça le sera.
 règle est dans `CLAUDE.md` : le code, les commits et les arbitrages en anglais, le README dans la
 langue du lecteur qui ouvre ce dépôt sans brief.
 
-Le reste de `docs/` est du **journal de construction**, pas de la documentation d'arrivée. Rien n'y
-est nécessaire pour comprendre la maquette, et l'inventaire est ici plutôt qu'ailleurs pour qu'un
+Le reste de `docs/` est le **plan de construction**, pas de la documentation d'arrivée. Rien n'y est
+nécessaire pour comprendre la maquette, et l'inventaire est ici plutôt qu'ailleurs pour qu'un
 fichier ne s'y ajoute pas en silence :
 
-| Fichier                                                                         | Ce que c'est                                                                                                                                                                                      |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BUILD-PLAN.md`                                                                 | l'ordre, les branches et le calendrier de la construction                                                                                                                                         |
-| `frontend-plan.md`, `direction-visuelle.md`                                     | le plan de construction et la direction visuelle de la SPA                                                                                                                                        |
-| `running.md`                                                                    | les deux topologies d'exécution (dev / prod-démo) et la panne qui suit quand on les mélange                                                                                                       |
-| `vulnerability-management.md`                                                   | ce qui se passe quand la porte `Dependency scan` passe au rouge                                                                                                                                   |
-| `PHASE-4-5-CLOSURE.md`                                                          | le relevé des revues de ces deux phases-là (les suivantes sont closes dans `open-questions.md`, incohérence de forme assumée)                                                                     |
-| `qa-rounds.md`, `qa-round-6-notes.md`, `todo.md`                                | les passes de relecture de l'application qui tourne, **par Clément Vallois, qui détient les arbitrages** : ce qui a été demandé, et ce qui en a été fait                                          |
-| `ssr-printables-sunset.md`                                                      | ce qui reste de la couche rendue serveur après le passage à la SPA, et ce qui n'a plus d'appelant                                                                                                 |
-| `audit-produit-ui-ux.md`, `plan-densification.md`, `plan-roles-rh-direction.md` | trois notes de travail sur ce que la maquette pourrait devenir. **Elles n'engagent rien** : ce qui en est sorti est passé par un ADR ou par « Ce que je ne construis pas », le reste n'existe pas |
-| `demo-checklist.md`                                                             | le script de démonstration, écrit pour être **vérifiable** — chaque étape nomme le test automatisé qui la prouve                                                                                  |
-| `agents/`                                                                       | l'outillage d'agents utilisé pour construire le dépôt                                                                                                                                             |
+| Fichier                                     | Ce que c'est                                                                                                     |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `BUILD-PLAN.md`                             | l'ordre, les branches et le calendrier des phases                                                                |
+| `frontend-plan.md`, `direction-visuelle.md` | le plan de construction et la direction visuelle de la SPA                                                       |
+| `running.md`                                | les deux topologies d'exécution (dev / prod-démo) et la panne qui suit quand on les mélange                      |
+| `demo-checklist.md`                         | le script de démonstration, écrit pour être **vérifiable** — chaque étape nomme le test automatisé qui la prouve |
+| `agents/`                                   | l'outillage d'agents utilisé pour construire le dépôt                                                            |
+
+Le **journal** de cette construction — le relevé des relectures, les notes produit, les points de
+contrôle de chaque phase — a été retiré de ce dépôt le 08/09/2026 et conservé hors ligne :
+[ADR-0120](docs/adr/0120-the-construction-journal-leaves-the-public-repository.md) dit ce qui est
+parti, pourquoi, et ce que « retiré » veut dire exactement ici. Ce qui reste est ce dont un lecteur
+a besoin.
 
 Deux fichiers d'outillage vivent hors de `docs/` et sont eux aussi versionnés :
 `.claude/agents/rules-auditor.md` et `.claude/agents/cold-reader.md` — les deux relecteurs en
 lecture seule lancés avant chaque merge sur `main`, l'un contre `docs/BUILD-RULES.md`, l'autre dans
 la peau du lecteur sans brief.
-
-⚠️ Ces trois notes de travail et `todo.md` sont **en français**, contrairement à la règle du dépôt
-(tout en anglais sauf ce README). C'est assumé et non corrigé : `todo.md` reproduit mot pour mot des
-demandes formulées en français, et les traduire remplacerait la demande par sa paraphrase.
 
 ### Vérifier soi-même plutôt que me croire
 
@@ -174,8 +171,10 @@ données et les tests d'intégration, voir « Démarrer » plus bas.
 ℹ️ **Le conteneur PostgreSQL publie `POSTGRES_PORT`, `5433` par défaut** — et non `5432`, pour ne
 pas entrer en conflit avec une instance déjà installée. Si `pnpm run setup` échoue sur
 `Bind for 0.0.0.0:5433 failed: port is already allocated`, c'est qu'autre chose l'occupe : changez
-`POSTGRES_PORT` dans `.env`, `DATABASE_URL` porte le même port et `pnpm run env:check` vérifie que
-les deux concordent.
+`POSTGRES_PORT` dans `.env` **et le port des deux URL de connexion**, `DATABASE_URL` et
+`MIGRATION_DATABASE_URL`. `pnpm run env:check` refuse désormais un `.env` où les trois ne
+concordent pas — c'est `MIGRATION_DATABASE_URL` que lisent `migrate` et `seed`, et `seed` **vide
+les trois schémas** : oubliée, elle envoie la commande sur la base qui répond à l'ancien port.
 
 ## Le problème métier
 
@@ -448,12 +447,22 @@ curl -s -b jar.txt http://127.0.0.1:3000/api/v1/cras
 ```
 
 Les **deux temps de la démonstration d'ADR-0003**, sur la **même** URL — prenez l'`id` d'un CRA
-renvoyé ci-dessus :
+renvoyé ci-dessus (la liste est paginée à vingt : `?limit=200` pour la voir entière, `?status=submitted`
+pour n'avoir que ceux qu'un manager peut décider) :
 
 ```sh
+CRA=<un id renvoyé ci-dessus>
+
 # 1. manager-paris le lit                       → 200
+curl -s -b jar.txt "http://127.0.0.1:3000/api/v1/cras/$CRA"
+
 # 2. la même URL sous manager-lyon              → 403, avec "deniedBy" qui porte le refus
+curl -s -c lyon.txt -X POST http://127.0.0.1:3000/api/v1/session \
+  -H 'content-type: application/json' -d '{"persona":"manager-lyon"}'
+curl -s -b lyon.txt "http://127.0.0.1:3000/api/v1/cras/$CRA"
+
 # 3. un id qui n'existe pas, sous manager-paris → 404
+curl -s -b jar.txt "http://127.0.0.1:3000/api/v1/cras/00000000-0000-7000-8000-000000000000"
 ```
 
 Trois faits différents, trois réponses différentes — et le `403` ne publie **rien** de ce qu'il
@@ -592,7 +601,7 @@ autres workflows du dépôt — `Analyze` (CodeQL, `codeql.yml`) et
 | **Module boundary**                                 | `pnpm run boundaries` + le test négatif                                                   | Un import qui franchit la frontière `timesheet`/`billing`, une flèche jamais déclarée — et une règle **morte** : le test rejoue une violation délibérée et exige qu'elle soit refusée                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | **Lint, format, types**                             | `lint` · `format:check` · `typecheck` · `env:check`                                       | Du code hors des règles ESLint (dont les invariants du domaine rendus mécaniques), un formatage divergent, une erreur de type — et une variable de `compose.yml` absente de `.env.example`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | **Secret scan**                                     | gitleaks sur l'historique                                                                 | Un secret commité, y compris dans un commit ancien de la branche                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| **Dependency scan**                                 | `pnpm audit` + osv-scanner                                                                | Une dépendance portant une vulnérabilité connue. Les deux étapes n'ont **pas** le même seuil, et c'est délibéré : `pnpm audit --audit-level=high` ne tombe qu'en haut ou critique, osv-scanner **n'a pas de plancher de sévérité** et tombe sur tout ce qu'OSV connaît. La porte est l'union des deux — c'est osv-scanner qui l'a fait passer au rouge pour la première fois le 31/08/2026, sur un avis **modéré** (GHSA-q8mj-m7cp-5q26, `qs`) que `pnpm audit` avait laissé passer. Le plancher n'a pas été ajouté pour faire repasser la porte au vert : le correctif a été pris (`pnpm-workspace.yaml`, `overrides`), procédure → [`docs/vulnerability-management.md`](docs/vulnerability-management.md)                                                                               |
+| **Dependency scan**                                 | `pnpm audit` + osv-scanner                                                                | Une dépendance portant une vulnérabilité connue. Les deux étapes n'ont **pas** le même seuil, et c'est délibéré : `pnpm audit --audit-level=high` ne tombe qu'en haut ou critique, osv-scanner **n'a pas de plancher de sévérité** et tombe sur tout ce qu'OSV connaît. La porte est l'union des deux — c'est osv-scanner qui l'a fait passer au rouge pour la première fois le 31/08/2026, sur un avis **modéré** (GHSA-q8mj-m7cp-5q26, `qs`) que `pnpm audit` avait laissé passer. Le plancher n'a pas été ajouté pour faire repasser la porte au vert : le correctif a été pris (`pnpm-workspace.yaml`, `overrides`), procédure de traitement → section « La procédure de gestion des vulnérabilités » plus bas                                                                        |
 | **SAST**                                            | Semgrep OSS                                                                               | Les motifs de vulnérabilité applicative détectables statiquement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | **Shell scripts**                                   | shellcheck (`--severity=warning`) sur `deploy/*.sh`, `deploy/test/*.sh` et `scripts/*.sh` | Une faute dans le chemin de déploiement. Le redéploiement, la remise à zéro nocturne et l'assistant d'installation de l'hôte sont du shell exécuté **en root sur le VPS**, et ni Semgrep ni CodeQL ne lisent bash : sans ce job, ces scripts seraient le seul code exécutable du dépôt sans aucune analyse statique                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | **Tests**                                           | `pnpm run test:cov`                                                                       | Un invariant du domaine cassé, et une couverture du **domaine** sous 90 % (branches : 85 %) — le seuil ne porte que sur `domain/` et sur le noyau partagé, pas sur le dépôt entier                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -654,6 +663,7 @@ Ce qui reste, et qui tourne réellement, c'est la porte `Dependency scan` du tab
 elle échoue sur une vulnérabilité connue dans une dépendance résolue, à chaque push et à chaque
 pull request, et elle verrouille le merge.
 
-Ce que fait la porte `Dependency scan` du tableau ci-dessus quand elle passe au rouge — qui
-décide, sur quel critère une exception se justifie, et où elle est écrite — est une procédure à
-part entière, pas une phrase de plus ici : **[`docs/vulnerability-management.md`](docs/vulnerability-management.md)**.
+Ce qu'on fait quand elle passe au rouge — qui décide, sur quel critère une exception se justifie,
+et où elle est écrite — est une procédure à part entière. Elle est écrite, elle est tenue hors de
+ce dépôt (ADR-0120), et la décision qui la cadre reste ici :
+**[ADR-0075](docs/adr/0075-the-vulnerability-management-procedure-and-where-it-lives.md)**.

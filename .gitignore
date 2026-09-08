@@ -33,17 +33,33 @@ reports/
 .claude/*
 !.claude/agents/
 
+# Generated agent onboarding notes, restating what CLAUDE.md and docs/BUILD-RULES.md already
+# state. Ignored rather than versioned so the inventory keeps one source per rule.
+AGENTS.md
+
 # The working documents. Purged from history by ADR-0014 and archived in the private
 # Maquette-ERP-notes repository; ignored here so a stray `git add .` cannot bring them back.
 CHOIX.md
 draft.md
 
+# The construction journal: withdrawn from the tree on 08/09/2026 and kept privately (ADR-0120).
+# Unlike CHOIX.md above, these are NOT purged from history — the ADR says so out loud. Ignored so a
+# stray `git add .` cannot put them back in the tree.
+docs/plan-roles-rh-direction.md
+docs/todo.md
+docs/qa-rounds.md
+docs/qa-round-6-notes.md
+docs/ssr-printables-sunset.md
+docs/PHASE-4-5-CLOSURE.md
+docs/audit-produit-ui-ux.md
+docs/plan-densification.md
+docs/vulnerability-management.md
+
 # Reference screenshots pasted in for a QA round: read locally, never published. The repo is
 # public (ADR-0086), and a screenshot of a third-party product is not ours to redistribute.
 docs/images/
 
-# Private working notes kept alongside the repo but never published: interview prep, salary
-# figures, the client's name. The repository is public (ADR-0086) and deliberately anonymised
-# ("a cybersecurity consulting firm"); `*.local.md` exists so a stray `git add .` cannot undo that.
+# Working notes kept beside the repository and not published with it (ADR-0120). The suffix exists
+# so that a stray `git add .` cannot publish one by accident.
 *.local.md
 docs/HANDOFF-qa-round-3.md

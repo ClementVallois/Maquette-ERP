@@ -107,6 +107,7 @@ retouched, so what was decided stays visible next to what replaced it.
 | [0117](./0117-assignment-interval-policy-belongs-to-timesheet.md)                            | Assignment interval policy belongs to timesheet                                                                                                    | accepted   |
 | [0118](./0118-cra-draft-transitions-use-a-pure-reducer.md)                                   | CRA draft transitions use a pure reducer                                                                                                           | accepted   |
 | [0119](./0119-the-uninstalled-renovate-configuration-is-removed.md)                          | The uninstalled Renovate configuration is removed (supersedes ADR-0075 point 1)                                                                    | accepted   |
+| [0120](./0120-the-construction-journal-leaves-the-public-repository.md)                      | The construction journal leaves the public repository                                                                                              | accepted   |
 | [0023](./0023-persona-selector-instead-of-authentication.md)                                 | A persona selector instead of authentication, and where authorization is decided                                                                   | accepted   |
 | [0043](./0043-economics-is-read-at-the-composition-root.md)                                  | Margin is read at the composition root, because it belongs to neither module                                                                       | accepted   |
 | [0044](./0044-idempotency-key-is-stored-not-merely-required.md)                              | `Idempotency-Key` is stored, not merely required                                                                                                   | accepted   |
@@ -321,7 +322,7 @@ configuration that is committed but not installed is stated as such rather than 
 live, on ADR-0040's own precedent — this repository has already shipped one claim of a gate that
 was never real, and did not want to ship a second.
 
-0076 opens the QA round 1 sequence (`docs/qa-rounds.md`, worked as `fix/qa-round-1`): item 4 asked for a
+0076 opens the QA round 1 sequence (worked as `fix/qa-round-1`): item 4 asked for a
 distinct colour per role badge, which reverses `docs/direction-visuelle.md` §4.5's "neutral
 everywhere but the selector" — a decision the SPA had implemented but the no-JS shell
 (`apps/api/src/web/style.css`'s `roleTag`) never did, using the identical three hex values under
@@ -334,8 +335,7 @@ independent of `/api/v1/cras`' own paginated page, on the same precedent ADR-007
 `public.consultants` directly, rather than deriving the filter's menu from a page that will not
 hold a whole office once item 6 grows a roster past it.
 
-0078 opens Wave 2 of the same round (`docs/open-questions.md`'s "Wave 2 plan" section, written
-before this ADR): ADR-0004's own threshold — "the day the mockup spans a second calendar year" —
+0078 opens Wave 2 of the same round, planned before this ADR was written: ADR-0004's own threshold — "the day the mockup spans a second calendar year" —
 is met by item 6's historical seed data, so the holiday table extends from 2026 alone to
 2016–2027, written out the same way the original eleven dates were rather than replaced by a
 computed Easter algorithm, for the same "verifiable by reading it" reason ADR-0004 gave.
@@ -370,8 +370,9 @@ the same stale array, and the second overwrote the first. The filter now replays
 diff against whatever the current value turns out to be.
 
 0084 and 0085 are Phase 8's, not this round's: the public GHCR package and the one bind mount ADR-0030's
-prohibition does not cover, both decided on 03/09/2026 by the review pass over `feat/deploy`. The QA rounds themselves — what each item asked for, and which shipped —
-are `docs/qa-rounds.md`; the ADRs above record only the decisions those items forced.
+prohibition does not cover, both decided on 03/09/2026 by the review pass over `feat/deploy`. The QA
+rounds themselves — what each item asked for, and which shipped — are held outside this repository;
+the ADRs above record only the decisions those items forced.
 
 ## Identified, not yet decided
 
