@@ -19,9 +19,9 @@ import { LABELS } from '@/lib/labels';
 
 interface TopbarProps {
   readonly title: string;
-  /** Item 4, QA round 5: what the bare `<h1>` shows below `md`, when `title` itself would not fit
-   * — `page-header.tsx`'s own comment has the full reasoning. Equal to `title` on every route this
-   * round did not touch. */
+  /** What the bare `<h1>` shows below `md`, when `title` itself would not fit —
+   * `page-header.tsx`'s own comment has the full reasoning. Equal to `title` on every other
+   * route. */
   readonly mobileTitle: string;
   readonly showBreadcrumb: boolean;
   readonly parent?: PageHeaderParentCrumb | undefined;

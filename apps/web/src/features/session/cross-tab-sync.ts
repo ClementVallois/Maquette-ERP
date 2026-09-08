@@ -13,7 +13,7 @@ import type { QueryClient } from '@tanstack/react-query';
  * - **Active** (a component is still mounted and subscribed at this instant — the persona grid
  *   itself, for the one frame before `navigate()` lands): `invalidateQueries()` marks it stale
  *   *without* deleting its data, so that observer keeps rendering what it already has instead of
- *   dropping to `isPending` and flashing its skeleton (QA round 1, item 2). With `refetchType:
+ *   dropping to `isPending` and flashing its skeleton. With `refetchType:
  *   'active'`, the background refetch this triggers runs against whatever the cookie now says, so
  *   what the observer re-renders with is already the new persona's answer.
  * - **Inactive** (no component subscribed right now, but the cache entry survives — the dashboard
@@ -24,8 +24,8 @@ import type { QueryClient } from '@tanstack/react-query';
  *   an app whose whole point is authorization by role and scope. `removeQueries` drops those
  *   outright, so a remount has nothing cached to paint and genuinely fetches under the new persona.
  *
- * `refetchType` is the one place callers deliberately differ (item 9, QA round 2, and this
- * module's own comment on `installCrossTabPersonaSync` below). `useMutation`'s hook-level
+ * `refetchType` is the one place callers deliberately differ (see this module's own comment on
+ * `installCrossTabPersonaSync` below). `useMutation`'s hook-level
  * `onSuccess` runs *before* either call site's own `onSuccess` — where `navigate()` actually lives
  * (`PersonaBlock.handleChange`, `routes/index.tsx`'s `choose`) — so whichever screen triggered the
  * mutation is still mounted, with its own persona-scoped query still active, at the exact moment
@@ -56,9 +56,8 @@ export function invalidateOnPersonaChange(
   // on its very first, never-yet-settled fetch when the persona changes has no data to gate on,
   // so without this line `invalidateQueries` would silently piggyback on that same in-flight
   // fetch instead of starting a new one — and whatever it eventually resolves to, built under the
-  // persona that is no longer current, becomes the query's data uncontested. Confirmed the other
-  // way too: this line removed reproduces exactly that, verified against
-  // `cross-tab-sync.test.ts`'s own "delayed response held open" case before adding it back.
+  // persona that is not current any more, becomes the query's data uncontested.
+  // `cross-tab-sync.test.ts`'s "delayed response held open" case fails without this line.
   // `cancelQueries()` has no such gate — it calls `query.cancel()` directly on every query
   // regardless of whether it has ever settled, discarding the in-flight fetch's eventual
   // resolution (query-core's own `isResolved` guard, read directly off `retryer.ts`) and
@@ -70,9 +69,9 @@ export function invalidateOnPersonaChange(
 }
 
 /**
- * Package 10's own Work item: "define how another tab changing the shared cookie invalidates a
- * tab's cached persona and business data." Nothing before this module answered that question — a
- * second same-origin tab has its own independent `QueryClient` and its own mounted queries, and
+ * How another tab changing the shared cookie invalidates this tab's cached persona and business
+ * data. A second same-origin tab has its own independent `QueryClient` and its own mounted
+ * queries, and
  * the only thing it shares with the tab that just switched persona is `document.cookie`, which
  * neither tab's cache is watching. `localStorage`'s `storage` event is the browser primitive built
  * for exactly this: writing a key fires `storage` in every OTHER same-origin document with that

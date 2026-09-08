@@ -10,7 +10,7 @@ import newsTeam from '@/assets/news-team.svg';
 import securityAlert from '@/assets/security-alert.webp';
 
 /**
- * Item 17, QA round 3: static, authored content for the dashboard's "informations CSE / vie de
+ * Static, authored content for the dashboard's "informations CSE / vie de
  * l'entreprise" module — there is no CMS or admin screen behind it (out of scope for this
  * mockup, same reasoning `README.md`'s "What I'm not building" gives for everything this repo
  * does not construct), so the messages live here rather than behind a fetch. Six entries, though
@@ -21,9 +21,7 @@ import securityAlert from '@/assets/security-alert.webp';
  * `import` puts a file in Vite's module graph, which is what makes it content-hashed into
  * `dist/assets/` at build time (`apps/web/index.html`'s own comment on the favicon has the full
  * reasoning) — a literal path string in a plain data module is invisible to that pipeline and
- * would 404 in production despite working in dev. Item 1, QA round 5 swapped the security entry's
- * illustration for a real "security alert" photo (`security-alert.webp`); the two training/team
- * SVGs are unchanged.
+ * would 404 in production despite working in dev.
  */
 
 export interface CompanyNewsMessage {
@@ -106,7 +104,7 @@ const MESSAGES: readonly CompanyNewsMessage[] = [
 ] as const;
 
 /** The five most recent, most recent first — `publishedAt` is `YYYY-MM-DD`, which already sorts
- * chronologically as plain text (same reasoning item 25 relies on for `period`). */
+ * chronologically as plain text, the same way `period` does. */
 export function recentCompanyNews(): readonly CompanyNewsMessage[] {
   return [...MESSAGES]
     .sort((left, right) => right.publishedAt.localeCompare(left.publishedAt))

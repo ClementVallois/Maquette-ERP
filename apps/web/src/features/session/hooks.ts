@@ -8,7 +8,7 @@ import { broadcastPersonaChange, invalidateOnPersonaChange } from './cross-tab-s
 import type { PersonasResponse, SelectPersonaResponse, SessionResponse } from './types';
 
 /**
- * `useSession` is what the shell and the guards (Phase 4) consume — one hook, one query key.
+ * `useSession` is what the shell and the route guards consume — one hook, one query key.
  * A persona change invalidates the whole cache rather than this key alone (see
  * `invalidateOnPersonaChange` below), so `beforeLoad`'s `ensureQueryData` below always refetches
  * rather than trusting a session this key held for a persona that just stopped being current.
@@ -42,11 +42,11 @@ export function usePersonas(): UseQueryResult<PersonasResponse> {
  * Both mutations below change which persona a query key like `['dashboard', period]` or
  * `['cra', 'list']` resolves to server-side, without the key itself changing — the reasoning for
  * `invalidateOnPersonaChange`'s two-branch `refetchType` is written once, on that function itself
- * (`cross-tab-sync.ts`, moved there in package 10 alongside the cross-tab listener that shares it).
+ * (`cross-tab-sync.ts`, next to the cross-tab listener that shares it).
  *
- * `broadcastPersonaChange()` after each is package 10's own addition: this tab already knows its
- * persona changed (that is what triggered `onSuccess`), but any other same-origin tab does not,
- * and nothing before this wrote anything either of them could notice. Called from `onSuccess`
+ * `broadcastPersonaChange()` after each: this tab knows its persona changed (that is what
+ * triggered `onSuccess`), but no other same-origin tab does, and the cookie is not something a
+ * cache watches. Called from `onSuccess`
  * rather than from inside `invalidateOnPersonaChange` itself, so the listener that later reacts to
  * this broadcast in another tab can call the same invalidation function without re-broadcasting
  * and ping-ponging the two tabs forever — see that listener's own comment.

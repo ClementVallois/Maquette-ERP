@@ -13,8 +13,8 @@ const DashboardSearch = z.object({
 });
 
 /**
- * `/tableau-de-bord` — reachable by every role (frontend-plan.md task 4.3), and the redirect
- * target after choosing a persona (task 4.1). Task 8.4, `GET /api/v1/dashboard?period=`.
+ * `/tableau-de-bord` — reachable by every role, the redirect target after choosing a persona,
+ * and backed by `GET /api/v1/dashboard?period=`.
  *
  * A bare visit still reads the wall-clock "now" (`lib/period.ts`): that is what "the dashboard,
  * right now" means for a first-time visitor, and this route still carries **no picker** — nothing

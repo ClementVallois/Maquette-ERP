@@ -23,19 +23,18 @@ function hiddenKey(personaKey: string): string {
 }
 
 /**
- * Item 17, QA round 3: the company-news module — a small rotating carousel (up to five most
- * recent messages, `recentCompanyNews`), collapsible with the same `VisibilityToggle` item 23's
- * charts area uses.
+ * The company-news module — a small rotating carousel (up to five most recent messages,
+ * `recentCompanyNews`), collapsible with the same `VisibilityToggle` the charts area uses.
  *
  * **Persisted visibility, not a plain boolean**: the stored value is the id of the newest message
  * at the moment the visitor hid the module, not `true`/`false`. On mount, the module starts
  * hidden only if that stored id still matches today's newest message — the instant a newer
- * message is authored, the stored id no longer matches and the module reopens on its own. A bare
+ * message is authored, the stored id stops matching and the module reopens on its own. A bare
  * boolean cannot express "hidden, but only until something new shows up", which is what "vie de
- * l'entreprise" content actually wants (item 17's own brief).
+ * l'entreprise" content wants.
  *
- * **Auto-rotation, with a visible timer, pausable, and gone under reduced motion** (item 1, QA
- * round 5 replaced the original `requestAnimationFrame` loop): the timer bar is a plain CSS
+ * **Auto-rotation, with a visible timer, pausable, and gone under reduced motion**: the timer
+ * bar is a plain CSS
  * animation (`news-progress-fill`, `globals.css`), restarted by keying its element on the current
  * message's id and paused in place with `animation-play-state` while `paused` is true — the
  * browser interpolates the fill and reports when it finishes (`onAnimationEnd`), so nothing here
@@ -50,14 +49,14 @@ function hiddenKey(personaKey: string): string {
  * **Pause covers the whole module, not just the message row**: `onMouseEnter`/`onMouseLeave`/
  * `onFocus`/`onBlur` sit on the outer card, so the heading and its visibility toggle pause it too
  * — a keyboard user tabbing through the module must not have the message change under them any
- * more than a mouse user hovering it should (item 1f, QA round 5).
+ * more than a mouse user hovering it should.
  *
  * **Message-to-message transition**: the message row is keyed on the current message's id and
  * carries `tw-animate-css`'s `animate-in fade-in-0`, which plays once whenever React mounts a
  * fresh element for a new key — the same mechanism every Radix panel in this app already uses to
  * animate in, applied here without a Radix `data-state` to key off.
  *
- * **Mobile (item 1c, QA round 5)**: the previous/next arrows move to the module's left/right edges
+ * **Mobile**: the previous/next arrows move to the module's left/right edges
  * only from `md` up (ADR-0096) — below it there is not enough width for side arrows plus text, so
  * the arrows stay in their original place, in a row under the message with the dots. Nothing here
  * is `absolute` below `md`, so the mobile layout carries no new horizontal-overflow risk.
@@ -124,17 +123,16 @@ export function CompanyNewsPanel({ personaKey }: { readonly personaKey: string }
       {visible && (
         <div className="mt-3 flex flex-col gap-3">
           {/* `relative`: the anchor for the `md`-and-up edge arrows below — their position is
-              fixed to this box, not to the text, which is the whole point of item 1b (QA round 5):
-              before this, the arrows sat in a row after the message and moved down every time a
-              longer body grew that row.
+              fixed to this box, not to the text. Arrows sitting in a row after the message move
+              down every time a longer body grows that row.
 
               The arrows themselves anchor to a **fixed pixel offset**, `top-[1.625rem]` (half of
               the illustration's fixed `h-20`, less half of the button's own `icon-sm` `size-7`),
               not `top-1/2`: this row's own height is variable (a longer body grows it downward,
               `sm:min-h-20`'s own comment says so), and centering on a *percentage* of a variable
               height would still move the arrows every time the message length changes — exactly
-              what item 1b's own follow-up asked not to happen, because it forces a visitor to
-              re-aim the pointer between clicks. A fixed offset from the row's top edge does not:
+              what must not happen, because it forces a visitor to re-aim the pointer between
+              clicks. A fixed offset from the row's top edge does not:
               that edge never moves, only the row's bottom does, so the arrows stay put whether the
               current message is one line or four.
 
@@ -183,7 +181,7 @@ export function CompanyNewsPanel({ personaKey }: { readonly personaKey: string }
                 measuring every message's true height up front would be needed for that), but it
                 removes the worst, most frequent case. `md:px-9` clears the two edge arrows above
                 (`size-7` plus their own inset) only when they are actually rendered. Keyed on the
-                message id so `animate-in fade-in-0` (the cross-fade, item 1e) replays on every
+                message id so `animate-in fade-in-0` (the cross-fade) replays on every
                 change, manual or automatic. */}
             <div
               key={current.id}
@@ -220,7 +218,7 @@ export function CompanyNewsPanel({ personaKey }: { readonly personaKey: string }
           </div>
 
           {messages.length > 1 && (
-            // Below `md`: the original row, prev/dots/next together (item 1c's argued fallback).
+            // Below `md`: one row, prev/dots/next together — no room for edge arrows.
             // From `md` up: the prev/next buttons above take over, so only the dots remain, and
             // `md:justify-center` re-centres them now that they are the row's only content.
             <div className="flex items-center justify-between gap-2 md:justify-center">

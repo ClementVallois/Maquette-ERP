@@ -31,9 +31,8 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 function RootLayout(): ReactElement {
   return (
     <>
-      {/* frontend-plan.md task 4.2 / direction-visuelle.md §6: first in tab order, visible on
-          focus — the SSR printables already have one (ADR-0061), the SPA does not get to be
-          worse. Each top-level page below owns an element with `id="main-content"`. */}
+      {/* First in tab order, visible on focus — the server-rendered printables have one
+          (ADR-0061), and the SPA does not get to be worse. Each top-level page below owns an element with `id="main-content"`. */}
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground"
@@ -70,11 +69,10 @@ function NotFoundScreen(): ReactElement {
 }
 
 /**
- * The global error boundary (task 4.4): "rendant un `ProblemDetails` en français avec
- * `correlationId`". An `ApiProblemError` reaching here means a `beforeLoad`/`loader` threw one
- * that no route-local handling caught (every route in Phase 4 is a plain component with no
- * `loader`, so this is the backstop for a phase that adds one without its own error UI); anything
- * else is an unrelated JS exception, rendered the same way minus the fields it does not have.
+ * The global error boundary: a `ProblemDetails` in French, with its `correlationId`. An
+ * `ApiProblemError` reaching here means a `beforeLoad`/`loader` threw one that no route-local
+ * handling caught; anything else is an unrelated JS exception, rendered the same way minus the
+ * fields it does not have.
  */
 function RootErrorBoundary({ error }: ErrorComponentProps): ReactElement {
   if (error instanceof ApiProblemError) {

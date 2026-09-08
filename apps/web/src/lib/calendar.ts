@@ -16,10 +16,9 @@ export function fetchCalendar(signal?: AbortSignal): Promise<ApiResult<CalendarR
 const CALENDAR_QUERY_KEY = ['calendar'] as const;
 
 /**
- * Item 4, QA round 6: moved out of `features/cra` so `features/factures`' own year filter
- * (`invoice-list-screen.tsx`) does not gain a dependency on `features/cra` — the repository
- * documents exactly one cross-feature import (`cra → factures`) and this would have been a
- * second. Neutral, alongside `query-client.ts` and `use-reduced-motion.ts`.
+ * Neutral, outside `features/`, so `features/factures`' year filter
+ * (`invoice-list-screen.tsx`) does not gain a dependency on `features/cra`: the repository allows
+ * exactly one cross-feature import (`cra → factures`), and this would be a second.
  *
  * The working calendar's own year coverage (ADR-0004) — bounds the "open a future month"/year
  * pickers. Effectively static within a session (the calendar table is code, not data), so the

@@ -3,9 +3,8 @@ import { apiFetch, type ApiResult } from '@/lib/api-client';
 import type { PersonasResponse, SelectPersonaResponse, SessionResponse } from './types';
 
 /**
- * The four fetch functions of `Annexe A — Session`. Never called from a component directly
- * (frontend-plan.md §2: "Aucun composant n'appelle fetch ni n'importe api.ts directement —
- * uniquement les hooks"); `hooks.ts` is the only caller.
+ * The four session fetch functions. Never called from a component directly — `hooks.ts` is the
+ * only caller.
  */
 
 export function fetchPersonas(signal?: AbortSignal): Promise<ApiResult<PersonasResponse>> {

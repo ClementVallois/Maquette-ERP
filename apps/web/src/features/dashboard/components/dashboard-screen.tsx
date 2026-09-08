@@ -291,11 +291,9 @@ function managerQueue(data: ManagerDashboard): readonly QueueItem[] {
       key: row.craId,
       primary: `${row.consultantName} — ${frenchMonth(row.period)}`,
       ...(age === undefined ? {} : { secondary: age }),
-      // Rank A1's own fix: this used to open the pré-facturier for the *displayed* period, not
-      // the row's own — a counter naming work and a button leading nowhere near it.
-      // Item 21, QA round 3: now opens the consultant's own CRA directly (the row's period, not
-      // the displayed one — same reasoning as the pré-facturier link it replaces) rather than the
-      // pré-facturier list the manager then had to search again.
+      // The row's own period, never the displayed one: a counter that names work and a button
+      // that leads somewhere else is worse than no button. Opens the consultant's CRA directly
+      // rather than a pré-facturier list the manager would have to search again.
       action: {
         label: labels.decide,
         to: '/cra/$period/$consultantId',
@@ -358,7 +356,7 @@ function ConsultantCards({ data }: { readonly data: ConsultantDashboard }): Reac
 }
 
 /**
- * Item 22, QA round 3: `StatCard` wrapped in a `Link` rather than a `to`/`onNavigate` prop added
+ * `StatCard` wrapped in a `Link` rather than a `to`/`onNavigate` prop added
  * to `StatCard` itself — that component is shared with the two counts below that stay plain
  * (§ "Billable ce mois", `BillingCards`' own three), and a stat card that only *sometimes*
  * navigates is a worse interface than a plain card a caller can choose to wrap.
@@ -389,7 +387,7 @@ function ManagerCards({ data }: { readonly data: ManagerDashboard }): ReactEleme
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Item 22, QA round 3: both cards below deep-link to `/cra`, filtered to exactly what
+        {/* Both cards below deep-link to `/cra`, filtered to exactly what
             they count. ADR-0082: these counts are never scoped to the displayed period — the
             link omits `year`/`month` entirely (not merely leaves them at their current value) so
             the list agrees with the count instead of silently narrowing to the wrong month. */}
@@ -431,11 +429,10 @@ function BillingCards({ data }: { readonly data: BillingDashboard }): ReactEleme
  * Whether the *displayed period itself* reads as genuinely empty — the A5 trigger for
  * `SeeMonthsWithData`, "Voir un mois avec des données".
  *
- * F10: this used to also require every role's own cross-period queue field to be empty
- * (`refusedPeriods`, `pendingDecisions`/`lateCras` — ADR-0082 — `oldestDrafts`), so a single old
- * refusal, pending decision or draft sitting in another month hid the shortcut even when the
- * period on screen had nothing. Scoped to the period-specific figures only, so historical-period
- * discovery stops depending on whether an old task happens to exist.
+ * Scoped to the period-specific figures only. Requiring the cross-period queue fields
+ * (`refusedPeriods`, `pendingDecisions`/`lateCras` — ADR-0082 — `oldestDrafts`) to be empty too
+ * would let one old refusal, pending decision or draft in another month hide the shortcut even
+ * when the period on screen has nothing.
  */
 function isEmpty(data: DashboardResponse): boolean {
   switch (data.role) {
@@ -457,17 +454,15 @@ function isEmpty(data: DashboardResponse): boolean {
 interface DashboardScreenProps {
   readonly role: Role;
   readonly period: string;
-  /** Items 17/23, QA round 3: scopes the two collapsible panels' localStorage preference —
+  /** Scopes the two collapsible panels' localStorage preference —
    * `lib/local-preference.ts`'s own header explains why an unscoped key would leak. */
   readonly personaKey: string;
 }
 
 /**
- * `/tableau-de-bord` (task 8.4) — the first screen after the persona selector. `GET
- * /api/v1/dashboard?period=` answers a discriminated union keyed by `role`
- * (`features/dashboard/types.ts`'s own header explains why the Phase 3 placeholder had the wrong
- * shape); this component picks the card set matching it. Rank A1 adds the three tiers and rank A3
- * fills recent activity from persisted lifecycle timestamps.
+ * `/tableau-de-bord` — the first screen after the persona selector. `GET
+ * /api/v1/dashboard?period=` answers a discriminated union keyed by `role`; this component picks
+ * the card set matching it.
  */
 export function DashboardScreen({ role, period, personaKey }: DashboardScreenProps): ReactElement {
   const query = useDashboard(period);

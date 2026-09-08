@@ -7,8 +7,8 @@
 export const INTERCONTRAT_MISSION_NAME = 'Intercontrat';
 
 /**
- * Package 09 (P1 audit): re-exported from `@erp/contracts` rather than hand-duplicated — the
- * single description now lives in `packages/contracts/src/staffing.ts`, shared with
+ * Re-exported from `@erp/contracts` rather than hand-duplicated — the single description lives
+ * in `packages/contracts/src/staffing.ts`, shared with
  * `apps/api/src/staffing/assignment-admin.ts`.
  */
 export type {

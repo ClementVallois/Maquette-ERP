@@ -345,11 +345,10 @@ function craColumns(
       id: 'actions',
       enableSorting: false,
       header: () => <span className="sr-only">{LABELS.action.tableActions}</span>,
-      // Item 3 (QA round 1): a manager used to have to leave the pré-facturier through the CRA
-      // menu (`cra-list-screen.tsx`'s own `Link` to this same route) to look at a row before
-      // deciding on it. "Ouvrir" is offered on every manager row, decidable or not — a validated
-      // or refused Cra is still worth opening to read — while validate/refuse stay gated on
-      // `decidable`, exactly as before.
+      // "Ouvrir" is offered on every manager row, decidable or not — a validated or refused Cra
+      // is still worth opening to read — so a manager never has to leave the pré-facturier
+      // through the CRA menu to look at a row before deciding on it. Validate and refuse stay
+      // gated on `decidable`.
       cell: ({ row }) => (
         <div className="ml-auto flex w-fit items-center gap-2">
           <Button asChild variant="outline" size="sm">

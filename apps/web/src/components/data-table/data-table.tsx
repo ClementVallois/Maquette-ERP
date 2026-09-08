@@ -41,12 +41,10 @@ declare module '@tanstack/react-table' {
 }
 
 /**
- * The generic table `docs/frontend-plan.md` §3 names (`components/data-table/`), headless via
- * TanStack Table (task 6.1's dependency) with the design 100% on `components/ui/table.tsx`'s
- * tokens. No toolbar/pagination in this phase: every table Phase 6 renders fits inside the API's
- * own 50-row cap without a second page (`Mes CRA` holds one row per period a consultant has ever
- * saved), so building one now would be for a caller that does not exist yet — Phase 7/8's tables,
- * with real filters and real multi-page lists, are where a toolbar earns its place.
+ * The generic table, headless via TanStack Table with the design entirely on
+ * `components/ui/table.tsx`'s tokens. No toolbar and no pagination control: every table built on
+ * it fits inside the API's own page cap without a second page (`Mes CRA` holds one row per period
+ * a consultant has ever saved), so one would be for a caller that does not exist.
  */
 interface DataTableProps<TData> {
   readonly columns: readonly ColumnDef<TData>[];
@@ -58,8 +56,8 @@ interface DataTableProps<TData> {
   /**
    * `false` on a server-paginated table: this component sorts client-side, so it only ever has the
    * loaded page to sort. Why that means no sort control rather than a page-scoped one, and what
-   * would replace it: README § "Ce que je ne construis pas", and `docs/open-questions.md` (row
-   * dated 05/09/2026) for the decision that is still open.
+   * would replace it: README § "Ce que je ne construis pas", and `docs/open-questions.md` for
+   * the decision that is still open.
    */
   readonly sortable?: boolean;
   /**
@@ -160,8 +158,7 @@ export function DataTable<TData>({
   // returns functions a compiler cannot prove are stable. This repository has no React Compiler
   // plugin wired into `vite.config.ts` — verified, not assumed — so the hazard the rule guards
   // against (a stale memoized child holding a function this hook rotated under it) cannot occur
-  // yet; `docs/frontend-plan.md` §1 is what names TanStack Table as the dependency in the first
-  // place. Same shape as `routes/_shell.tsx`'s `only-throw-error` disable: a framework contract
+  // yet. Same shape as `routes/_shell.tsx`'s `only-throw-error` disable: a framework contract
   // the rule does not know about, not a rule being relaxed for convenience.
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({

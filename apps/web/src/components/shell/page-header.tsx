@@ -24,15 +24,15 @@ export interface PageHeaderParentCrumb {
 interface PageHeaderProps {
   readonly title: string;
   /**
-   * Item 4, QA round 5: what the bare `<h1>` below shows **below `md`** instead of `title`, when
+   * What the bare `<h1>` below shows **below `md`** instead of `title`, when
    * `title` itself is too long there — `/cra/$period`'s "Mes CRA — septembre 2026" has no room
    * next to nothing else on a phone, and the ellipsis `truncate` adds cuts the month in half
-   * rather than dropping it cleanly. Equal to `title` on every route this round did not touch
+   * rather than dropping it cleanly. Equal to `title` on every other route
    * (`_shell.tsx`'s `mobileTitleFor`), so `<ResponsiveTitle>` below is then rendering the same
    * text twice, once per breakpoint span — never two different strings a screen reader would
    * announce both of, since `display:none` (`md:hidden`/`hidden md:inline`) removes the other
-   * span from the accessibility tree entirely, the same reasoning item 33's breadcrumb comment
-   * below already relies on.
+   * span from the accessibility tree entirely, the same reasoning the breadcrumb comment below
+   * relies on.
    */
   readonly mobileTitle: string;
   /** Omitted on the dashboard itself — a breadcrumb back to the page you are already on is noise. */
@@ -43,8 +43,8 @@ interface PageHeaderProps {
   readonly parent?: PageHeaderParentCrumb | undefined;
 }
 
-/** The one `<h1>` both branches below render, `truncate`d exactly as before — the only change is
- * *which* string shows below `md` (item 4, QA round 5). */
+/** The one `<h1>` both branches below render, `truncate`d — only *which* string shows differs
+ * below `md`. */
 function ResponsiveTitle({
   title,
   mobileTitle,
@@ -62,10 +62,9 @@ function ResponsiveTitle({
 
 /**
  * The topbar's left-hand content (direction-visuelle.md §6): page title, and a breadcrumb back to
- * the dashboard when the route is not the dashboard itself. Extracted from `Topbar` as its own
- * component per `docs/frontend-plan.md` §3's tree (`components/shell/PageHeader`) — the piece a
- * later phase's page-local header (inside a card, not the topbar) can reuse without pulling in the
- * persona block that lives beside it in `Topbar`.
+ * the dashboard when the route is not the dashboard itself. Its own component rather than part
+ * of `Topbar`: a page-local header (inside a card, not the topbar) can reuse it without pulling
+ * in the persona block that lives beside it in `Topbar`.
  */
 export function PageHeader({
   title,
@@ -79,7 +78,7 @@ export function PageHeader({
 
   return (
     <div className="flex flex-col gap-0.5">
-      {/* Item 33 (QA round 3, mobile design): `hidden lg:block`, the same breakpoint
+      {/* `hidden lg:block`, the same breakpoint
           `topbar.tsx`'s own burger trigger and `sidebar.tsx` already treat as "mobile" in this
           shell — below it, the `<h1>` below is the only page label shown. `display:none` removes
           the trail from the accessibility tree entirely rather than leaving it there for

@@ -70,7 +70,7 @@ interface IssueVariables {
  * badge/number/TTC for that row — both queries are invalidated rather than patched by hand, same
  * reasoning `features/cra/hooks.ts`'s `useValidateCra` already gives for its own affected reads.
  *
- * Package 11's dependency table (`docs/adr/0113-mutations-invalidate-every-projection-they-
+ * Per ADR-0113's dependency table (`docs/adr/0113-mutations-invalidate-every-projection-they-
  * actually-change.md`): also the dashboard (billing's own `draftInvoices`/`issuedInvoices`/
  * `totalTtcIssuedCents`, `apps/api/src/routes/dashboard.ts`) and invoice history
  * (`byYearAndStatus`, `apps/api/src/routes/invoices.ts`) — issuing flips this invoice's status

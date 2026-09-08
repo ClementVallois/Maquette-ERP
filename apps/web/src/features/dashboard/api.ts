@@ -17,7 +17,7 @@ export function fetchDashboard(
   });
 }
 
-/** Item 18, QA round 3 — `GET /api/v1/org-chart`, no query parameters (unlike the dashboard above,
+/** `GET /api/v1/org-chart`, no query parameters (unlike the dashboard above,
  * the org chart is not read "as of" a period; it is read as of today). */
 export function fetchOrgChart(signal?: AbortSignal): Promise<ApiResult<OrgChartResponse>> {
   return apiFetch<OrgChartResponse>('/api/v1/org-chart', { signal });

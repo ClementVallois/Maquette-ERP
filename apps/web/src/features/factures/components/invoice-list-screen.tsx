@@ -150,9 +150,8 @@ interface InvoiceListScreenProps {
 }
 
 /**
- * `/factures` (task 8.1). `GET /api/v1/invoices` answers one page of up to 50, unfiltered — the
- * status filter is a client-side view (`docs/frontend-plan.md` §8.1's "onglets de vue comme sur
- * les maquettes"), never a second request per pill.
+ * `/factures`. `GET /api/v1/invoices` answers one page of up to 50, unfiltered — the status
+ * filter is a client-side view, never a second request per pill.
  */
 export function InvoiceListScreen({
   status,
@@ -298,9 +297,8 @@ export function InvoiceListScreen({
         )}
         <CopyLinkButton />
       </form>
-      {/* Item 8 (QA round 1): a segmented pill per status, `exclusive` (item 7's own multi-select
-       * CRA-status filter is the non-exclusive sibling) — obviously individually clickable rather
-       * than one wide bar, the brief's own complaint about the previous `Tabs` rendering. */}
+      {/* A segmented pill per status, `exclusive` (the CRA-status filter is the non-exclusive
+       * sibling) — individually clickable, rather than reading as one wide bar. */}
       <TogglePillGroup
         label={LABELS.preFacturier.invoiceStatus}
         exclusive

@@ -11,7 +11,7 @@ import type { Role } from '@/features/session/types';
 import { LABELS } from '@/lib/labels';
 
 /**
- * frontend-plan.md task 4.3: "La Sidebar lit exclusivement ce tableau" — no JSX branch in
+ * The sidebar reads this table and nothing else: no JSX branch in
  * `components/shell/sidebar.tsx` decides which entries a role sees; this array, filtered by
  * `navigationForRole`, is the only place that decision is made. Adding a module to the nav is
  * editing this file, never the component that renders it.
@@ -20,9 +20,8 @@ import { LABELS } from '@/lib/labels';
  * `Role` from `features/session` (the one feature every screen already depends on for who is
  * asking), and nothing else under `features/`. A `NavEntry` never imports a type from
  * `features/cra`, `features/factures`, `features/pre-facturier` or `features/marge` — doing so
- * would be the same `billing → timesheet`-shaped arrow `docs/open-questions.md` (row dated
- * 24/08/2026) already caught once inside `features/`, one tier further out, where dependency-cruiser
- * cannot see it either.
+ * would be the same `billing → timesheet`-shaped arrow, one tier further out, where
+ * dependency-cruiser cannot see it either.
  */
 export interface NavEntry {
   readonly id: string;
@@ -46,12 +45,9 @@ const ALL_ROLES: readonly Role[] = ['consultant', 'manager', 'billing'];
  * function of the viewer's role, which is what "the Sidebar reads this array exclusively" means in
  * practice.
  *
- * No `marge` entry: Phase 4 added one pointing at `/marge`, a route §3 never pinned (only
- * `/marge/$consultantId` is), as a landing target task 4.3 needed and the plan did not name.
- * `docs/open-questions.md` (row dated 24/08/2026) recorded both questions that placeholder raised
- * and named this phase to decide them with a real margin screen in front of it. Decided in Phase 7,
- * task 7.5: §7.5 reaches the margin screen only by an explicit click on a pré-facturier row — "jamais
- * un survol" — because every read is a logged disclosure (ADR-0052), and a standing sidebar entry
+ * No `marge` entry, deliberately: the margin screen is reached only by an explicit click on a
+ * pré-facturier row, never by browsing, because every read is a logged disclosure (ADR-0052).
+ * A standing sidebar entry
  * is the opposite of that: it invites exactly the idle browsing the click-through exists to
  * prevent, for a consultant chosen from a list this route does not have. The nav entry and its
  * `/marge` index route are removed; `/marge/$consultantId` (the pinned route) keeps working, its

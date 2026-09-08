@@ -10,7 +10,7 @@ import { readLocalPreference, writeLocalPreference } from '@/lib/local-preferenc
 import type { ManagerStaffing } from '../types';
 
 /**
- * The two entry points into `/affectations`, filtered — item 3, QA round 6. The billing
+ * The two entry points into `/affectations`, filtered. The billing
  * dashboard's own `?status=draft` deep link (`features/dashboard/actions.ts`) is the precedent for
  * `ActionLink` over a widened `to: string`; `view=current` matches this chart's own "as of today"
  * scope (ADR-0098), not the dashboard's `period`.
@@ -29,15 +29,15 @@ const INTERCONTRAT_LINK: ActionLink = {
 const BAR_WIDTH = 480;
 const BAR_HEIGHT = 28;
 
-/** Item 23's own `erp:dashboard-charts-visible:*` key is deliberately not reused here — this is a
- * different section with different content, and reusing it would inherit a stale `'false'` from
- * anyone who had collapsed the invoice-history charts this section replaces for managers. */
+/** The history section's `erp:dashboard-charts-visible:*` key is deliberately not reused here:
+ * this is a different section, and sharing the key would inherit a stale `'false'` from anyone
+ * who had collapsed the invoice-history charts this section replaces for managers. */
 function staffingVisibleKey(personaKey: string): string {
   return `erp:dashboard-staffing-visible:${personaKey}`;
 }
 
 /**
- * Item 3, QA round 5 (ADR-0098): the manager's own dashboard chart — how many of the office's
+ * The manager's own dashboard chart (ADR-0098) — how many of the office's
  * current consultants are on a client mission versus in `Intercontrat`, **as of today** (the
  * figure's own caption says so, since the rest of this screen is scoped to `period`). One
  * two-segment bar, coloured the same way `invoice-history-chart.tsx`'s `DenseMonthsChart` already
@@ -45,8 +45,7 @@ function staffingVisibleKey(personaKey: string): string {
  * never the only carrier of the two counts (`direction-visuelle.md` §9).
  *
  * Collapsible with the same `VisibilityToggle`/persisted-preference pattern the company-news
- * module and the (now manager/billing-less) history section already use, under its own
- * localStorage key.
+ * module and the history section use, under its own localStorage key.
  */
 export function ManagerStaffingPanel({
   personaKey,

@@ -1,7 +1,7 @@
 import { problemDetailsSchema, type ProblemDetails } from '@erp/contracts';
 
 /**
- * A thin, typed fetch wrapper (frontend-plan.md task 3.1). Same-origin (empty base — the Vite
+ * A thin, typed fetch wrapper. Same-origin (empty base — the Vite
  * proxy does the rest in dev, ADR-0063), `credentials: 'same-origin'` so the persona cookie
  * travels, JSON in and out.
  *
@@ -18,16 +18,14 @@ export type ApiResult<T> =
 const PROBLEM_JSON = 'application/problem+json';
 
 /**
- * `type` values this **client** invents, never sent by the API — the frontend-plan.md task 3.1
- * case Annexe A does not settle: what a response becomes when its body is not the JSON its status
+ * `type` values this **client** invents, never sent by the API: what a response becomes when its
+ * body is not the JSON its status
  * implied — a non-2xx without `application/problem+json` (a Vite proxy's own 502 page, an HTML
  * error document from somewhere in front of it), a 2xx that does not parse (Vite's SPA fallback) —
  * or when `fetch()` itself never got a response (offline, DNS failure, connection refused). Both are facts about the **transport**, not a refusal the API made, so they
  * get their own namespace rather than being reported as `API_PROBLEM_TYPES.internal` — which would
  * claim the server said something it never had the chance to say. `lib/labels.ts` carries their
- * French sentences, clearly marked client-originated; `docs/open-questions.md` (row of
- * 2026-08-24) records this as a judgement call for Phase 4 to revisit once `ErrorState` is built
- * and the two cases have had a real screen to be wrong on.
+ * French sentences, clearly marked client-originated.
  */
 export const CLIENT_PROBLEM_TYPES = {
   /** A response arrived and its body was not the JSON its status implied: a non-2xx without
@@ -67,7 +65,7 @@ interface ApiRequest {
   readonly body?: unknown;
   readonly headers?: Readonly<Record<string, string>>;
   /**
-   * Package 10: forwarded verbatim to `fetch()`. Every read hook passes its `queryFn` context's
+   * Forwarded verbatim to `fetch()`. Every read hook passes its `queryFn` context's
    * own `signal` here, so TanStack Query's `cancelRefetch` (on by default whenever a persona
    * switch invalidates an active query — see `features/session/hooks.ts`) actually aborts the
    * superseded network request instead of only marking it logically stale while it keeps running.
@@ -145,7 +143,7 @@ export async function apiFetch<T>(path: string, request: ApiRequest = {}): Promi
     return { ok: false, problem: unparsableResponseProblem(path, response.status) };
   }
 
-  // Package 09: the content type is not proof of the shape. An intermediary answering the right
+  // The content type is not proof of the shape. An intermediary answering the right
   // header over the wrong body — or a future route this repository gets wrong — must not let an
   // unvalidated `.type` reach a caller that branches on it as if the API had said it.
   const parsed = problemDetailsSchema.safeParse(errorBody);

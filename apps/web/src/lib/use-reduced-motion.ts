@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react';
 const QUERY = '(prefers-reduced-motion: reduce)';
 
 /**
- * Item 17, QA round 3: the company-news carousel's auto-rotation timer. Item 1, QA round 5
- * (ADR-0096) moved the timer bar itself to a CSS animation (`news-progress-fill`, `globals.css`),
- * which that file's own `@media (prefers-reduced-motion: reduce)` rule does collapse to a
+ * Read by the company-news carousel's auto-rotation timer. The timer bar itself is a CSS
+ * animation (`news-progress-fill`, `globals.css`, ADR-0096), which that file's own
+ * `@media (prefers-reduced-motion: reduce)` rule does collapse to a
  * near-zero duration — but collapsing the duration is not the same as not rotating: an animation
  * that still runs, just almost instantly, fires `onAnimationEnd` immediately and spins the
  * carousel through every message at frame rate. This hook is read in JS instead and used to skip

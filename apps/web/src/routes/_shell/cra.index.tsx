@@ -6,9 +6,8 @@ import { CraListScreen } from '@/features/cra/components/cra-list-screen';
 import { LABELS } from '@/lib/labels';
 
 /**
- * Item 7 (QA round 1): the manager/billing-only consultant and status filters, in the URL —
- * "the router already validates search with Zod", so a filtered view is linkable and survives a
- * reload. `CraStatus`'s own four literals (`features/cra/types.ts`), not `@erp/timesheet`'s
+ * The manager/billing-only consultant and status filters, held in the URL and validated with Zod,
+ * so a filtered view is linkable and survives a reload. `CraStatus`'s own four literals (`features/cra/types.ts`), not `@erp/timesheet`'s
  * `CRA_STATUSES`: this SPA keeps its own copy of that enum rather than importing across the
  * apps/packages boundary, the same reason `features/session/types.ts`'s `Role` gives for its own
  * copy of `@erp/platform`'s `ROLES`.
@@ -16,8 +15,8 @@ import { LABELS } from '@/lib/labels';
  * `.optional()`, not `.default([])`: with `default([])`, an unrelated pre-existing test —
  * `journeys.spec.ts`'s `page.waitForURL('/cra')` — started timing out (the screen itself rendered
  * correctly; only that specific `waitForURL` assertion failed), consistent with TanStack Router
- * writing the defaulted value back into the URL and the sidebar's plain "CRA" link no longer
- * resolving to bare `/cra`. `.optional()` with `?? []` at the one call site below removed the
+ * writing the defaulted value back into the URL, leaving the sidebar's plain "CRA" link no
+ * longer resolving to bare `/cra`. `.optional()` with `?? []` at the one call site below removed the
  * failure; the URL itself was not inspected to confirm the exact query string this produced.
  */
 const CraListSearch = z.object({
@@ -26,16 +25,16 @@ const CraListSearch = z.object({
     .array(z.enum(['draft', 'submitted', 'refused', 'validated']))
     .catch([])
     .optional(),
-  // Item 4 (QA round 2): independent of each other and of the two filters above. `.catch(undefined)`
+  // Independent of each other and of the two filters above. `.catch(undefined)`
   // rather than `.catch([])` — these are single values, not lists — so a hand-typed `?year=bogus`
   // degrades to "no filter" the same way an unrecognised status already does, instead of a 400 the
   // visitor cannot self-correct from a URL bar. Both carry the API's own bounds (`YearQuery` and
-  // `MonthQuery`, `apps/api/src/routes/api.ts`): a value the API would refuse has to fail here,
+  // `MonthQuery`, `apps/api/src/routes/`): a value the API would refuse has to fail here,
   // where it degrades, rather than reach it — `?year=1900` is an integer and would otherwise pass
   // this schema and land on a 400, which is exactly what the paragraph above says must not happen.
   year: z.coerce.number().int().min(2000).max(2100).optional().catch(undefined),
   month: z.coerce.number().int().min(1).max(12).optional().catch(undefined),
-  // Item 22, QA round 3: the dashboard's "CRA en retard" deep link — every period strictly
+  // The dashboard's "CRA en retard" deep link — every period strictly
   // before this one. `.catch(undefined)`, same degrade-to-no-filter reasoning as `year`/`month`.
   beforePeriod: z
     .string()

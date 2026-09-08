@@ -18,7 +18,7 @@ const COPIED_FEEDBACK_MS = 1500;
  * some browsers) — guarded with try/catch rather than assumed, same reasoning as every other
  * clipboard call this codebase makes.
  *
- * Item 19, QA round 3: the button itself acknowledges the copy (icon swap, brief scale/colour
+ * The button itself acknowledges the copy (icon swap, brief scale/colour
  * transition) on top of the existing toast — a toast alone is easy to miss when the pointer is
  * still on the button. The transition is plain CSS (`transition-*` classes), so it already
  * collapses to near-zero under `prefers-reduced-motion` via the global rule in `globals.css`; only

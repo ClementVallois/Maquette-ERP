@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils';
 export interface TogglePillOption {
   readonly value: string;
   readonly label: string;
-  /** Rendered after the label in parentheses when present — item 8's "a count per status if the
-   * data already carries one". Omitted, not zero, when there is nothing to count yet. */
+  /** Rendered after the label in parentheses when present: a count per status, when the data
+   * already carries one. Omitted, not zero, when there is nothing to count. */
   readonly count?: number;
 }
 
@@ -33,16 +33,16 @@ const PILL_UNPRESSED =
   'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground';
 
 /**
- * A set of individually-clickable pills. Built to read as obviously clickable, which item 8 named
- * as the problem with the previous "one wide bar" reading: each pill carries its own border, so
+ * A set of individually-clickable pills, built to read as obviously clickable rather than as one
+ * wide bar: each pill carries its own border, so
  * an unpressed one is visibly a *button* rather than a segment of a single background — plus a
  * hover state and a focus-visible ring `Button`/`Badge` already give every other clickable
  * control in this app.
  *
- * Two selection models, one visual language, one accessibility pattern — "the two filter UIs
- * should look like they were designed by the same person" (QA round 1, item 8's own words about
- * item 7). Both `exclusive={false}` (item 7's CRA-status filter) and `exclusive={true}` (item 8's
- * invoice-status filter) render `role="group"` with `aria-pressed` toggle buttons, not
+ * Two selection models, one visual language, one accessibility pattern — the two filter UIs
+ * should look like they were designed by the same person. Both `exclusive={false}` (the CRA-status
+ * filter) and `exclusive={true}` (the invoice-status filter) render `role="group"` with
+ * `aria-pressed` toggle buttons, not
  * `role="radiogroup"`/`role="radio"`. The radio pattern is the textbook-correct one for "exactly
  * one of these", but it obliges arrow-key roving-tabindex navigation between the radios (WAI-ARIA
  * APG), which this component does not implement and axe-core's static audit does not catch either

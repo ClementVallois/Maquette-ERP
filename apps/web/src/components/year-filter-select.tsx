@@ -23,9 +23,9 @@ interface YearFilterSelectProps {
 }
 
 /**
- * Item 4, QA round 6: the year `Select` `/cra`'s own filters built first (item 24, QA round 3),
- * extracted so `/factures` can share it rather than keep its own raw `<Input type="number">` —
- * `useCalendar` (`@/lib/calendar`) is what both screens now read the offered years from.
+ * The year `Select` shared by `/cra`'s filters and `/factures`, rather than a raw
+ * `<Input type="number">` in each. `useCalendar` (`@/lib/calendar`) is where both screens read the
+ * offered years from.
  */
 export function YearFilterSelect({
   value,
@@ -49,9 +49,9 @@ export function YearFilterSelect({
 
   return (
     <Select value={value === undefined ? FILTER_ALL : String(value)} onValueChange={handleChange}>
-      {/* Item 24, QA round 3: `w-36` (144px) clipped "Toutes les années" to "Toutes les anné" —
-          widened to fit that longest option; the panel already matches the trigger's own width
-          via `position: popper` (items 7/10), so only the trigger needed changing. */}
+      {/* `w-48`, not `w-36` (144px), which clips "Toutes les années" to "Toutes les anné". The
+          panel matches the trigger's own width via `position: popper`, so the trigger is the only
+          thing that needs the size. */}
       <SelectTrigger aria-label={label} className={className ?? 'w-48'}>
         <SelectValue />
       </SelectTrigger>

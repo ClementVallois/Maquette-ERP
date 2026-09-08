@@ -1,9 +1,8 @@
 /**
- * Package 09 (P1 audit): re-exported from `@erp/contracts` rather than hand-duplicated — the
- * single description now lives in `packages/contracts/src/invoices.ts`, shared with
- * `apps/api/src/routes/invoices.ts`. That file also carries the confirmed-against-the-route
- * history this file used to hold, including why `InvoiceListItem` lives there rather than with
- * `cra` or `pre-facturier`, and why `dueDate` is deliberately absent.
+ * Re-exported from `@erp/contracts` rather than hand-duplicated — the single description lives
+ * in `packages/contracts/src/invoices.ts`, shared with `apps/api/src/routes/invoices.ts`. That
+ * file also says why `InvoiceListItem` lives there rather than with `cra` or `pre-facturier`, and
+ * why `dueDate` is deliberately absent.
  */
 export type {
   BilledParty,

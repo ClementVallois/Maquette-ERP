@@ -25,7 +25,7 @@ interface SaveAssignmentVariables {
 }
 
 /**
- * Package 11's dependency table (`docs/adr/0113-mutations-invalidate-every-projection-they-
+ * Per ADR-0113's dependency table (`docs/adr/0113-mutations-invalidate-every-projection-they-
  * actually-change.md`): also the dashboard — a saved assignment changes `public.assignments`,
  * exactly what `apps/api/src/staffing/staffing-snapshot.ts`'s `managerStaffingSnapshot` reads for
  * the manager dashboard's `staffing` panel. `['dashboard']` is a bare literal key for the same

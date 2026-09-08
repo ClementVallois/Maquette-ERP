@@ -8,8 +8,8 @@ import type {
 } from './types';
 
 /**
- * The fetch functions for `Annexe A — Billing`'s invoice endpoints (task 8.1-8.3). Never called
- * from a component directly (`docs/frontend-plan.md` §2) — `hooks.ts` is the only caller.
+ * The fetch functions for the invoice endpoints. Never called from a component directly —
+ * `hooks.ts` is the only caller.
  */
 
 export interface InvoiceListFilters {

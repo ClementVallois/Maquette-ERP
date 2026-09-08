@@ -3,8 +3,8 @@ import { QueryClient } from '@tanstack/react-query';
 import { ApiProblemError } from './api-client.ts';
 
 /**
- * frontend-plan.md task 3.5: reasonable `staleTime`, retry at most once, never on a 4xx — "un
- * refus métier ne se rejoue pas". Invalidation is per-feature, in each feature's `hooks.ts`, after
+ * A reasonable `staleTime`, retry at most once, never on a 4xx — a business refusal is not
+ * replayed. Invalidation is per-feature, in each feature's `hooks.ts`, after
  * its own mutations — not here, which would make this file grow one entry per feature.
  */
 

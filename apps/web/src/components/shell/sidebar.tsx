@@ -18,17 +18,16 @@ interface SidebarProps {
 }
 
 /**
- * direction-visuelle.md §3.3/§6: near-black sidebar, 248px expanded / 64px collapsed
+ * `docs/direction-visuelle.md` §3.3/§6: near-black sidebar, 248px expanded / 64px collapsed
  * (icons + tooltips), active entry = fill + 3px left marker + white label. Reads `entries`
- * exclusively (frontend-plan.md task 4.3) — every branch below is about layout, never about which
+ * exclusively — every branch below is about layout, never about which
  * entries exist for which role; that decision was already made by `navigationForRole`.
  */
 export function Sidebar({ entries, collapsed, onToggleCollapse }: SidebarProps): ReactElement {
   return (
     <aside
       className={cn(
-        // Hidden below `lg` (1024px), not Tailwind's `md` (768px): frontend-plan.md task 4.5 asks
-        // for the mobile treatment "sous le breakpoint md", and `playwright.config.ts`'s own
+        // Hidden below `lg` (1024px), not Tailwind's `md` (768px): `playwright.config.ts`'s own
         // secondary viewport for this check is 768 wide — Tailwind's `md:` is a `min-width: 768px`
         // query, so at exactly 768 it would already count as desktop and the two configured
         // viewports would never disagree. `lg` (1024px) is the literal breakpoint that keeps the

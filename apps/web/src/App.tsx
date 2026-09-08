@@ -19,10 +19,7 @@ installSessionGuard(queryClient);
 installCrossTabPersonaSync(queryClient);
 
 /**
- * The app's composition root (frontend-plan.md Phase 4 replaces this file's previous content —
- * `PersonasGateEvidence`, Phase 3's Gate evidence — with the real router; `docs/open-questions.md`,
- * Phase 3 checkpoint point 5, names this as the fix and it is deleted, not moved). `TooltipProvider`
- * is mounted once here so `components/shell/sidebar.tsx`'s collapsed-mode tooltips (and any later
+ * The app's composition root. `TooltipProvider` is mounted once here so `components/shell/sidebar.tsx`'s collapsed-mode tooltips (and any later
  * screen's) do not each need their own.
  */
 export function App(): ReactElement {

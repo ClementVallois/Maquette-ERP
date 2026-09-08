@@ -37,8 +37,7 @@ interface ComboboxShellProps {
   readonly matches: (option: ComboboxOption, query: string) => boolean;
   /**
    * An option this predicate accepts is offered even when it fails `matches` against the current
-   * query — the single-select's "keep the currently chosen consultant in the list" rule
-   * (previously a synthetic extra `<option>` next to the native `<select>` this replaces). Kept
+   * query — the single-select's "keep the currently chosen consultant in the list" rule. Kept
    * separate from `matches` rather than folded into it: a query that matches nothing real still
    * has to say so (`noMatchLabel`), which only holds if "no *real* match" and "always-offered
    * anyway" are counted differently. The multi-select passes nothing here — every one of its
@@ -55,7 +54,7 @@ interface ComboboxShellProps {
 }
 
 /**
- * Item 7 (QA round 1)'s shared foundation: a `Popover` + search `Input` + scrollable `<ul>` of
+ * The shared foundation of both comboboxes: a `Popover` + search `Input` + scrollable `<ul>` of
  * option rows, extracted out of the original `MultiSelectCombobox` so a single-select variant
  * (task: consultant picker in the assignment forms) does not copy-paste it. Still no
  * `cmdk`/`command` primitive — `MultiSelectCombobox`'s own docblock already recorded why

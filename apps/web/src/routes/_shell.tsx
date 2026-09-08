@@ -12,17 +12,16 @@ import { frenchMonth } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 
 /**
- * Defect D2 (Phase 6 revue du 25/08): "le titre et le fil d'Ariane nomment le mois — sur l'écran
- * livré le 25/08, rien n'indiquait quel mois était ouvert." `navEntryForPath`'s label is the same
- * static string for every period (`/cra/$period` and `/cra/$period/$consultantId` both fall under
- * the one `cra-*` nav entry), so the fix reads the period straight off the URL here rather than
- * inventing a route-to-shell context channel for one string. `/cra/$period` is the only route this
- * matters for — Annexe C.3's own routing table names no other screen with a period in its path.
+ * The title and the breadcrumb name the open month. `navEntryForPath`'s label is the same static
+ * string for every period (`/cra/$period` and `/cra/$period/$consultantId` both fall under the one
+ * `cra-*` nav entry), so the period is read straight off the URL here rather than through a
+ * route-to-shell context channel invented for one string. `/cra/$period` is the only route with a
+ * period in its path.
  */
 const CRA_PERIOD_IN_PATH = /^\/cra\/(\d{4}-\d{2})(?:\/|$)/u;
 
 /**
- * `/marge/$consultantId` (Phase 7, task 7.5) has no nav entry at all — `config/navigation.ts`'s
+ * `/marge/$consultantId` has no nav entry at all — `config/navigation.ts`'s
  * own comment explains why (a click-through the sidebar must not offer) — so `activeEntry` below
  * is `undefined` for it and `entryLabel` falls back to `LABELS.appName`, which would show "CRA →
  * Facture" as the page title for a screen that is very much not that.
@@ -52,15 +51,14 @@ function titleFor(
 }
 
 /**
- * Item 4, QA round 5: below `md`, `/cra/$period`'s full title ("Mes CRA — septembre 2026") has no
- * room and its ellipsis cuts the month in half — read separately below `md` in `page-header.tsx`.
- * Item 33 (QA round 3) already solved the *breadcrumb*'s own overflow by hiding it below `lg`; this
- * is a second, narrower band inside what that fix left showing (the bare `<h1>`), and it changes
+ * Below `md`, `/cra/$period`'s full title ("Mes CRA — septembre 2026") has no room and its
+ * ellipsis cuts the month in half — read separately below `md` in `page-header.tsx`.
+ * The *breadcrumb*'s own overflow is handled by hiding it below `lg`; this is a second, narrower
+ * band inside what that leaves showing (the bare `<h1>`), and it changes
  * only which **string** renders there, not the mechanism that decides whether it overflows
  * (`truncate`, unchanged). The period is visible further down every `/cra/$period` screen, so
  * nothing is lost by dropping it from the topbar specifically at this width. No other route in
- * `titleFor` needs the same treatment — the CRA route is the one item 4 names, and this returns
- * `entryLabel` unchanged for every other path, `titleFor`'s own value included.
+ * `titleFor` needs the same treatment: this returns `entryLabel` unchanged for every other path.
  */
 function mobileTitleFor(entryLabel: string, fullTitle: string, pathname: string): string {
   return CRA_PERIOD_IN_PATH.test(pathname) ? entryLabel : fullTitle;
@@ -114,8 +112,8 @@ function writeStoredCollapsed(collapsed: boolean): void {
 }
 
 /**
- * The layout route every protected screen nests under (`docs/frontend-plan.md` §3's `_shell`).
- * `beforeLoad` is frontend-plan.md task 4.4's "no session → redirect to `/`" guard: it reads the
+ * The layout route every protected screen nests under. `beforeLoad` is the "no session →
+ * redirect to `/`" guard: it reads the
  * session through `ensureQueryData(sessionQueryOptions)` — the exact query `useSession` itself
  * reads, so a persona chosen one screen ago is not fetched twice — and throws a `redirect` before
  * this layout, or anything nested under it, ever paints. A deep-link with no cookie therefore never
