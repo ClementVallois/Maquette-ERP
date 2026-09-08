@@ -34,8 +34,7 @@ module.exports = {
       comment:
         'The wire contract both apps read is not a place either module reaches back into. A ' +
         'DTO copies a shape at the boundary; it does not import the domain that produces it. ' +
-        'Package 09 of docs/clean-up-audit.consolidated.local.md makes this a named rule rather ' +
-        'than the closed whitelist below enforcing it silently.',
+        'Named here rather than left to the closed whitelist below to enforce silently.',
       from: { path: '^packages/contracts/' },
       to: { path: '^packages/(timesheet|billing)/' },
     },
@@ -109,9 +108,9 @@ module.exports = {
     { from: { path: '^apps/' }, to: { path: '^packages/[^/]+/src/index\\.ts$' } },
     // Third-party code. The domain is held to nothing at all by a separate forbidden rule.
     // `npm-no-pkg` is what dependency-cruiser reports when the IMPORTING package's manifest does
-    // not declare the package — not, as this comment used to say, a pnpm symlink it cannot
-    // resolve. The two modules now declare `pg` themselves, so their imports classify as `npm`;
-    // this entry stays for a root-only devDependency reached from repository tooling.
+    // not declare the package — it is not about a pnpm symlink it cannot resolve. Both modules
+    // declare `pg` themselves, so their imports classify as `npm`; this entry stays for a
+    // root-only devDependency reached from repository tooling.
     {
       from: {},
       to: { dependencyTypes: ['npm', 'npm-dev', 'npm-optional', 'npm-peer', 'npm-no-pkg', 'core'] },

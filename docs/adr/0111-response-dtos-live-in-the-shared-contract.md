@@ -5,7 +5,7 @@
 
 ## Context
 
-Package 09 of the audit (`docs/clean-up-audit.consolidated.local.md`), second sub-step:
+Package 09 of an internal repository cleanup audit (kept private), second sub-step:
 "`packages/contracts/src/index.ts` exports problem types only. Feature `types.ts` files manually
 duplicate server response shapes; `apiFetch<T>` casts parsed JSON to caller-supplied `T`. The route
 file's claim that clients are typechecked against the same response types is false."

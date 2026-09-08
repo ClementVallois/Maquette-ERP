@@ -5,7 +5,7 @@
 
 ## Context
 
-Package 14 of the audit (`docs/clean-up-audit.consolidated.local.md`): at the audit's original
+Package 14 of an internal repository cleanup audit (kept private): at the audit's original
 revision, `registerApiRoutes` was "roughly a thousand lines within a 1,322-line file," mixing
 request schemas, route registration, SQL-oriented orchestration, aggregate calculations, and
 response presentation for every resource. The package named two ordered moves: first split routes
@@ -142,7 +142,7 @@ line count.
 - The remaining phase-2 work is precisely named rather than hidden inside a "done" claim: five
   handlers, named above, each a candidate for its own composition function whenever a second
   caller or a correctness bug makes the extraction pay for itself — tracked in
-  `docs/clean-up-audit.consolidated.local.md`'s own package 14 row, not repeated here.
+  that audit's own package 14 row, not repeated here.
 - No behavior changed: `pnpm run -s typecheck`, `lint`, `test` (680 unit), `test:int` (294) and
   `boundaries` all pass unchanged in shape (`boundaries`' own module count moved by exactly one,
   the new `economics.ts` file).

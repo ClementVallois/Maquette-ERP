@@ -5,7 +5,7 @@
 
 ## Context
 
-Package 13 of the audit (`docs/clean-up-audit.consolidated.local.md`): "`Html.of` is publicly
+Package 13 of an internal repository cleanup audit (kept private): "`Html.of` is publicly
 callable despite an `@internal` comment and bypasses `trustedMarkup`'s reason argument. No
 external production caller was found. Close that construction escape hatch, or make the trusted
 construction boundary mechanically clear while removing unused raw-markup APIs."

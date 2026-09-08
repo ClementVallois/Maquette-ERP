@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The dry-run assertion `docs/BUILD-PLAN.md`'s TDD table owes deploy scripts: "a dry-run assertion
-# where one exists". Runs `pull-and-redeploy.sh --dry-run` against `fake-docker.sh` and checks
+# The dry-run assertion for the deploy scripts.
+# Runs `pull-and-redeploy.sh --dry-run` against `fake-docker.sh` and checks
 # ADR-0029's own five words for what dry-run must not do — pull, migrate, restart, write digest
 # state, take a backup — rather than only checking the process exits 0, which a script that did
 # all five and then exited 0 would also pass.

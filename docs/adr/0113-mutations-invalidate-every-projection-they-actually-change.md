@@ -5,7 +5,7 @@
 
 ## Context
 
-Package 11 of the audit (`docs/clean-up-audit.consolidated.local.md`): "Complete mutation
+Package 11 of an internal repository cleanup audit (kept private): "Complete mutation
 invalidation and protect unsaved CRA drafts." Its evidence: CRA mutations invalidate selected
 CRA/pré-facturier keys; issuance invalidates invoice list/detail only; assignment saves invalidate
 assignments only. Dashboard, history, economics, and other affected projections can retain stale

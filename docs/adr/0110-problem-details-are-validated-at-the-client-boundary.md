@@ -5,7 +5,7 @@
 
 ## Context
 
-Package 09 of the audit (`docs/clean-up-audit.consolidated.local.md`), first sub-step: "at
+Package 09 of an internal repository cleanup audit (kept private), first sub-step: "at
 minimum validate problem details before treating arbitrary proxy JSON as a known error."
 
 `apps/web/src/lib/api-client.ts`'s `apiFetch` already refused to trust a non-2xx response whose

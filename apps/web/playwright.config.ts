@@ -4,7 +4,7 @@ const API_URL = 'http://127.0.0.1:3000';
 
 /**
  * Which of ADR-0063's two topologies this run drives — the one thing about this file that is not
- * fixed, and the reason front-end plan Phase 9.6 exists.
+ * fixed.
  *
  * Unset (the default, and every local `pnpm --filter @erp/web exec playwright test`): the **dev**
  * topology. Vite on 5173 is the browser's origin and proxies to the API on 3000.
@@ -31,8 +31,8 @@ export default defineConfig({
   forbidOnly: Boolean(process.env['CI']),
   retries: process.env['CI'] ? 2 : 0,
   // Playwright's default output directories (`test-results/`, `playwright-report/`) land under
-  // `tests/visual/` instead, per frontend-plan.md Phase 1.5 — one place for every Playwright
-  // artefact, gitignored and prettier-ignored as a whole rather than by default-name guesswork.
+  // `tests/visual/` instead — one place for every Playwright artefact, gitignored and
+  // prettier-ignored as a whole rather than by default-name guesswork.
   outputDir: './tests/visual/test-results',
   reporter: [['html', { outputFolder: './tests/visual/report', open: 'never' }]],
   use: {
@@ -42,17 +42,16 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop',
-      // Primary viewport (frontend-plan.md Phase 1.5): 1440 wide, the width every screenshot in
-      // Phase 2+ is taken against. Excludes the mutating journeys: `fullyParallel` runs every spec
-      // file in its own worker, and the journeys share one seeded database in a fixed order
-      // (Annexe B) — three simultaneous copies of J1 against one Cra would corrupt each other.
+      // Primary viewport: 1440 wide, the width every screenshot is taken against. Excludes the
+      // mutating journeys: `fullyParallel` runs every spec file in its own worker, and the
+      // journeys share one seeded database in a fixed order — three simultaneous copies of the
+      // same journey against one Cra would corrupt each other.
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
       testIgnore: [JOURNEYS_SPEC, RESPONSIVE_SPEC],
     },
     {
       name: 'mobile-shell',
-      // Secondary viewport, for the shell's responsive check (Phase 4.5's `Sheet` breakpoint) —
-      // not exercised by Phase 1's smoke test, which runs on both projects regardless. Same
+      // Secondary viewport, for the shell's responsive check (the `Sheet` breakpoint). Same
       // exclusion as `desktop`, same reason.
       use: { ...devices['Desktop Chrome'], viewport: { width: 768, height: 1024 } },
       testIgnore: [JOURNEYS_SPEC, RESPONSIVE_SPEC],
@@ -100,7 +99,7 @@ export default defineConfig({
     ? [
         {
           // One server, no Vite: the API serves `apps/web/dist` on 3000 and is the only origin
-          // (front-end plan Phase 9.6). The build is chained in rather than left to the caller —
+          // The build is chained in rather than left to the caller —
           // a `dist/` older than the sources is precisely the failure this Gate exists to catch,
           // and it would pass silently against a stale one.
           command: `${process.env['CI'] ? '' : 'pnpm run db:reset && '}VITE_DEV_ROUTES=1 pnpm --filter @erp/web build && pnpm run api`,

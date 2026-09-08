@@ -1,4 +1,4 @@
--- Package 06 of docs/clean-up-audit.consolidated.local.md (ADR-0107). `billing.invoices` already
+-- ADR-0107. `billing.invoices` already
 -- freezes the client (`billed_to_*`, migration 003, "copied at drafting, never read back") and
 -- the totals (`total_ht_cents`/`total_tax_cents`/`total_ttc_cents`, "frozen totals — null until
 -- issued"). Two gaps sat next to those: the seller was never snapshotted at all (only `seller_id`,

@@ -11,11 +11,10 @@ import { buildServer } from '../server.ts';
 import { savepointTransactionally } from '../testing/transaction.ts';
 
 /**
- * `POST /api/v1/assignments` and `PUT /api/v1/assignments/:id`, through the API. A repository-wide
- * search found no direct test of these routes anywhere before package 04 of
- * `docs/clean-up-audit.consolidated.local.md` — the interval-coverage logic itself is tested at
- * the function level in `apps/api/src/staffing/assignment-admin.int.test.ts`; this file is the
- * HTTP surface around it: access control, malformed input, and scope.
+ * `POST /api/v1/assignments` and `PUT /api/v1/assignments/:id`, through the API. The
+ * interval-coverage logic itself is tested at the function level in
+ * `apps/api/src/staffing/assignment-admin.int.test.ts`; this file is the HTTP surface around it:
+ * access control, malformed input, and scope.
  */
 
 const transaction = useTestTransaction();

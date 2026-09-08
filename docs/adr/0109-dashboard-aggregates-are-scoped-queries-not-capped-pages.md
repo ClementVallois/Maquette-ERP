@@ -5,7 +5,7 @@
 
 ## Context
 
-Package 08 of the audit (`docs/clean-up-audit.consolidated.local.md`): `GET /api/v1/dashboard`
+Package 08 of an internal repository cleanup audit (kept private): `GET /api/v1/dashboard`
 computed every summary figure — a role's `availablePeriods`, a consultant's `refusedPeriods`, a
 manager's `pendingDecisions`/`lateCras`/`awaitingDecision`, and billing's
 `draftInvoices`/`issuedInvoices`/`totalTtcIssuedCents`/`oldestDrafts` — by reading one page of

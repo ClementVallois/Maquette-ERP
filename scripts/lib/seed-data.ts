@@ -7,10 +7,10 @@
  * Réunion client at 8.5 % · EU B2B client under Autoliquidation · Guyane client outside VAT scope ·
  * Grade carrying the default Tjm grid · Cjm as the sensitive value the scope test protects.
  *
- * Item 6 (QA round 1) added volume on top of that shape, further down this file: 40 more
- * consultants and two more managers, none of them in `personas`; dense Cras for June, July and
- * August 2026; four veterans carrying a sparse history back to 2016, one of whom has left the
- * firm; and invoices from 2016 in three statuses. The nine named individuals above are unchanged.
+ * Volume sits on top of that shape, further down this file: 40 more consultants and two more
+ * managers, none of them in `personas`; dense Cras for June, July and August 2026; four veterans
+ * carrying a sparse history back to 2016, one of whom has left the firm; and invoices from 2016
+ * in three statuses.
  * (The second of those two managers, Rennes' own, exists so that no consultant is attached to a
  * manager in another office — ADR-0094, and `managerAttachments` below.)
  */
@@ -180,12 +180,11 @@ const originalConsultants = [
 
 const [alice, bruno, claire, david, emma, francois, gabrielle, henri, ines] = originalConsultants;
 
-// ── Roster expansion (item 6, QA round 1) ───────────────────────────────────
+// ── Roster expansion ────────────────────────────────────────────────────────
 //
-// Wave 2 plan step 4 (`docs/open-questions.md`): each manager needs 10+ consultants, dense
-// 2026-06/07/08 for every active one, sparse history to 2016 for a subset of veterans, at least
-// one departure, and more managers — all NOT selectable (`personas` stays exactly four entries,
-// ADR-0023). Every name below is synthetic (ADR-0022: no real name, no real rate), built by a
+// Each manager needs 10+ consultants, dense 2026-06/07/08 for every active one, sparse history to
+// 2016 for a subset of veterans, at least one departure, and more managers — all NOT selectable
+// (`personas` stays exactly four entries, ADR-0023). Every name below is synthetic (ADR-0022: no real name, no real rate), built by a
 // small deterministic generator — a fixed pool indexed by counter, never `Math.random()` — so
 // `pnpm run seed:fingerprint` stays reproducible.
 //
@@ -481,7 +480,7 @@ export const consultantGrades = [
     toDate: null,
     cjmCents: 19000,
   }, // 190 €/j
-  // Roster expansion (item 6, QA round 1; ADR-0094 added the second manager): one grade per
+  // Roster expansion (ADR-0094 is why there is a second manager): one grade per
   // new consultant, cycling Junior/Confirmé/Senior (a manager gets the Manager grade instead).
   // `fromDate` matches each roster member's own join date — 2016 for the four veterans and for
   // each manager, 2025 for every dense-only filler (a year of margin before the earliest 2026
@@ -640,9 +639,9 @@ const [clientMetro, clientReunion, clientGuyane, clientEu] = clients;
 export const missions = [
   // Regie missions — these produce invoices
   //
-  // `startDate` on these three (Audit DORA, SOC Réunion, GRC Guyane) was `2026-01-05`/`2026-03-
-  // 01`/`2026-02-01` until item 6 (QA round 1): pushed back to 2016 so the roster's veteran
-  // consultants (`julien`, `camille`, `theo` below) can carry a sparse **historical** Cra on the
+  // `startDate` on these three (Audit DORA, SOC Réunion, GRC Guyane) reaches back to 2016 so the
+  // roster's veteran consultants (`julien`, `camille`, `theo` below) can carry a sparse
+  // **historical** Cra on the
   // same mission id — one mission's whole lifetime rather than a second, parallel "legacy"
   // mission per veteran. `missionTjm` below grows a matching historical rate window per mission;
   // the *existing* 2026 entry is untouched, so Alice/Claire/David's own 2026 invoices resolve
@@ -688,10 +687,10 @@ export const missions = [
     startDate: '2026-05-01',
     endDate: null,
   },
-  // Forfait mission — present in the dataset, never invoiced (ADR-0037). `endDate` was
-  // `2026-06-30` until item 6 (QA round 1): pushed to `null` (ongoing) so Gabrielle — Forfait,
-  // "present but not invoiced" is her whole point in this dataset — stays actively assigned
-  // through July and August rather than falling out of every consultant's dense months.
+  // Forfait mission — present in the dataset, never invoiced (ADR-0037). `endDate: null`
+  // (ongoing) so Gabrielle — Forfait, "present but not invoiced" is her whole point in this
+  // dataset — stays actively assigned through July and August rather than falling out of the
+  // dense months.
   {
     id: ids.next(),
     clientId: clientMetro.id,
@@ -766,10 +765,9 @@ export const missionTjm = [
     toDate: null,
     tjmCents: 95000,
   }, // 950 €/j
-  // Roster expansion (item 6, QA round 1): a historical rate window on each of the three
-  // missions pushed back to 2016 above, ending the day before that mission's existing 2026 entry
-  // starts — non-overlapping, so Alice/Claire/David's own 2026 invoices resolve exactly the Tjm
-  // they always did. One flat rate for the whole 2016–2025 span: `Tjm` is dated (BUILD-RULES), and
+  // A historical rate window on each of the three missions reaching back to 2016 above, ending
+  // the day before that mission's 2026 entry starts — non-overlapping, so Alice/Claire/David's
+  // 2026 invoices resolve the 2026 Tjm. One flat rate for the whole 2016–2025 span: `Tjm` is dated (BUILD-RULES), and
   // one window already exercises that a historical invoice resolves *its own period's* rate
   // rather than today's — a second rate change inside the span would prove the same thing twice.
   {
@@ -837,8 +835,8 @@ export const assignments = [
     fromDate: '2026-04-01',
     toDate: null,
   },
-  // Gabrielle → Pentest Forfait (Forfait — present, not invoiced). `toDate` was `2026-06-30`
-  // until item 6 (QA round 1) — now open-ended, matching the mission's own new `endDate: null`.
+  // Gabrielle → Pentest Forfait (Forfait — present, not invoiced). Open-ended `toDate`, matching
+  // the mission's own `endDate: null`.
   {
     id: ids.next(),
     consultantId: gabrielle.id,
@@ -854,7 +852,7 @@ export const assignments = [
     fromDate: '2026-01-01',
     toDate: null,
   },
-  // Roster expansion (item 6, QA round 1): one continuous assignment per new consultant, from
+  // Roster expansion: one continuous assignment per new consultant, from
   // their own join date (2016 for the veterans/departure, 2025 for dense-only fillers) through
   // `null` — or the departure date for Marine, closed the same way ADR-0079 asks every open row
   // to close. Julien/Camille/Théo sit on the same historically-extended mission a veteran of
@@ -982,7 +980,7 @@ export const managerAttachments = [
     fromDate: '2023-06-01',
     toDate: null,
   },
-  // Roster expansion (item 6, QA round 1): Karim is Bordeaux's own new manager, reporting to
+  // Roster expansion: Karim is Bordeaux's manager, reporting to
   // Henri like Bruno/Emma — dated from 2016 (not 2024) so he can already be Théo's manager on
   // Théo's earliest historical Cra below.
   {
@@ -1067,7 +1065,7 @@ export const managerAttachments = [
 export const SUBMITTED_NOT_VALIDATED_EMAIL = 'claire.dubois@secureco.test';
 
 /**
- * Who the seed's historical invoices are issued as (item 6, QA round 1). Henri, and only Henri:
+ * Who the seed's historical invoices are issued as. Henri, and only Henri:
  * he is the one consultant guaranteed absent from every `validated_by` in this dataset (the same
  * property `personas` already relies on for `billing-paris`), so issuing as anyone else risks
  * `ValidatorCannotIssueError` the moment a historical veteran's manager and issuer collide.
@@ -1164,21 +1162,17 @@ export const personas = [
 export const CRA_PERIOD = '2026-06';
 
 /**
- * Item 6 (QA round 1): dense CRAs for every active consultant across three consecutive months,
- * not just the original June — the mockup is reviewed in September 2026, so June/July/August
- * should all read as already closed out. Every active consultant, Alice included (item 2, QA
- * round 2 — her own August used to be withheld here for `journeys.spec.ts`'s interactive
- * create/submit/validate journey; that journey now runs against September instead, which stays
- * genuinely blank for everyone simply by not being in this list, so no per-consultant withhold
- * list is needed any more).
+ * Dense CRAs for every active consultant across three consecutive months: the mockup is reviewed
+ * in September 2026, so June, July and August should all read as already closed out. Every active
+ * consultant, Alice included — `journeys.spec.ts`'s interactive create/submit/validate journey
+ * runs against September, which stays genuinely blank for everyone simply by not being in this
+ * list, so no per-consultant withhold list is needed.
  */
 export const DENSE_PERIODS = ['2026-06', '2026-07', '2026-08'] as const;
 
-/** One historical Cra-period list per veteran/departed consultant (item 6's own "sparse back to
- * 2016" and "at least one departure"), keyed by email like the exclusions above. Every 24 months
- * from 2016 — sparse, not monthly, per the plan's own contingency ("cut the span, do not
- * optimise" if the seed's 60s budget does not hold); Marine's list stops at 2022, the last one
- * before her `2022-12-31` departure. */
+/** One historical Cra-period list per veteran or departed consultant, keyed by email like the
+ * exclusions above. Every 24 months from 2016 — sparse, not monthly, so the seed stays inside its
+ * 60s budget; Marine's list stops at 2022, the last one before her `2022-12-31` departure. */
 export interface HistoricalVeteran {
   readonly email: string;
   readonly periods: readonly string[];
@@ -1201,7 +1195,7 @@ export const HISTORICAL_VETERANS: readonly HistoricalVeteran[] = [
 /** The clock a historical period's submit/validate is stamped with: the 5th of the month after
  * the period closes at 10:00 UTC (June 2026 closes 30/06, its clock reads 05/07) — a function
  * rather than one frozen constant so every period gets its own plausible timestamp instead of all
- * sharing one. It replaced that constant when the historical periods arrived (item 6, QA round 1). */
+ * sharing one. */
 export function clockInstantAfter(period: string): Date {
   const [year, month] = period.split('-').map(Number) as [number, number];
   const nextMonth = month === 12 ? 1 : month + 1;

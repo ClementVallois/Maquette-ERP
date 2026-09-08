@@ -8,10 +8,8 @@ import { uuidv7 } from '../ids/uuidv7.ts';
 import { createAssignment, updateAssignment } from './assignment-admin.ts';
 
 /**
- * `validateAssignment` had no direct test anywhere in the repository before this file (package 04
- * of `docs/clean-up-audit.consolidated.local.md`). Two defects were reproduced and are fixed here;
- * every other case in this file is a positive or negative regression test the audit asked for and
- * none of them had before.
+ * `validateAssignment`'s direct tests: every rule it enforces, exercised against a real
+ * PostgreSQL, positive and negative.
  */
 
 const transaction = useTestTransaction();

@@ -5,7 +5,7 @@
 
 ## Context
 
-Package 10 of the audit (`docs/clean-up-audit.consolidated.local.md`): "Make persona changes an
+Package 10 of an internal repository cleanup audit (kept private): "Make persona changes an
 atomic client-data transition." Its evidence named four gaps in `features/session/hooks.ts` and
 `lib/api-client.ts`: business query keys carry no persona identity, `apiFetch` accepted no
 `AbortSignal`, an old response can outlive the persona that initiated it, and nothing defines how
