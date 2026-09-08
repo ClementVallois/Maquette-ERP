@@ -23,8 +23,8 @@ value is refused `403 /problems/forbidden-origin` — the second CSRF control of
 So the value follows the topology: `http://127.0.0.1:5173` in dev, `http://127.0.0.1:3000` in
 prod/demo.
 
-The two files disagree on it **on purpose**, decided 27/08/2026 in front-end plan task 9.5 (the row
-is in the `Settled` table of [`open-questions.md`](open-questions.md), commit `cacdf3c`):
+The two files disagree on it **on purpose**, decided 27/08/2026 in front-end plan task 9.5
+(commit `cacdf3c`):
 
 | File                       | Value                   | Because                                               |
 | -------------------------- | ----------------------- | ----------------------------------------------------- |

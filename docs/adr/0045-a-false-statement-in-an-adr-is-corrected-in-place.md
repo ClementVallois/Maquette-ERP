@@ -81,7 +81,7 @@ day the directory is published as flat files.
 Three ADRs are corrected in the commit that accepts this one, and `docs/BUILD-RULES.md` § Working
 discipline states the two-branch rule instead of the absolute one.
 
-`docs/PHASE-4-5-CLOSURE.md` said "ADRs are never rewritten" in three places while proposing
+The Phase 4 and 5 closure record said "ADRs are never rewritten" in three places while proposing
 superseding notes for exactly these corrections. Those rows resolve as in-place corrections
 instead, which is a smaller change than the file assumed.
 

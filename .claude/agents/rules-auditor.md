@@ -41,7 +41,7 @@ are exclusions from _reading in full_ — never from being audited:
 
 - **Binary files** (`.png`, and anything `git diff` reports as binary). Reading them as text finds
   nothing. Audit their **presence, path and count** from `--stat`.
-- **Append-only records** — `docs/open-questions.md` (~495 KB and growing), `docs/adr/README.md`,
+- **Append-only records** — `docs/open-questions.md`, `docs/adr/README.md`,
   `README.md`. These are audited from **the diff hunks plus targeted `Grep`**, because what matters
   is what this range _added_ to them, not their accumulated history. A checkpoint that is missing
   is visible in the hunks; it is not more visible after reading forty phases of prose.

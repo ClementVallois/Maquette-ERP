@@ -34,6 +34,21 @@ export function composeReferences(contents: string): Set<string> {
   return new Set([...found].map((match) => match[1]).filter((name) => name !== undefined));
 }
 
+/**
+ * The value of `NAME=value` in a `.env`-shaped string, or `undefined`. Quotes are not stripped:
+ * nothing here writes them, and a quoted port would be a different finding.
+ */
+function declaredValue(contents: string, name: string): string | undefined {
+  const line = new RegExp(`^\\s*${name}\\s*=(.*)$`, 'mu').exec(contents);
+
+  return line?.[1]?.trim();
+}
+
+/** The `:5433` of a `postgres://…@host:5433/db` URL. */
+function portOf(url: string): string | undefined {
+  return /:(\d+)\/[^/]*$/u.exec(url)?.[1];
+}
+
 export function envProblems({ example, compose, local }: EnvSources): string[] {
   const problems: string[] = [];
   const declared = declaredKeys(example);
@@ -78,6 +93,28 @@ export function envProblems({ example, compose, local }: EnvSources): string[] {
   for (const name of configured) {
     if (!declared.has(name)) {
       problems.push(`${LOCAL} sets ${name}, which ${EXAMPLE} does not document.`);
+    }
+  }
+
+  // Drift 4. The container publishes POSTGRES_PORT; every connection string has to dial it. These
+  // drift apart the moment POSTGRES_PORT is changed to dodge a collision, and the failure is
+  // silent and destructive rather than loud: `migrate` and `seed` read MIGRATION_DATABASE_URL, so
+  // a stale port sends them to whatever else answers there, and seeding truncates three schemas.
+  const port = declaredValue(local, 'POSTGRES_PORT');
+
+  if (port !== undefined) {
+    for (const name of configured) {
+      if (!name.endsWith('DATABASE_URL')) continue;
+
+      const url = declaredValue(local, name);
+      const dialled = url === undefined ? undefined : portOf(url);
+
+      if (dialled !== undefined && dialled !== port) {
+        problems.push(
+          `${LOCAL} sets POSTGRES_PORT=${port} but ${name} dials :${dialled}. ` +
+            'The container and the connection string must agree.',
+        );
+      }
     }
   }
 
