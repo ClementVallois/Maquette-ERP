@@ -1,9 +1,8 @@
 # Maquette ERP : la chaîne CRA → facture d'un module d'ERP interne
 
-> ⚠️ Ossature initialisée le 07/08/2026. Ce README se remplit **au fil de la construction**, pas à
-> la fin : une section décrit ce qui existe le jour où elle est écrite, et une section absente est
-> une chose non construite. Les chiffres portent leur date ou la commande qui les recompte — un
-> nombre écrit une fois est faux quelques commits plus tard, et ce README en a porté quatre.
+> Une section de ce fichier décrit ce qui existe ; une section absente est une chose non construite.
+> Les chiffres portent la commande qui les recompte, parce qu'un nombre écrit une fois est faux
+> quelques commits plus tard.
 
 [![CI](https://github.com/ClementVallois/Maquette-ERP/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ClementVallois/Maquette-ERP/actions/workflows/ci.yml)
 [![Nightly](https://github.com/ClementVallois/Maquette-ERP/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/ClementVallois/Maquette-ERP/actions/workflows/nightly.yml)
@@ -17,7 +16,7 @@ se parcourt dans cet ordre :
    qu'est un CRA et pourquoi il décide du chiffre d'affaires d'un cabinet de conseil.
 2. **Une décision** — [ADR-0010](docs/adr/0010-vat-rounded-per-rate.md) : la TVA est arrondie
    **par taux**, jamais par ligne ni sur le total. Chaque ADR nomme l'option écartée et le seuil
-   auquel on y reviendrait ; il y en a 95 (`ls docs/adr/0*.md | wc -l`, moins le gabarit `0000`).
+   auquel on y reviendrait ; il y en a 118 (`ls docs/adr/0*.md | wc -l`, moins le gabarit `0000`).
 3. **La preuve mécanique** — [`tests/boundary-rule.test.ts`](tests/boundary-rule.test.ts) : la
    frontière `timesheet`/`billing` n'est pas une convention de nommage, c'est un job de CI qui
    rejoue une violation délibérée et exige qu'elle soit refusée.
@@ -31,34 +30,32 @@ je n'ai délibérément pas construit.
 
 ## Où en est cette maquette
 
-**Phases 0 à 8 terminées** — le plan en compte onze, numérotées 0 à 10
-([`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md)). Les phases 1 à 3 datent du 19/08/2026, la 4 et la 5
-du 21/08/2026, la 6 — les écrans — du 22/08/2026, le plan front-end qui remplace l'interactif par
-une SPA React du 28/08/2026, la 7 (durcissement de la CI) du 31/08/2026 et la 8 (déploiement) du
-03/09/2026. **La phase 9 est en cours** : c'est la relecture documentaire, et ce README en est le
-livrable. Reste la phase 10, le gel.
+**La chaîne est complète et déployée** : domaines, persistance, jeu de données, API, écrans et
+déploiement. Ce qui reste au plan de construction ([`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md)) est
+de la relecture, pas de la fonctionnalité. Ce que cette section décrit, section par section, existe
+et se lance.
 
 Les **domaines**, en TypeScript pur et sans base de données : `timesheet` — CRA, cycle de vie,
 calendrier ouvré, règles de soumission, validation et événement de domaine — et `billing` —
 arithmétique monétaire exacte, TVA résolue par territorialité, ligne de facture portant son origine,
 mentions légales obligatoires, numérotation, avoir.
 
-La **persistance**, depuis la phase 3 : des migrations SQL numérotées (`ls migrations/`) et un
+La **persistance** : des migrations SQL numérotées (`ls migrations/`) et un
 runner rejouable, un schéma PostgreSQL par module, les dépôts `PgCraRepository` et
 `PgInvoiceRepository`, la numérotation sans trou sous un verrou de ligne (ADR-0007), les événements
 de domaine écrits **dans la même transaction** que ce qui les émet (ADR-0020), et le traitement d'un
 CRA rendu idempotent (ADR-0021).
 
-Le **jeu de données**, depuis la phase 4 : un seed déterministe qui pilote les agrégats du domaine
+Le **jeu de données** : un seed déterministe qui pilote les agrégats du domaine
 au lieu d'écrire des lignes en dur (ADR-0022) — section « Jeu de données » plus bas.
 
-L'**API**, depuis la phase 5 : `/api/v1` sur Fastify, un sélecteur de persona à la place d'une
+L'**API** : `/api/v1` sur Fastify, un sélecteur de persona à la place d'une
 authentification (ADR-0023), et la chaîne complète CRA → facture en une transaction. Comment la
 lancer : section « Démarrer » plus bas.
 
 Les compteurs de tests se recomptent plutôt qu'ils ne se croient : `pnpm run test` pour les tests
-unitaires, `pnpm run test:int` pour ceux qui tournent contre un vrai PostgreSQL. Au **04/09/2026**,
-614 et 225.
+unitaires, `pnpm run test:int` pour ceux qui tournent contre un vrai PostgreSQL. Au **08/09/2026**,
+690 et 300.
 
 **La chaîne franchit déjà la frontière** : `billing` réagit à `timesheet.TimesheetValidated` et
 produit un projet de facture par client. **Aucun fichier livré de `billing` — tests compris —
@@ -73,8 +70,7 @@ méritent d'être nommés : `packages/billing/src/__boundary-fixture__/` viole l
 qu'aucune règle ne mentionne — il prouve que la liste `allowed` **refuse par défaut**, ce qui est la
 moitié la plus facile à perdre.
 
-Les **écrans** existent depuis la phase 6, et depuis le 28/08/2026 l'interactif est une **SPA
-React** servie par la même instance Fastify que l'API — ADR-0062 remplace ADR-0009, ADR-0063 fixe
+Les **écrans** : l'interactif est une **SPA React** servie par la même instance Fastify que l'API — ADR-0062 remplace ADR-0009, ADR-0063 fixe
 l'origine unique, ADR-0064 dit ce que la CSP admet. Deux documents restent **rendus par le
 serveur**, et ce sont les seuls : la **facture imprimable** (`/facture/:id`, ADR-0055) et le
 **relevé de CRA imprimable** (`/releve/:id`, ADR-0056). Tout le reste est la SPA, ce qui implique
@@ -106,8 +102,8 @@ domaine ni API derrière elles ; la section « Ce que je ne construis pas » dit
 
 La même chaîne se voit en HTTP ou à l'écran, au choix.
 
-**L'instance tourne : [https://erp.clementvallois.fr](https://erp.clementvallois.fr)** — déployée le
-03/09/2026. La chaîne complète de la phase 8 est en service sur l'hôte : l'image publiée par la CI
+**L'instance tourne : [https://erp.clementvallois.fr](https://erp.clementvallois.fr)**. La chaîne
+complète est en service sur l'hôte : l'image publiée par la CI
 et tirée par digest, PostgreSQL sur un réseau privé sans port publié, les migrations et le seed en
 conteneurs éphémères, le minuteur systemd qui interroge GHCR, et la remise à zéro nocturne
 (ADR-0032 — les données sont synthétiques et repartent de zéro chaque nuit à 03h30).
@@ -123,8 +119,8 @@ définit le vocabulaire — métier (`Tjm`, `Cjm`, `pré-facturier`, `régie`, `
 arbitrages avec, pour chacun, l'option écartée et le seuil de réouverture ;
 [`docs/BUILD-RULES.md`](docs/BUILD-RULES.md) est la forme vérifiable de ces arbitrages — ce qu'on a
 le droit d'écrire dans ce dépôt et ce qu'on n'a pas le droit d'y écrire ; et
-[`docs/open-questions.md`](docs/open-questions.md) dit ce qui n'est **pas** tranché, avec la phase
-qui le tranchera.
+[`docs/open-questions.md`](docs/open-questions.md) dit ce qui n'est **pas** tranché, et à quel
+moment ça le sera.
 
 ⚠️ Ces quatre fichiers sont **en anglais**, ce README seul est en français. C'est délibéré et la
 règle est dans `CLAUDE.md` : le code, les commits et les arbitrages en anglais, le README dans la
@@ -136,7 +132,7 @@ fichier ne s'y ajoute pas en silence :
 
 | Fichier                                                                         | Ce que c'est                                                                                                                                                                                      |
 | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BUILD-PLAN.md`                                                                 | l'ordre, les branches et le calendrier des phases                                                                                                                                                 |
+| `BUILD-PLAN.md`                                                                 | l'ordre, les branches et le calendrier de la construction                                                                                                                                         |
 | `frontend-plan.md`, `direction-visuelle.md`                                     | le plan de construction et la direction visuelle de la SPA                                                                                                                                        |
 | `running.md`                                                                    | les deux topologies d'exécution (dev / prod-démo) et la panne qui suit quand on les mélange                                                                                                       |
 | `vulnerability-management.md`                                                   | ce qui se passe quand la porte `Dependency scan` passe au rouge                                                                                                                                   |
@@ -149,8 +145,7 @@ fichier ne s'y ajoute pas en silence :
 Deux fichiers d'outillage vivent hors de `docs/` et sont eux aussi versionnés :
 `.claude/agents/rules-auditor.md` et `.claude/agents/cold-reader.md` — les deux relecteurs en
 lecture seule lancés avant chaque merge sur `main`, l'un contre `docs/BUILD-RULES.md`, l'autre dans
-la peau du lecteur sans brief. Ce sont eux qui ont trouvé la moitié des corrections datées du
-04/09/2026 dans ce fichier.
+la peau du lecteur sans brief.
 
 ⚠️ Ces trois notes de travail et `todo.md` sont **en français**, contrairement à la règle du dépôt
 (tout en anglais sauf ce README). C'est assumé et non corrigé : `todo.md` reproduit mot pour mot des
@@ -218,7 +213,7 @@ Périmètre volontairement étroit : deux modules, et **une seule flèche qui fr
 2. **Des invariants métier tenus par le code, pas par la discipline**
    - un CRA validé est **immuable** ;
    - les montants sont des **entiers en centimes** — jamais de flottant sur une valeur monétaire ;
-   - la numérotation des factures est **séquentielle et sans trou** — construit en phase 3
+   - la numérotation des factures est **séquentielle et sans trou**
      (**ADR-0007**) : la forme de la série vient d'ADR-0018, et l'allocation est un `SELECT … FOR
 UPDATE` sur la ligne de compteur, dans la transaction d'émission. Jamais une `SEQUENCE`
      PostgreSQL : `nextval` n'est pas transactionnel, donc un rollback laisse un trou. Un test
@@ -506,9 +501,7 @@ pôles, quatre implantations (Paris, Lyon, Rennes, Bordeaux), des missions en **
 **habilitation PASSI** portée par un auditeur et exigée par une mission qualifiée.
 
 **Le volume** — parce qu'un cabinet de neuf consultants sur un seul mois n'exerce ni la
-pagination, ni les filtres, ni l'historique. Ce qui suit date du 31/08/2026, d'une relecture de
-l'application qui tourne : les quatre passes sont dans
-[`docs/qa-rounds.md`](docs/qa-rounds.md), et ce point-là y est « item 6, round 1 ».
+pagination, ni les filtres, ni l'historique.
 
 - **49 personnes** dans `public.consultants`, dont **4 managers** — un par implantation. Quatre
   d'entre elles seulement sont sélectionnables dans le choix de persona (ADR-0023) ; les autres
@@ -559,16 +552,14 @@ irrégulier** : une journée partagée entre ses deux missions
 (deux quarts de journée sur chacune), une journée d'absence, un **samedi travaillé donc signalé**,
 et une seconde journée partagée à trois quarts contre un (ADR-0069). Ce n'est pas de la décoration
 — la journée partagée est la raison structurelle pour laquelle la mission est portée par la _ligne_
-et non par le _jour_, et le jeu de données ne l'exerçait pas jusqu'à la phase 6 ; le partage 3/1
-est ce qui fait qu'une ligne de facture porte une quantité qui n'est pas un multiple de quatre, et
+et non par le _jour_ ; le partage 3/1 est ce qui fait qu'une ligne de facture porte une quantité qui n'est pas un multiple de quatre, et
 qui prouve donc la facturation au quart plutôt que de l'illustrer. Les deux missions d'Alice étant
 vendues au **même client**, chaque journée partagée produit une seconde _ligne_ sur une facture,
 pas une seconde facture (ADR-0038).
 
 Ce que **juin** 2026 ne peut pas montrer : un **jour férié** signalé. Il n'y en a aucun ce mois-là
 (ADR-0004 place l'Ascension au 14/05 et la Pentecôte au 25/05) ; c'est le calendrier, pas un oubli.
-Juillet, lui, en porte un — le 14 — et il est dense depuis l'élargissement du seed
-(`docs/qa-rounds.md`, item 6 du round 1) : la maquette montre donc bien un
+Juillet, lui, en porte un — le 14 — et il est dense : la maquette montre donc bien un
 jour férié signalé, mais pas sur le mois d'Alice.
 
 ## Tests et portes de CI
@@ -580,8 +571,8 @@ sert ici deux fois, pour deux choses différentes, et il vaut mieux les séparer
    `error`. C'est le sens du mot en tête de ce README (« casser la frontière fait échouer le job,
    pas produire un warning »), et **ce piège-là est fermé** : les jobs ci-dessous échouent
    réellement, et `tests/boundary-rule.test.ts` le prouve sur des violations délibérées.
-2. **Une porte qui échoue sans rien empêcher.** C'était l'état de ce dépôt jusqu'au 03/09/2026, et
-   **ce piège-là est fermé aussi** — écrit ici plutôt que sous-entendu.
+2. **Une porte qui échoue sans rien empêcher** — rouge sur un runner, mais le bouton de merge
+   reste cliquable. **Ce piège-là est fermé aussi**, et par la plateforme : voir juste en dessous.
 
 Elles tournent sur chaque push et sur chaque pull request, elles passent au rouge, **et depuis le
 03/09/2026 un rouge verrouille le merge**. La seule chose capable de désactiver le bouton — la
@@ -590,58 +581,37 @@ devenu public, et la bascule a été faite le jour même. **Quatorze checks sont
 `enforce_admins` compris, donc la règle « rien ne merge en rouge » ne repose plus sur l'auteur.
 Décision, option écartée et seuil →
 **[ADR-0086](docs/adr/0086-the-gates-become-blocking-on-a-public-repository.md)**, qui remplace
-l'**[ADR-0040](docs/adr/0040-ci-gates-are-advisory-while-the-repository-is-private.md)** — laquelle
-disait l'état antérieur, et disait aussi que ce README avait affirmé le contraire (« cinq sont
-exigées ») depuis la phase 0 alors que la bascule n'était pas en attente mais indisponible.
+l'**[ADR-0040](docs/adr/0040-ci-gates-are-advisory-while-the-repository-is-private.md)**, lequel
+disait l'état antérieur.
 
 Les quatorze se lisent avec
 `gh api repos/ClementVallois/Maquette-ERP/branches/main/protection --jq '.required_status_checks.contexts'`.
 Le tableau ci-dessous décrit les **onze** que porte `ci.yml` ; les trois autres viennent des deux
 autres workflows du dépôt — `Analyze` (CodeQL, `codeql.yml`) et
-`Build and boot the image` / `Deploy script --dry-run` (`image.yml`, arrivés avec la phase 8).
+`Build and boot the image` / `Deploy script --dry-run` (`image.yml`).
 
-| Porte (job CI)                                      | Commande                                                                                  | Ce qu'elle fait passer au rouge                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Module boundary**                                 | `pnpm run boundaries` + le test négatif                                                   | Un import qui franchit la frontière `timesheet`/`billing`, une flèche jamais déclarée — et une règle **morte** : le test rejoue une violation délibérée et exige qu'elle soit refusée                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| **Lint, format, types**                             | `lint` · `format:check` · `typecheck` · `env:check`                                       | Du code hors des règles ESLint (dont les invariants du domaine rendus mécaniques), un formatage divergent, une erreur de type — et une variable de `compose.yml` absente de `.env.example`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| **Secret scan**                                     | gitleaks sur l'historique                                                                 | Un secret commité, y compris dans un commit ancien de la branche                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| **Dependency scan**                                 | `pnpm audit` + osv-scanner                                                                | Une dépendance portant une vulnérabilité connue. Les deux étapes n'ont **pas** le même seuil, et c'est délibéré : `pnpm audit --audit-level=high` ne tombe qu'en haut ou critique, osv-scanner **n'a pas de plancher de sévérité** et tombe sur tout ce qu'OSV connaît. La porte est l'union des deux — c'est osv-scanner qui l'a fait passer au rouge pour la première fois le 31/08/2026, sur un avis **modéré** (GHSA-q8mj-m7cp-5q26, `qs`) que `pnpm audit` avait laissé passer. Le plancher n'a pas été ajouté pour faire repasser la porte au vert : le correctif a été pris (`pnpm-workspace.yaml`, `overrides`), procédure → [`docs/vulnerability-management.md`](docs/vulnerability-management.md)                                                                                                  |
-| **SAST**                                            | Semgrep OSS                                                                               | Les motifs de vulnérabilité applicative détectables statiquement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| **Shell scripts**                                   | shellcheck (`--severity=warning`) sur `deploy/*.sh`, `deploy/test/*.sh` et `scripts/*.sh` | Une faute dans le chemin de déploiement. La phase 8 a mis en shell le redéploiement, la remise à zéro nocturne et l'assistant d'installation de l'hôte — tous exécutés **en root sur le VPS** — et ni Semgrep ni CodeQL ne lisent bash : jusqu'à ce job, ces scripts étaient le seul code exécutable du dépôt sans aucune analyse statique                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| **Tests**                                           | `pnpm run test:cov`                                                                       | Un invariant du domaine cassé, et une couverture du **domaine** sous 90 % (branches : 85 %) — le seuil ne porte que sur `domain/` et sur le noyau partagé, pas sur le dépôt entier                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| **Integration tests**                               | `pnpm run test:int` sur un vrai PostgreSQL                                                | Une requête SQL fausse, une colonne manquante, une règle d'autorisation par périmètre qui ne refuse plus — les tests tournent contre le schéma réel, appliqué par le runner de migrations                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| **Playwright (apps/web, against the served build)** | `playwright test` contre le build servi par l'API                                         | Une régression d'un parcours SPA de bout en bout (persona → grille → pré-facturier → facture), rejouée contre `apps/web/dist` servi par Fastify sur le port 3000 — la seule topologie qui envoie la vraie `Content-Security-Policy` de l'application, jamais contre le serveur de dev Vite. Arrivée avec la phase 9.6 du plan front-end ; sa ligne manquait ici jusqu'à la phase 7                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| **Migrations replayed twice**                       | `pnpm run migrate` deux fois de suite                                                     | Un runner de migrations non idempotent : le second passage doit être un no-op. ⚠️ Cette porte ne vérifie **pas** que les migrations sont additives — un `DROP COLUMN` dans un fichier `007` passerait les deux passages au vert, puisque le runner saute les versions déjà inscrites dans `schema_migrations`. La règle additive reste tenue à la relecture ; ce qui est mécanique ici, c'est le rejeu                                                                                                                                                                                                                                                                                                                                                                                                       |
-| **Cold setup (migrate + seed)**                     | `pnpm run setup` (le vrai composite) + `seed` une seconde fois + `seed:fingerprint`       | Un seed qui n'est ni idempotent ni déterministe : la porte relance le seed et **diffe l'empreinte des deux passes** (un hash de contenu et un compte de lignes par table), puis relit chaque table en tant que rôle `erp_app` pour vérifier que le rôle de moindre privilège voit ce que le propriétaire du schéma a écrit. Depuis la phase 7, ce job lance le **script composite lui-même** (`env:init`, `env:check`, `docker compose up -d --wait`, `migrate`, `seed`) plutôt que de le ré-implémenter : `ubuntu-latest` fournit Docker et le plugin Compose directement sur le runner, ce que les autres jobs base de données n'utilisent pas (ils tournent contre un conteneur `services:`, qui n'a pas de `docker compose` à lancer). Un `setup` cassé par une faute de frappe passe désormais au rouge |
+| Porte (job CI)                                      | Commande                                                                                  | Ce qu'elle fait passer au rouge                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Module boundary**                                 | `pnpm run boundaries` + le test négatif                                                   | Un import qui franchit la frontière `timesheet`/`billing`, une flèche jamais déclarée — et une règle **morte** : le test rejoue une violation délibérée et exige qu'elle soit refusée                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **Lint, format, types**                             | `lint` · `format:check` · `typecheck` · `env:check`                                       | Du code hors des règles ESLint (dont les invariants du domaine rendus mécaniques), un formatage divergent, une erreur de type — et une variable de `compose.yml` absente de `.env.example`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **Secret scan**                                     | gitleaks sur l'historique                                                                 | Un secret commité, y compris dans un commit ancien de la branche                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **Dependency scan**                                 | `pnpm audit` + osv-scanner                                                                | Une dépendance portant une vulnérabilité connue. Les deux étapes n'ont **pas** le même seuil, et c'est délibéré : `pnpm audit --audit-level=high` ne tombe qu'en haut ou critique, osv-scanner **n'a pas de plancher de sévérité** et tombe sur tout ce qu'OSV connaît. La porte est l'union des deux — c'est osv-scanner qui l'a fait passer au rouge pour la première fois le 31/08/2026, sur un avis **modéré** (GHSA-q8mj-m7cp-5q26, `qs`) que `pnpm audit` avait laissé passer. Le plancher n'a pas été ajouté pour faire repasser la porte au vert : le correctif a été pris (`pnpm-workspace.yaml`, `overrides`), procédure → [`docs/vulnerability-management.md`](docs/vulnerability-management.md)                                                                               |
+| **SAST**                                            | Semgrep OSS                                                                               | Les motifs de vulnérabilité applicative détectables statiquement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **Shell scripts**                                   | shellcheck (`--severity=warning`) sur `deploy/*.sh`, `deploy/test/*.sh` et `scripts/*.sh` | Une faute dans le chemin de déploiement. Le redéploiement, la remise à zéro nocturne et l'assistant d'installation de l'hôte sont du shell exécuté **en root sur le VPS**, et ni Semgrep ni CodeQL ne lisent bash : sans ce job, ces scripts seraient le seul code exécutable du dépôt sans aucune analyse statique                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **Tests**                                           | `pnpm run test:cov`                                                                       | Un invariant du domaine cassé, et une couverture du **domaine** sous 90 % (branches : 85 %) — le seuil ne porte que sur `domain/` et sur le noyau partagé, pas sur le dépôt entier                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **Integration tests**                               | `pnpm run test:int` sur un vrai PostgreSQL                                                | Une requête SQL fausse, une colonne manquante, une règle d'autorisation par périmètre qui ne refuse plus — les tests tournent contre le schéma réel, appliqué par le runner de migrations                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **Playwright (apps/web, against the served build)** | `playwright test` contre le build servi par l'API                                         | Une régression d'un parcours SPA de bout en bout (persona → grille → pré-facturier → facture), rejouée contre `apps/web/dist` servi par Fastify sur le port 3000 — la seule topologie qui envoie la vraie `Content-Security-Policy` de l'application, jamais contre le serveur de dev Vite                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **Migrations replayed twice**                       | `pnpm run migrate` deux fois de suite                                                     | Un runner de migrations non idempotent : le second passage doit être un no-op. ⚠️ Cette porte ne vérifie **pas** que les migrations sont additives — un `DROP COLUMN` dans un fichier `007` passerait les deux passages au vert, puisque le runner saute les versions déjà inscrites dans `schema_migrations`. La règle additive reste tenue à la relecture ; ce qui est mécanique ici, c'est le rejeu                                                                                                                                                                                                                                                                                                                                                                                    |
+| **Cold setup (migrate + seed)**                     | `pnpm run setup` (le vrai composite) + `seed` une seconde fois + `seed:fingerprint`       | Un seed qui n'est ni idempotent ni déterministe : la porte relance le seed et **diffe l'empreinte des deux passes** (un hash de contenu et un compte de lignes par table), puis relit chaque table en tant que rôle `erp_app` pour vérifier que le rôle de moindre privilège voit ce que le propriétaire du schéma a écrit. Ce job lance le **script composite lui-même** (`env:init`, `env:check`, `docker compose up -d --wait`, `migrate`, `seed`) plutôt que de le ré-implémenter : `ubuntu-latest` fournit Docker et le plugin Compose directement sur le runner, ce que les autres jobs base de données n'utilisent pas (ils tournent contre un conteneur `services:`, qui n'a pas de `docker compose` à lancer). Un `setup` cassé par une faute de frappe passe désormais au rouge |
 
 > ✅ **Les onze sont vertes**, et chacune l'est devenue en livrant ce qu'elle mesure plutôt qu'en
-> baissant son seuil. `Tests` est restée **rouge de la phase 0 à la phase 1** : le seuil de
-> couverture existait avant le domaine à mesurer, et la rendre verte plus tôt aurait demandé soit
-> d'abaisser le seuil, soit d'écrire un test qui ne prouve rien. `Integration tests` et
-> `Migrations replayed twice` arrivent avec la phase 3, dans la même PR que le code qu'elles
-> testent — et toutes deux ont échoué à leur premier run sur une pull request, pour une raison qui
-> n'avait rien à voir avec le code : `pnpm run migrate` chargeait un `.env` absent du runner.
-> `Playwright (apps/web, against the served build)` arrive avec la phase 9.6 du plan front-end. Historique complet →
-> `docs/open-questions.md`.
->
-> ✅ La réserve du 28/08/2026 sur `Cold setup (migrate + seed)` est levée. Le job venait d'être
-> réécrit pour lancer le composite réel, et cette version-là **n'avait jamais tourné sur un runner
-> GitHub** : la branche qui la portait ne pouvait pas déclencher sa propre pull request. Elle a
-> tourné verte sur chaque pull request depuis. Elle n'est donc plus seulement recoupée avec la
-> liste logicielle documentée d'`ubuntu-latest`, elle est observée verte sur la plateforme.
->
-> ✅ Depuis le 03/09/2026, chacune de ces onze empêche un merge — elles font partie des quatorze
-> checks exigés sur `main`, `enforce_admins` compris (ADR-0086). La réserve qui figurait ici, « aucune
-> de ces dix n'empêche un merge », décrivait l'état antérieur et n'est plus vraie. Celle qui disait
-> que `ci.yml` en portait dix était fausse autrement : `Shell scripts` en est un job, compté
-> ailleurs et absent de ce tableau — une porte qui bloque un merge, invisible dans l'inventaire des
-> portes. Corrigé le 04/09/2026, trouvé par le sous-agent `cold-reader` en recomptant les quatorze.
+> baissant son seuil : aucun seuil de ce tableau n'a été abaissé pour faire passer une porte au
+> vert. Chacune fait partie des quatorze checks exigés sur `main`, `enforce_admins` compris
+> (ADR-0086) — donc chacune empêche un merge, elle ne se contente pas de le signaler.
 
-Les hooks locaux (lefthook) rejouent une partie de ces portes **avant** le commit et le push. De
-l'ADR-0040 à l'ADR-0086 ils ont été **le seul arrêt mécanique** qui précédait un merge, puisque
-aucune porte ne le bloquait ; depuis le 03/09/2026 ils doublent des portes qui bloquent vraiment, ce
-qui les remet dans leur rôle normal — échouer sur le poste plutôt que sur un runner, deux minutes
-plus tôt. ⚠️ Ils
+Les hooks locaux (lefthook) rejouent une partie de ces portes **avant** le commit et le push : ils
+doublent des portes qui bloquent déjà, pour échouer sur le poste plutôt que sur un runner, deux
+minutes plus tôt. ⚠️ Ils
 ne s'installent pas tout seuls : `ignore-scripts` est activé, donc un clone frais n'en a aucun tant
 qu'on n'a pas lancé `pnpm exec lefthook install`. Ce qu'ils font :
 gitleaks sur ce qui est indexé — le seul des deux qui empêche réellement la fuite, la CI ne scannant
@@ -659,46 +629,31 @@ jamais sur une pull request — la couverture dit _combien_ du domaine un test t
 mutation dit _si_ l'assertion qui le touche verrait une mauvaise réponse. Décision, option écartée
 et seuils → **[ADR-0027](docs/adr/0027-nightly-gates-and-what-the-pr-pipeline-never-runs.md)**.
 
-Premier score, mesuré localement le 28/08/2026 (`pnpm exec stryker run`) : **72,80 %** (`billing`
-67,75 %, `timesheet` 79,07 %) — sous le seuil de couverture du domaine (90 %/85 %), ce que ce gate
-existe justement à rendre visible plutôt qu'à masquer. Le seuil de rupture du job (`break: 70` dans
-`stryker.config.json`) est fixé quelques points sous ce score réel, pas abaissé pour le faire
-passer.
+Le seuil de rupture du job (`break: 70` dans `stryker.config.json`) est fixé quelques points sous
+le premier score réellement mesuré — **72,80 %** le 28/08/2026 — et non abaissé pour faire passer le
+job. Ce score est sous le seuil de couverture du domaine (90 %/85 %), et c'est ce que ce mécanisme
+existe pour rendre visible plutôt que pour masquer.
 
-**Depuis, il tourne sur la plateforme.** `schedule:` ne se déclenche que depuis la branche par
-défaut : le workflow a donc été inerte tant qu'il n'était pas sur `main`, déclenché une première
-fois à la main (`workflow_dispatch`) le **31/08/2026**, puis tous les jours à 08:00 UTC depuis le
-01/09/2026. Se vérifie sans me croire :
+Il tourne tous les jours à 08:00 UTC. Se vérifie sans me croire :
 `gh run list --workflow=nightly.yml`. Dernier score **mesuré par la plateforme**, run du
 04/09/2026 : **75,65 %** (`billing` 67,75 %, `timesheet` 83,25 %) — le rapport complet est
-l'artefact `mutation-report` de ce run, `gh run download <id> -n mutation-report`. `billing` n'a pas
-bougé d'un point, `timesheet` a gagné quatre : c'est exactement ce que le score de mutation est
-censé montrer et que la couverture ne montre pas. Ne pas lire « onze jobs verts » plus haut comme
-couvrant ce douzième mécanisme — il n'y figure pas, et il n'empêche aucun merge.
+l'artefact `mutation-report` de ce run, `gh run download <id> -n mutation-report`. Entre les deux
+mesures `billing` n'a pas bougé d'un point et `timesheet` a gagné quatre : c'est exactement ce que
+le score de mutation montre et que la couverture ne montre pas. Ne pas lire « onze jobs verts »
+plus haut comme couvrant ce douzième mécanisme — il n'y figure pas, et il n'empêche aucun merge.
 
-⚠️ Ce paragraphe a **affirmé le contraire jusqu'au 04/09/2026** (« ce workflow n'a donc jamais
-tourné »), écrit quand c'était vrai et laissé en place quatre jours après que ça ait cessé de
-l'être. Trouvé par le sous-agent `cold-reader`, en lançant la commande que la section précédente
-lui proposait. C'est le mode d'échec que ce README dit vouloir éviter, sur la seule affirmation
-négative qu'il porte sur sa propre CI.
+### La procédure de gestion des vulnérabilités
 
-### Renovate, et la procédure de gestion des vulnérabilités
+**Il n'y a pas de mise à jour automatisée des dépendances sur ce dépôt.** Une configuration Renovate
+y a été committée, puis retirée : l'App GitHub n'a jamais été installée, donc aucune de ses règles
+n'a jamais produit le moindre effet observable, et une configuration qui ne tourne pas est une
+affirmation de plus à vérifier plutôt qu'un mécanisme. Décision, option écartée et seuil →
+**[ADR-0119](docs/adr/0119-the-uninstalled-renovate-configuration-is-removed.md)**, qui remplace le
+point 1 de l'**[ADR-0075](docs/adr/0075-the-vulnerability-management-procedure-and-where-it-lives.md)**.
 
-`renovate.json5` (racine du dépôt) est **committé** : mises à jour groupées, cadence fixe
-hebdomadaire, Node et pnpm exclus de l'automatisation, alertes de vulnérabilité ouvertes **à tout
-moment**, sans attendre la cadence. Décision, option écartée et seuil →
-**[ADR-0075](docs/adr/0075-the-vulnerability-management-procedure-and-where-it-lives.md)**.
-
-⚠️ **L'application GitHub Renovate n'est pas installée sur ce dépôt** — vérifié le 28/08/2026 :
-aucun webhook, aucune pull request ouverte par le bot. Le dépôt était alors privé ; il est public
-depuis le 03/09/2026, ce qui lève l'obstacle sans rien changer au constat. Installer une App GitHub est
-une action de plateforme, à faire depuis github.com : ni la CI ni un script de ce dépôt ne peut la
-déclencher, et elle n'est pas faite. Ce README dit
-donc ce qui est vrai — la configuration est committée et correcte — et pas ce qui ne l'est pas
-encore — que Renovate tourne. C'est le précédent d'ADR-0040 appliqué une seconde fois plutôt que
-réinventé : ce dépôt a déjà affirmé une porte qui n'a jamais été réellement active (la protection
-de branche, « cinq sont exigées », fausse de la phase 0 au 19/08/2026) et ne voulait pas répéter
-l'erreur pour Renovate.
+Ce qui reste, et qui tourne réellement, c'est la porte `Dependency scan` du tableau ci-dessus :
+elle échoue sur une vulnérabilité connue dans une dépendance résolue, à chaque push et à chaque
+pull request, et elle verrouille le merge.
 
 Ce que fait la porte `Dependency scan` du tableau ci-dessus quand elle passe au rouge — qui
 décide, sur quel critère une exception se justifie, et où elle est écrite — est une procédure à
