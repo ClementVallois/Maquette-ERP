@@ -13,30 +13,29 @@ Cet audit n’est plus un plan d’action à exécuter tel quel — il l’a dé
 (02/09/2026) en est le **descendant opérationnel** : il a trié chaque constat ci-dessous en Gardé,
 Optionnel ou Laissé de côté (sa §10 fait la traçabilité identifiant par identifiant). Les QA rounds 3,
 4 et 5 (`docs/qa-rounds.md`, travaillées 03-04/09/2026) ont livré la majorité de ce qui était Gardé.
-Un audit plus récent et non versionné, `docs/audit-ceo-readiness-2026-09-05.md` (matériel propriétaire
-de Clement, non modifié par cette passe), a repris ce qui restait ouvert et l’a formalisé en
+Une relecture plus récente, du 05/09/2026, a repris ce qui restait ouvert et l’a formalisé en
 constats **F01 à F15**, avec priorités P0/P1/P2.
 
 **Cette passe (05/09/2026, branche `fix/audit-produit-residuel`) ferme sept de ces résidus,** tous
 sans RH/Direction, sans nouveau module et sans agrandir le périmètre (`CLAUDE.md`, règle « ne pas
 étendre le périmètre ») :
 
-| Résidu fermé                                                                                                                  | Constat CEO | Item de cet audit                                                          | Commit    |
-| ----------------------------------------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------- | --------- |
-| Unités de la ligne de facture (jours × taux journalier, plus le prix au quart de journée)                                     | F03         | P2.2 (Q7, densification B4)                                                | `f28a267` |
-| Récupération sur une page hors-plage (distincte d’un résultat filtré vide)                                                    | F07         | P0.3 (Q2, densification A12)                                               | `e96863d` |
-| Une seule action « à faire » sur le mois courant du consultant                                                                | F11         | P1.1 (Q1, densification A1) — complète l’ADR-0097                          | `874b544` |
-| Trois textes qui promettaient ce que l’interface ne tient pas                                                                 | F14         | P1.7 (D3, densification B2)                                                | `feb6b7f` |
-| File de brouillons de facturation (discriminant consultant, portée des compteurs manager, découverte historique)              | F10         | P0.2 et P1.5 (D2/D4, densification A1/A7)                                  | `c5005b6` |
-| Chronologie CRA/facture étiquetée comme jalons courants, pas un historique complet                                            | F12         | P2.5 (L5, densification A3)                                                | `6c29e0e` |
-| Portée du tri des tableaux rendue honnête (désactivé sur les trois tables server-paginées plutôt que de mentir sur sa portée) | F06         | P1.4 (Q3, densification A8) — **partiellement traité**, tri global reporté | `9c2d72d` |
+| Résidu fermé                                                                                                                  | Constat | Item de cet audit                                                          | Commit    |
+| ----------------------------------------------------------------------------------------------------------------------------- | ------- | -------------------------------------------------------------------------- | --------- |
+| Unités de la ligne de facture (jours × taux journalier, plus le prix au quart de journée)                                     | F03     | P2.2 (Q7, densification B4)                                                | `f28a267` |
+| Récupération sur une page hors-plage (distincte d’un résultat filtré vide)                                                    | F07     | P0.3 (Q2, densification A12)                                               | `e96863d` |
+| Une seule action « à faire » sur le mois courant du consultant                                                                | F11     | P1.1 (Q1, densification A1) — complète l’ADR-0097                          | `874b544` |
+| Trois textes qui promettaient ce que l’interface ne tient pas                                                                 | F14     | P1.7 (D3, densification B2)                                                | `feb6b7f` |
+| File de brouillons de facturation (discriminant consultant, portée des compteurs manager, découverte historique)              | F10     | P0.2 et P1.5 (D2/D4, densification A1/A7)                                  | `c5005b6` |
+| Chronologie CRA/facture étiquetée comme jalons courants, pas un historique complet                                            | F12     | P2.5 (L5, densification A3)                                                | `6c29e0e` |
+| Portée du tri des tableaux rendue honnête (désactivé sur les trois tables server-paginées plutôt que de mentir sur sa portée) | F06     | P1.4 (Q3, densification A8) — **partiellement traité**, tri global reporté | `9c2d72d` |
 
 **Ce que cette passe ne ferme pas**, faute d’être dans son périmètre confié : F01 (provenance de la
 publication), F02 (changement de persona qui efface une session), F04 (caches non invalidés), F05
 (imprimable d’une facture annulée), F08 (script de démo), F09 (tests de l’écran d’affectation), F13
 (effectif sans affectation dans le graphique de staffing), F15 (réconciliation documentaire). Ils
-restent ouverts exactement comme `docs/audit-ceo-readiness-2026-09-05.md` les décrit ; ce document ne
-les rouvre pas et ne les referme pas.
+restent ouverts exactement comme la relecture du 05/09/2026 les décrit ; ce document ne les rouvre
+pas et ne les referme pas.
 
 Le document source n'est pas dans le dépôt et n'a pas vocation à y entrer. **Les deux tableaux
 ci-dessus sont donc le référent public des numéros F** : un lecteur qui croise `// F10:` dans le code
@@ -110,9 +109,8 @@ ce qu’il ne couvre pas) ; **États, feedback et résilience** aussi (`OrgChart
 d’échec compact) ; **Pédagogie et aide à l’apprentissage** un peu (chronologie étiquetée honnêtement),
 mais reste basse — aucun élément du Lot 3 (glossaire mis à part, déjà livré) n’a été construit par
 cette passe. Deux règles distinctes le tiennent fermé : `CLAUDE.md` « ne pas étendre le
-périmètre » (générale, elle ne nomme ni §6 ni les lots), et
-`docs/audit-ceo-readiness-2026-09-05.md`, qui demande explicitement de ne pas laisser une passe
-de finition ouvrir un nouveau chantier produit.
+périmètre » (générale, elle ne nomme ni §6 ni les lots), et la relecture du 05/09/2026, qui
+demande explicitement de ne pas laisser une passe de finition ouvrir un nouveau chantier produit.
 
 ## 2. Méthode et limites de l’audit
 
@@ -246,7 +244,7 @@ trois lignes parfaites.
 
 #### P0.1 — L’émission ne donne pas une synthèse financière suffisante
 
-> **Statut 05/09 :** shipped — Gardé **B1** (densification), confirmé par `docs/audit-ceo-readiness-2026-09-05.md` : « Present in list/detail/issuance with provisional markers. No blind issuance found. »
+> **Statut 05/09 :** shipped — Gardé **B1** (densification), confirmé par la relecture du 05/09/2026 : les marqueurs provisoires sont présents en liste, en détail et à l’émission, et aucune émission à l’aveugle n’a été trouvée.
 
 Une facture brouillon n’expose pas les trois cartes de total, car `totals` est absent tant qu’elle
 n’est pas émise. Le dialogue d’émission n’affiche le total TTC que si ce même champ existe. Il peut
@@ -313,7 +311,7 @@ paramètre caché dans l’URL.
 
 #### P1.2 — Le responsive couvre une tablette, pas un téléphone
 
-> **Statut 05/09 :** still open (acceptation, pas implémentation) — Gardé **A11**, décision desktop+mobile prise. `docs/audit-ceo-readiness-2026-09-05.md` : rendu tactile échantillonné et sain, mais aucun parcours dédié saisie→soumission au format tactile promis (390×844) n’a encore couru. Hors périmètre de cette passe ; voir BUILD-PLAN Phase 10.
+> **Statut 05/09 :** still open (acceptation, pas implémentation) — Gardé **A11**, décision desktop+mobile prise. Relecture du 05/09/2026 : rendu tactile échantillonné et sain, mais aucun parcours dédié saisie→soumission au format tactile promis (390×844) n’a encore couru. Hors périmètre de cette passe ; voir BUILD-PLAN Phase 10.
 
 Le projet « mobile-shell » utilise 768 × 1024 px avec un profil desktop. Le tiroir de navigation est
 bien testé, mais les cartes restent sur trois colonnes, les blocs de facture sur deux colonnes, et
@@ -488,7 +486,7 @@ les dialogues après erreur et le défilement horizontal de la grille.
 
 > **Statut 05/09 :** cette section correspond au **Lot 3** de `docs/plan-densification.md` (L1-L6)
 > et à sa **§6.5/§6.7** exclues. Deux éléments sont **shipped** : 6.2 filiation interactive
-> (Gardé **A4**, « Keep this as a strong CEO demonstration moment » per l’audit CEO) et 6.4
+> (Gardé **A4**, que la relecture du 05/09/2026 retient comme un temps fort de la démonstration) et 6.4
 > glossaire contextuel (Gardé **B5**). Le reste (6.1, 6.3, 6.6 — Optionnel **O10/O2/O4**, non
 > engagés) reste **still open**, et 6.5/6.7 (bac à sable, assistant IA) sont **superseded par
 > décision explicite** : `CLAUDE.md` exclut désormais tout le Lot 3/Lot 4 d’une suite à cette passe
@@ -609,7 +607,7 @@ reste à faire et atteint l’action utile sans détour.
 
 > **Statut 05/09 :** décision prise (R2 : mobile supporté) et largement construit — Gardé **A11**
 > (chaîne consultant), **O5/O13** promus avec lui, **X2** (desktop-only) annulé.
-> `docs/audit-ceo-readiness-2026-09-05.md` a échantillonné un rendu tactile sain (profil iPhone 13, 390×664, sans
+> La relecture du 05/09/2026 a échantillonné un rendu tactile sain (profil iPhone 13, 390×664, sans
 > violation axe ni débordement), mais **aucun parcours dédié saisie → soumission tactile** (R1/R4,
 > 390×844) n’a encore couru — **still open**, hors périmètre de cette passe, avant l’acceptation du
 > 09/09 (BUILD-PLAN Phase 10).
