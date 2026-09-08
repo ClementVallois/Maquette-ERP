@@ -10,10 +10,9 @@ import { carries, forRoles } from '../personas/access.ts';
  * The pré-facturier's assembly (ADR-0053): for one month and one office, what is billable and, for
  * everything else, why not.
  *
- * Extracted from `web/routes.ts` in front-end plan Phase 5, which needed the same read for
- * `GET /api/v1/pre-facturier` and named the rule this obeys: "the compositions exist already ...
- * the endpoints reuse them, they do not reinvent them." The screen still owns the rendering
- * (`web/pages/pre-facturier.ts`); this owns the two module reads and the arithmetic between them.
+ * The screen owns the rendering (`web/pages/pre-facturier.ts`) and `GET /api/v1/pre-facturier`
+ * owns the transport; this owns the two module reads and the arithmetic between them, so both
+ * reuse one composition rather than each reinventing it.
  */
 
 export const DECIDES_CRA = forRoles('manager');
@@ -95,9 +94,8 @@ export interface PreFacturierComposition {
  * second, period-filtered query (ADR-0053), so what the dropdown offers never bounds what the table
  * shows.
  *
- * Module-private since Phase 9.3: the pré-facturier's own screen imported it directly to build the
- * Cra list's picker, and that screen is `apps/web`'s now — it reads the `offeredPeriods` field of
- * the composition below, like every other consumer.
+ * Module-private: every consumer reads the `offeredPeriods` field of the composition below
+ * rather than calling this.
  */
 function offeredPeriods(periods: readonly string[]): string[] {
   return [...new Set(periods)].sort((left, right) => right.localeCompare(left));

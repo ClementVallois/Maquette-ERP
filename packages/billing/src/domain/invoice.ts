@@ -50,11 +50,11 @@ export function billedParty(source: Client): BilledParty {
 }
 
 /**
- * Defensive-copy helpers (package 07, ADR-0108). `readonly` blocks a caller from *reassigning* a
+ * Defensive-copy helpers (ADR-0108). `readonly` blocks a caller from *reassigning* a
  * field without a cast, but a cast defeats that just as completely for a plain string field as it
  * does for a `Date`'s mutating method — `(invoice.billedTo.billingAddress as Mutable).line1 = 'x'`
- * needs no method call at all. The audit's "Done when" names addresses, line origins and VAT
- * treatments alongside timestamps, so every one of these — one level deep, no recursive framework,
+ * needs no method call at all. Addresses, line origins and VAT treatments are covered alongside
+ * timestamps, so every one of these — one level deep, no recursive framework,
  * because none of these types nest further than this — is copied at both the constructor and the
  * getter, exactly like `#lines`/`#validatedBy` already were.
  */
@@ -285,7 +285,7 @@ export class Invoice {
    * what is printed on a legal document is what was checked when it was issued.
    */
   get vatBreakdown(): readonly VatGroup[] {
-    // Copied (package 07): once issued, `#vatBreakdown` is the same array — and the same group
+    // Copied (ADR-0108): once issued, `#vatBreakdown` is the same array — and the same group
     // objects within it, `treatment` included — on every call. `vatBreakdownOf` below computes a
     // fresh, unaliased array before issuance, so only the frozen branch needs the copy.
     return this.#vatBreakdown === null
@@ -299,7 +299,7 @@ export class Invoice {
    * issued, and a total that recomputes is a total that can change.
    */
   get totals(): DocumentTotals {
-    // Copied (package 07): once issued, `#totals` is the same flat object on every call.
+    // Copied (ADR-0108): once issued, `#totals` is the same flat object on every call.
     // `totalsOf` below computes a fresh object before issuance, so only the frozen branch needs it.
     return this.#totals === null ? totalsOf(this.#lines) : { ...this.#totals };
   }
@@ -342,9 +342,8 @@ export class Invoice {
     const vatBreakdown = vatBreakdownOf(this.#lines);
 
     // The gate BUILD-RULES puts before a document leaves. Tautological here and not written for
-    // here — Phase 3 reconstructs a document from stored rows, where the totals are columns and
-    // the lines are another table, and the two can disagree. That is also when this ordering
-    // stops being theoretical.
+    // here: the repository reconstructs a document from stored rows, where the totals are columns
+    // and the lines are another table, and the two can disagree.
     assertDocumentAddsUp({
       id: this.#id,
       lines: this.#lines,

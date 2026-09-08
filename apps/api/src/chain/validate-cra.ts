@@ -23,11 +23,10 @@ import { inProcessEventBus } from './event-bus.ts';
  * The chain this repository exists to demonstrate, composed: a manager validates a month, and the
  * draft invoices appear — **in one transaction, or not at all**.
  *
- * The three pieces existed after Phase 3 and were tested in isolation; this is the caller Phase
- * 3's checkpoint named as owed to Phase 5. What makes the guarantee real is not this function but
- * `Transactionally`: every repository here is built over one checked-out client, so `billing`'s
- * write and `timesheet`'s write are the same transaction (ADR-0001), and the subscriber performs
- * no I/O outside it.
+ * What makes the guarantee real is not this function but `Transactionally`: every repository here
+ * is built over one checked-out client, so `billing`'s write and `timesheet`'s write are the same
+ * transaction (ADR-0001). The subscriber writes through that same client and performs no side
+ * effect outside it — no HTTP call, no queue publish, nothing a rollback could not undo.
  *
  * `billing` is still not imported by `timesheet`, and nothing here mocks either: the event goes
  * onto a bus, and the bus is what the drafting handler is subscribed to. That absence is the
@@ -129,10 +128,9 @@ export async function validateCraAndDraftInvoices(
         await unit.invoices.saveDraft(invoice, event.payload.craId);
       }
 
-      // `billing.declined_days` was created in Phase 3 and read by nothing until here: the days a
-      // validated Cra carried that produced no line, with the reason (ADR-0037). It is the
-      // blocking-reason column of the pré-facturier, and it is written in the same transaction as
-      // the invoices it explains the absence of.
+      // `billing.declined_days`: the days a validated Cra carried that produced no line, with
+      // the reason (ADR-0037). It is the blocking-reason column of the pré-facturier, and it is
+      // written in the same transaction as the invoices whose absence it explains.
       await unit.invoices.saveDeclinedDays(
         event.payload.officeId,
         result.declined.map((entry) => ({

@@ -1,8 +1,7 @@
 /**
- * Package 09 (P1 audit): `GET /api/v1/assignments`, `POST /api/v1/assignments`, and
- * `PUT /api/v1/assignments/:id` — the shape both `apps/api/src/staffing/assignment-admin.ts` and
- * `apps/web/src/features/affectations/types.ts` now share, moved verbatim from the SPA's own
- * hand-typed copy.
+ * `GET /api/v1/assignments`, `POST /api/v1/assignments`, and `PUT /api/v1/assignments/:id` — the
+ * shape both `apps/api/src/staffing/assignment-admin.ts` and
+ * `apps/web/src/features/affectations/types.ts` read from here, rather than each restating it.
  */
 export interface AssignmentInput {
   readonly consultantId: string;

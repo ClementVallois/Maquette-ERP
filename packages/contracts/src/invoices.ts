@@ -1,9 +1,7 @@
 /**
- * Package 09 (P1 audit): `Annexe A — Billing` — `GET /api/v1/invoices`, `GET /api/v1/invoices/:id`,
- * `GET /api/v1/invoices/history` and `POST /api/v1/invoices/:id/issuance`. The shape both
- * `apps/api/src/routes/invoices.ts` and `apps/web/src/features/factures/types.ts` now share,
- * moved verbatim from the SPA's own hand-typed copy (confirmed against the route handlers and the
- * domain types they compose, not guessed — see that file's own history before this move).
+ * Billing — `GET /api/v1/invoices`, `GET /api/v1/invoices/:id`, `GET /api/v1/invoices/history`
+ * and `POST /api/v1/invoices/:id/issuance`. The shape both `apps/api/src/routes/invoices.ts` and
+ * `apps/web/src/features/factures/types.ts` read from here, rather than each restating it.
  *
  * `InvoiceListItem` lives here, not with `cra` or `pre-facturier`: three responses project it
  * (this list, the pré-facturier, and the CRA validation response), and the resource that owns the

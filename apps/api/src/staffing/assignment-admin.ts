@@ -307,11 +307,11 @@ export async function updateAssignment(
   const refusal = await validateAssignment(client, actor, input, id);
   if (refusal !== null) return refusal;
 
-  // A recorded day is only at risk if this edit's own new range no longer covers it AND no
-  // *other* assignment on the same (consultant, mission) covers it either (package 05): the
-  // original query compared every recorded day only to this assignment's own new range, so a
-  // disjoint historical assignment on the same mission (e.g. January, still covering its own
-  // recorded days unchanged) blocked an edit to an unrelated one (e.g. July). Two assignments on
+  // A recorded day is only at risk if this edit's own new range does not cover it AND no *other*
+  // assignment on the same (consultant, mission) covers it either. Comparing each recorded day
+  // to this assignment's new range alone is not enough: a disjoint historical assignment on the
+  // same mission (January, still covering its own recorded days) would block an edit to an
+  // unrelated one (July). Two assignments on
   // the same mission cannot overlap in time (the overlap check above forbids it), so "another
   // assignment covers this day" and "this edit's own new range covers this day" are mutually
   // exclusive by construction — this query is still exactly the "would this day lose its only

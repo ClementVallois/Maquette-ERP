@@ -25,7 +25,6 @@ const PreFacturierParams = PeriodQuery.extend({
  * The declared-reason half of a Cra row's `blocking` (ADR-0037): a `notValidated` block already
  * has its own field on the row (`status`, `late`), so it is not repeated here as a string nobody
  * would parse back into those two facts — only a validated Cra's typed decline reasons are.
- * Package 14: moved here from `cra.ts`, its one real consumer — `cra.ts` itself never called it.
  */
 function blockingReasonsOf(row: CraRow): readonly DeclineReason[] {
   return row.blocking
@@ -76,9 +75,7 @@ export function registerPreFacturierRoutes(
             (total, row) => total + row.totalExcludingVatCents,
             0,
           ),
-          // Package 09, sub-step 4/4: named to match its own unit (quarter-days, what
-          // `frenchDays` takes directly) rather than the old `lateDays`, which Annexe A pinned
-          // and never matched what the field actually carried.
+          // Named for its own unit: quarter-days, what `frenchDays` takes directly.
           lateQuarterDays: composition.lateQuarterDays,
           craCount: composition.pagination.cras.total,
         },

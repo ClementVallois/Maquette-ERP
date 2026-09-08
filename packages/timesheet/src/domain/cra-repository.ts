@@ -36,8 +36,8 @@ export interface CraListQuery {
    */
   readonly period?: string;
   /**
-   * Item 7 (QA round 1): "for these three consultants, every CRA not yet validated" — both this
-   * field and `statuses` below narrow *within* whatever `actor` may already see; neither can
+   * "For these three consultants, every CRA not yet validated" — both this field and `statuses`
+   * below narrow *within* whatever `actor` may already see; neither can
    * widen it. The office boundary (and, for a consultant, the own-id boundary) is applied first
    * in the SQL, so a consultant id or a status outside the actor's scope answers an empty result,
    * never another office's row — `list` is filtered, not refused, and that holds here too.
@@ -47,7 +47,7 @@ export interface CraListQuery {
   readonly consultantIds?: readonly ConsultantId[];
   readonly statuses?: readonly CraStatus[];
   /**
-   * Item 4 (QA round 2): "a year and/or month filter", independent of `period` above and of each
+   * A year and/or month filter, independent of `period` above and of each
    * other — `year` alone narrows to every period in that calendar year, `month` alone to that
    * calendar month across every year, both together to the one `year-month` combination (the same
    * result `period` would give, reached a different way: a manager picking two dropdowns, not
@@ -58,8 +58,8 @@ export interface CraListQuery {
   readonly year?: number;
   readonly month?: number;
   /**
-   * Item 22, QA round 3: "every period strictly before this one" (`period < beforePeriod`,
-   * exclusive) — what the dashboard's "CRA en retard" deep link needs. Distinct from `year`/
+   * Every period strictly before this one (`period < beforePeriod`, exclusive) — what the
+   * dashboard's "CRA en retard" deep link needs. Distinct from `year`/
    * `month`: those match one calendar unit, this is an open-ended range with no lower bound, the
    * same shape the dashboard's own `lateCras` count already computes server-side
    * (`lastDayOf(period) < today` — equivalent to `period < currentPeriod` for any `today` inside
@@ -88,19 +88,19 @@ export interface CraRepository {
   /** Every distinct period visible to the actor, newest first; never derived from a page. */
   listPeriods(actor: Actor): Promise<readonly string[]>;
   /**
-   * Package 08: one consultant's own distinct refused periods, newest first — `listPeriods`'s
+   * One consultant's own distinct refused periods, newest first — `listPeriods`'s
    * own guarantee, narrowed to one consultant and the `refused` status, never derived from a
    * page. A `consultantId` outside `own` scope answers empty rather than raising (ADR-0003's
    * "filtered, not refused" — the same shape every list read already gives).
    */
   refusedPeriods(consultantId: ConsultantId, actor: Actor): Promise<readonly string[]>;
   /**
-   * Package 08: the N most recently status-changed Cras visible to the actor, newest first,
+   * The N most recently status-changed Cras visible to the actor, newest first,
    * sorted and limited in SQL — never a page's own first N rows re-sorted in the application.
    */
   recentActivity(actor: Actor, limit: number): Promise<readonly CraListItem[]>;
   /**
-   * Package 08: the N oldest-submitted Cras awaiting a decision, visible to the actor, sorted
+   * The N oldest-submitted Cras awaiting a decision, visible to the actor, sorted
    * and limited in SQL for the same reason as `recentActivity`.
    */
   awaitingDecision(actor: Actor, limit: number): Promise<readonly CraListItem[]>;

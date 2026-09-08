@@ -33,9 +33,9 @@ function isPgUniqueViolation(error: unknown, constraintName: string): boolean {
 }
 
 /**
- * 200, not 50 (ADR-0081, item 6/step 3 QA round 1) — this repository's own cap, raised past the
- * realistic worst case item 6's roster expansion actually measured (Paris, 65 Cras in one
- * office). Raised **here**, not only in `apps/api/src/routes/api.ts`'s `CraListParams`: a route
+ * 200, not 50 (ADR-0081) — this repository's own cap, sized past the realistic worst case the
+ * seeded roster actually measures (Paris, 65 Cras in one office). Enforced **here**, not only in
+ * the route's own `CraListParams`: a route
  * cap the repository's own `Math.min` still narrows behind is not a fix, it is a cap that looks
  * raised and silently isn't. `PgInvoiceRepository`'s own `MAX_PAGE_SIZE` is untouched — a
  * different file, a different constant, deliberately not shared, so this change cannot loosen the
@@ -186,7 +186,7 @@ export class PgCraRepository implements CraRepository {
       //
       // `c.office_id = $1` (and, for a consultant, `$2`) runs first and unconditionally — `$6`
       // (consultantIds) and `$7` (statuses) are ANDed onto it, never substituted for it, so
-      // neither can widen what the actor may see, only narrow it further (item 7, QA round 1).
+      // neither can widen what the actor may see, only narrow it further.
       `${CRA_LIST_SELECT}
        WHERE c.office_id = $1
          AND ($2::text IS NULL OR c.consultant_id = $2)
@@ -211,12 +211,12 @@ export class PgCraRepository implements CraRepository {
           : null,
         query.statuses !== undefined && query.statuses.length > 0 ? query.statuses : null,
         // `period` is `YYYY-MM` text (migration 002's own comment) — `left`/`right` on that
-        // string is what item 4 (QA round 2)'s year-alone/month-alone filtering needs, cheaper
-        // than a real date type this column was never given. Zero-padded to two digits: `period`
+        // string is what the year-alone/month-alone filtering needs, cheaper than a real date
+        // type this column was never given. Zero-padded to two digits: `period`
         // itself always is, and an unpadded '6' would never match `right(c.period, 2)`'s '06'.
         query.year === undefined ? null : String(query.year),
         query.month === undefined ? null : String(query.month).padStart(2, '0'),
-        // Item 22, QA round 3: plain text comparison — `period` sorts lexically the same as
+        // Plain text comparison — `period` sorts lexically the same as
         // chronologically for `YYYY-MM` text, same reasoning `routes/_shell/pre-facturier.tsx`'s
         // own `localeCompare` on this column already relies on.
         query.beforePeriod ?? null,
@@ -281,7 +281,7 @@ export class PgCraRepository implements CraRepository {
   }
 
   /**
-   * Package 08: the consultant's own distinct refused periods, never derived from a page —
+   * The consultant's own distinct refused periods, never derived from a page —
    * `listPeriods`'s own reasoning, narrowed to one consultant and one status. `own` scope
    * requires `consultantId` to be the actor's own; a manager or billing actor asking about
    * someone else answers an empty result rather than raising, the same "filtered, not refused"
@@ -304,9 +304,8 @@ export class PgCraRepository implements CraRepository {
   }
 
   /**
-   * Package 08: the dashboard's "recent activity" feed, sorted and limited in SQL rather than
-   * sliced from `list`'s own page — the fix for the audit's "manager counts... derived from
-   * those pages" finding applied to a queue rather than a count.
+   * The dashboard's "recent activity" feed, sorted and limited in SQL rather than sliced from
+   * `list`'s own page, which would only ever see the rows that page happened to hold.
    */
   async recentActivity(actor: Actor, limit: number): Promise<readonly CraListItem[]> {
     const scope = readScope(actor, 'cra');
@@ -332,9 +331,8 @@ export class PgCraRepository implements CraRepository {
   }
 
   /**
-   * Package 08: the manager's "awaiting a decision" queue, oldest first, sorted and limited in
-   * SQL — the same fix as `recentActivity`, for the other list the dashboard used to slice off
-   * a 200-row page rather than the whole office.
+   * The manager's "awaiting a decision" queue, oldest first, sorted and limited in SQL — the
+   * same reasoning as `recentActivity`, over the whole office rather than one page of it.
    */
   async awaitingDecision(actor: Actor, limit: number): Promise<readonly CraListItem[]> {
     const scope = readScope(actor, 'cra');
@@ -504,11 +502,8 @@ function toCraListItem(row: CraListRow): CraListItem {
     period: row.period,
     // The `crm.status` column carries a `CHECK (status IN (...))` matching `CraStatus` exactly
     // (migration 002) — `pg` still hands every column back as `string`, so this is the one place
-    // that narrows it back to the domain's own union. Package 14: this replaced a wider
-    // `CraListItem.status: string` that made every reader re-derive the same narrowing (API's own
-    // `craRowStatus`, `dashboard.ts`'s `craActivityStatus`) — moving the cast here let those
-    // call-site casts delete themselves; `pnpm run -s typecheck` cascading no further than this
-    // one row mapper is what confirmed the column, not the interface, was the only place lying.
+    // that narrows it back to the domain's own union. Narrowing here rather than in
+    // `CraListItem.status` is what keeps every reader from re-deriving the same cast.
     status: row.status as CraStatus,
     // `::int` in the query rather than a string-to-integer helper here: `SUM` is `bigint` and
     // `pg` hands a `bigint` back as a string, while an `int` arrives as a number. A month of

@@ -1,7 +1,7 @@
 /**
- * Package 09 (P1 audit): `GET /api/v1/consultants/:id/economics?period=` — the shape both
+ * `GET /api/v1/consultants/:id/economics?period=` — the shape both
  * `apps/api/src/economics/consultant-economics.ts` and `apps/web/src/features/marge/types.ts`
- * now share, moved verbatim from the SPA's own hand-typed copy.
+ * read from here, rather than each restating it.
  *
  * `Cjm`, `Tjm` and margin live **only** in the `marge` feature on the SPA side (BUILD-RULES §
  * Authorization, "never in a list") — moving their shape here does not relax that: nothing else

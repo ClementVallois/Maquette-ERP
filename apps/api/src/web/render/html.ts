@@ -24,18 +24,17 @@ export class UnsafeMarkupError extends TechnicalFailure {
  * is not one — `instanceof` is a real check here, and `html` refuses anything that fails it rather
  * than calling `toString()` on it.
  *
- * `of`/`read`/`render`/`tag` are `private static`, not merely `@internal`-commented (package 13 of
- * the cleanup audit: the comment was never enforced — `Html.of` was a public static member any
- * caller in the repository could call directly, constructing raw, unescaped markup while
- * bypassing `trustedMarkup`'s own reason-required gate entirely, and no test caught it because
- * none had ever tried). TypeScript's `private` restricts access to *this class's own members*,
+ * `of`/`read`/`render`/`tag` are `private static`, not merely `@internal`-commented (ADR-0114): a
+ * comment is not enforced, and a public static `Html.of` lets any caller construct raw, unescaped
+ * markup while bypassing `trustedMarkup`'s reason-required gate.
+ * TypeScript's `private` restricts access to *this class's own members*,
  * not merely this file — confirmed empirically (a throwaway same-file top-level function calling
  * a `private static` member fails to typecheck with TS2341) — which is why `render` and the `html`
  * tag below are themselves static methods now, rather than free functions reaching into the class
  * from outside it: there is no other way to make the restriction real rather than photographic.
  * `trustedMarkup` and `html` (exported below, unchanged in name and signature) are still the only
  * two ways anything outside this file can obtain an `Html` — they are now thin delegates to
- * `Html.trustedMarkup`/`Html.tag`, which is where the logic that used to be theirs now lives.
+ * `Html.trustedMarkup`/`Html.tag`, which hold the logic.
  */
 export class Html {
   readonly #markup: string;

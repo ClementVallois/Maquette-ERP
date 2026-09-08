@@ -119,9 +119,10 @@ export function draftInvoicesFrom(
 }
 
 /**
- * Subscribes `billing` to the fact `timesheet` publishes. The handler performs no I/O: it drafts
- * and hands the result to the caller, which is what lets it run inside the emitter's transaction
- * (ADR-0001). The day it needs to write, an outbox is required — that is the threshold.
+ * Subscribes `billing` to the fact `timesheet` publishes. This handler performs no I/O of its
+ * own: it drafts and hands the result to `drafted`, which is the composition root's callback and
+ * the only thing that persists anything — through the emitter's own transaction (ADR-0001). The
+ * day a subscriber needs a side effect *outside* that transaction, an outbox is required.
  */
 export function onTimesheetValidated(
   dependencies: DraftInvoicesDependencies,

@@ -85,9 +85,9 @@ export function totalsOf(lines: readonly InvoiceLine[]): DocumentTotals {
  * `total TTC = total HT + Σ VAT per rate`. A mismatch is a typed refusal, not a log line.
  *
  * On a document whose totals were just computed from its own lines this is tautological, and it is
- * not written for that case. It is written for the one Phase 3 creates: a document **reconstructed
- * from stored rows**, where the totals are columns and the lines are another table, and where the
- * two can disagree. Running it at issuance as well is what keeps it exercised until then.
+ * not written for that case. It is written for the document the repository **reconstructs from
+ * stored rows**, where the totals are columns and the lines are another table, and where the two
+ * can disagree. Running it at issuance as well is what keeps it exercised on every path.
  */
 export function assertDocumentAddsUp(document: AccountableDocument): void {
   const lineSum = document.lines.reduce((sum, line) => sum + line.amountCents, 0);

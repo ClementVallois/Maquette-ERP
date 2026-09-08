@@ -58,32 +58,31 @@ const CommaSeparatedStatuses = z
   .pipe(z.array(z.enum(CRA_STATUSES)).optional());
 
 /**
- * Item 4 (QA round 2): "a year and/or month filter" — the month half. `YearQuery` (`./schemas.ts`)
- * is shared with `invoices.ts`; this half has only this one consumer.
+ * The month half of the year/month filter. `YearQuery` (`./schemas.ts`) is shared with
+ * `invoices.ts`; this half has only this one consumer.
  */
 const MonthQuery = z.coerce.number().int().min(1).max(12).optional();
 
 /**
- * Item 7 (QA round 1): "for these three consultants, every CRA not yet validated" — both
- * dimensions, non-exclusive within themselves (an id/status list is an OR) and ANDed with each
- * other, pushed to the domain's `CraListQuery` (`packages/timesheet`) so item 6's larger office
- * rosters filter server-side rather than over a page truncated by `limit`/`offset` first.
+ * "For these three consultants, every CRA not yet validated" — both dimensions, non-exclusive
+ * within themselves (an id/status list is an OR) and ANDed with each other, pushed to the domain's
+ * `CraListQuery` (`packages/timesheet`) so a large office roster filters server-side rather than
+ * over a page `limit`/`offset` truncated first.
  */
 const CraListParams = Pagination.extend({
   // `limit` overrides the base schema's field, at `CRA_LIST_MAX_PAGE_SIZE` rather than
   // `MAX_PAGE_SIZE` — this route's own cap, ADR-0081.
   limit: z.coerce.number().int().min(1).max(CRA_LIST_MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
-  // No exact `period`: unlike `/api/v1/pre-facturier`, this route has never taken one, and item 7
-  // did not ask for one either (the CRA list already shows every period at once, with its own
-  // `period` column) — `year`/`month` below (item 4, QA round 2) narrow *within* that same
-  // always-every-period list, they do not add a single-period mode back.
+  // No exact `period`: unlike `/api/v1/pre-facturier`, this route does not take one — the CRA
+  // list shows every period at once, with its own `period` column. `year`/`month` below narrow
+  // *within* that always-every-period list; they do not add a single-period mode.
   consultantIds: CommaSeparatedIds,
   statuses: CommaSeparatedStatuses,
   year: YearQuery,
   month: MonthQuery,
-  // Item 22, QA round 3: the dashboard's "CRA en retard" deep link — every period strictly
-  // before this one, matching `lateCras`' own `lastDayOf(period) < today` (`CraListQuery`'s own
-  // doc comment, `packages/timesheet`, has the equivalence).
+  // The dashboard's "CRA en retard" deep link — every period strictly before this one, matching
+  // `lateCras`' own `lastDayOf(period) < today` (`CraListQuery`'s doc comment, `packages/timesheet`,
+  // has the equivalence).
   beforePeriod: z
     .string()
     .regex(/^\d{4}-(0[1-9]|1[0-2])$/u)
@@ -138,12 +137,10 @@ const RefusalBody = z.object({ reason: z.string().min(1).max(500) });
  * own domain constructor (`craLine`, `packages/timesheet/src/domain/cra-line.ts`) enforces one to
  * four at construction, but nothing in `QuarterDays` itself can say so — unlike `CraStatus`/
  * `InvoiceStatus`, this is not a repository leaking a narrower type back to `string`; it is one
- * genuinely wider type reused in two contexts. Package 14's own audit named this cast as one of
- * five to reconsider: `craRowStatus`, `invoiceRowStatus`, `craActivityStatus` and
- * `invoiceActivityStatus` all turned out to be dead (deleted here and in `dashboard.ts`/
- * `invoices.ts`/`pre-facturier.ts` — `CraListItem.status`/`InvoiceListItem.status`/
- * `InvoiceYearStatusCount.status` now carry their real domain union, narrowed once at the
- * PostgreSQL row mapper that is the actual source of the widening). This one stays: narrowing it
+ * genuinely wider type reused in two contexts. The status casts this file once needed are gone:
+ * `CraListItem.status`, `InvoiceListItem.status` and `InvoiceYearStatusCount.status` carry their
+ * real domain union, narrowed once at the PostgreSQL row mapper that is the source of the
+ * widening. This one stays: narrowing it
  * would need a distinct `1 | 2 | 3 | 4` type split off from the aggregate `QuarterDays`, which is
  * a real domain-modelling decision, not a call-site cleanup — out of this package's scope.
  */
@@ -151,7 +148,7 @@ function craLineQuarterDays(quarterDays: number): 1 | 2 | 3 | 4 {
   return quarterDays as 1 | 2 | 3 | 4;
 }
 
-/** Every day of the month, workable or not — the calendar half of front-end plan Phase 5.2's grid read. */
+/** Every day of the month, workable or not — the calendar half of the grid read. */
 function gridDaysSkeleton(periodIso: string): GridDay[] {
   const calendar = workingCalendar();
 
@@ -220,9 +217,8 @@ export function registerCraRoutes(app: FastifyInstance, dependencies: ServerDepe
    * read at all — it exists so `/cra`'s month picker can offer exactly the months
    * `workingCalendar()` can answer about, instead of a hard-coded upper bound the calendar itself
    * would silently outgrow. Every connected role may ask; the answer carries nothing scoped to an
-   * office or a consultant. Package 14: moved here from `pre-facturier.ts`, its actual and only
-   * consumer today (`apps/web/src/lib/calendar.ts`, read by the CRA list/year filter) — it was
-   * never a pré-facturier concern, only placed in that file historically.
+   * office or a consultant. It lives here rather than with the pré-facturier because its only
+   * consumer is `apps/web/src/lib/calendar.ts`, read by the CRA list and its year filter.
    */
   app.get(
     '/api/v1/calendar',
@@ -231,16 +227,15 @@ export function registerCraRoutes(app: FastifyInstance, dependencies: ServerDepe
   );
 
   /**
-   * Item 7 (QA round 1): the consultant filter's own option list, independent of `/api/v1/cras`'
-   * page — a manager's office can hold more Cra rows than one page (item 6 grows a roster past
-   * fifty), so deriving "who can I filter by" from whichever page happens to be loaded would make
+   * The consultant filter's own option list, independent of `/api/v1/cras`' page — a manager's
+   * office holds more Cra rows than one page, so deriving "who can I filter by" from whichever
+   * page happens to be loaded would make
    * the picker's own options depend on which filter is already applied. Manager only, matching
    * the one caller (`features/cra/components/cra-list-screen.tsx`'s `CraListFilters`, manager-only
    * itself): billing sees `/api/v1/cras` too, but that screen renders neither a consultant column
    * nor an "Ouvrir" action for that role, so this filter has nothing on screen for billing to
-   * narrow down yet — granting the read anyway would be capability nothing exercises. Package 14:
-   * moved here from `pre-facturier.ts`, its actual and only consumer (`features/cra/api.ts`) —
-   * the pré-facturier screen never called it.
+   * narrow down yet — granting the read anyway would be capability nothing exercises. It lives
+   * here rather than with the pré-facturier because `features/cra/api.ts` is its only caller.
    */
   app.get('/api/v1/consultants', { config: { access: forRoles('manager') } }, async (request) => {
     const actor = requireActor(request);
@@ -264,7 +259,7 @@ export function registerCraRoutes(app: FastifyInstance, dependencies: ServerDepe
 
       // Filtered, not refused: a consultant sees their own months, a manager the office's. The
       // empty state is ADR-0003's first beat and it is what this route can answer.
-      // `consultantIds`/`statuses` (item 7, QA round 1) narrow within that same filtering — never
+      // `consultantIds`/`statuses` narrow within that same filtering — never
       // widen it, the repository's own contract (`CraListQuery`'s header, `packages/timesheet`).
       return dependencies.transactionally(async (unit) => {
         const filters = {

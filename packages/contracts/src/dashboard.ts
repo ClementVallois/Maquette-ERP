@@ -1,9 +1,7 @@
 /**
- * Package 09 (P1 audit): `GET /api/v1/dashboard?period=` and `GET /api/v1/org-chart` — the shape
- * both `apps/api/src/routes/dashboard.ts` and `apps/web/src/features/dashboard/types.ts` now
- * share, moved here verbatim from the SPA's own hand-typed copy (confirmed against the handler
- * and a live call, not guessed — see that file's own history before this move). `apps/web`'s
- * `types.ts` re-exports these rather than restating them.
+ * `GET /api/v1/dashboard?period=` and `GET /api/v1/org-chart` — the shape both
+ * `apps/api/src/routes/dashboard.ts` and `apps/web/src/features/dashboard/types.ts` read from
+ * here. `apps/web`'s `types.ts` re-exports these rather than restating them.
  */
 
 /**
@@ -53,8 +51,8 @@ export interface ManagerQueueRow {
 }
 
 /**
- * Item 3, QA round 5 (ADR-0098): how many of the manager's own office's current consultants are
- * staffed on a client mission versus sitting in `Intercontrat` **today** — not scoped to `period`
+ * How many of the manager's own office's current consultants are staffed on a client mission
+ * versus sitting in `Intercontrat` **today** (ADR-0098) — not scoped to `period`
  * above, which is why it is its own field rather than folded into the figures that are.
  */
 export interface ManagerStaffing {
@@ -104,7 +102,7 @@ export interface BillingDashboard {
 
 export type DashboardResponse = ConsultantDashboard | ManagerDashboard | BillingDashboard;
 
-/** Item 18, QA round 3 — `GET /api/v1/org-chart`. One org-chart neighbour. */
+/** `GET /api/v1/org-chart`. One org-chart neighbour. */
 export interface OrgChartMember {
   readonly id: string;
   readonly displayName: string;

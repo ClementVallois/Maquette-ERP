@@ -64,7 +64,7 @@ export function buildServer(
   });
 
   app.setNotFoundHandler((request, reply) => {
-    // The SPA fallback (ADR-0063, front-end plan Phase 9.1): every screen navigation that isn't
+    // The SPA fallback (ADR-0063): every screen navigation that isn't
     // `/api/*`, an asset, or one of the two printable routes (matched by their own registration,
     // so they never reach here) answers `index.html` instead of this application's own 404 page,
     // and the client-side router takes it from there. `serveSpaShellOrNull` returns `null` when

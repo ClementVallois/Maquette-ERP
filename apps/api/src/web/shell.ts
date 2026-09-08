@@ -17,8 +17,8 @@ import { html, type Html } from './render/html.ts';
  * Shape matches `apps/web`'s own topbar (`direction-visuelle.md` §6, `components/shell/topbar.tsx`)
  * rather than inventing a second one: a single 56px bar, the page's own crumb and title on the
  * left, the persona block on the right. There is no second navigation row here any more — this
- * chrome now serves only the two printables (ADR-0055, ADR-0056), and the SPA's own sidebar is
- * where a role's navigation lives since front-end plan Phase 9.3.
+ * chrome serves only the two printables (ADR-0055, ADR-0056); a role's navigation lives in the
+ * SPA's own sidebar.
  */
 
 export interface Chrome {

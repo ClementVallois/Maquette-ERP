@@ -13,9 +13,8 @@ import { notFound, PeriodQuery } from './schemas.ts';
 const ConsultantParams = z.object({ consultantId: z.string().min(1).max(64) });
 
 /**
- * Package 14: split out of `pre-facturier.ts`, where the economics endpoint had been registered
- * historically despite belonging to neither that resource nor any other existing file — its own
- * and only real caller is `apps/web/src/features/marge/api.ts`.
+ * Its own registrar rather than a corner of `pre-facturier.ts`: the economics endpoint belongs to
+ * neither that resource nor any other, and its only caller is `apps/web/src/features/marge/api.ts`.
  */
 export function registerEconomicsRoutes(
   app: FastifyInstance,

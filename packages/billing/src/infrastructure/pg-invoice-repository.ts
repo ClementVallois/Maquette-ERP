@@ -217,7 +217,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
     return exactInteger('count', rows[0]!.count);
   }
 
-  /** Package 08: `count`'s own filter, summed instead of counted — one row, however large. */
+  /** `count`'s own filter, summed instead of counted — one row, however large. */
   async sumTtcCents(query: Omit<InvoiceListQuery, 'limit' | 'offset'>): Promise<number> {
     const { actor } = query;
 
@@ -279,7 +279,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
     return exactInteger('sum', rows[0]!.sum ?? '0');
   }
 
-  /** Package 08: never derived from a page — `PgCraRepository.listPeriods`'s own guarantee. */
+  /** Never derived from a page — `PgCraRepository.listPeriods`'s own guarantee. */
   async listPeriods(actor: Actor): Promise<readonly string[]> {
     if (readScope(actor, 'invoice') === 'none') return [];
 
@@ -295,9 +295,9 @@ export class PgInvoiceRepository implements InvoiceRepository {
   }
 
   /**
-   * Package 08: the oldest drafts across every period, sorted and limited in SQL — the defect
-   * the audit reproduced by name (a page ordered newest-first, filtered and re-sorted after the
-   * cap already dropped the true oldest rows). A dedicated `SELECT` rather than
+   * The oldest drafts across every period, sorted and limited in SQL: a page ordered
+   * newest-first, filtered and re-sorted afterwards, has already dropped the true oldest rows at
+   * the cap. A dedicated `SELECT` rather than
    * `INVOICE_LIST_SELECT`, which also backs `list`/`findDraftedFrom`/`findIssuedWithKey`, none of
    * which need `source_cra_ids[1]` — Postgres's 1-based first element, `NULL` on the empty array
    * `text[] NOT NULL DEFAULT '{}'` (migration 003) guarantees, matching `sourceCraId`'s `| null`.
@@ -337,7 +337,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
     }));
   }
 
-  /** Package 08: the most recently issued invoices, sorted and limited in SQL. */
+  /** The most recently issued invoices, sorted and limited in SQL. */
   async recentIssued(actor: Actor, limit: number): Promise<readonly InvoiceListItem[]> {
     if (readScope(actor, 'invoice') === 'none') return [];
 
@@ -537,7 +537,8 @@ export class PgInvoiceRepository implements InvoiceRepository {
         total_tax_cents = EXCLUDED.total_tax_cents,
         total_ttc_cents = EXCLUDED.total_ttc_cents,
         -- COALESCE, not EXCLUDED: a later re-save carries no key and must not erase the one the
-        -- issuance wrote. source_cra_ids learned the same lesson in Phase 3, by being erased.
+        -- issuance wrote. source_cra_ids solves the same problem by staying out of this list
+        -- entirely -- see the comment above #upsertInvoice.
         issuance_idempotency_key = COALESCE(
           EXCLUDED.issuance_idempotency_key, billing.invoices.issuance_idempotency_key)
         -- seller_* and billed_to_* are deliberately absent from this list, same reasoning as
@@ -881,9 +882,8 @@ interface InvoiceRow {
 function toListItem(row: InvoiceListRow): InvoiceListItem {
   return {
     id: row.id as InvoiceId,
-    // Same narrowing as `toInvoice` (line 683) at the true SQL boundary, so `InvoiceListItem`
-    // could carry the domain's own union instead of the wider `string` every reader used to
-    // re-derive — package 14's discriminator confirmed the column, not the interface, was lying.
+    // Same narrowing as `toInvoice` at the true SQL boundary, so `InvoiceListItem` carries the
+    // domain's own union rather than the wider `string` every reader would otherwise re-derive.
     status: row.status as InvoiceStatus,
     supplyPeriod: row.supply_period,
     billedToName: row.billed_to_name,

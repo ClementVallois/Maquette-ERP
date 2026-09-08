@@ -27,7 +27,7 @@ const SelectPersona = z.object({ key: z.string().min(1).max(64) });
 const NOT_FOUND = 404;
 
 /**
- * Package 09: typed against `@erp/contracts`' `PersonaSummary`, not `Record<string, string>` —
+ * Typed against `@erp/contracts`' `PersonaSummary`, not `Record<string, string>` —
  * a field renamed or removed on either end now fails a type check instead of surfacing at runtime
  * only, on the SPA side, once a component reads a key that stopped existing.
  */

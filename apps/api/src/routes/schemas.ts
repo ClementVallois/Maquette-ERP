@@ -5,12 +5,10 @@ import { z } from 'zod';
 import { contextOf } from '../http/reply.ts';
 
 /**
- * Package 14: this file now holds only what is genuinely common across resource route files —
- * pagination bounds, a shared query shape, and the two HTTP-shaped helpers (`notFound`, the
- * status constants) any resource's error responses reach for. Everything that validated one
- * resource's own input — `CraListParams`, `MonthEntries`, `InvoiceListParams`, `AssignmentBody`,
- * `PreFacturierParams`, `ConsultantParams`, `assignmentRefusal` and their private helpers — moved
- * next to the route file that is their one real consumer, per the audit's own rule ("keep
+ * This file holds only what is genuinely common across resource route files — pagination bounds,
+ * a shared query shape, and the two HTTP-shaped helpers (`notFound`, the status constants) any
+ * resource's error responses reach for. A schema that validates one resource's own input lives
+ * next to the route file that consumes it, not here ("keep
  * resource-specific schemas next to their routes; share only genuinely common input schemas and
  * HTTP helpers"). The discriminator used throughout: a schema imported by exactly one resource
  * file moved into it; one imported by two or more, or built from a constant two or more resource
@@ -39,11 +37,11 @@ export const Pagination = z.object({
 });
 
 /**
- * `GET /api/v1/cras`'s own cap (ADR-0081, item 6/step 3, QA round 1) — deliberately **not**
- * `MAX_PAGE_SIZE` above, which `/api/v1/invoices` and every other list in this file also share:
- * raising the shared constant would have raised theirs too, unmeasured. Item 6's own roster
- * expansion measured a real worst case — Paris, 65 Cras in one office once the dense months and
- * the sparse 2016 history exist (`docs/adr/0080-…`) — and this cap clears it with headroom for
+ * `GET /api/v1/cras`'s own cap (ADR-0081) — deliberately **not** `MAX_PAGE_SIZE` above, which
+ * `/api/v1/invoices` and every other list in this file share: raising the shared constant would
+ * raise theirs too, unmeasured. The seeded worst case is Paris, 65 Cras in one office once the
+ * dense months and the sparse 2016 history exist (`docs/adr/0080-…`); this cap clears it with
+ * headroom for
  * organic growth rather than merely matching it. `MAX_PAGE_SIZE` is still the hard ceiling
  * BUILD-RULES asks for ("no 'show all'"): 200 is a fixed number, not `Infinity`, and a caller who
  * asks for more still gets refused by `Pagination`'s own `.max()` shape, reproduced here at a
@@ -56,7 +54,7 @@ export const CRA_LIST_MAX_PAGE_SIZE = 200;
 export const PeriodQuery = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u) });
 
 /**
- * Item 4 (QA round 2): "a year and/or month filter" — the year half. Shared by `cra.ts`'s
+ * The year half of the year/month filter. Shared by `cra.ts`'s
  * `CraListParams` and `invoices.ts`'s `InvoiceListParams`, which both filter on the four-digit
  * prefix of a `YYYY-MM` text period column (migration 002's own comment on why it is text, not a
  * date) under the identical bounds; the month half (`MonthQuery`) has only the one CRA consumer

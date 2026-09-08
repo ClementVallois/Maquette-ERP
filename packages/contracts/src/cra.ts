@@ -2,10 +2,8 @@ import type { InvoiceListItem } from './invoices.ts';
 import type { DeclineReason } from './pre-facturier.ts';
 
 /**
- * Package 09 (P1 audit): `Annexe A — Timesheet` — the shape both `apps/api/src/routes/cra.ts` and
- * `apps/web/src/features/cra/types.ts` now share, moved verbatim from the SPA's own hand-typed
- * copy (confirmed against the route handlers themselves, not guessed — see that file's own
- * history before this move).
+ * Timesheet — the shape both `apps/api/src/routes/cra.ts` and `apps/web/src/features/cra/types.ts`
+ * read from here, rather than each restating it.
  */
 export type CraStatus = 'draft' | 'submitted' | 'refused' | 'validated';
 
@@ -34,7 +32,7 @@ export interface CraListResponse {
   readonly offset: number;
 }
 
-/** `GET /api/v1/consultants` (item 7, QA round 1) — a manager's own office roster, consultants
+/** `GET /api/v1/consultants` — a manager's own office roster, consultants
  * only (never the manager asking, never another office). Manager alone: ADR-0077 rejects granting
  * it to a billing persona, and `api.int.test.ts` asserts the 403. */
 export interface ConsultantRosterResponse {

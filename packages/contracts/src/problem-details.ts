@@ -30,7 +30,7 @@ export interface ProblemDetails {
 }
 
 /**
- * Package 09: the runtime half of `ProblemDetails` above — kept next to it so a field added to
+ * The runtime half of `ProblemDetails` above — kept next to it so a field added to
  * one is visible beside the other. A non-2xx response with `Content-Type: application/
  * problem+json` is not, on its own, proof the body is a `ProblemDetails`: an intermediary proxy
  * (or a future route that gets the header right and the body wrong) can send that content type
@@ -55,9 +55,8 @@ export const problemDetailsSchema = z.object({
  * its own `problemType` (ADR-0016) and never appears here; everything below is a fact about the
  * request rather than about the business, which is exactly why the modules cannot name them.
  *
- * These were four absolute `https://erp.internal/...` URIs until Phase 5, which contradicted
- * ADR-0016's "written as a relative URI reference" and duplicated identifiers the domain already
- * published under its own names.
+ * Relative URI references, per ADR-0016 — never absolute `https://erp.internal/...` URIs, which
+ * would duplicate identifiers the domain already publishes under its own names.
  */
 export const API_PROBLEM_TYPES = {
   /** The request does not parse, or does not match the shape the route accepts. */

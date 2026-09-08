@@ -1,8 +1,7 @@
 /**
- * Package 09 (P1 audit): `GET /api/v1/pre-facturier?period=` — the shape both
- * `apps/api/src/routes/pre-facturier.ts` and `apps/web/src/features/pre-facturier/types.ts` now
- * share, moved verbatim from the SPA's own hand-typed copy (confirmed against the route and the
- * composition it reads, not guessed — see that file's own history before this move).
+ * `GET /api/v1/pre-facturier?period=` — the shape both
+ * `apps/api/src/routes/pre-facturier.ts` and `apps/web/src/features/pre-facturier/types.ts` read
+ * from here, rather than each restating it.
  *
  * `DeclineReason` is repeated as a literal here rather than imported from `@erp/billing`, the
  * same reasoning `DashboardCraStatus` already gives (`dashboard.ts`'s own header): a shared
@@ -13,12 +12,9 @@ export type DeclineReason = 'notRegie' | 'unknownMission' | 'noAgreedRate' | 'un
 export interface PreFacturierSummary {
   readonly billableCents: number;
   /**
-   * Package 09 (P1 audit), sub-step 4/4: named `lateQuarterDays`, not `lateDays` — the field
-   * always carried quarter-days (`frenchDays` takes it directly, never divided by four), and the
-   * old name was the misleading one the audit asked to be coordinated with its only client
-   * rather than kept forever. Same unit as `composition.lateQuarterDays`
-   * (`apps/api/src/composition/pre-facturier.ts`), which this field has always mirrored — the
-   * rename makes the two names agree, not just the two values.
+   * `lateQuarterDays`, not `lateDays`: the field carries quarter-days and `frenchDays` takes it
+   * directly, never divided by four. Same unit and same name as `composition.lateQuarterDays`
+   * (`apps/api/src/composition/pre-facturier.ts`), which it mirrors.
    */
   readonly lateQuarterDays: number;
   readonly craCount: number;

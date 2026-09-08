@@ -61,7 +61,7 @@ function copyRefusal(refusal: CraRefusal | null): CraRefusal | null {
 
 /**
  * `CraLine` holds only strings and a number — no mutating method to reach the way `Date` has one
- * — but a cast still defeats `readonly` by reassigning a field directly (package 07, ADR-0108):
+ * — but a cast still defeats `readonly` by reassigning a field directly (ADR-0108):
  * `(cra.lines[0] as { quarterDays: number }).quarterDays = 4` needs no method call at all. A
  * shallow copy is enough because `CraLine` nests nothing further.
  */

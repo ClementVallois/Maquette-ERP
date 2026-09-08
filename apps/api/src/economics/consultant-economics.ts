@@ -11,11 +11,10 @@ import type { PgReadClient } from '../persistence/pg-client.ts';
  * The progressive-disclosure control of BUILD-PLAN 5.3: `Tjm`, `Cjm` and margin are served **only**
  * here, by a dedicated single-record read, and every access is logged.
  *
- * The control is the extra request, not the secrecy. `Cjm`, `Tjm` and margin are already absent
- * from every list projection (ADR-0003) — the asset being protected is the aggregate, so what has
- * to be expensive is collecting eight hundred of them, not reading one. One round trip per
- * consultant is half a second for a legitimate reveal and prohibitive for a scrape, and the log
- * line is what makes the scrape attributable afterwards.
+ * The control is attribution, not secrecy, and it is deliberately not a rate limit. `Cjm`, `Tjm`
+ * and margin are absent from every list projection (ADR-0003), so there is no bulk read to take:
+ * collecting the whole office means one identified, logged request per consultant. That does not
+ * make a scrape impossible — it makes it leave a per-consultant trail naming who asked and when.
  *
  * Why it lives at the composition root and in neither module (ADR-0043): margin has two terms and
  * they belong to different owners. `Tjm` is a commercial term of a mission, which is `billing`'s

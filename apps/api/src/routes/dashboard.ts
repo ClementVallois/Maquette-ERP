@@ -24,13 +24,12 @@ export function registerDashboardRoutes(
   dependencies: ServerDependencies,
 ): void {
   /**
-   * Item 18, QA round 3: the dashboard's org-chart panel — a consultant's own manager (N+1), or a
-   * manager's direct reports (N-1) plus their own manager (N+1). No existing route exposed this:
-   * `PgReferenceReader.hierarchy()` was write-side only until now (`refuse-cra.ts`,
-   * `validate-cra.ts`, deciding who accepts a Cra) — reused here rather than adding new SQL, since
-   * it already loads every `manager_attachments` row and answers "who manages X today" from it.
-   * A manager's reports are found by inverting it against `consultantsOfOffice` (item 7's own
-   * reader method, ADR-0077), which already excludes a departed consultant (ADR-0079) — no
+   * The dashboard's org-chart panel — a consultant's own manager (N+1), or a manager's direct
+   * reports (N-1) plus their own manager (N+1). Built on `PgReferenceReader.hierarchy()`, the
+   * same reader `refuse-cra.ts` and `validate-cra.ts` use to decide who accepts a Cra, rather
+   * than new SQL: it already loads every `manager_attachments` row and answers "who manages X
+   * today" from it. A manager's reports are found by inverting it against `consultantsOfOffice`
+   * (ADR-0077), which already excludes a departed consultant (ADR-0079) — no
    * separate exclusion needed here. `billing` has no place in this org chart in the seed (Henri,
    * the one billing persona, is the *director* every manager reports to, not a subject of this
    * read) — `forRoles` below omits it, the same reasoning `/api/v1/consultants` gives for the
@@ -85,8 +84,8 @@ export function registerDashboardRoutes(
           (day) => calendar.nonWorkableReason(day) === null,
         );
 
-        // Package 08: `availablePeriods`, `refusedPeriods` and `recentActivity` each get their
-        // own scoped, unbounded query rather than being derived from one capped `list` page —
+        // `availablePeriods`, `refusedPeriods` and `recentActivity` each get their own scoped,
+        // unbounded query rather than being derived from one capped `list` page —
         // a page ordered by period can drop an old refused month, or the wrong "most recent"
         // row entirely, once the office (or, here, the consultant's own history) outgrows it.
         // Sequential, not `Promise.all`: every read here shares the one checked-out client this
@@ -154,16 +153,15 @@ export function registerDashboardRoutes(
         // itself already documents).
         const cutoffPeriod = today.slice(0, 7);
 
-        // Package 08: `availablePeriods`, `pendingDecisions`, `lateCras`, `awaitingDecision` and
+        // `availablePeriods`, `pendingDecisions`, `lateCras`, `awaitingDecision` and
         // `recentActivity` each get their own scoped query — a count, a sum, or an explicitly
         // sorted-and-limited-in-SQL read — rather than being derived from one `list` page capped
         // at `CRA_LIST_MAX_PAGE_SIZE`. `billableCents` still reads off `preFacturierComposition`
         // for the requested period specifically (ADR-0053, ADR-0065) — a month's own billable
         // total, not an actionable state; `pendingDecisions`/`lateCras` stay period-independent
         // (ADR-0082): a Cra awaiting a decision or already late does not stop being either just
-        // because the requested period changed. Sequential, not `Promise.all` (package 15's own
-        // finding on this same client): every read here shares the one checked-out client this
-        // transaction is.
+        // because the requested period changed. Sequential, not `Promise.all`: every read here
+        // shares the one checked-out client this transaction is.
         const {
           composition,
           availablePeriods,
@@ -190,14 +188,14 @@ export function registerDashboardRoutes(
           });
           // `CRA_LIST_MAX_PAGE_SIZE`, not unbounded: a genuine ceiling on a real queue (ADR-0081's
           // own 65-Cra worst case is well under it), sorted and limited in SQL rather than sliced
-          // out of a page — the two are no longer the same operation.
+          // out of a page.
           const awaitingDecisionResult = await unit.cras.awaitingDecision(
             actor,
             CRA_LIST_MAX_PAGE_SIZE,
           );
           const recentActivityResult = await unit.cras.recentActivity(actor, 5);
           const consultantNamesResult = await new PgReferenceReader(unit.client).consultantNames();
-          // Item 3, QA round 5 (ADR-0098): "as of today", not the requested period — see that
+          // "As of today", not the requested period (ADR-0098) — see that
           // function's own header for why a staffing snapshot is not a monthly figure.
           const staffingResult = await managerStaffingSnapshot(unit.client, actor.officeId, today);
 
@@ -252,15 +250,15 @@ export function registerDashboardRoutes(
         return managerDashboard;
       }
 
-      // Package 08: `draftInvoices`, `issuedInvoices` and `totalTtcIssuedCents` each get their
-      // own scoped `count`/`sumTtcCents` for the requested period — never a page's own `.filter`
+      // `draftInvoices`, `issuedInvoices` and `totalTtcIssuedCents` each get their own scoped
+      // `count`/`sumTtcCents` for the requested period — never a page's own `.filter`
       // and `.reduce`, which silently drops the fifty-first invoice an office that busy would
       // have. `availablePeriods` and `oldestDrafts` read every period, not the requested one
       // (ADR-0082's own reasoning applied to billing): a work queue does not stop existing
-      // because the requested period changed, the same shape package 08 also applies to `cras`.
-      // `oldestDrafts`/`recentIssued` are sorted and limited in SQL directly — the audit's own
-      // "oldest drafts... ordered by newest supply period" finding, closed at the query itself
-      // rather than by a wider page (raising `MAX_PAGE_SIZE` would not fix an ordering defect).
+      // because the requested period changed, the same shape the `cras` reads above use.
+      // `oldestDrafts`/`recentIssued` are sorted and limited in SQL directly: ordering a page by
+      // newest supply period and re-sorting it afterwards drops the true oldest rows at the cap,
+      // and a wider page would not fix an ordering defect.
       const {
         draftInvoices,
         issuedInvoices,

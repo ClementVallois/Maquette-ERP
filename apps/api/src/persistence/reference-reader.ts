@@ -126,11 +126,9 @@ export class PgReferenceReader {
    * What `timesheet`'s rules read: which missions run when, who is staffed on them, what clearance
    * each mission requires, and which clearances each consultant holds and until when.
    *
-   * The last two joined this projection in Phase 6 and closed a hole the open-questions file had
-   * been carrying since 21/08: migration 007 created `mission_habilitations` and
-   * `consultant_habilitations`, the seed filled them, and nothing read them — so `CLAUDE.md`
-   * § Dataset shape required an habilitation that "constrains an assignment" while no code
-   * constrained anything (ADR-0051).
+   * The last two are what make an `Habilitation` constrain a recorded day (ADR-0051): migration
+   * 007's `mission_habilitations` and `consultant_habilitations` are read here, and nowhere
+   * else.
    */
   async timesheet(): Promise<TimesheetReference> {
     const { rows: missions } = await this.#client.query<MissionRow>(
@@ -243,7 +241,7 @@ export class PgReferenceReader {
   }
 
   /**
-   * One office's **current** roster, for item 7's (QA round 1) consultant filter — unlike
+   * One office's **current** roster, for the consultant filter — unlike
    * `consultantNames` above, this is scoped by `office_id` at the query itself rather than left to
    * the caller, because it is meant to be exposed on the wire as a list, not read back only to
    * enrich rows an authorization check already scoped elsewhere. A manager reads their own office,
@@ -292,7 +290,7 @@ export class PgReferenceReader {
     return new Map(rows.map((row) => [row.id, row.name]));
   }
 
-  /** Mission → client name, for the grid's mission picker (front-end plan Phase 5.2). Presentation, not a rule. */
+  /** Mission → client name, for the grid's mission picker. Presentation, not a rule. */
   async missionClientNames(): Promise<ReadonlyMap<string, string>> {
     const { rows } = await this.#client.query<{ id: string; client_name: string }>(
       `SELECT m.id, c.name AS client_name FROM public.missions m JOIN public.clients c ON c.id = m.client_id`,
