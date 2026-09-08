@@ -15,12 +15,13 @@ import {
   isDayOverbooked,
   rowTotal,
   valueAt,
+  type CellQuantity,
   type MatrixState,
 } from '../matrix';
 import { missionTone } from '../mission-tone';
 import type { GridDay } from '../types';
 
-import { CraQuantityCell, type CellQuantity, type NavigationDirection } from './cra-quantity-cell';
+import { CraQuantityCell, type NavigationDirection } from './cra-quantity-cell';
 
 /**
  * ADR-0070's matrix, rendered. Pure with respect to the write path — it holds no mutation logic of

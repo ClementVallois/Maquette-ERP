@@ -11,7 +11,7 @@ import {
   Undo2Icon,
 } from 'lucide-react';
 import type { ReactElement } from 'react';
-import { useMemo, useState } from 'react';
+import { useMemo, useReducer, useState } from 'react';
 
 import { DeniedState } from '@/components/feedback/denied-state';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -36,20 +36,19 @@ import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 import { cn } from '@/lib/utils';
 
+import { createDraftState, reduceDraft, type UndoState } from '../draft-state';
 import { decideGridResync } from '../grid-resync';
 import { useCraGrid, useSaveMonth } from '../hooks';
 import {
   ABSENCE_ROW_KEY,
   addRow,
-  clearRow,
   dayTotal,
   entriesFromMatrix,
   fillEmptyWorkdays,
   initMatrix,
   isDayComplete,
   isRowEmpty,
-  removeRow,
-  withValue,
+  type CellQuantity,
   type MatrixState,
 } from '../matrix';
 import { missingDaysFrom } from '../missing-days';
@@ -58,7 +57,6 @@ import type { CraGridResponse, GridDay } from '../types';
 
 import { CopyPreviousMonthDialog } from './copy-previous-month-dialog';
 import { CraDayCards, CraLegend, CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
-import type { CellQuantity } from './cra-quantity-cell';
 import { CraTimeline } from './cra-timeline';
 
 /**
@@ -167,8 +165,9 @@ function calendarWeeks(days: readonly GridDay[]): readonly (readonly GridDay[])[
 }
 
 function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
-  const [matrix, setMatrix] = useState<MatrixState>(() => initMatrix(data));
-  const [dirty, setDirty] = useState(false);
+  const [{ matrix, dirty, undo }, dispatchDraft] = useReducer(reduceDraft, data, (initialData) =>
+    createDraftState(initMatrix(initialData)),
+  );
   const [mobileWeekIndex, setMobileWeekIndex] = useState(0);
   // A9's desktop month/week toggle — reuses A11's own slicing (`calendarWeeks`, `WeekNavigator`,
   // `compact`), so this is a second, independent index rather than a new mechanism.
@@ -182,7 +181,6 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   // one action, the action's own name for the button's visible text, and the row it applied to for
   // the accessible name only. Cleared once used, or whenever a fresh `data` resyncs the whole
   // matrix below.
-  const [undo, setUndo] = useState<UndoState | null>(null);
   // O6: "Copier le mois précédent" — a preview dialog, not a direct mutation.
   const [copyingPreviousMonth, setCopyingPreviousMonth] = useState(false);
   // React's own documented pattern for "reset state when a prop changes" (react.dev, "Adjusting
@@ -211,7 +209,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   // place that decides whether to run the reset above unconditionally as before, or to hold the
   // new reference instead of silently discarding unsaved work. `savePending: saveMonth.isPending`
   // is what tells it a reference arriving while `dirty` is still `true` is this grid's *own*
-  // save settling — `setDirty(false)` below has not run yet at that point (confirmed empirically,
+  // save settling — the `markSaved` dispatch below has not run yet at that point (confirmed empirically,
   // see `grid-resync.ts`'s own comment on `savePending`) — rather than an unrelated invalidation.
   const [pendingRemoteData, setPendingRemoteData] = useState<CraGridResponse | null>(null);
   const resyncDecision = decideGridResync({
@@ -223,11 +221,9 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   });
   if (resyncDecision.kind === 'adopt') {
     setSyncedWith(data);
-    setMatrix(initMatrix(data));
-    setDirty(false);
+    dispatchDraft({ kind: 'replace', matrix: initMatrix(data) });
     setMobileWeekIndex(0);
     setDesktopWeekIndex(0);
-    setUndo(null);
     setCopyingPreviousMonth(false);
     if (pendingRemoteData !== null) setPendingRemoteData(null);
   } else if (resyncDecision.kind === 'holdAsConflict') {
@@ -237,11 +233,9 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   function handleDiscardEditsAndReload(): void {
     if (pendingRemoteData === null) return;
     setSyncedWith(pendingRemoteData);
-    setMatrix(initMatrix(pendingRemoteData));
-    setDirty(false);
+    dispatchDraft({ kind: 'replace', matrix: initMatrix(pendingRemoteData) });
     setMobileWeekIndex(0);
     setDesktopWeekIndex(0);
-    setUndo(null);
     setCopyingPreviousMonth(false);
     setPendingRemoteData(null);
   }
@@ -309,45 +303,42 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
   );
 
   function updateCell(rowKey: string, day: string, value: CellQuantity): void {
-    setMatrix((previous) => withValue(previous, rowKey, day, value));
-    setDirty(true);
+    dispatchDraft({ kind: 'setCell', rowKey, day, value });
   }
 
   function handleFillRow(rowKey: string): void {
     const row = rowsByKey.get(rowKey);
-    setUndo({
-      matrix,
+    dispatchDraft({
+      kind: 'fillRow',
+      rowKey,
+      workableDays,
+      assignableDays: row?.assignableDays ?? null,
       action: LABELS.cra.matrix.fillEmptyWorkdays,
       detail: row?.label ?? rowKey,
     });
-    setMatrix((previous) =>
-      fillEmptyWorkdays(previous, rowKey, workableDays, row?.assignableDays ?? null),
-    );
-    setDirty(true);
   }
 
   function handleClearRow(rowKey: string): void {
     const row = rowsByKey.get(rowKey);
-    setUndo({ matrix, action: LABELS.cra.matrix.clearRow, detail: row?.label ?? rowKey });
-    setMatrix((previous) => clearRow(previous, rowKey));
-    setDirty(true);
+    dispatchDraft({
+      kind: 'clearRow',
+      rowKey,
+      action: LABELS.cra.matrix.clearRow,
+      detail: row?.label ?? rowKey,
+    });
   }
 
   function handleUndo(): void {
     if (undo === null) return;
-    setMatrix(undo.matrix);
-    setUndo(null);
-    setDirty(true);
+    dispatchDraft({ kind: 'undo' });
   }
 
   function handleRemoveRow(rowKey: string): void {
-    setMatrix((previous) => removeRow(previous, rowKey));
-    setDirty(true);
+    dispatchDraft({ kind: 'removeRow', rowKey });
   }
 
   function handleAddActivity(missionId: string): void {
-    setMatrix((previous) => addRow(previous, missionId));
-    setDirty(true);
+    dispatchDraft({ kind: 'addRow', rowKey: missionId });
   }
 
   async function handleSubmitMonth(submit: boolean): Promise<void> {
@@ -355,7 +346,7 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
 
     try {
       await saveMonth.mutateAsync({ submit, entries });
-      setDirty(false);
+      dispatchDraft({ kind: 'markSaved' });
       const now = new Date();
       setLastWrite({
         kind: submit ? 'submitted' : 'saved',
@@ -506,9 +497,12 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
               days={mobileDays}
               matrix={matrix}
               onFill={(nextMatrix, label) => {
-                setUndo({ matrix, action: LABELS.cra.matrix.fillWeek, detail: label });
-                setMatrix(nextMatrix);
-                setDirty(true);
+                dispatchDraft({
+                  kind: 'replaceWithUndo',
+                  matrix: nextMatrix,
+                  action: LABELS.cra.matrix.fillWeek,
+                  detail: label,
+                });
               }}
             />
             <MobileRowTools
@@ -627,9 +621,12 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
             setCopyingPreviousMonth(false);
           }}
           onConfirm={(nextMatrix) => {
-            setUndo({ matrix, action: LABELS.cra.matrix.copyPreviousMonth, detail: null });
-            setMatrix(nextMatrix);
-            setDirty(true);
+            dispatchDraft({
+              kind: 'replaceWithUndo',
+              matrix: nextMatrix,
+              action: LABELS.cra.matrix.copyPreviousMonth,
+              detail: null,
+            });
             setCopyingPreviousMonth(false);
           }}
         />
@@ -946,12 +943,6 @@ function WeekNavigator({
       </Button>
     </div>
   );
-}
-
-interface UndoState {
-  readonly matrix: MatrixState;
-  readonly action: string;
-  readonly detail: string | null;
 }
 
 /**

@@ -1,5 +1,7 @@
-import type { CellQuantity } from './components/cra-quantity-cell';
 import type { CraGridResponse, MonthEntry } from './types';
+
+/** `0` is the empty cell — never a `CraLine`, never posted. */
+export type CellQuantity = 0 | 1 | 2 | 3 | 4;
 
 /**
  * The matrix's local state (ADR-0070): one row per activity — a mission id, or the fixed

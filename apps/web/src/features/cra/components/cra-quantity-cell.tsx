@@ -5,6 +5,8 @@ import { frenchDays } from '@/lib/format';
 import { LABELS } from '@/lib/labels';
 import { cn } from '@/lib/utils';
 
+import type { CellQuantity } from '../matrix';
+
 /**
  * ADR-0070's matrix cell: a quantity in quarter-days, nothing else. ADR-0068's reasons for a
  * native `<select>` over the kit's own `components/ui/select.tsx` survive its supersession intact
@@ -14,9 +16,6 @@ import { cn } from '@/lib/utils';
  */
 
 export type NavigationDirection = 'up' | 'down' | 'left' | 'right' | 'home' | 'end';
-
-/** `0` is the empty cell — never a `CraLine`, never posted. */
-export type CellQuantity = 0 | 1 | 2 | 3 | 4;
 
 const GLYPHS: Readonly<Record<CellQuantity, string>> = { 0: '', 1: '¼', 2: '½', 3: '¾', 4: '1' };
 
