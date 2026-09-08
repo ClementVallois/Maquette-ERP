@@ -20,7 +20,7 @@ allowBuilds:
 # Transitive packages pinned exactly by a parent, so no `pnpm update` can reach them. Every key is
 # version-qualified deliberately: it stops matching, and the entry retires itself, the day upstream
 # moves. Not read from package.json in pnpm 11 — `pnpm.overrides` there is ignored with a warning.
-# Procedure: docs/vulnerability-management.md.
+# Procedure: ADR-0075, and the written procedure it points to.
 overrides:
   # `typed-rest-client@2.3.1` (pulled in by @stryker-mutator/core) depends on `qs` at an exact
   # `6.15.1` — GHSA-q8mj-m7cp-5q26, fixed in 6.15.2. Raised to 6.16.0 on 03/09/2026: 6.15.2 is
