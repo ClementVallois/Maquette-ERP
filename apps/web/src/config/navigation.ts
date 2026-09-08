@@ -37,8 +37,8 @@ const MANAGER_AND_BILLING: readonly Role[] = ['manager', 'billing'];
 const ALL_ROLES: readonly Role[] = ['consultant', 'manager', 'billing'];
 
 /**
- * Two entries share the path `/cra` on purpose (`cra-mine`, `cra-office`): task 4.3's per-role
- * wording is genuinely different — a consultant's own month ("Mes CRA",
+ * Two entries share the path `/cra` on purpose (`cra-mine`, `cra-office`): the per-role wording
+ * is genuinely different — a consultant's own month ("Mes CRA",
  * `LABELS.cra.nav`) and a manager's office-wide list ("CRA", `LABELS.cra.navManager`) are not the
  * same sentence, and `Role` filtering already makes the two mutually exclusive for any one
  * session, so no session ever sees both. That keeps the label a plain data field instead of a

@@ -65,8 +65,8 @@ export function Sidebar({ entries, collapsed, onToggleCollapse }: SidebarProps):
 
 /**
  * The nav list alone, without the brand block, the collapse control or the reserved footer —
- * extracted so `components/shell/topbar.tsx`'s mobile `Sheet` (4.5: "sidebar en Sheet sous le
- * breakpoint md") can render the exact same config-driven links without duplicating them, and
+ * extracted so `components/shell/topbar.tsx`'s mobile `Sheet` can render the exact same
+ * config-driven links without duplicating them, and
  * without the icons-only affordance that only makes sense for the persistent, narrow aside.
  */
 export function SidebarNavList({
