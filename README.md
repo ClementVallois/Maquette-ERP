@@ -141,7 +141,7 @@ fichier ne s'y ajoute pas en silence :
 | `running.md`                                      | les deux topologies d'exécution (dev / prod-démo) et la panne qui suit quand on les mélange                                                                                                      |
 | `vulnerability-management.md`                     | ce qui se passe quand la porte `Dependency scan` passe au rouge                                                                                                                                  |
 | `PHASE-4-5-CLOSURE.md`                            | le relevé des revues de ces deux phases-là (les suivantes sont closes dans `open-questions.md`, incohérence de forme assumée)                                                                    |
-| `qa-rounds.md`, `todo.md`                         | les quatre passes de relecture de l'application qui tourne, **par Clément Vallois, qui détient les arbitrages** : ce qui a été demandé, et ce qui en a été fait                                  |
+| `qa-rounds.md`                                    | les quatre passes de relecture de l'application qui tourne, **par Clément Vallois, qui détient les arbitrages** : ce qui a été demandé, et ce qui en a été fait                                  |
 | `audit-produit-ui-ux.md`, `plan-densification.md` | deux notes de travail sur ce que la maquette pourrait devenir. **Elles n'engagent rien** : ce qui en est sorti est passé par un ADR ou par « Ce que je ne construis pas », le reste n'existe pas |
 | `demo-checklist.md`                               | le script de démonstration, écrit pour être **vérifiable** — chaque étape nomme le test automatisé qui la prouve                                                                                 |
 | `agents/`                                         | l'outillage d'agents utilisé pour construire le dépôt                                                                                                                                            |
@@ -152,9 +152,9 @@ lecture seule lancés avant chaque merge sur `main`, l'un contre `docs/BUILD-RUL
 la peau du lecteur sans brief. Ce sont eux qui ont trouvé la moitié des corrections datées du
 04/09/2026 dans ce fichier.
 
-⚠️ Ces deux notes de travail et `todo.md` sont **en français**, contrairement à la règle du dépôt
-(tout en anglais sauf ce README). C'est assumé et non corrigé : `todo.md` reproduit mot pour mot des
-demandes formulées en français, et les traduire remplacerait la demande par sa paraphrase.
+⚠️ Ces deux notes de travail sont **en français**, contrairement à la règle du dépôt (tout en
+anglais sauf ce README). C'est assumé et non corrigé : elles reproduisent des demandes formulées en
+français, et les traduire remplacerait la demande par sa paraphrase.
 
 Pour vérifier soi-même plutôt que me croire. Les versions sont **strictes** (`engine-strict` est
 activé, donc la première commande échoue au lieu d'avertir) : **Node ≥ 24.13.1** — la version exacte
