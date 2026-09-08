@@ -38,6 +38,10 @@ reports/
 CHOIX.md
 draft.md
 
+# Withdrawn from the public repository on the same grounds and kept privately, per ADR-0014's
+# precedent. Ignored so a stray `git add .` cannot bring them back either.
+docs/plan-roles-rh-direction.md
+
 # Reference screenshots pasted in for a QA round: read locally, never published. The repo is
 # public (ADR-0086), and a screenshot of a third-party product is not ours to redistribute.
 docs/images/

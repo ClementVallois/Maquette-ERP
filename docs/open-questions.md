@@ -4352,6 +4352,11 @@ outcomes, and nothing was reported back as "acknowledged":
 - **`docs/` holds seven files the README does not account for**, two of which (`plan-densification.md`,
   `plan-roles-rh-direction.md`) reference an interview brief a cold reader has no access to. That is
   a question about what belongs in a public repository, and it is Clement's.
+  **Resolved 08/09/2026.** `plan-roles-rh-direction.md` is withdrawn from the public repository and
+  kept privately, per ADR-0014's precedent; it is gitignored so a stray `git add .` cannot restore
+  it. `plan-densification.md` stays, with its references to unpublished material removed. Commit
+  citations elsewhere in this file that name the withdrawn document resolve the same way `CHOIX.md`'s
+  do — the document is archived, not lost.
 - **`main`'s own last CI run is red** on `Dependency scan` (`pnpm audit`, run 33861522765). The same
   job passed on this branch's pull request minutes later against an untouched lockfile, so it reads
   as the registry flake the previous session already saw once — worth a re-run rather than a fix.

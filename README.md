@@ -17,7 +17,7 @@ se parcourt dans cet ordre :
    qu'est un CRA et pourquoi il décide du chiffre d'affaires d'un cabinet de conseil.
 2. **Une décision** — [ADR-0010](docs/adr/0010-vat-rounded-per-rate.md) : la TVA est arrondie
    **par taux**, jamais par ligne ni sur le total. Chaque ADR nomme l'option écartée et le seuil
-   auquel on y reviendrait ; il y en a 95 (`ls docs/adr/0*.md | wc -l`, moins le gabarit `0000`).
+   auquel on y reviendrait ; il y en a 101 (`ls docs/adr/0*.md | wc -l`, moins le gabarit `0000`).
 3. **La preuve mécanique** — [`tests/boundary-rule.test.ts`](tests/boundary-rule.test.ts) : la
    frontière `timesheet`/`billing` n'est pas une convention de nommage, c'est un job de CI qui
    rejoue une violation délibérée et exige qu'elle soit refusée.
@@ -134,17 +134,17 @@ Le reste de `docs/` est du **journal de construction**, pas de la documentation 
 est nécessaire pour comprendre la maquette, et l'inventaire est ici plutôt qu'ailleurs pour qu'un
 fichier ne s'y ajoute pas en silence :
 
-| Fichier                                                                         | Ce que c'est                                                                                                                                                                                      |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BUILD-PLAN.md`                                                                 | l'ordre, les branches et le calendrier des phases                                                                                                                                                 |
-| `frontend-plan.md`, `direction-visuelle.md`                                     | le plan de construction et la direction visuelle de la SPA                                                                                                                                        |
-| `running.md`                                                                    | les deux topologies d'exécution (dev / prod-démo) et la panne qui suit quand on les mélange                                                                                                       |
-| `vulnerability-management.md`                                                   | ce qui se passe quand la porte `Dependency scan` passe au rouge                                                                                                                                   |
-| `PHASE-4-5-CLOSURE.md`                                                          | le relevé des revues de ces deux phases-là (les suivantes sont closes dans `open-questions.md`, incohérence de forme assumée)                                                                     |
-| `qa-rounds.md`, `todo.md`                                                       | les quatre passes de relecture de l'application qui tourne, **par Clément Vallois, qui détient les arbitrages** : ce qui a été demandé, et ce qui en a été fait                                   |
-| `audit-produit-ui-ux.md`, `plan-densification.md`, `plan-roles-rh-direction.md` | trois notes de travail sur ce que la maquette pourrait devenir. **Elles n'engagent rien** : ce qui en est sorti est passé par un ADR ou par « Ce que je ne construis pas », le reste n'existe pas |
-| `demo-checklist.md`                                                             | le script de démonstration, écrit pour être **vérifiable** — chaque étape nomme le test automatisé qui la prouve                                                                                  |
-| `agents/`                                                                       | l'outillage d'agents utilisé pour construire le dépôt                                                                                                                                             |
+| Fichier                                           | Ce que c'est                                                                                                                                                                                     |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BUILD-PLAN.md`                                   | l'ordre, les branches et le calendrier des phases                                                                                                                                                |
+| `frontend-plan.md`, `direction-visuelle.md`       | le plan de construction et la direction visuelle de la SPA                                                                                                                                       |
+| `running.md`                                      | les deux topologies d'exécution (dev / prod-démo) et la panne qui suit quand on les mélange                                                                                                      |
+| `vulnerability-management.md`                     | ce qui se passe quand la porte `Dependency scan` passe au rouge                                                                                                                                  |
+| `PHASE-4-5-CLOSURE.md`                            | le relevé des revues de ces deux phases-là (les suivantes sont closes dans `open-questions.md`, incohérence de forme assumée)                                                                    |
+| `qa-rounds.md`, `todo.md`                         | les quatre passes de relecture de l'application qui tourne, **par Clément Vallois, qui détient les arbitrages** : ce qui a été demandé, et ce qui en a été fait                                  |
+| `audit-produit-ui-ux.md`, `plan-densification.md` | deux notes de travail sur ce que la maquette pourrait devenir. **Elles n'engagent rien** : ce qui en est sorti est passé par un ADR ou par « Ce que je ne construis pas », le reste n'existe pas |
+| `demo-checklist.md`                               | le script de démonstration, écrit pour être **vérifiable** — chaque étape nomme le test automatisé qui la prouve                                                                                 |
+| `agents/`                                         | l'outillage d'agents utilisé pour construire le dépôt                                                                                                                                            |
 
 Deux fichiers d'outillage vivent hors de `docs/` et sont eux aussi versionnés :
 `.claude/agents/rules-auditor.md` et `.claude/agents/cold-reader.md` — les deux relecteurs en
@@ -152,7 +152,7 @@ lecture seule lancés avant chaque merge sur `main`, l'un contre `docs/BUILD-RUL
 la peau du lecteur sans brief. Ce sont eux qui ont trouvé la moitié des corrections datées du
 04/09/2026 dans ce fichier.
 
-⚠️ Ces trois notes de travail et `todo.md` sont **en français**, contrairement à la règle du dépôt
+⚠️ Ces deux notes de travail et `todo.md` sont **en français**, contrairement à la règle du dépôt
 (tout en anglais sauf ce README). C'est assumé et non corrigé : `todo.md` reproduit mot pour mot des
 demandes formulées en français, et les traduire remplacerait la demande par sa paraphrase.
 
