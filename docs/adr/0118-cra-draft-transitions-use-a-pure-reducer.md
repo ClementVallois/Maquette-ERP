@@ -14,17 +14,17 @@ already live in the tested pure `matrix.ts` module.
 ## Decision
 
 Represent the client-side CRA draft as one state value managed by a pure reducer. The reducer
-coordinates matrix, dirty, and undo transitions by calling the existing matrix functions; the screen
-temporarily continues to own server synchronization and persistence until that coordination is
-extracted as the next package-17 step. Desktop and mobile controls dispatch into the same reducer.
+coordinates matrix, dirty, and undo transitions by calling the existing matrix functions. A
+`useCraDraft` coordinator wraps that reducer with server synchronization, persistence, remote-update
+conflicts, and navigation blocking. Desktop and mobile controls dispatch into the same reducer.
 
 ## Rejected option
 
 A single hook combining draft transformations, persistence, and navigation was rejected because it
 would hide the independently testable transitions behind a rendering harness. Persistence
-coordination will be extracted separately around the reducer. Splitting every local visual component
-into its own file was also rejected because file count does not reduce state coupling and the existing
-local sections do not all have independent behavior.
+coordination is extracted separately around the reducer. Splitting every local visual component into
+its own file was also rejected because file count does not reduce state coupling and the existing local
+sections do not all have independent behavior.
 
 ## Reconsideration threshold
 
@@ -35,5 +35,5 @@ view section only when it gains independent state, reuse, or a separately testab
 ## Consequences
 
 Edit, fill, clear, add, remove, replace, save, and undo transitions are testable without rendering
-React. The screen remains responsible for translating UI actions into reducer actions, so retained
-browser tests remain the proof of that wiring.
+React. The coordinator owns the ordering-sensitive remote state while the screen translates UI
+actions into reducer actions, so retained browser tests remain the proof of both wiring boundaries.

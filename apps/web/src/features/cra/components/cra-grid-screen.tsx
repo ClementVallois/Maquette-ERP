@@ -1,4 +1,4 @@
-import { Link, useBlocker } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import {
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -11,7 +11,7 @@ import {
   Undo2Icon,
 } from 'lucide-react';
 import type { ReactElement } from 'react';
-import { useMemo, useReducer, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { DeniedState } from '@/components/feedback/denied-state';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -36,16 +36,13 @@ import { LABELS } from '@/lib/labels';
 import { classifyProblem, headingFor, sentenceFor } from '@/lib/problems';
 import { cn } from '@/lib/utils';
 
-import { createDraftState, reduceDraft, type UndoState } from '../draft-state';
-import { decideGridResync } from '../grid-resync';
-import { useCraGrid, useSaveMonth } from '../hooks';
+import type { UndoState } from '../draft-state';
+import { useCraGrid } from '../hooks';
 import {
   ABSENCE_ROW_KEY,
   addRow,
   dayTotal,
-  entriesFromMatrix,
   fillEmptyWorkdays,
-  initMatrix,
   isDayComplete,
   isRowEmpty,
   type CellQuantity,
@@ -54,6 +51,7 @@ import {
 import { missingDaysFrom } from '../missing-days';
 import { missionTone } from '../mission-tone';
 import type { CraGridResponse, GridDay } from '../types';
+import { useCraDraft } from '../use-cra-draft';
 
 import { CopyPreviousMonthDialog } from './copy-previous-month-dialog';
 import { CraDayCards, CraLegend, CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
@@ -165,100 +163,40 @@ function calendarWeeks(days: readonly GridDay[]): readonly (readonly GridDay[])[
 }
 
 function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
-  const [{ matrix, dirty, undo }, dispatchDraft] = useReducer(reduceDraft, data, (initialData) =>
-    createDraftState(initMatrix(initialData)),
-  );
+  const {
+    matrix,
+    dirty,
+    undo,
+    dispatch: dispatchDraft,
+    canEdit,
+    savePending,
+    saveFailed,
+    mutationProblem,
+    lastWrite,
+    pendingRemoteData,
+    viewResetSource,
+    save,
+    discardEditsAndReload,
+    keepEditsAndDismissRemoteConflict,
+  } = useCraDraft(period, data);
   const [mobileWeekIndex, setMobileWeekIndex] = useState(0);
   // A9's desktop month/week toggle — reuses A11's own slicing (`calendarWeeks`, `WeekNavigator`,
   // `compact`), so this is a second, independent index rather than a new mechanism.
   const [desktopView, setDesktopView] = useState<'month' | 'week'>('month');
   const [desktopWeekIndex, setDesktopWeekIndex] = useState(0);
-  const [lastWrite, setLastWrite] = useState<{
-    readonly kind: 'saved' | 'submitted';
-    readonly at: string;
-  } | null>(null);
   // O7: single-level undo for "remplir/vider la ligne" — the matrix as it stood just before that
   // one action, the action's own name for the button's visible text, and the row it applied to for
   // the accessible name only. Cleared once used, or whenever a fresh `data` resyncs the whole
   // matrix below.
   // O6: "Copier le mois précédent" — a preview dialog, not a direct mutation.
   const [copyingPreviousMonth, setCopyingPreviousMonth] = useState(false);
-  // React's own documented pattern for "reset state when a prop changes" (react.dev, "Adjusting
-  // state when a prop changes"): compared and reassigned during render, not inside an effect —
-  // `react-hooks/set-state-in-effect` is why this is not a `useEffect`. ADR-0067: the grid's
-  // in-memory edit is rebuilt from the server's own answer whenever `data` changes reference — a
-  // fresh fetch for a new period, or the refetch a successful save triggers.
-  const [syncedWith, setSyncedWith] = useState(data);
-
-  const saveMonth = useSaveMonth(period);
-  // Package 11's Work item, "make edits during an in-flight save either impossible or safely
-  // preserved": chose impossible, over preserving them, because the alternative is a genuine
-  // correctness hazard, not a UX nicety. `handleSubmitMonth` snapshots `matrix` into `entries`
-  // before the request goes out, then clears `dirty` only once that request *resolves* — an edit
-  // made in between (while `saveMonth.isPending`) would set `dirty` back to `true`, immediately
-  // overwritten `false` by that same resolution moments later, so `decideGridResync` would treat
-  // the still-unsent newer edit as safely saved and let the save's own refetch (reflecting the
-  // *older* snapshot) silently replace it — exactly "a response resets edits the request never
-  // contained." Locking every edit path below on `canEdit` instead of `data.editable` alone
-  // closes the window entirely rather than trying to merge two matrices afterwards.
-  const canEdit = data.editable && !saveMonth.isPending;
-
-  // Package 11: a fresh `data` reference is no longer proof that this grid's own save is what
-  // produced it — package 10's cross-tab sweep can invalidate this query for a reason that has
-  // nothing to do with these edits. `decideGridResync` (kept pure, its own test file) is the one
-  // place that decides whether to run the reset above unconditionally as before, or to hold the
-  // new reference instead of silently discarding unsaved work. `savePending: saveMonth.isPending`
-  // is what tells it a reference arriving while `dirty` is still `true` is this grid's *own*
-  // save settling — the `markSaved` dispatch below has not run yet at that point (confirmed empirically,
-  // see `grid-resync.ts`'s own comment on `savePending`) — rather than an unrelated invalidation.
-  const [pendingRemoteData, setPendingRemoteData] = useState<CraGridResponse | null>(null);
-  const resyncDecision = decideGridResync({
-    incoming: data,
-    syncedWith,
-    dirty,
-    pendingRemoteData,
-    savePending: saveMonth.isPending,
-  });
-  if (resyncDecision.kind === 'adopt') {
-    setSyncedWith(data);
-    dispatchDraft({ kind: 'replace', matrix: initMatrix(data) });
+  const [viewSyncedWith, setViewSyncedWith] = useState(viewResetSource);
+  if (viewSyncedWith !== viewResetSource) {
+    setViewSyncedWith(viewResetSource);
     setMobileWeekIndex(0);
     setDesktopWeekIndex(0);
     setCopyingPreviousMonth(false);
-    if (pendingRemoteData !== null) setPendingRemoteData(null);
-  } else if (resyncDecision.kind === 'holdAsConflict') {
-    setPendingRemoteData(data);
   }
-
-  function handleDiscardEditsAndReload(): void {
-    if (pendingRemoteData === null) return;
-    setSyncedWith(pendingRemoteData);
-    dispatchDraft({ kind: 'replace', matrix: initMatrix(pendingRemoteData) });
-    setMobileWeekIndex(0);
-    setDesktopWeekIndex(0);
-    setCopyingPreviousMonth(false);
-    setPendingRemoteData(null);
-  }
-
-  function handleKeepEditsDismissRemoteConflict(): void {
-    setPendingRemoteData(null);
-  }
-
-  // task 6.3's own instruction: "une modification non enregistrée bloque la navigation par une
-  // confirmation" — `window.confirm` inside `shouldBlockFn` is a synchronous yes/no, which is
-  // exactly the contract that sentence asks for; a custom dialog would need its own
-  // proceed/cancel plumbing (`withResolver`) for no behavioural difference here.
-  useBlocker({
-    shouldBlockFn: () => {
-      if (!dirty) return false;
-
-      // The one deliberate native dialog in this SPA (comment above explains why); every other
-      // confirmation in this codebase uses `components/ui/alert-dialog.tsx` instead.
-      return !window.confirm(LABELS.cra.matrix.unsavedChangesConfirm);
-    },
-    enableBeforeUnload: true,
-    disabled: !dirty,
-  });
 
   const flaggedDays = useMemo(() => new Set(data.flags.map((flag) => flag.day)), [data.flags]);
   const workableDays = useMemo(
@@ -341,24 +279,6 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
     dispatchDraft({ kind: 'addRow', rowKey: missionId });
   }
 
-  async function handleSubmitMonth(submit: boolean): Promise<void> {
-    const entries = entriesFromMatrix(matrix);
-
-    try {
-      await saveMonth.mutateAsync({ submit, entries });
-      dispatchDraft({ kind: 'markSaved' });
-      const now = new Date();
-      setLastWrite({
-        kind: submit ? 'submitted' : 'saved',
-        at: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
-      });
-    } catch {
-      // The refusal renders inline below, from `saveMonth.error` — nothing else to do here.
-    }
-  }
-
-  const mutationProblem =
-    saveMonth.error instanceof ApiProblemError ? saveMonth.error.problem : null;
   // Front-end plan §6.5: an `IncompleteCraError` names the days in the totals row, where the user
   // reads them. `missingDaysFrom` yields an empty set for every other refusal, so the grid carries
   // server-side flags only for the one that produced them.
@@ -638,14 +558,14 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
           <AlertDescription>
             <p>{LABELS.cra.matrix.remoteUpdateConflictBody}</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button type="button" size="sm" onClick={handleDiscardEditsAndReload}>
+              <Button type="button" size="sm" onClick={discardEditsAndReload}>
                 {LABELS.cra.matrix.remoteUpdateConflictReload}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={handleKeepEditsDismissRemoteConflict}
+                onClick={keepEditsAndDismissRemoteConflict}
               >
                 {LABELS.cra.matrix.remoteUpdateConflictKeep}
               </Button>
@@ -706,33 +626,33 @@ function CraGridBody({ period, data }: CraGridBodyProps): ReactElement {
             <Button
               className="min-h-11 flex-1 md:min-h-0 md:flex-none"
               variant="outline"
-              pending={saveMonth.isPending}
+              pending={savePending}
               onClick={() => {
-                void handleSubmitMonth(false);
+                void save(false);
               }}
             >
               {LABELS.cra.save}
             </Button>
             <Button
               className="min-h-11 flex-1 md:min-h-0 md:flex-none"
-              pending={saveMonth.isPending}
+              pending={savePending}
               onClick={() => {
-                void handleSubmitMonth(true);
+                void save(true);
               }}
             >
               {LABELS.cra.submit}
             </Button>
             <p
               className={
-                saveMonth.isError
+                saveFailed
                   ? 'w-full text-sm text-destructive md:ml-2 md:w-auto'
                   : 'w-full text-sm text-muted-foreground md:ml-2 md:w-auto'
               }
               aria-live="polite"
             >
-              {saveMonth.isPending
+              {savePending
                 ? LABELS.cra.saveState.saving
-                : saveMonth.isError
+                : saveFailed
                   ? LABELS.cra.saveState.failed
                   : dirty
                     ? LABELS.cra.saveState.dirty

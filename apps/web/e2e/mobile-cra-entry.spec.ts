@@ -272,6 +272,71 @@ test('the mobile row tools clear a row and only then let it be removed', async (
   await expect(page.getByRole('combobox', { name: 'Ajouter une activité' })).toBeVisible();
 });
 
+test('keeping local edits dismisses an acknowledged remote refresh until newer data arrives', async ({
+  page,
+}) => {
+  let remoteGrid = grid;
+  await page.route('**/api/v1/session', (route) =>
+    route.fulfill({
+      json: {
+        persona: {
+          key: 'consultant-paris',
+          role: 'consultant',
+          displayName: 'Alice Martin',
+          office: 'Paris',
+        },
+      },
+    }),
+  );
+  await page.route('**/api/v1/cras/2026-07/grid', (route) => route.fulfill({ json: remoteGrid }));
+  await page.goto('/cra/2026-07');
+  const absence = page
+    .locator('[data-cra-day-cards]')
+    .getByRole('combobox', { name: 'Absence — 01/07/2026', exact: true });
+  await absence.selectOption('4');
+  await page.getByRole('button', { name: 'Semaine suivante', exact: true }).click();
+  const previousWeek = page.getByRole('button', { name: 'Semaine précédente', exact: true });
+  await expect(previousWeek).toBeEnabled();
+
+  remoteGrid = {
+    ...grid,
+    timeline: [{ kind: 'submitted', at: '2026-07-02T09:00:00.000Z', actorName: 'Alice Martin' }],
+  };
+  await page.evaluate(() => {
+    window.dispatchEvent(new StorageEvent('storage', { key: 'erp:persona-changed-at' }));
+  });
+
+  const conflict = page.getByText('Des données plus récentes sont arrivées du serveur', {
+    exact: true,
+  });
+  await expect(conflict).toBeVisible();
+  await page.getByRole('button', { name: 'Garder mes modifications', exact: true }).click();
+  await expect(conflict).toBeHidden();
+  await expect(previousWeek).toBeEnabled();
+  await previousWeek.click();
+  await expect(absence).toHaveValue('4');
+
+  remoteGrid = {
+    ...remoteGrid,
+    timeline: [
+      ...remoteGrid.timeline,
+      { kind: 'submitted', at: '2026-07-03T09:00:00.000Z', actorName: 'Alice Martin' },
+    ],
+  };
+  await page.evaluate(() => {
+    window.dispatchEvent(new StorageEvent('storage', { key: 'erp:persona-changed-at' }));
+  });
+  await expect(conflict).toBeVisible();
+  await page
+    .getByRole('button', {
+      name: 'Recharger la version du serveur (perdre mes modifications)',
+      exact: true,
+    })
+    .click();
+  await expect(conflict).toBeHidden();
+  await expect(absence).toHaveValue('0');
+});
+
 test('read-only CRA exposes complete summaries and errors without editing tools', async ({
   page,
 }) => {
