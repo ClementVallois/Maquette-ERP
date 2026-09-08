@@ -1,13 +1,9 @@
 import { Link } from '@tanstack/react-router';
 import {
-  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   CopyIcon,
-  EraserIcon,
   ListChecksIcon,
-  PlusIcon,
-  Trash2Icon,
   Undo2Icon,
 } from 'lucide-react';
 import type { ReactElement } from 'react';
@@ -19,16 +15,7 @@ import { GlossaryTerm } from '@/components/glossary-term';
 import { TogglePillGroup } from '@/components/toggle-pill-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Role } from '@/features/session/types';
 import { ApiProblemError } from '@/lib/api-client';
 import { frenchDate, frenchMonth, frenchWeekday } from '@/lib/format';
@@ -49,11 +36,11 @@ import {
   type MatrixState,
 } from '../matrix';
 import { missingDaysFrom } from '../missing-days';
-import { missionTone } from '../mission-tone';
 import type { CraGridResponse, GridDay } from '../types';
 import { useCraDraft } from '../use-cra-draft';
 
 import { CopyPreviousMonthDialog } from './copy-previous-month-dialog';
+import { AddActivityControl, MobileRowTools, RowTools } from './cra-grid-row-controls';
 import { CraDayCards, CraLegend, CraMatrixTable, type MatrixRowMeta } from './cra-matrix-table';
 import { CraTimeline } from './cra-timeline';
 
@@ -899,95 +886,6 @@ function UndoButton({
   );
 }
 
-/**
- * The phone's counterpart to `RowTools`, which hangs off a table row `CraDayCards` does not have.
- * Same two rules as the desktop tools — Absence is never removable, and a row is only removable
- * once it is empty across the whole month — except that the trash button is disabled rather than
- * hidden, with `removeRowHint` stating why: a control that disappears is the one the reader could
- * not find.
- */
-function MobileRowTools({
-  rows,
-  matrix,
-  monthDays,
-  onClear,
-  onRemove,
-}: {
-  readonly rows: readonly MatrixRowMeta[];
-  readonly matrix: MatrixState;
-  readonly monthDays: readonly string[];
-  readonly onClear: (rowKey: string) => void;
-  readonly onRemove: (rowKey: string) => void;
-}): ReactElement | null {
-  if (rows.length === 0) return null;
-
-  return (
-    <Collapsible>
-      <CollapsibleTrigger asChild>
-        <Button type="button" variant="outline" className="group min-h-11 w-full justify-between">
-          {LABELS.cra.matrix.manageRows}
-          <ChevronDownIcon
-            aria-hidden="true"
-            className="size-4 transition-transform group-data-[state=open]:rotate-180"
-          />
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="mt-2 rounded-xl bg-card px-3 ring-1 ring-border">
-        {rows.map((row) => {
-          const empty = isRowEmpty(matrix, row.key, monthDays);
-
-          return (
-            <div
-              key={row.key}
-              className="flex items-center gap-2 border-b border-border py-1 last:border-0"
-            >
-              <span
-                aria-hidden="true"
-                className={cn(
-                  'size-2 shrink-0 rounded-full',
-                  row.toneIndex === null ? 'bg-absence-dot' : missionTone(row.toneIndex).dotClass,
-                )}
-              />
-              <span className="min-w-0 flex-1 break-words text-sm">{row.label}</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-11"
-                disabled={empty}
-                aria-label={`${LABELS.cra.matrix.clearRow} — ${row.label}`}
-                onClick={() => {
-                  onClear(row.key);
-                }}
-              >
-                <EraserIcon />
-              </Button>
-              {row.key !== ABSENCE_ROW_KEY && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="size-11"
-                  disabled={!empty}
-                  aria-label={`${LABELS.cra.matrix.removeRow} — ${row.label}`}
-                  onClick={() => {
-                    onRemove(row.key);
-                  }}
-                >
-                  <Trash2Icon />
-                </Button>
-              )}
-            </div>
-          );
-        })}
-        <p className="border-t border-border py-2 text-xs text-muted-foreground">
-          {LABELS.cra.matrix.removeRowHint}
-        </p>
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-
 function MonthNav({ period }: { readonly period: string }): ReactElement {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -1006,102 +904,6 @@ function MonthNav({ period }: { readonly period: string }): ReactElement {
         <GlossaryTerm term="cra" />
       </span>
     </div>
-  );
-}
-
-/**
- * A9: a real, visible tooltip on hover/focus (`components/ui/tooltip.tsx`, Radix) — not the
- * `title` attribute ADR-0061 rejected (invisible on touch, unreliable focus/timing) and not
- * `aria-label` alone, which carries the accessible name but shows nothing to a sighted pointer or
- * keyboard user. Both are kept: `aria-label` names the button, `TooltipContent` shows the same
- * words on hover/focus.
- */
-function RowToolButton({
-  label,
-  onClick,
-  children,
-}: {
-  readonly label: string;
-  readonly onClick: () => void;
-  readonly children: ReactElement;
-}): ReactElement {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label={label} onClick={onClick}>
-          {children}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
-  );
-}
-
-function RowTools({
-  row,
-  empty,
-  onFill,
-  onClear,
-  onRemove,
-}: {
-  readonly row: MatrixRowMeta;
-  readonly empty: boolean;
-  readonly onFill: () => void;
-  readonly onClear: () => void;
-  readonly onRemove: () => void;
-}): ReactElement {
-  return (
-    <>
-      <RowToolButton
-        label={`${LABELS.cra.matrix.fillEmptyWorkdays} — ${row.label}`}
-        onClick={onFill}
-      >
-        <ListChecksIcon />
-      </RowToolButton>
-      <RowToolButton label={`${LABELS.cra.matrix.clearRow} — ${row.label}`} onClick={onClear}>
-        <EraserIcon />
-      </RowToolButton>
-      {row.key !== ABSENCE_ROW_KEY && empty && (
-        <RowToolButton label={`${LABELS.cra.matrix.removeRow} — ${row.label}`} onClick={onRemove}>
-          <Trash2Icon />
-        </RowToolButton>
-      )}
-    </>
-  );
-}
-
-function AddActivityControl({
-  missions,
-  onAdd,
-}: {
-  readonly missions: CraGridResponse['missions'];
-  readonly onAdd: (missionId: string) => void;
-}): ReactElement {
-  return (
-    // Remounted on every addition (`key`): the picker is a one-shot action, not a persisted
-    // selection — once a mission is added it leaves `missions` (the caller's `availableToAdd`),
-    // and a `Select` holding a value no longer in its own list is exactly the state this avoids
-    // having to reason about.
-    <Select key={missions.length} onValueChange={onAdd}>
-      {/* `min-h-*`, not `h-*`: the trigger's own height is a `data-[size=default]:h-8` variant,
-          which outranks a plain utility class. `flex-1` on the value keeps the placeholder against
-          the plus icon — the trigger is `justify-between`, which centres it once the trigger is
-          wider than its contents. */}
-      <SelectTrigger
-        className="min-h-11 w-full *:data-[slot=select-value]:flex-1 md:min-h-0 md:w-64"
-        aria-label={LABELS.cra.matrix.addActivity}
-      >
-        <PlusIcon className="size-4" />
-        <SelectValue placeholder={LABELS.cra.matrix.addActivityPlaceholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {missions.map((mission) => (
-          <SelectItem key={mission.missionId} value={mission.missionId}>
-            {mission.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   );
 }
 
