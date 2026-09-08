@@ -176,8 +176,10 @@ données et les tests d'intégration, voir « Démarrer » plus bas.
 ℹ️ **Le conteneur PostgreSQL publie `POSTGRES_PORT`, `5433` par défaut** — et non `5432`, pour ne
 pas entrer en conflit avec une instance déjà installée. Si `pnpm run setup` échoue sur
 `Bind for 0.0.0.0:5433 failed: port is already allocated`, c'est qu'autre chose l'occupe : changez
-`POSTGRES_PORT` dans `.env`, `DATABASE_URL` porte le même port et `pnpm run env:check` vérifie que
-les deux concordent.
+`POSTGRES_PORT` dans `.env` **et le port des deux URL de connexion**, `DATABASE_URL` et
+`MIGRATION_DATABASE_URL`. `pnpm run env:check` refuse désormais un `.env` où les trois ne
+concordent pas — c'est `MIGRATION_DATABASE_URL` que lisent `migrate` et `seed`, et `seed` **vide
+les trois schémas** : oubliée, elle envoie la commande sur la base qui répond à l'ancien port.
 
 ## Le problème métier
 
