@@ -43,11 +43,10 @@ item per commit throughout.
 ## Round 3 — worked 03–04/09/2026
 
 Twenty-three items, given in two batches: 14–31 first, then 32–36 under the heading "Focus sur le
-design mobile". The numbering continues round 2's on purpose — the owner's own list in
-`docs/todo.md` is one running sequence — so there is no item 1 here. Item 13, the last of the
-previous run, is answered in that file and not repeated. What each item asked for, verbatim and in
-French, and what shipped for it, is `docs/todo.md`; this table is the index those "item N, QA round
-3" citations resolve to.
+design mobile". The numbering continues round 2's on purpose — the owner's own list is one running
+sequence — so there is no item 1 here. Item 13, the last of the previous run, was answered in that
+run and is not repeated. The requests were made in French; this table restates each one and records
+what shipped for it, and it is the index those "item N, QA round 3" citations resolve to.
 
 | #   | What was asked                                                                                                                                                                                | Outcome                                                                                                                    |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
@@ -76,7 +75,7 @@ French, and what shipped for it, is `docs/todo.md`; this table is the index thos
 | 36  | On the invoice page the text goes everywhere on mobile; it must stay inside the cards and line up with its label                                                                              | Shipped                                                                                                                    |
 
 Item 37 ("a consultant search on the assignment page") was written down mid-sentence and is not part
-of this round. It stays in `docs/todo.md` exactly as typed.
+of this round. It stays on the owner's own list, and nothing was built for it here.
 
 ## Round 4 — worked 04/09/2026
 

@@ -122,7 +122,7 @@ L’audit s’appuie sur :
 - la direction visuelle et le plan frontend ;
 - les captures de référence desktop et tablette ;
 - les tests de parcours, de navigation, de mouvement et d’accessibilité ;
-- le périmètre déclaré dans le README et les décisions déjà prises dans `docs/todo.md`.
+- le périmètre déclaré dans le README et les décisions déjà prises par le propriétaire du dépôt.
 
 Il ne s’agit pas d’une étude utilisateur. Aucun consultant, manager ou gestionnaire de facturation
 n’a été observé en situation. Il n’y a pas non plus de données d’usage, de test sous NVDA, JAWS ou
