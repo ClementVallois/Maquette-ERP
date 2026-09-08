@@ -1,13 +1,13 @@
 # Demo checklist
 
-The exact script for the guided demonstration (`docs/frontend-plan.md` Phase 10, task 10.4), run against the
+The exact script for the guided demonstration, run against the
 seed (`2026-06`, ADR-0022) and nothing else — no fixture invented for this document, no step it
 asks a presenter to take that the running application cannot actually produce.
 
 **This document is also the spec.** Every step below names the automated test that proves it holds
 today, rather than duplicating that test's assertions here in prose that could quietly drift out of
 sync with the code. Two specs carry the narrative: `apps/web/e2e/journeys.spec.ts` (the mutating
-steps, Annexe B's J1–J6, run in the file's own declared serial order) and `apps/web/e2e/axe.spec.ts`
+steps, the J1–J6 journeys, run in the file's own declared serial order) and `apps/web/e2e/axe.spec.ts`
 (the accessibility pass on the screens the narrative visits). Replaying the checklist by hand is
 replaying those two files; a presenter who wants to see it live runs:
 
@@ -56,8 +56,7 @@ a matrix edit/save/submit` (all three tests) — the first test is the read-only
 Switch to Bruno. Land on `/tableau-de-bord?period=2026-06` first — the **CRA en attente de
 décision** card reads **1** (Claire's submitted June), not 0. `?period=` is what makes this step
 reproducible on any date the demo happens to run: the screen's organic, picker-less default is
-still the wall-clock month (`docs/open-questions.md`, row settled 27/08/2026, task 10.4), and June
-is what has data.
+still the wall-clock month, and June is what has data.
 
 Then `/pre-facturier?period=2026-06`: **validate Claire's month**. The result dialog names one
 draft invoice, addressed to Réunion Cyber Services (the seed's 8.5% VAT client), and **no declined
@@ -78,7 +77,7 @@ a reason. Switch back to Alice and confirm the reason renders on her own grid, m
   that test's own opening lines, before it navigates to `/pre-facturier`.
 - **Proof (refusal)**: `journeys.spec.ts`, describe `J3 — manager-paris (Bruno): refuses the month
 Alice submitted in J1, with a reason`.
-- **Accessibility**: `axe.spec.ts`, describes `accessibility — Tableau de bord (task 8.4, three
+- **Accessibility**: `axe.spec.ts`, describes `accessibility — Tableau de bord (three
 roles)`, `accessibility — Pré-facturier` and `accessibility — Marge`.
 
 ## 4 — Emma (`manager-lyon`): the office boundary
@@ -87,7 +86,7 @@ Switch to Emma. Deep-link a Paris Cra (Alice's validated June, by id). The scree
 refusal — "Accès refusé", `/problems/out-of-scope` — not a crash and not a silent empty page: the
 record exists, and Emma's office does not reach it.
 
-- **Proof**: `journeys.spec.ts`, describe `items 4/5 — a manager sees consultants, picks one, opens
+- **Proof**: `journeys.spec.ts`, describe `a manager sees consultants, picks one, opens
 a read-only CRA (ADR-0071)`, test `a manager of another office is refused, out-of-scope, on the
 same deep link`.
 - **Accessibility**: `axe.spec.ts`, describe `accessibility — États 403/404`, test `out-of-scope`.
@@ -96,8 +95,9 @@ same deep link`.
 
 Switch to Henri. Open `/factures`, open the Réunion Cyber Services draft J2's validation left
 behind, and **issue it** through the dialog — the `Idempotency-Key` header shown in the dialog is
-the real one the confirm click sends. The allocated number is the series' first ever in this
-database: `SEC-2026-000001`. Replay the same key at the API directly and show `replayed: true`,
+the real one the confirm click sends. The allocated number is `SEC-2026-000001`: the counter is
+kept per entity **and per fiscal year** (ADR-0018), so 2026's series starts at one even though the
+database already holds twelve issued numbers from 2016 to 2024. Replay the same key at the API directly and show `replayed: true`,
 same number — the guarantee that protects a retried click.
 
 Then click **"Version imprimable"**: it opens the server-rendered `/facture/:id` in a new tab, the
@@ -108,9 +108,8 @@ Then deep-link a margin URL as Henri. Billing is refused by **role**, not scope 
 
 - **Proof (issuance + replay)**: `journeys.spec.ts`, describe `J4 — billing-paris (Henri): issues
 the draft J2 created, with a key, then proves the replay`.
-- **Proof (printable)**: the same test, the "Version imprimable" step added for this task —
-  asserts the popup's document is `main#contenu` (SSR), not `#root` (SPA), and shows the issued
-  number.
+- **Proof (printable)**: the same test's "Version imprimable" step — asserts the popup's document
+  is `main#contenu` (SSR), not `#root` (SPA), and shows the issued number.
 - **Proof (role refusal)**: `journeys.spec.ts`, describe `J6 — billing-paris (Henri): the margin
 URL refuses him, by role, and names the rule`.
 - **Accessibility**: `axe.spec.ts`, describes `accessibility — Factures` and `accessibility — États
@@ -123,8 +122,8 @@ URL refuses him, by role, and names the rule`.
 menu item every persona above uses to switch, proven generically rather than once per role (the
 component behind it is not per-persona).
 
-- **Proof**: `journeys.spec.ts`'s `switchPersonaViaUi` helper, exercised by describe `item 1 —
-switching persona drops stale data without a reload`.
+- **Proof**: `journeys.spec.ts`'s `switchPersonaViaUi` helper, exercised by describe
+  `switching persona drops stale data without a reload`.
 
 ## Known gaps in this script
 
@@ -135,11 +134,10 @@ Two states this mockup can render have no live persona that reaches them today, 
   `GET /api/v1/cras` has no period filter — it lists every Cra the actor's scope can see, ever —
   and all four seeded personas already have at least one. Reaching it needs a seed change (a fifth
   persona with no assignment, or one of Lyon's two consultants losing theirs), which is Clement's
-  call, not this task's to make unilaterally. Row: `docs/open-questions.md`, dated 27/08/2026,
-  narrowed 27/08/2026.
+  call. Tracked in `docs/open-questions.md`.
 - **A validation that declines a day.** Every seeded, persona-reachable Cra bills cleanly; the one
   Forfait-assigned consultant (Gabrielle) has no persona. Noted in step 3 above rather than staged
   as a step this script cannot actually produce.
 
 Neither gap blocks the demo: both states are real, reachable code (verified by reading), just
-unproven by an automated screen capture. Task 10.6's baseline freeze does not include either.
+unproven by an automated screen capture, and the visual baseline does not cover either.

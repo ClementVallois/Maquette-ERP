@@ -66,8 +66,9 @@ export function pgTransactionally(pool: pg.Pool, newId: () => string = uuidv7): 
       return result;
     } catch (error) {
       // A failed statement leaves the transaction aborted, so the rollback is the only statement
-      // that can still run — and if even that fails the connection is broken, which the release
-      // below discards. Either way the original failure is what the caller must see.
+      // that can still run. Its own failure is swallowed because the original error is what the
+      // caller must see — `release()` with no argument returns the client to the pool rather than
+      // destroying it, so a connection whose ROLLBACK failed goes back reusable.
       await client.query('ROLLBACK').catch(() => undefined);
 
       throw error;

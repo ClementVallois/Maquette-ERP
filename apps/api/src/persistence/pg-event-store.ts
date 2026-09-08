@@ -21,9 +21,8 @@ export interface EventStore {
  * Writes a domain event to `domain_events` using the caller's PgClient — which means the event
  * commits or rolls back with the state change it describes (ADR-0020).
  *
- * Promoted here from `tests/harness/` in Phase 5, as ADR-0020 said it would be. The move also
- * settles the open question of 18/08/2026: the event id was a UUIDv4 because the harness had no
- * v7 generator it was allowed to reach, and the composition root has one.
+ * The event id is a UUIDv7 (`../ids/uuidv7.ts`), injected by the composition root rather than
+ * generated here.
  */
 export class PgEventStore implements EventStore {
   readonly #client: PgClient;

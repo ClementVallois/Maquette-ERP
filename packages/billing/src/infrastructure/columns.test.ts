@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  ColumnIsNotAnExactIntegerError,
-  exactInteger,
-  ReferencedRowMissingError,
-} from './columns.ts';
+import { ColumnIsNotAnExactIntegerError, exactInteger } from './columns.ts';
 
 describe('exactInteger', () => {
   it('reads a bigint column, which pg hands back as a string', () => {
@@ -50,15 +46,5 @@ describe('exactInteger', () => {
     } catch (error) {
       expect((error as ColumnIsNotAnExactIntegerError).retryable).toBe(false);
     }
-  });
-});
-
-describe('ReferencedRowMissingError', () => {
-  it('names the table and the id, so the message points at the row to repair', () => {
-    const error = new ReferencedRowMissingError('public.legal_entities', 'entity-fr');
-
-    expect(error.message).toContain('public.legal_entities');
-    expect(error.message).toContain('entity-fr');
-    expect(error.retryable).toBe(false);
   });
 });

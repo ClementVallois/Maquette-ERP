@@ -3,10 +3,10 @@ import { API_PROBLEM_TYPES, type ProblemDetails } from '@erp/contracts';
 import { LABELS } from './labels.ts';
 
 /**
- * Branch on `problem.type`, never on `problem.status` (frontend-plan.md §2 and task 3.2). This
- * module holds the pure classification and the two French-sentence lookups Phase 4's screens
- * consume (`ErrorState`, `DeniedState`, the shell's session guards); it renders nothing itself —
- * `apps/web/src/components/feedback/` (Phase 4) is where a `ProblemAction` becomes JSX.
+ * Branch on `problem.type`, never on `problem.status`. This module holds the pure classification
+ * and the two French-sentence lookups its consumers read (`ErrorState`, `DeniedState`, the
+ * shell's session guards); it renders nothing itself — `apps/web/src/components/feedback/` is
+ * where a `ProblemAction` becomes JSX.
  */
 
 const FORBIDDEN = 403;
@@ -15,7 +15,7 @@ const CONFLICT = 409;
 const UNPROCESSABLE = 422;
 
 /**
- * What a screen does with a refusal, per frontend-plan.md task 3.2's five branches.
+ * What a screen does with a refusal: five branches.
  *
  * The two session-cookie cases are checked by `type` before anything else, and only one of them
  * needs it: `unknown-persona` is a **403 carrying `deniedBy`** (`apps/api/src/personas/access.ts`
@@ -46,12 +46,10 @@ export function classifyProblem(problem: ProblemDetails): ProblemAction {
   // business error has `details` (`http/problem.ts`'s `problemFromBusinessError`, the CONFLICT
   // branch — `invariant: error.problemType, ...asErrors(error.details)`), and a 422's own `errors`
   // never comes with an `invariant` at all (the same function's UNPROCESSABLE branch sets only
-  // `errors`). Checking `errors` first — this file's own order until Phase 8 found it live,
-  // issuing an invoice a second time with a fresh key — silently swallowed every 409 that also
-  // carried structured detail fields into `field-errors`, a kind no screen renders as a designed
-  // conflict; `problems.test.ts`'s "conflict" fixture never set `errors` alongside `invariant`, so
-  // nothing caught it. `invariant` first is safe unconditionally: a 422 with `errors` never
-  // acquires one on the way here to be mis-ordered against.
+  // `errors`). Checking `errors` first would swallow every 409 that also carries structured
+  // detail fields into `field-errors`, a kind no screen renders as a designed conflict — reached
+  // live by issuing an invoice a second time with a fresh key. `invariant` first is safe
+  // unconditionally: a 422 with `errors` never acquires one on the way here.
   if (problem.invariant !== undefined) return { kind: 'conflict', invariant: problem.invariant };
   if (problem.errors !== undefined) return { kind: 'field-errors', errors: problem.errors };
 

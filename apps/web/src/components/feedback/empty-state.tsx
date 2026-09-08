@@ -11,8 +11,8 @@ import { Button } from '@/components/ui/button';
  * at body weight 600, one line of help text, and — only when the caller passes one — one action.
  * Never an illustration.
  *
- * Phase 4 uses this for the persona grid's empty case (4.1) and, with a different icon and copy,
- * for every "à venir" placeholder the nav can reach ahead of its own phase (4.3) — the two are the
+ * Used for the persona grid's empty case and, with a different icon and copy, for every "à venir"
+ * placeholder the nav can reach — the two are the
  * same visual shape (icon, one-line title, one line of help text, no illustration), so one
  * component serves both rather than a `ComingSoon` twin that would only restate this file.
  */

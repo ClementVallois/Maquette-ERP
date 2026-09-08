@@ -53,9 +53,8 @@ interface SingleSelectComboboxProps {
  * - a departed consultant (ADR-0079) never appears — enforced by the caller, which is the one
  *   that knows what "departed" means for a `Consultant`; this component only ever sees the
  *   `options` list it is handed;
- * - the currently selected option stays offered even when it no longer matches the search query
- *   (previously a synthetic `<option>` spliced in next to the native `<select>`'s own filtered
- *   ones) — `ComboboxShell`'s `alwaysInclude` below is what keeps it there, kept apart from
+ * - the currently selected option stays offered even when it stops matching the search query —
+ *   `ComboboxShell`'s `alwaysInclude` below is what keeps it there, kept apart from
  *   `matches` so a query that matches nothing real still shows `noMatchLabel` alongside it.
  */
 export function SingleSelectCombobox({

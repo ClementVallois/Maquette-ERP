@@ -9,7 +9,7 @@ export interface CraListItem {
   readonly consultantId: ConsultantId;
   readonly officeId: OfficeId;
   readonly period: string;
-  readonly status: string;
+  readonly status: CraStatus;
   /**
    * The quarter-days the Cra records, summed. A quantity and not a rate, so it does not reach the
    * line `Cjm`, `Tjm` and margin are held behind (BUILD-RULES § Authorization); it is here so the
@@ -36,8 +36,8 @@ export interface CraListQuery {
    */
   readonly period?: string;
   /**
-   * Item 7 (QA round 1): "for these three consultants, every CRA not yet validated" — both this
-   * field and `statuses` below narrow *within* whatever `actor` may already see; neither can
+   * "For these three consultants, every CRA not yet validated" — both this field and `statuses`
+   * below narrow *within* whatever `actor` may already see; neither can
    * widen it. The office boundary (and, for a consultant, the own-id boundary) is applied first
    * in the SQL, so a consultant id or a status outside the actor's scope answers an empty result,
    * never another office's row — `list` is filtered, not refused, and that holds here too.
@@ -47,7 +47,7 @@ export interface CraListQuery {
   readonly consultantIds?: readonly ConsultantId[];
   readonly statuses?: readonly CraStatus[];
   /**
-   * Item 4 (QA round 2): "a year and/or month filter", independent of `period` above and of each
+   * A year and/or month filter, independent of `period` above and of each
    * other — `year` alone narrows to every period in that calendar year, `month` alone to that
    * calendar month across every year, both together to the one `year-month` combination (the same
    * result `period` would give, reached a different way: a manager picking two dropdowns, not
@@ -58,8 +58,8 @@ export interface CraListQuery {
   readonly year?: number;
   readonly month?: number;
   /**
-   * Item 22, QA round 3: "every period strictly before this one" (`period < beforePeriod`,
-   * exclusive) — what the dashboard's "CRA en retard" deep link needs. Distinct from `year`/
+   * Every period strictly before this one (`period < beforePeriod`, exclusive) — what the
+   * dashboard's "CRA en retard" deep link needs. Distinct from `year`/
    * `month`: those match one calendar unit, this is an open-ended range with no lower bound, the
    * same shape the dashboard's own `lateCras` count already computes server-side
    * (`lastDayOf(period) < today` — equivalent to `period < currentPeriod` for any `today` inside
@@ -76,7 +76,9 @@ export interface CraRepository {
    * API call refused with a 403 that names the rule that denied it", and a `null` names nothing.
    */
   findById(id: CraId, actor: Actor): Promise<Cra | null>;
+  findListItemsByIds(ids: readonly CraId[], actor: Actor): Promise<readonly CraListItem[]>;
   list(query: CraListQuery): Promise<readonly CraListItem[]>;
+  listPeriod(actor: Actor, period: string): Promise<readonly CraListItem[]>;
   /**
    * Rank A12: the same `WHERE` predicate `list` applies, minus `limit`/`offset` — what makes
    * truncation observable (`total` vs. the page length) and what a page-size selector's own
@@ -85,7 +87,44 @@ export interface CraRepository {
   count(query: Omit<CraListQuery, 'limit' | 'offset'>): Promise<number>;
   /** Every distinct period visible to the actor, newest first; never derived from a page. */
   listPeriods(actor: Actor): Promise<readonly string[]>;
+  /**
+   * One consultant's own distinct refused periods, newest first — `listPeriods`'s
+   * own guarantee, narrowed to one consultant and the `refused` status, never derived from a
+   * page. A `consultantId` outside `own` scope answers empty rather than raising (ADR-0003's
+   * "filtered, not refused" — the same shape every list read already gives).
+   */
+  refusedPeriods(consultantId: ConsultantId, actor: Actor): Promise<readonly string[]>;
+  /**
+   * The N most recently status-changed Cras visible to the actor, newest first,
+   * sorted and limited in SQL — never a page's own first N rows re-sorted in the application.
+   */
+  recentActivity(actor: Actor, limit: number): Promise<readonly CraListItem[]>;
+  /**
+   * The N oldest-submitted Cras awaiting a decision, visible to the actor, sorted
+   * and limited in SQL for the same reason as `recentActivity`.
+   */
+  awaitingDecision(actor: Actor, limit: number): Promise<readonly CraListItem[]>;
   findByConsultantAndPeriod(
+    consultantId: ConsultantId,
+    period: Period,
+    actor: Actor,
+  ): Promise<Cra | null>;
+  /**
+   * `findById`, locked for a write command (ADR-0103): `SELECT … FOR UPDATE`, so a manager's
+   * `validate`/`refuse` on the same Cra serializes against a concurrent one instead of both
+   * transitioning a copy of the same pre-lock state. Deliberately **not** what a screen reads —
+   * `findById` above stays plain, so a list or a printable never queues behind a write.
+   */
+  findByIdForWrite(id: CraId, actor: Actor): Promise<Cra | null>;
+  /**
+   * `findByConsultantAndPeriod`, locked for `recordMonth`. A row lock alone cannot protect a Cra
+   * that does not exist yet, which is why this also takes an advisory lock on
+   * `(consultantId, period)` before the read — the same shape `PgInvoiceRepository.prepareIssuance`
+   * uses for the idempotency key it cannot yet see a row for (ADR-0102). Once the Cra exists, the
+   * advisory lock and the row lock both cover it, and a manager's `findByIdForWrite` on the same
+   * row contends with either.
+   */
+  findByConsultantAndPeriodForWrite(
     consultantId: ConsultantId,
     period: Period,
     actor: Actor,

@@ -66,17 +66,7 @@ const WIDTHS = [360, 375, 768, 1024, 1440] as const;
  * parameters (`?from=`, `?client=`) that change what the page renders.
  */
 const ROUTES: readonly (readonly [persona: string, routes: readonly string[]])[] = [
-  [
-    'consultant-paris',
-    [
-      '/tableau-de-bord',
-      '/cra',
-      '/cra/2026-06',
-      '/mes-informations',
-      '/mes-notes-de-frais',
-      '/mes-absences',
-    ],
-  ],
+  ['consultant-paris', ['/tableau-de-bord', '/cra', '/cra/2026-06']],
   ['manager-paris', ['/tableau-de-bord', '/cra', '/pre-facturier', '/affectations', '/factures']],
   ['billing-paris', ['/tableau-de-bord', '/factures', '/pre-facturier']],
 ];

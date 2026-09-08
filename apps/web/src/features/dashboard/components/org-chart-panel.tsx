@@ -8,7 +8,7 @@ import { useOrgChart } from '../hooks';
 import type { OrgChartMember } from '../types';
 
 /**
- * Item 18, QA round 3: a small org-chart panel — a consultant's own manager (N+1), or a manager's
+ * A small org-chart panel — a consultant's own manager (N+1), or a manager's
  * direct reports (N-1) plus their own manager (N+1). Rendered only for those two roles
  * (`DashboardScreen`'s own call site) — `useOrgChart`'s `GET /api/v1/org-chart` is `forRoles('consultant',
  * 'manager')` (see that route's own comment for why billing has no place in this read).

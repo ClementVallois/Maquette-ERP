@@ -230,6 +230,36 @@ describe('PgInvoiceRepository', () => {
     expect(lyonResults).toHaveLength(0);
   });
 
+  it('projects list enrichment and exact HT without reconstituting the invoice', async () => {
+    await seedReferenceData();
+    await repo().saveDraft(makeDraftInvoice(), 'cra-1');
+
+    const projected = await repo().listProjection({ actor: parisManager, limit: 10, offset: 0 });
+    const periodProjected = await repo().listPeriodProjection(parisManager, '2026-03');
+
+    expect(projected).toStrictEqual(periodProjected);
+    expect(projected[0]).toMatchObject({
+      id: 'invoice-1',
+      sourceCraId: 'cra-1',
+      missionIds: ['mission-audit'],
+      lineCount: 1,
+      totalExcludingVatCents: 1_365_000,
+      totalTtcCents: 1_638_000,
+    });
+    expect(await repo().sumHtCents({ actor: parisManager, period: '2026-03' })).toBe(1_365_000);
+  });
+
+  it('scopes every package 15 projection by role and office', async () => {
+    await seedReferenceData();
+    await repo().saveDraft(makeDraftInvoice(), 'cra-1');
+
+    for (const actor of [lyonManager, parisConsultant]) {
+      expect(await repo().listProjection({ actor, limit: 10, offset: 0 })).toStrictEqual([]);
+      expect(await repo().listPeriodProjection(actor, '2026-03')).toStrictEqual([]);
+      expect(await repo().sumHtCents({ actor, period: '2026-03' })).toBe(0);
+    }
+  });
+
   it('caps pagination at MAX_PAGE_SIZE, however large the caller asks', async () => {
     // Seeded past the cap on purpose. Asking for 1000 against an empty table also returns "no
     // more than 50" and proves nothing — the cap has to be the reason the answer is short.
@@ -237,6 +267,10 @@ describe('PgInvoiceRepository', () => {
     await tx.client.query(`
       INSERT INTO billing.invoices (
         id, office_id, seller_id, status, supply_period,
+        seller_name, seller_legal_form, seller_share_capital_cents, seller_siren,
+        seller_intra_community_vat_number, seller_rcs_registration,
+        seller_address_street, seller_address_postal_code, seller_address_city,
+        seller_address_country, seller_number_prefix,
         billed_to_client_id, billed_to_name,
         billed_to_billing_street, billed_to_billing_postal_code,
         billed_to_billing_city, billed_to_billing_country,
@@ -247,6 +281,8 @@ describe('PgInvoiceRepository', () => {
         mentions_late_penalty_rate, mentions_recovery_indemnity, mentions_vat_on_debits
       )
       SELECT 'invoice-bulk-' || g, 'office-paris', 'entity-fr', 'draft', '2026-03',
+             'Sécurité & Conseil', 'SAS', 15000000, '493296529', 'FR23493296529',
+             'RCS Paris 493 296 529', '12 rue de la Boétie', '75008', 'Paris', 'FR', 'TST',
              'client-1', 'Client Test',
              '1 rue Test', '75001', 'Paris', 'France',
              '1 rue Test', '75001', 'Paris', 'France',
@@ -260,6 +296,206 @@ describe('PgInvoiceRepository', () => {
     // And a caller under the cap still gets what it asked for, so the fix is not "always 50".
     const asked = await repo().list({ actor: parisManager, limit: 10, offset: 0 });
     expect(asked).toHaveLength(10);
+  });
+
+  /** Package 08: fills every `NOT NULL` column a bulk `generate_series` row needs, one status. */
+  async function bulkInsertInvoices(options: {
+    readonly idPrefix: string;
+    readonly count: number;
+    readonly status: 'draft' | 'issued';
+    readonly supplyPeriod: (g: number) => string;
+    readonly totalTtcCents?: (g: number) => number;
+    readonly issueDate?: (g: number) => string;
+  }): Promise<void> {
+    const rows = Array.from({ length: options.count }, (_unused, index) => {
+      const g = index + 1;
+      const totalTtcCents = options.totalTtcCents?.(g) ?? null;
+      const issueDate = options.issueDate?.(g) ?? null;
+      return { g, supplyPeriod: options.supplyPeriod(g), totalTtcCents, issueDate };
+    });
+
+    for (const row of rows) {
+      await tx.client.query(
+        `INSERT INTO billing.invoices (
+          id, office_id, seller_id, status, supply_period,
+          seller_name, seller_legal_form, seller_share_capital_cents, seller_siren,
+          seller_intra_community_vat_number, seller_rcs_registration,
+          seller_address_street, seller_address_postal_code, seller_address_city,
+          seller_address_country, seller_number_prefix,
+          billed_to_client_id, billed_to_name,
+          billed_to_billing_street, billed_to_billing_postal_code,
+          billed_to_billing_city, billed_to_billing_country,
+          billed_to_delivery_street, billed_to_delivery_postal_code,
+          billed_to_delivery_city, billed_to_delivery_country,
+          payment_terms_kind, payment_terms_days,
+          mentions_operation_category, mentions_early_payment_kind,
+          mentions_late_penalty_rate, mentions_recovery_indemnity, mentions_vat_on_debits,
+          total_ht_cents, total_tax_cents, total_ttc_cents, issue_date
+        )
+        VALUES (
+          $1, 'office-paris', 'entity-fr', $2, $3,
+          'Sécurité & Conseil', 'SAS', 15000000, '493296529', 'FR23493296529',
+          'RCS Paris 493 296 529', '12 rue de la Boétie', '75008', 'Paris', 'FR', 'TST',
+          'client-1', 'Client Test',
+          '1 rue Test', '75001', 'Paris', 'France',
+          '1 rue Test', '75001', 'Paris', 'France',
+          'net', 30, 'services', 'none', 1000, 4000, false,
+          $4, $4, $4, $5
+        )`,
+        [
+          `${options.idPrefix}-${String(row.g)}`,
+          options.status,
+          row.supplyPeriod,
+          row.totalTtcCents,
+          row.issueDate,
+        ],
+      );
+    }
+  }
+
+  describe('package 08 — scoped aggregates over the complete office, never a page', () => {
+    it('sums and counts an office holding more than one page of issued invoices', async () => {
+      await seedReferenceData();
+      // 60 > MAX_PAGE_SIZE (50): a page-derived sum would silently drop ten of these.
+      await bulkInsertInvoices({
+        idPrefix: 'sum',
+        count: 60,
+        status: 'issued',
+        supplyPeriod: () => '2026-03',
+        totalTtcCents: (g) => g * 1000,
+        issueDate: () => '2026-04-01',
+      });
+
+      expect(await repo().count({ actor: parisManager, status: 'issued' })).toBe(60);
+      // Sum of 1000..60000 step 1000 = 1000 * (60 * 61 / 2) = 1_830_000.
+      expect(await repo().sumTtcCents({ actor: parisManager, status: 'issued' })).toBe(1_830_000);
+    });
+
+    it("lists every distinct period, including the office's oldest, past a page of invoices", async () => {
+      await seedReferenceData();
+      // One invoice per period, 60 periods, ordered newest-first by `list` — the 50-newest page
+      // a page-derived `availablePeriods` used to read from would never contain 2020-01..2020-09.
+      await bulkInsertInvoices({
+        idPrefix: 'period',
+        count: 60,
+        status: 'draft',
+        supplyPeriod: (g) =>
+          `${String(2020 + Math.floor((g - 1) / 12))}-${String(((g - 1) % 12) + 1).padStart(2, '0')}`,
+      });
+
+      const periods = await repo().listPeriods(parisManager);
+
+      expect(periods).toHaveLength(60);
+      expect(periods).toContain('2020-01');
+      // Newest first: g=60 -> 2020 + floor(59/12) = 2024, month (59 % 12) + 1 = 12 -> '2024-12'.
+      expect(periods[0]).toBe('2024-12');
+    });
+
+    it('finds the true oldest draft, past a page ordered newest-first', async () => {
+      await seedReferenceData();
+      // 60 distinct periods, oldest is 2020-01 (g=1). The old dashboard code read only the 50
+      // newest (ordered `supply_period DESC`) and sorted *within* that page — the true oldest ten
+      // rows (2020-01..2020-10) never appeared in it.
+      await bulkInsertInvoices({
+        idPrefix: 'oldest',
+        count: 60,
+        status: 'draft',
+        supplyPeriod: (g) =>
+          `${String(2020 + Math.floor((g - 1) / 12))}-${String(((g - 1) % 12) + 1).padStart(2, '0')}`,
+      });
+
+      const oldest = await repo().oldestDrafts(parisManager, 10);
+
+      expect(oldest.map((row) => row.supplyPeriod)).toStrictEqual([
+        '2020-01',
+        '2020-02',
+        '2020-03',
+        '2020-04',
+        '2020-05',
+        '2020-06',
+        '2020-07',
+        '2020-08',
+        '2020-09',
+        '2020-10',
+      ]);
+    });
+
+    it('finds the true most recent issued invoice, past a page ordered newest-first by supply period', async () => {
+      await seedReferenceData();
+      // `list`'s own order is by supply period, not issue date — a page-derived recent-activity
+      // feed built from it would use the wrong axis entirely, on top of the same cap defect.
+      await bulkInsertInvoices({
+        idPrefix: 'recent',
+        count: 60,
+        status: 'issued',
+        supplyPeriod: () => '2026-03',
+        totalTtcCents: (g) => g * 100,
+        issueDate: (g) =>
+          `20${String(20 + Math.floor((g - 1) / 12)).padStart(2, '0')}-${String(((g - 1) % 12) + 1).padStart(2, '0')}-01`,
+      });
+
+      const recent = await repo().recentIssued(parisManager, 3);
+
+      // g=60 is the latest issue date (2024-12-01) — the true most recent, invisible to any read
+      // ordered by supply period (every row here shares the same one).
+      expect(recent.map((row) => row.issueDate)).toStrictEqual([
+        '2024-12-01',
+        '2024-11-01',
+        '2024-10-01',
+      ]);
+    });
+
+    it('paginates a supply-period/client-name tie deterministically — no row skipped or repeated', async () => {
+      await seedReferenceData();
+      // Five invoices sharing (supply_period, billed_to_name): without a unique key in `ORDER
+      // BY`, Postgres makes no ordering guarantee across two separate queries over a tie — this
+      // test did not actually flip red on this small, single-transaction fixture (a stable plan
+      // over an unchanging table tends to return the same physical order regardless), so the
+      // guarantee this proves is by inspection of `ORDER BY`'s own total order (`i.id` is the
+      // primary key, so appending it makes every row comparable and the sort total), not by an
+      // observed race — the `Done when` clause names the property, not a reproduction technique.
+      await bulkInsertInvoices({
+        idPrefix: 'tie',
+        count: 5,
+        status: 'draft',
+        supplyPeriod: () => '2026-03',
+      });
+
+      const page1 = await repo().list({ actor: parisManager, limit: 2, offset: 0 });
+      const page2 = await repo().list({ actor: parisManager, limit: 2, offset: 2 });
+      const page3 = await repo().list({ actor: parisManager, limit: 2, offset: 4 });
+
+      const seenIds = [...page1, ...page2, ...page3].map((row) => row.id);
+      expect(new Set(seenIds).size).toBe(5); // No duplicate.
+      expect(seenIds).toHaveLength(5); // No row missing (2 + 2 + 1).
+    });
+
+    it('answers nothing for another office, and nothing for a consultant, on every new read', async () => {
+      // The audit's own "Done when" for package 08 closes with "and all queries retain
+      // role/office scope" — the same claim `findDraftedFrom`/`findDeclinedDays` already carry a
+      // dedicated negative test for, extended here to the four new reads.
+      await seedReferenceData();
+      await bulkInsertInvoices({
+        idPrefix: 'scope',
+        count: 5,
+        status: 'issued',
+        supplyPeriod: () => '2026-03',
+        totalTtcCents: (g) => g * 1000,
+        issueDate: () => '2026-04-01',
+      });
+
+      expect(await repo().listPeriods(lyonManager)).toStrictEqual([]);
+      expect(await repo().listPeriods(parisConsultant)).toStrictEqual([]);
+
+      expect(await repo().sumTtcCents({ actor: lyonManager })).toBe(0);
+      expect(await repo().sumTtcCents({ actor: parisConsultant })).toBe(0);
+
+      expect(await repo().oldestDrafts(lyonManager, 10)).toStrictEqual([]);
+      expect(await repo().oldestDrafts(parisConsultant, 10)).toStrictEqual([]);
+
+      expect(await repo().recentIssued(lyonManager, 10)).toStrictEqual([]);
+      expect(await repo().recentIssued(parisConsultant, 10)).toStrictEqual([]);
+    });
   });
 
   it('list items do not expose Tjm, Cjm or margin', async () => {
@@ -360,10 +596,10 @@ describe('PgInvoiceRepository', () => {
     expect(rows[0]!.source_cra_ids).toStrictEqual(['cra-1']);
   });
 
-  it('still reports a CRA as processed after its invoice is issued', async () => {
+  it('still finds the invoice by its source Cra after it is issued', async () => {
     // The consequence of the line above, stated as the invariant rather than as the column:
-    // the idempotency guard has to survive issuance, or a replayed event drafts a duplicate of a
-    // document that has already left.
+    // `source_cra_ids` has to survive issuance, or a replayed validation stops finding the
+    // document it already drafted and reaches the immutable aggregate instead (ADR-0104).
     await seedReferenceData();
 
     const invoice = makeDraftInvoice();
@@ -371,7 +607,8 @@ describe('PgInvoiceRepository', () => {
     invoice.issue({ by: 'claire', sequence: 8, issueDate: '2026-04-02' });
     await repo().save(invoice);
 
-    expect(await repo().hasCraBeenProcessed('cra-1')).toBe(true);
+    const found = await repo().findDraftedFrom('cra-1', parisManager);
+    expect(found.map((item) => item.id)).toStrictEqual([invoice.id]);
   });
 
   it('refuses a second draft from the same CRA after the first was issued', async () => {
@@ -426,7 +663,7 @@ describe('PgInvoiceRepository', () => {
     expect(found2!.number).toBe('TST-2026-000001');
   });
 
-  it('round-trips the seller through the legal_entities table', async () => {
+  it('freezes the seller at drafting, from the legal_entities row at that moment', async () => {
     await seedReferenceData();
 
     const invoice = makeDraftInvoice();
@@ -439,21 +676,128 @@ describe('PgInvoiceRepository', () => {
     expect(found!.seller.shareCapitalCents).toBe(15_000_000);
   });
 
-  // ---------------------------------------------------------------------------
-  // Idempotency — ADR-0021
-  // ---------------------------------------------------------------------------
-
-  it('hasCraBeenProcessed returns false for a CRA with no invoice', async () => {
-    await seedReferenceData();
-    expect(await repo().hasCraBeenProcessed('cra-never-seen')).toBe(false);
-  });
-
-  it('hasCraBeenProcessed returns true after saveDraft', async () => {
+  it('keeps the seller it was drafted with after legal_entities changes underneath it (package 06, ADR-0107)', async () => {
+    // The audit's own reproduction: "changing the seller name in a transaction changed the
+    // seller returned when an already issued invoice was reloaded." No public seller-edit
+    // endpoint is needed to falsify the persistence claim — a raw update to the reference row is
+    // sufficient, and is exactly what a reference-data correction or a later migration would do.
     await seedReferenceData();
 
     const invoice = makeDraftInvoice();
-    await repo().saveDraft(invoice, 'cra-1');
-    expect(await repo().hasCraBeenProcessed('cra-1')).toBe(true);
+    await repo().save(invoice);
+    invoice.issue({ by: 'claire', sequence: 1, issueDate: '2026-04-02' });
+    await repo().save(invoice);
+
+    await tx.client.query(
+      `UPDATE public.legal_entities
+          SET name = 'Renamed After The Fact', siren = '000000000', legal_form = 'SARL',
+              share_capital_cents = 1, rcs_registration = 'RCS Nowhere', number_prefix = 'ZZZ'
+        WHERE id = 'entity-fr'`,
+    );
+
+    const reloaded = await repo().findById('invoice-1', parisManager);
+
+    expect(reloaded!.seller.name).toBe('Sécurité & Conseil');
+    expect(reloaded!.seller.siren).toBe('493296529');
+    expect(reloaded!.seller.legalForm).toBe('SAS');
+    expect(reloaded!.seller.shareCapitalCents).toBe(15_000_000);
+    expect(reloaded!.seller.rcsRegistration).toBe('RCS Paris 493 296 529');
+    expect(reloaded!.seller.numberPrefix).toBe('TST');
+    // The document number was already allocated from the pre-mutation prefix — proof the freeze
+    // reaches numbering too, not just the printed identity fields.
+    expect(reloaded!.number).toBe('TST-2026-000001');
+  });
+
+  it('reloads the frozen VAT breakdown and due date rather than recomputing them, once issued', async () => {
+    // The instrument the audit's "Preserve historical results if calculation policy changes"
+    // clause actually asks for: seed stored values that *disagree* with what recomputing from
+    // the frozen lines/terms would produce, and prove the loaded aggregate reports the stored
+    // ones. A live-recompute bug returns the recomputed figures here instead.
+    //
+    // Two groups, one taxable and one not, so this also exercises: (a) `invoice_vat_groups`'
+    // `tax_cents IS NULL` path the migration made representable again, and (b) whether SQL's
+    // `ORDER BY group_key` and `vatBreakdownOf`'s `localeCompare` agree on group order — they are
+    // two different comparators, and the printable prints whatever order `vatBreakdown` returns.
+    await seedReferenceData();
+
+    const invoice = Invoice.draft({
+      id: 'invoice-1',
+      officeId: PARIS,
+      seller: SELLER,
+      billedTo: billedParty(parisClient),
+      supplyPeriod: period(2026, 3),
+      lines: [
+        regieLine({
+          designation: 'Prestation taxable — mars 2026',
+          missionId: 'mission-audit',
+          craId: 'cra-1',
+          period: '2026-03',
+          quarterDays: quarterDays(84),
+          tjmCents: 65_000,
+          vat: { kind: 'taxable', basisPoints: 2000 },
+        }),
+        regieLine({
+          designation: 'Prestation hors UE — mars 2026',
+          missionId: 'mission-audit',
+          craId: 'cra-1',
+          period: '2026-03',
+          quarterDays: quarterDays(4),
+          tjmCents: 50_000,
+          vat: { kind: 'notCharged', reason: 'reverseChargeEuB2b' },
+        }),
+      ],
+      terms: TERMS,
+      mentions: MENTIONS,
+      validatedBy: ['bruno'],
+    });
+    await repo().save(invoice);
+    invoice.issue({ by: 'claire', sequence: 1, issueDate: '2026-04-02' });
+    await repo().save(invoice);
+
+    // The order `issue()` itself computed, in memory, before anything is reloaded — the reference
+    // this reload has to match.
+    const orderBeforeReload = invoice.vatBreakdown.map((group) => group.key);
+
+    await tx.client.query(
+      `UPDATE billing.invoice_vat_groups SET tax_cents = tax_cents + 999
+        WHERE invoice_id = 'invoice-1' AND vat_kind = 'taxable'`,
+    );
+    // Kept coherent with the mutated group, the way a real correction would be: `#reconstitute`
+    // does not run `assertDocumentAddsUp` today, so this test is not what stops totals and the
+    // recapitulative from disagreeing — it is only proving the recapitulative is read from
+    // storage, not recomputed, and an invoice whose totals disagree with its own lines proves
+    // nothing about that.
+    await tx.client.query(
+      `UPDATE billing.invoices
+          SET due_date = '2099-01-01', total_tax_cents = total_tax_cents + 999,
+              total_ttc_cents = total_ttc_cents + 999
+        WHERE id = 'invoice-1'`,
+    );
+
+    const reloaded = await repo().findById('invoice-1', parisManager);
+
+    expect(reloaded!.vatBreakdown.map((group) => group.key)).toStrictEqual(orderBeforeReload);
+    expect(reloaded!.vatBreakdown).toHaveLength(2);
+
+    // The taxable line is 21 days at 65 000 cents/day, taxed at 20 %: 1 365 000 HT, 273 000 VAT.
+    // Recomputing from the (unchanged) lines would answer 273 000 — the mutated, stored value is
+    // 273 999, and that is what a faithful reload has to answer instead.
+    const taxable = reloaded!.vatBreakdown.find((group) => group.key === 'taxable:2000');
+    expect(taxable?.baseCents).toBe(1_365_000);
+    expect(taxable?.vatCents).toBe(273_999);
+    expect(taxable?.mention).toBeNull();
+
+    // The not-charged line: no tax amount at all — `null`, not the `0` a lossy round-trip through
+    // the pre-migration `tax_cents ?? 0` write would have produced — and a mention derived from
+    // the frozen `reason`.
+    const notCharged = reloaded!.vatBreakdown.find(
+      (group) => group.key === 'notCharged:reverseChargeEuB2b',
+    );
+    expect(notCharged?.baseCents).toBe(50_000);
+    expect(notCharged?.vatCents).toBeNull();
+    expect(notCharged?.mention).toContain('Autoliquidation');
+
+    expect(reloaded!.dueDate).toBe('2099-01-01');
   });
 
   it('saveDraft throws CraAlreadyProcessedError on duplicate CRA + same client', async () => {

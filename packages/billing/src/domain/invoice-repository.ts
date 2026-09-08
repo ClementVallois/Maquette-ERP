@@ -7,7 +7,7 @@ import type { Invoice } from './invoice.ts';
 
 export interface InvoiceListItem {
   readonly id: InvoiceId;
-  readonly status: string;
+  readonly status: InvoiceStatus;
   readonly supplyPeriod: string;
   readonly billedToName: string;
   readonly invoiceNumber: string | null;
@@ -19,6 +19,13 @@ export interface InvoiceListItem {
    */
   readonly totalTtcCents: number | null;
   readonly totalsAreProvisional: boolean;
+}
+
+export interface InvoiceListProjection extends InvoiceListItem {
+  readonly sourceCraId: CraId | null;
+  readonly missionIds: readonly MissionId[];
+  readonly lineCount: number;
+  readonly totalExcludingVatCents: number;
 }
 
 export interface InvoiceListQuery {
@@ -52,7 +59,7 @@ export interface DeclinedDaysRecord {
  */
 export interface InvoiceYearStatusCount {
   readonly year: string;
-  readonly status: string;
+  readonly status: InvoiceStatus;
   readonly count: number;
 }
 
@@ -62,7 +69,18 @@ export interface InvoiceRepository {
    * `OutOfScopeError` (ADR-0003, ADR-0023).
    */
   findById(id: InvoiceId, actor: Actor): Promise<Invoice | null>;
+  /**
+   * Serialize one issuance key and lock the target invoice before returning its current state.
+   * `keyOwnerId` is global because the database uniqueness constraint is global too.
+   */
+  prepareIssuance(
+    id: InvoiceId,
+    idempotencyKey: string,
+    actor: Actor,
+  ): Promise<{ readonly invoice: Invoice | null; readonly keyOwnerId: InvoiceId | null }>;
   list(query: InvoiceListQuery): Promise<readonly InvoiceListItem[]>;
+  listProjection(query: InvoiceListQuery): Promise<readonly InvoiceListProjection[]>;
+  listPeriodProjection(actor: Actor, period: string): Promise<readonly InvoiceListProjection[]>;
   /**
    * Rank A12: `list`'s own `WHERE`, minus `limit`/`offset` — what makes truncation observable
    * (`total` vs. the page length actually returned) instead of indistinguishable from "there were
@@ -70,19 +88,36 @@ export interface InvoiceRepository {
    */
   count(query: Omit<InvoiceListQuery, 'limit' | 'offset'>): Promise<number>;
   /**
+   * The exact sum of `totalTtcCents` over `count`'s own filter — never a page's own arithmetic. Only an `issued` invoice has a frozen `totalTtcCents`; the caller decides which
+   * statuses to include, the same way `count` already leaves that choice to its own caller.
+   */
+  sumTtcCents(query: Omit<InvoiceListQuery, 'limit' | 'offset'>): Promise<number>;
+  sumHtCents(query: Omit<InvoiceListQuery, 'limit' | 'offset'>): Promise<number>;
+  /** Every distinct supply period visible to the actor, newest first; never derived from a page. */
+  listPeriods(actor: Actor): Promise<readonly string[]>;
+  /**
+   * The N oldest drafts across every period, sorted and limited in SQL rather than filtered out
+   * of one page ordered newest-first, which would drop the true oldest rows at the cap.
+   * `sourceCraId` is the first Cra that produced this invoice, if any (ADR-0038: an invoice can
+   * have several; the dashboard's own queue names one consultant per row).
+   */
+  oldestDrafts(
+    actor: Actor,
+    limit: number,
+  ): Promise<readonly (InvoiceListItem & { readonly sourceCraId: CraId | null })[]>;
+  /** The N most recently issued invoices visible to the actor, sorted and limited in SQL. */
+  recentIssued(actor: Actor, limit: number): Promise<readonly InvoiceListItem[]>;
+  /**
    * `issuanceIdempotencyKey` is written only by an issuance, and only once: the unique index in
    * migration 009 is what makes a retry visible rather than a second numbered document (ADR-0044).
    */
   save(invoice: Invoice, options?: { issuanceIdempotencyKey: string }): Promise<void>;
-  /** The document a previous issuance already produced under this key, if this actor may see it. */
+  /**
+   * The document a previous issuance already produced under this key, if this actor may see it.
+   * Read side only — issuance itself goes through `prepareIssuance`, which is not office-scoped.
+   */
   findIssuedWithKey(key: string, actor: Actor): Promise<InvoiceListItem | null>;
   saveDraft(invoice: Invoice, craId: string): Promise<void>;
-  /**
-   * Internal invariant check — returns whether any invoice has already been drafted from this CRA.
-   * Not office-scoped: it is a boolean, exposes no data, and scoping it would let a replayed event
-   * draft duplicates in another office's transaction (ADR-0021).
-   */
-  hasCraBeenProcessed(craId: string): Promise<boolean>;
   /**
    * The invoices already drafted from this Cra. ADR-0021's contract is "replay → original result,
    * not rejection", and a boolean cannot return the original result — this is what lets a replayed

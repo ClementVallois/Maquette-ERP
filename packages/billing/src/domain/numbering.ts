@@ -7,7 +7,7 @@ import type { LegalEntity } from './seller.ts';
  * The number a document carries once it is issued: sequential, gapless, and shared by invoices and
  * credit notes (ADR-0018). This file holds the **shape** of the series and of the number; the
  * allocation that makes it gapless under concurrency is a locked row inside the issuing
- * transaction, and it is ADR-0007 in Phase 3.
+ * transaction (ADR-0007).
  */
 
 /**

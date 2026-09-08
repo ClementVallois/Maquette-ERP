@@ -9,8 +9,8 @@ on:
   # `cancelled` and left a fully green pull request unmergeable.
   push:
     branches: [main]
-  # `main` alone: `develop` was merged and deleted in Phase 0, and a trigger naming a branch that
-  # cannot exist is a rule nobody will notice has stopped applying.
+  # `main` alone: a trigger naming a branch that does not exist is a rule nobody will notice has
+  # stopped applying.
   pull_request:
     branches: [main]
 
@@ -64,15 +64,15 @@ jobs:
 
       # `apps/web` needs no entry of its own above: `pnpm run lint` is `eslint .` (repo-wide) and
       # `pnpm run typecheck` recurses into every workspace member's own `typecheck` script
-      # (package.json script) — both already cover apps/web as of frontend-plan.md Phase 1.2/1.3,
-      # the same way they cover every other member. `pnpm audit` (the `dependencies` job) is what
-      # actually changed shape by apps/web existing: a React+Vite+Playwright tree is new surface.
+      # (package.json script) — both cover apps/web the same way they cover every other member.
+      # `pnpm audit` (the `dependencies` job) is where apps/web changes the shape of the work: a
+      # React+Vite+Playwright tree is new surface.
       - run: pnpm run lint
       - run: pnpm run format:check
       - run: pnpm run typecheck
 
       # Neither lint nor typecheck runs a bundler. This is the only CI step that proves Vite can
-      # actually produce apps/web/dist — the thing Phase 9.1 will serve.
+      # actually produce apps/web/dist — the thing the API serves.
       - run: pnpm --filter @erp/web build
 
       # `.env` is gitignored, so `env:init` copies the template first. That makes the
@@ -105,11 +105,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    # The Gate of front-end plan Phase 9.6: the suite runs against `apps/web/dist` **served by the
-    # API on 3000**, not against Vite. That is not a preference — it is the only topology that
-    # sends the application's own `Content-Security-Policy` (Vite's dev server sends none), and the
-    # only one that exercises the SPA fallback of task 9.1 rather than the dev proxy standing in
-    # for it. `E2E_SERVED_BUILD=1` on the last step is what selects it; `playwright.config.ts`
+    # The suite runs against `apps/web/dist` **served by the API on 3000**, not against Vite.
+    # That is not a preference — it is the only topology that sends the application's own
+    # `Content-Security-Policy` (Vite's dev server sends none), and the only one that exercises
+    # the SPA fallback rather than the dev proxy standing in for it. `E2E_SERVED_BUILD=1` on the last step is what selects it; `playwright.config.ts`
     # documents the two topologies on its own side.
     services:
       postgres:
@@ -150,23 +149,14 @@ jobs:
       # `webServer`) would find no configuration at all. `env:init` copies the tracked
       # `.env.example`, whose values are already the ones this job needs: `DATABASE_URL` on
       # localhost:5433, matching the service container's port mapping, and
-      # `API_PUBLIC_ORIGIN=http://127.0.0.1:3000`, which is exactly the served topology (Phase 9.5
-      # is where `.env.example` says so out loud).
+      # `API_PUBLIC_ORIGIN=http://127.0.0.1:3000`, which is exactly the served topology.
       - run: pnpm run env:init
 
       # The service container runs no init scripts. Identical to `test-integration`'s own step and
       # to `docker/postgres/init/01-roles.sh`, and for the same reason: before the migrations, so
       # tables created afterwards inherit the default privileges.
       - name: Create app role, as the local init script does
-        run: |
-          psql "postgres://erp_migration:erp_local_dev@localhost:5433/erp" <<'EOSQL'
-            CREATE ROLE erp_app WITH LOGIN PASSWORD 'erp_local_dev';
-            GRANT CONNECT ON DATABASE erp TO erp_app;
-            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
-              GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO erp_app;
-            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
-              GRANT USAGE, SELECT ON SEQUENCES TO erp_app;
-          EOSQL
+        run: scripts/bootstrap-ci-role.sh
         env:
           PGPASSWORD: erp_local_dev
 
@@ -231,18 +221,10 @@ jobs:
       # `docker/postgres/init/01-roles.sh` and must stay identical to it: same role, same grants,
       # same `public` default privileges, and — critically — run BEFORE the migrations, so tables
       # created afterwards inherit them. It stops here. The per-schema grants for `timesheet` and
-      # `billing` are migration 001's job, and this workflow used to repeat them in a later step,
-      # which meant a broken grant block in the migration merged green.
+      # `billing` are migration 001's job, and are deliberately not repeated here: a workflow
+      # that re-granted them would let a broken grant block in the migration merge green.
       - name: Create app role, as the local init script does
-        run: |
-          psql "postgres://erp_migration:erp_local_dev@localhost:5433/erp" <<'EOSQL'
-            CREATE ROLE erp_app WITH LOGIN PASSWORD 'erp_local_dev';
-            GRANT CONNECT ON DATABASE erp TO erp_app;
-            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
-              GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO erp_app;
-            ALTER DEFAULT PRIVILEGES FOR ROLE erp_migration IN SCHEMA public
-              GRANT USAGE, SELECT ON SEQUENCES TO erp_app;
-          EOSQL
+        run: scripts/bootstrap-ci-role.sh
         env:
           PGPASSWORD: erp_local_dev
 
@@ -325,8 +307,7 @@ jobs:
       # Compose v2 plugin on the runner directly (verified locally — same command, same image,
       # same `.env.example` — not on an actual Actions run, which this branch cannot trigger
       # before it merges). A `setup` broken by a typo in `package.json` — the first command a
-      # stranger to this repository types — now ships red instead of green: the row of
-      # 21/08/2026 in `docs/open-questions.md`.
+      # stranger to this repository types — ships red instead of green.
       - name: The composite pnpm run setup, exactly as the README names it
         run: pnpm run setup
 
@@ -341,8 +322,8 @@ jobs:
       # non-zero — asserting `exit 0` asserts nothing. Comparing the two fingerprints closes both
       # halves of ADR-0022 at once: a non-idempotent pass moves a row count, and a
       # non-deterministic one moves every id — swapping `uuidv7Deterministic` for
-      # `crypto.randomUUID` used to leave all nine jobs green and now fails here. `diff` also
-      # names the table that moved, which an `exit 1` would not.
+      # `crypto.randomUUID` fails here and nowhere else. `diff` also names the table that moved,
+      # which an `exit 1` would not.
       #
       # What it does not cover: rows already present before the first pass. Both passes see them,
       # so both fingerprints agree. That is the seed's reset step, and it is asserted by the
@@ -354,7 +335,7 @@ jobs:
 
       # The half the seed itself cannot prove: it runs as the schema OWNER, so a successful seed
       # says nothing about whether the least-privilege role the API actually uses can read what
-      # was written. Phase 4's checkpoint deferred this here by name. Every table the API reads is
+      # was written. Every table the API reads is
       # queried as `erp_app`, and the counts are asserted rather than merely printed — a `SELECT`
       # that answers zero rows also "succeeds". The connection string is `DATABASE_URL` read out of
       # the `.env` that `setup`'s own `env:init` just wrote, rather than a second copy of the same
@@ -362,39 +343,15 @@ jobs:
       # instead of being masked by a hard-coded literal that still happens to match.
       #
       # The numbers are the seed's own volume, so any change to the dataset lands here — deliberate:
-      # a gate that accepted "more than zero" would have stayed green through item 6's roster
-      # expansion without ever reading it. Every mismatch is collected and raised once, because
-      # aborting on the first hid the eight tables behind `consultants` when that expansion landed.
+      # a gate that accepted "more than zero" would stay green through a roster change without
+      # ever reading it. Every mismatch is collected and raised once: aborting on the first hides
+      # every table behind the one that moved.
       - name: The app role can read what the seed wrote
         run: |
           set -a
           . ./.env
           set +a
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" <<'EOSQL'
-            DO $$
-            DECLARE
-              expected CONSTANT text[][] := ARRAY[
-                ['public.offices','4'], ['public.practices','5'], ['public.personas','4'],
-                ['public.consultants','49'], ['public.clients','5'], ['public.missions','7'],
-                ['timesheet.cras','148'], ['billing.invoices','66'], ['public.domain_events','147']
-              ];
-              found bigint;
-              mismatches text[] := ARRAY[]::text[];
-            BEGIN
-              FOR i IN 1 .. array_length(expected, 1) LOOP
-                EXECUTE format('SELECT count(*) FROM %s', expected[i][1]) INTO found;
-                IF found <> expected[i][2]::bigint THEN
-                  mismatches := mismatches || format('%s reads %s rows, expected %s',
-                    expected[i][1], found, expected[i][2]);
-                END IF;
-              END LOOP;
-              IF array_length(mismatches, 1) IS NOT NULL THEN
-                RAISE EXCEPTION 'erp_app: %', array_to_string(mismatches, '; ');
-              END IF;
-              RAISE NOTICE 'erp_app reads every seeded table at the expected volume.';
-            END
-            $$;
-          EOSQL
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f scripts/assert-seed-counts.sql
 
   secrets:
     name: Secret scan
@@ -449,10 +406,10 @@ jobs:
         with:
           persist-credentials: false
 
-      # Phase 8 put the production deploy path into shell — the redeploy, the nightly reset and
-      # the host wizard all run as root on the host. Semgrep's `p/typescript` and
-      # `p/security-audit` do not read bash, so until this job existed those scripts were the only
-      # executable code in the repository with no static analysis on it at all. Digest-pinned
+      # The production deploy path is shell — the redeploy, the nightly reset and the host
+      # wizard all run as root on the host. Semgrep's `p/typescript` and `p/security-audit` do not
+      # read bash, so without this job those scripts would be the only executable code in the
+      # repository with no static analysis on it at all. Digest-pinned
       # container for the same reason as osv-scanner and semgrep above.
       - name: shellcheck
         run: |

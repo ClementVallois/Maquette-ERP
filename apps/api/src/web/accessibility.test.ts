@@ -125,7 +125,6 @@ const invoice = renderToString(
         validatedBy: ['a11y-bruno'],
       }),
       dueDate: null,
-      issuanceKey: 'a11y-key',
     },
     { ...persona, key: 'billing-paris', role: 'billing' },
   ),
@@ -198,10 +197,7 @@ describe('the print stylesheet', () => {
 
 describe('the topbar crumb', () => {
   it("points the printable Cra's crumb at the SPA's own /cra/:period, never the POST-only /consultant/cra", () => {
-    // Front-end plan Phase 9.3: `PATHS.consultantCra` ('/consultant/cra') stays a registered
-    // route for the grid's save/submit POST, but no GET answers it any more — the SPA renders the
-    // grid at `/cra/:period`, and this crumb (the printable's only back affordance, replacing the
-    // shell's old role-scoped nav) has to point there instead.
+    // The SPA renders the grid at `/cra/:period`; this printable crumb must return there.
     expect(craPrint).toContain('<a class="crumb" href="/cra/2026-06">');
     expect(craPrint).not.toContain('/consultant/cra');
   });

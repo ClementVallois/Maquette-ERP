@@ -1,5 +1,5 @@
 /**
- * Items 17/23, QA round 3: a UI preference read/written the same guarded way
+ * A UI preference read/written the same guarded way
  * `routes/_shell.tsx`'s `SIDEBAR_COLLAPSED_KEY` already is — `localStorage`, never sent to the
  * API, wrapped in try/catch (private browsing, storage disabled, or no `window` yet all degrade
  * to "use the default" rather than throw).

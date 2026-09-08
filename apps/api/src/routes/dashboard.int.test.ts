@@ -247,6 +247,7 @@ describe('GET /api/v1/dashboard — consultant', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toStrictEqual({
       period: '2026-06',
+      availablePeriods: ['2026-06'],
       role: 'consultant',
       myMonthStatus: 'draft',
       recordedQuarterDays: 20,
@@ -285,6 +286,7 @@ describe('GET /api/v1/dashboard — manager', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toStrictEqual({
       period: '2026-06',
+      availablePeriods: ['2026-06'],
       role: 'manager',
       pendingDecisions: 1,
       billableCents: 0,
@@ -328,6 +330,7 @@ describe('GET /api/v1/dashboard — manager', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toStrictEqual({
       period: '2026-06',
+      availablePeriods: ['2026-06'],
       role: 'manager',
       pendingDecisions: 0,
       // 22 days × 800 € = 17 600 € HT.
@@ -373,6 +376,38 @@ describe('GET /api/v1/dashboard — manager', () => {
       // 22 workable June days × 800 € — the requested period's own total, unaffected by May.
       billableCents: 0,
     });
+  });
+
+  it('package 08: counts and lists the whole office past the 200-Cra page cap, not just its first 200 rows', async () => {
+    // 220 more submitted Cras across 220 distinct, deliberately old periods — on top of the two
+    // `beforeEach` already seeds (Alice's June draft, Chloé's June submission) — so the office
+    // holds 222 Cras total, past `CRA_LIST_MAX_PAGE_SIZE` (200). Before package 08, every one of
+    // `pendingDecisions`, `lateCras` and `availablePeriods` was derived from one `list` page
+    // ordered `period DESC`: the 22 oldest of these (2000-01..2001-10) never appeared in it.
+    await transaction.client.query(`
+      INSERT INTO timesheet.cras (id, consultant_id, office_id, period, status, submitted_at)
+      SELECT 'dashapi-old-' || g, '${ALICE}', '${PARIS}',
+             to_char(DATE '2000-01-01' + (g || ' month')::interval, 'YYYY-MM'), 'submitted',
+             TIMESTAMPTZ '2000-01-01' + (g || ' day')::interval
+      FROM generate_series(1, 220) AS g
+    `);
+
+    const response = await dashboard('manager-paris');
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{
+      readonly pendingDecisions: number;
+      readonly lateCras: number;
+      readonly availablePeriods: readonly string[];
+    }>();
+    // 220 synthetic + Chloé's June — Alice's June is a draft, not a decision awaiting one.
+    expect(body.pendingDecisions).toBe(221);
+    // Every one of the 222 Cras in the office is in a closed period (2000s or June 2026, both
+    // before NOW's July) and not validated.
+    expect(body.lateCras).toBe(222);
+    expect(body.availablePeriods).toHaveLength(221); // 220 synthetic + '2026-06'.
+    // The single oldest period — the exact row a 200-row page ordered newest-first would drop.
+    expect(body.availablePeriods).toContain('2000-02');
   });
 });
 
@@ -522,6 +557,7 @@ describe('GET /api/v1/dashboard — billing', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toStrictEqual({
       period: '2026-06',
+      availablePeriods: ['2026-06'],
       role: 'billing',
       draftInvoices: 0,
       issuedInvoices: 1,
@@ -543,6 +579,135 @@ describe('GET /api/v1/dashboard — billing', () => {
           at: '2026-07-02',
         },
       ],
+    });
+  });
+
+  /** Package 08: fills every `NOT NULL` column a bulk `generate_series` invoice row needs. */
+  async function bulkInsertInvoices(options: {
+    readonly idPrefix: string;
+    readonly count: number;
+    readonly status: 'draft' | 'issued';
+    readonly supplyPeriod: string;
+    readonly issueDate?: string;
+  }): Promise<void> {
+    await transaction.client.query(
+      `INSERT INTO billing.invoices (
+        id, office_id, seller_id, status, supply_period,
+        seller_name, seller_legal_form, seller_share_capital_cents, seller_siren,
+        seller_intra_community_vat_number, seller_rcs_registration,
+        seller_address_street, seller_address_postal_code, seller_address_city,
+        seller_address_country, seller_number_prefix,
+        billed_to_client_id, billed_to_name,
+        billed_to_billing_street, billed_to_billing_postal_code,
+        billed_to_billing_city, billed_to_billing_country,
+        billed_to_delivery_street, billed_to_delivery_postal_code,
+        billed_to_delivery_city, billed_to_delivery_country,
+        payment_terms_kind, payment_terms_days,
+        mentions_operation_category, mentions_early_payment_kind,
+        mentions_late_penalty_rate, mentions_recovery_indemnity, mentions_vat_on_debits,
+        total_ht_cents, total_tax_cents, total_ttc_cents, issue_date
+      )
+      SELECT $1 || '-' || g, $6, $7, $2, $3,
+             'SecureCo SAS', 'SAS', 10000000, '732829320', 'FR27732829320',
+             'RCS Paris 732 829 320', '42 rue', '75008', 'Paris', 'France', 'DSH',
+             $8, 'Client Bulk Test',
+             '1 rue Test', '75001', 'Paris', 'France',
+             '1 rue Test', '75001', 'Paris', 'France',
+             'net', 30, 'services', 'none', 1000, 4000, false,
+             1000 * g, 200 * g, 1200 * g, ($4::date + (g || ' day')::interval)::date
+      FROM generate_series(1, $5) AS g`,
+      [
+        options.idPrefix,
+        options.status,
+        options.supplyPeriod,
+        options.issueDate ?? '2000-01-01',
+        options.count,
+        PARIS,
+        ENTITY,
+        CLIENT,
+      ],
+    );
+  }
+
+  it('package 08: counts, sums and lists the whole office past the 50-invoice page cap', async () => {
+    // 55 issued invoices in the requested period, on top of `MAX_PAGE_SIZE` (50): before package
+    // 08, `issuedInvoices`/`totalTtcIssuedCents` were a `.filter`/`.reduce` over one 50-row page,
+    // silently dropping the 51st..55th invoice's worth of both the count and the sum.
+    await bulkInsertInvoices({
+      idPrefix: 'dashapi-issued',
+      count: 55,
+      status: 'issued',
+      supplyPeriod: '2026-06',
+    });
+    // 60 drafts, one per period, spanning back to 2000-02 — the true oldest, past a naive
+    // 50-row page ordered newest-first (ADR-0082's own reasoning, applied to `oldestDrafts`).
+    await transaction.client.query(`
+      INSERT INTO billing.invoices (
+        id, office_id, seller_id, status, supply_period,
+        seller_name, seller_legal_form, seller_share_capital_cents, seller_siren,
+        seller_intra_community_vat_number, seller_rcs_registration,
+        seller_address_street, seller_address_postal_code, seller_address_city,
+        seller_address_country, seller_number_prefix,
+        billed_to_client_id, billed_to_name,
+        billed_to_billing_street, billed_to_billing_postal_code,
+        billed_to_billing_city, billed_to_billing_country,
+        billed_to_delivery_street, billed_to_delivery_postal_code,
+        billed_to_delivery_city, billed_to_delivery_country,
+        payment_terms_kind, payment_terms_days,
+        mentions_operation_category, mentions_early_payment_kind,
+        mentions_late_penalty_rate, mentions_recovery_indemnity, mentions_vat_on_debits
+      )
+      SELECT 'dashapi-old-draft-' || g, '${PARIS}', '${ENTITY}', 'draft',
+             to_char(DATE '2000-01-01' + (g || ' month')::interval, 'YYYY-MM'),
+             'SecureCo SAS', 'SAS', 10000000, '732829320', 'FR27732829320',
+             'RCS Paris 732 829 320', '42 rue', '75008', 'Paris', 'France', 'DSH',
+             '${CLIENT}', 'Client Bulk Test',
+             '1 rue Test', '75001', 'Paris', 'France',
+             '1 rue Test', '75001', 'Paris', 'France',
+             'net', 30, 'services', 'none', 1000, 4000, false
+      FROM generate_series(1, 60) AS g
+    `);
+
+    const response = await dashboard('billing-paris');
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{
+      readonly draftInvoices: number;
+      readonly issuedInvoices: number;
+      readonly totalTtcIssuedCents: number;
+      readonly availablePeriods: readonly string[];
+      readonly oldestDrafts: readonly { readonly supplyPeriod: string }[];
+    }>();
+    expect(body.issuedInvoices).toBe(55);
+    // Sum of 1200*g for g=1..55 = 1200 * (55*56/2) = 1200 * 1540 = 1_848_000.
+    expect(body.totalTtcIssuedCents).toBe(1_848_000);
+    expect(body.availablePeriods).toContain('2000-02'); // The oldest, past a 50-row page.
+    expect(body.oldestDrafts).toHaveLength(10);
+    expect(body.oldestDrafts[0]!.supplyPeriod).toBe('2000-02'); // The true oldest draft overall.
+  });
+
+  it('ADR-0109: excludes a cancelled invoice from issuedInvoices and totalTtcIssuedCents', async () => {
+    // A cancelled invoice's number and amount still exist for provenance, but it is no longer
+    // owed — counting it as issued revenue would overstate what the firm can actually collect.
+    // This is a decision, not an accident of the label: the query filters `status = 'issued'`
+    // explicitly, and this fixture is what proves it rather than merely asserting the filter text.
+    await bulkInsertInvoices({
+      idPrefix: 'dashapi-cancelled',
+      count: 1,
+      status: 'issued',
+      supplyPeriod: '2026-06',
+    });
+    await transaction.client.query(
+      `UPDATE billing.invoices SET status = 'cancelledByCreditNote' WHERE id = 'dashapi-cancelled-1'`,
+    );
+
+    const response = await dashboard('billing-paris');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      draftInvoices: 0,
+      issuedInvoices: 0,
+      totalTtcIssuedCents: 0,
     });
   });
 });

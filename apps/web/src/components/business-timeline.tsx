@@ -10,11 +10,10 @@ export interface TimelineItem {
   readonly actorName?: string | null;
   readonly detail?: string;
   /**
-   * Item 30, QA round 3: a `bg-status-*-dot` utility class (`components/status-badge.tsx`'s own
+   * A `bg-status-*-dot` utility class (`components/status-badge.tsx`'s own
    * token set) — the same colours a `StatusBadge` reads, so a validated Cra's bubble and a
    * validated Cra's badge are the same green everywhere in the app, never a colour invented for
-   * this component alone. `undefined` (a caller that predates this field, if any) falls back to
-   * `bg-primary`, the timeline's own original single colour.
+   * this component alone. `undefined` falls back to `bg-primary`.
    */
   readonly dotClassName?: string;
 }
@@ -33,8 +32,8 @@ function TimelineText({ item }: { readonly item: TimelineItem }): ReactElement {
 }
 
 /**
- * Item 30, QA round 3: horizontal from `sm` up, to save the vertical space a long list of events
- * used to spend one full row each on — the original vertical layout stays below `sm` (a
+ * Horizontal from `sm` up, so a long list of events does not spend one full row each — the
+ * vertical layout stays below `sm` (a
  * `sm:hidden`/`hidden sm:flex` pair, the same "two trees, one hidden by breakpoint" idiom
  * `cra-grid-screen.tsx`'s own mobile/desktop matrices already use, rather than a single markup
  * tree trying to reflow itself both ways). `overflow-x-auto` on the horizontal row: this

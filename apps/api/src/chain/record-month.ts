@@ -1,5 +1,11 @@
 import type { Actor, Clock, IsoDate, Period } from '@erp/platform';
-import { Cra, type CraFlag, type RecordedDayType, workingCalendar } from '@erp/timesheet';
+import {
+  Cra,
+  type CraFlag,
+  type CraStatus,
+  type RecordedDayType,
+  workingCalendar,
+} from '@erp/timesheet';
 
 import { PgReferenceReader } from '../persistence/reference-reader.ts';
 import type { Transactionally } from '../persistence/unit-of-work.ts';
@@ -51,7 +57,7 @@ export interface RecordMonthCommand {
 
 export interface RecordMonthOutcome {
   readonly craId: string;
-  readonly status: string;
+  readonly status: CraStatus;
   readonly flags: readonly CraFlag[];
 }
 
@@ -121,7 +127,12 @@ export async function recordMonth(
   calendar.workableDaysOf(command.period);
 
   return dependencies.transactionally(async (unit) => {
-    const existing = await unit.cras.findByConsultantAndPeriod(
+    // Locked (ADR-0103): an advisory lock on `(consultantId, period)` before the row lock, so two
+    // concurrent first saves for a month with no Cra yet do not both open one — the second waits,
+    // then finds the first's row and edits it instead of racing `save`'s INSERT. A concurrent
+    // manager decision on the same, already-existing Cra contends on the same row through
+    // `findByIdForWrite`.
+    const existing = await unit.cras.findByConsultantAndPeriodForWrite(
       command.actor.consultantId,
       command.period,
       command.actor,

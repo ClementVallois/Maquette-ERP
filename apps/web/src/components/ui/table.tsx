@@ -17,11 +17,9 @@ function Table({ className, containerLabel, ...props }: TableProps) {
       // A table wider than its container scrolls horizontally on every screen this app builds
       // (`DataTable`'s own tables, and every hand-built one that reuses this component) — axe's
       // `scrollable-region-focusable` (WCAG 2.1.1/2.1.3) requires the scrollable region itself to
-      // be keyboard-reachable, not only the controls inside it. Found live (Phase 8, task 8.2's
-      // invoice line table, mobile-shell project) on the one shared component every table in this
-      // app already goes through — the CRA matrix's own identical fix
-      // (`cra-matrix-table.tsx`) never covered this one because that screen builds its own
-      // `<table>` by hand rather than through this component.
+      // be keyboard-reachable, not only the controls inside it. Fixed here, on the one shared
+      // component every table goes through — the CRA matrix carries the same fix separately
+      // (`cra-matrix-table.tsx`), because that screen builds its own `<table>` by hand.
       tabIndex={0}
       {...(containerLabel === undefined ? {} : { 'aria-label': containerLabel })}
       className="relative w-full overflow-x-auto"

@@ -1,7 +1,5 @@
 -- Grades and habilitations: the two reference dimensions the seed introduces that have no table
 -- yet. Grade carries the default Tjm grid; Habilitation constrains an assignment.
--- BUILD-PLAN 1.4 said "Phase 3 gives it its tables, Phase 4 its rows" — this migration is the
--- exception named in the Phase 4 checkpoint.
 
 CREATE TABLE public.grades (
   id    TEXT PRIMARY KEY,

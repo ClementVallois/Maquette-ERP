@@ -14,7 +14,7 @@ interface VisibilityToggleProps {
 }
 
 /**
- * Items 17/23, QA round 3: the eye/eye-off collapsible affordance shared by the dashboard's
+ * The eye/eye-off collapsible affordance shared by the dashboard's
  * company-news module and its charts area — one small component rather than two copies of the
  * same icon-swap button. Owns nothing about *what* is shown or hidden or how that choice
  * persists: each caller keeps its own `visible` state and its own `localStorage` read/write

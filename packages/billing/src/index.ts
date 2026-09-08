@@ -57,6 +57,7 @@ export {
 export type {
   DeclinedDaysRecord,
   InvoiceListItem,
+  InvoiceListProjection,
   InvoiceListQuery,
   InvoiceRepository,
   InvoiceYearStatusCount,

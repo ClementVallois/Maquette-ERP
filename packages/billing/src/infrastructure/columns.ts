@@ -39,15 +39,3 @@ export function exactInteger(column: string, value: string | number): number {
 
   return parsed;
 }
-
-/**
- * A row an existing foreign key points at came back empty. Not retryable for the same reason as
- * above: the same query will answer the same way until the data is repaired.
- */
-export class ReferencedRowMissingError extends TechnicalFailure {
-  readonly retryable = false;
-
-  constructor(table: string, id: string) {
-    super(`${table} has no row with id ${id}, though a foreign key points at it`);
-  }
-}

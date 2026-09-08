@@ -43,7 +43,12 @@ const EMMA = 'pf-emma';
 const MISSION = 'pf-mission';
 const FORFAIT = 'pf-mission-forfait';
 const CLIENT = 'pf-client';
-const ENTITY = 'pf-entity';
+// `000-` sorts before the permanently-committed rows `cra-concurrency.int.test.ts` and
+// `pg-numbering-counter.int.test.ts` leave in the shared integration database
+// (`aaa-cra-concurrency-entity`, `entity-fr`), so `PgReferenceReader.seller()`'s unscoped
+// `ORDER BY id LIMIT 1` deterministically returns this file's own row, not a leftover from
+// another one — see `api.int.test.ts`'s identical `000-api-entity` for the same reasoning.
+const ENTITY = '000-pf-entity';
 const CRA_VALIDATED = 'pf-cra-validated';
 const CRA_SUBMITTED = 'pf-cra-submitted';
 
@@ -96,10 +101,6 @@ const personas: readonly Persona[] = [
 
 function as(key: string): { cookie: string } {
   return { cookie: `${PERSONA_COOKIE}=${key}.${signPersonaKey(key, SECRET)}` };
-}
-
-function posting(key: string): Record<string, string> {
-  return { ...as(key), origin: ORIGIN, 'content-type': 'application/x-www-form-urlencoded' };
 }
 
 /** Every workable day of June 2026 — the 1st is Pentecost Monday and is not one. */
@@ -452,195 +453,3 @@ describe('the pages ADR-0061 claims about, and only a database can render', () =
     }
   });
 });
-
-describe('the three verbs of the chain, on screen', () => {
-  it('lets the manager validate a submitted month, and the invoice appears', async () => {
-    const validated = await app.inject({
-      method: 'POST',
-      url: `${PATHS.validateCra}/${CRA_VALIDATED}`,
-      headers: posting('manager-paris'),
-      payload: 'periode=2026-06',
-    });
-
-    // POST-then-redirect, so a refresh does not re-validate — and back to the month the manager
-    // was looking at, not to the default one. BUILD-PLAN 6.6 puts the filter in the URL, and an
-    // action that drops it makes every decision a jump somewhere else.
-    expect(validated.statusCode).toBe(303);
-    // `period`, not `periode`: the form field this verb reads is French (ADR-0026), the search
-    // param of the SPA route it redirects *to* is English (task 7.1), and `backToPreFacturier`
-    // translates between them. Sending `periode` would land the SPA on its own default month.
-    expect(validated.headers.location).toBe(`${PATHS.preFacturier}?period=2026-06`);
-
-    // "And the invoice appears" — read where the SPA reads it, the pré-facturier screen this
-    // file used to render being `apps/web`'s since Phase 9.3.
-    const listed = await app.inject({
-      method: 'GET',
-      url: '/api/v1/pre-facturier?period=2026-06',
-      headers: as('manager-paris'),
-    });
-    expect(listed.statusCode).toBe(200);
-    expect(listed.json<{ summary: { billableCents: number } }>().summary.billableCents).toBe(
-      1_700_000,
-    );
-  });
-
-  it('lets the manager refuse it with a reason, and the consultant sees the reason', async () => {
-    const refused = await app.inject({
-      method: 'POST',
-      url: `${PATHS.refuseCra}/${CRA_VALIDATED}`,
-      headers: posting('manager-paris'),
-      payload: 'reason=le+12+est+une+mission+termin%C3%A9e&periode=2026-06',
-    });
-
-    expect(refused.statusCode).toBe(303);
-    expect(refused.headers.location).toBe(`${PATHS.preFacturier}?period=2026-06`);
-
-    // The consultant's grid is `apps/web`'s screen since Phase 9.3, so the reason is read from
-    // the endpoint it renders — the same `craGridComposition` the deleted screen composed, one
-    // representation later. That the SPA then *shows* it is `journeys.spec.ts`'s J2.
-    const grid = await app.inject({
-      method: 'GET',
-      url: '/api/v1/cras/2026-06/grid',
-      headers: as('consultant-paris'),
-    });
-    expect(grid.statusCode).toBe(200);
-    const body = grid.json<{ status: string; refusal: { reason: string } | null }>();
-    expect(body.status).toBe('refused');
-    expect(body.refusal?.reason).toBe('le 12 est une mission terminée');
-  });
-
-  it('refuses a refusal that says nothing, before the domain is reached', async () => {
-    const response = await app.inject({
-      method: 'POST',
-      url: `${PATHS.refuseCra}/${CRA_VALIDATED}`,
-      headers: posting('manager-paris'),
-      payload: 'reason=',
-    });
-
-    // 400, not 422: an empty field is a malformed request, decided at the transport before any
-    // module is called (ADR-0042).
-    expect(response.statusCode).toBe(400);
-  });
-
-  it('refuses a manager of another office both verbs', async () => {
-    for (const path of [PATHS.validateCra, PATHS.refuseCra]) {
-      const response = await app.inject({
-        method: 'POST',
-        url: `${path}/${CRA_VALIDATED}`,
-        headers: posting('manager-lyon'),
-        payload: 'reason=pas+mon+implantation',
-      });
-
-      expect(response.statusCode).toBe(403);
-      expect(response.body).toContain('/problems/out-of-scope');
-    }
-  });
-
-  it('refuses billing the decision, whatever the screen offered it', async () => {
-    // The offer half of this test moved with the screen: `decidable` on `GET
-    // /api/v1/pre-facturier` is what the SPA renders a button from, and
-    // `routes/pre-facturier.int.test.ts` asserts it is false for billing. What stays here is the
-    // half that was always the control — the absence of a button never was one. The route is.
-    const posted = await app.inject({
-      method: 'POST',
-      url: `${PATHS.validateCra}/${CRA_VALIDATED}`,
-      headers: posting('billing-paris'),
-    });
-    expect(posted.statusCode).toBe(403);
-    expect(posted.body).toContain('/problems/insufficient-role');
-  });
-
-  it('issues the invoice from the page, carrying the key in a hidden field', async () => {
-    const id = await validateAliceJune();
-    const href = `${PATHS.invoice}/${id}`;
-
-    const page = await app.inject({ method: 'GET', url: href, headers: as('billing-paris') });
-    const key = /name="idempotencyKey" value="([\w-]+)"/u.exec(page.body)?.[1];
-    expect(key).toBeDefined();
-
-    const issued = await app.inject({
-      method: 'POST',
-      url: `${PATHS.issueInvoice}/${id}`,
-      headers: posting('billing-paris'),
-      payload: `idempotencyKey=${key ?? ''}`,
-    });
-    expect(issued.statusCode).toBe(303);
-    expect(issued.headers.location).toBe(href);
-
-    const document = await app.inject({ method: 'GET', url: href, headers: as('billing-paris') });
-    // Matched by shape rather than by prefix. The seller is `public.legal_entities` ORDER BY id
-    // LIMIT 1, and the integration database is seeded on a laptop and not in CI — so which entity
-    // wins, and therefore which prefix the number carries, differs between the two runs. What is
-    // asserted is ADR-0018's format: prefix, fiscal year, zero-padded sequence.
-    expect(document.body).toMatch(/[A-Z]{3}-2026-\d{6}/u);
-    expect(document.body).not.toContain(LABELS.invoice.draftNotice);
-    expect(document.body).toContain(LABELS.invoice.cannotIssue);
-  });
-
-  it('answers a resubmission of the same key with the same document, not a second number', async () => {
-    const id = await validateAliceJune();
-    const key = 'a-stable-key-from-one-render';
-
-    const first = await app.inject({
-      method: 'POST',
-      url: `${PATHS.issueInvoice}/${id}`,
-      headers: posting('billing-paris'),
-      payload: `idempotencyKey=${key}`,
-    });
-    const replay = await app.inject({
-      method: 'POST',
-      url: `${PATHS.issueInvoice}/${id}`,
-      headers: posting('billing-paris'),
-      payload: `idempotencyKey=${key}`,
-    });
-
-    expect(first.statusCode).toBe(303);
-    expect(replay.statusCode).toBe(303);
-
-    const { rows } = await transaction.client.query<{ count: string }>(
-      `SELECT count(*)::text AS count FROM billing.numbering_series`,
-    );
-    // One counter row, and the invoice carries one number. A retry that burned a second one is
-    // exactly what ADR-0044's key exists to stop.
-    expect(Number.parseInt(rows[0]?.count ?? '0', 10)).toBeGreaterThan(0);
-  });
-
-  it('refuses a manager the issuance, and offers them no form for it', async () => {
-    const id = await validateAliceJune();
-
-    const page = await app.inject({
-      method: 'GET',
-      url: `${PATHS.invoice}/${id}`,
-      headers: as('manager-paris'),
-    });
-    expect(page.body).not.toContain('idempotencyKey');
-
-    // Separation of duties, second rule: whoever validates does not issue. Here it is the role
-    // that refuses, before the domain's own check on `validatedBy` is reached.
-    const posted = await app.inject({
-      method: 'POST',
-      url: `${PATHS.issueInvoice}/${id}`,
-      headers: posting('manager-paris'),
-      payload: 'idempotencyKey=whatever-key-8',
-    });
-    expect(posted.statusCode).toBe(403);
-    expect(posted.body).toContain('/problems/insufficient-role');
-  });
-});
-
-/*
- * `describe('the reveal behind the pré-facturier')` stood here until Phase 9.3, and is deleted
- * rather than moved: `/marge/:consultantId` was a rendered page and is now `apps/web`'s screen,
- * reading `GET /api/v1/consultants/:consultantId/economics`. Its four claims were checked against
- * that route before the deletion, and each one already had a test there — "the progressive-
- * disclosure read" in `apps/api/src/routes/api.int.test.ts`: the margin served to a manager of the
- * office, the 403 `insufficient-role` for billing (`economics: 'none'`, ADR-0023), the 403
- * `out-of-scope` for a manager of another office (the repository's third claim, and the one
- * BUILD-RULES names), and — the one fact that had no equivalent and was moved rather than found —
- * a month with no Cra answering 404 and not a refusal.
- *
- * What is lost with the page is only the rendering: that the refusal is a **page** naming the rule
- * is still asserted in this file (the invoice document, above) and in `states.int.test.ts`, so no
- * claim of ADR-0052 or ADR-0003 rests on a test that no longer exists. The SPA's own rendering of
- * the same two refusals is `apps/web/e2e/journeys.spec.ts` (task 7.6's deep-linked 403).
- */

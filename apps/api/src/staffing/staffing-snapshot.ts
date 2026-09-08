@@ -1,12 +1,11 @@
 import type { PgReadClient } from '../persistence/pg-client.ts';
 
 /**
- * Item 3, QA round 5 (ADR-0098): a manager's office headcount, split by whether each consultant is
- * currently staffed on a client mission or sitting in `Intercontrat`. `CONTEXT.md`'s own
+ * A manager's office headcount (ADR-0098), split by whether each consultant is currently staffed on a client mission or sitting in `Intercontrat`. `CONTEXT.md`'s own
  * `Intercontrat` entry is the discriminator this reads: "modelled as an internal `Forfait` mission
  * named `Intercontrat`" (ADR-0046) — there is no boolean column and no separate table, only a
  * mission whose name this constant matches. Nothing in `packages/timesheet` or `packages/billing`
- * reads this name today; this is the first thing that does, at the application layer, the same way
+ * reads this name; only this does, at the application layer, the same way
  * `assignment-admin.ts` already queries `public.missions`/`public.assignments` directly rather than
  * through a module port. Two ADRs, not one: ADR-0047 is why there is no port (no second
  * implementation to justify one), ADR-0043 is why an app-tier read may reach `public.*` at all

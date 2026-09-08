@@ -23,44 +23,121 @@ export class UnsafeMarkupError extends TechnicalFailure {
  * Markup that has been through this module. The field is `#private`, so an object shaped like one
  * is not one — `instanceof` is a real check here, and `html` refuses anything that fails it rather
  * than calling `toString()` on it.
+ *
+ * `of`/`read`/`render`/`tag` are `private static`, not merely `@internal`-commented (ADR-0114): a
+ * comment is not enforced, and a public static `Html.of` lets any caller construct raw, unescaped
+ * markup while bypassing `trustedMarkup`'s reason-required gate.
+ * TypeScript's `private` restricts access to *this class's own members*,
+ * not merely this file — confirmed empirically (a throwaway same-file top-level function calling
+ * a `private static` member fails to typecheck with TS2341) — which is why `render` and the `html`
+ * tag below are themselves static methods now, rather than free functions reaching into the class
+ * from outside it: there is no other way to make the restriction real rather than photographic.
+ * `trustedMarkup` and `html` (exported below, unchanged in name and signature) are still the only
+ * two ways anything outside this file can obtain an `Html` — they are now thin delegates to
+ * `Html.trustedMarkup`/`Html.tag`, which hold the logic.
  */
 export class Html {
   readonly #markup: string;
 
-  /** Private: `html` and `trustedMarkup` are the only two ways to obtain one. */
+  /** Private: `Html.trustedMarkup` and `Html.tag` are the only two ways to obtain one. */
   private constructor(markup: string) {
     this.#markup = markup;
   }
 
-  /** @internal — construction stays inside this module; see the two factories below. */
-  static of(markup: string): Html {
+  private static of(markup: string): Html {
     return new Html(markup);
   }
 
-  /** @internal */
-  static read(node: Html): string {
+  private static read(node: Html): string {
     return node.#markup;
+  }
+
+  static renderToString(node: Html): string {
+    return Html.read(node);
+  }
+
+  /**
+   * The named opt-out, and the only route to raw markup. It demands a reason in the call itself,
+   * so `grep -rn 'trustedMarkup(' apps/` enumerates every place raw markup enters a page **with
+   * the argument for it on the same line**. A comment above the call would rot; an argument
+   * cannot.
+   */
+  static trustedMarkup(rawMarkup: string, why: string): Html {
+    if (why.trim() === '') {
+      throw new UnsafeMarkupError(
+        'trustedMarkup needs a reason: it is the one route past escaping, and an unexplained one ' +
+          'is indistinguishable from a mistake.',
+      );
+    }
+
+    return Html.of(rawMarkup);
+  }
+
+  private static render(value: unknown, context: Context): string {
+    if (context.kind === 'refused') throw new UnsafeMarkupError(`${context.why}.`);
+
+    if (value === null || value === undefined || value === false) return '';
+
+    if (value instanceof Html) {
+      if (context.kind === 'attribute') {
+        throw new UnsafeMarkupError(
+          `markup cannot be interpolated into the ${context.name} attribute: an attribute holds ` +
+            'text, and a nested template is markup.',
+        );
+      }
+
+      return Html.read(value);
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((element: unknown) => Html.render(element, context)).join('');
+    }
+
+    if (typeof value === 'string' || typeof value === 'number') {
+      const text = String(value);
+
+      return context.kind === 'attribute' ? renderInAttribute(text, context.name) : escape(text);
+    }
+
+    // `true`, objects, symbols, functions. Every one of them has a plausible-looking `String()`
+    // and none of them has a rendering the author meant — `[object Object]` in a page is a bug
+    // that shipped. Formatting is the caller's job, and this is where that is said.
+    throw new UnsafeMarkupError(
+      `a ${typeof value} has no rendering: format it before interpolating it. Only strings, ` +
+        'numbers, nested templates, arrays of those, and null/undefined/false may be interpolated.',
+    );
+  }
+
+  /**
+   * The tag. `strings.length` is always `values.length + 1`, so the loop pairs each static chunk
+   * with the hole that follows it and appends the final chunk after.
+   */
+  static tag(strings: TemplateStringsArray, ...values: readonly unknown[]): Html {
+    const scanner = new Scanner();
+    let out = '';
+
+    for (const [index, value] of values.entries()) {
+      const chunk = strings[index] ?? '';
+      out += chunk;
+      scanner.advance(chunk);
+      out += Html.render(value, scanner.context());
+    }
+
+    return Html.of(out + (strings.at(-1) ?? ''));
   }
 }
 
 export function renderToString(node: Html): string {
-  return Html.read(node);
+  return Html.renderToString(node);
 }
 
 /**
- * The named opt-out, and the only route to raw markup. It demands a reason in the call itself, so
- * `grep -rn 'trustedMarkup(' apps/` enumerates every place raw markup enters a page **with the
- * argument for it on the same line**. A comment above the call would rot; an argument cannot.
+ * The named opt-out, and the only route to raw markup. Delegates to `Html.trustedMarkup`, where
+ * the actual construction now has to live (see the class's own header comment) — same name, same
+ * signature, same behaviour for every existing caller.
  */
 export function trustedMarkup(rawMarkup: string, why: string): Html {
-  if (why.trim() === '') {
-    throw new UnsafeMarkupError(
-      'trustedMarkup needs a reason: it is the one route past escaping, and an unexplained one ' +
-        'is indistinguishable from a mistake.',
-    );
-  }
-
-  return Html.of(rawMarkup);
+  return Html.trustedMarkup(rawMarkup, why);
 }
 
 // ── Escaping ────────────────────────────────────────────────────────────────
@@ -477,55 +554,12 @@ function renderInAttribute(value: string, name: string): string {
   return escape(URL_ATTRIBUTES.has(name) ? sanitiseUrl(value, name) : value);
 }
 
-function render(value: unknown, context: Context): string {
-  if (context.kind === 'refused') throw new UnsafeMarkupError(`${context.why}.`);
-
-  if (value === null || value === undefined || value === false) return '';
-
-  if (value instanceof Html) {
-    if (context.kind === 'attribute') {
-      throw new UnsafeMarkupError(
-        `markup cannot be interpolated into the ${context.name} attribute: an attribute holds ` +
-          'text, and a nested template is markup.',
-      );
-    }
-
-    return Html.read(value);
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((element: unknown) => render(element, context)).join('');
-  }
-
-  if (typeof value === 'string' || typeof value === 'number') {
-    const text = String(value);
-
-    return context.kind === 'attribute' ? renderInAttribute(text, context.name) : escape(text);
-  }
-
-  // `true`, objects, symbols, functions. Every one of them has a plausible-looking `String()` and
-  // none of them has a rendering the author meant — `[object Object]` in a page is a bug that
-  // shipped. Formatting is the caller's job, and this is where that is said.
-  throw new UnsafeMarkupError(
-    `a ${typeof value} has no rendering: format it before interpolating it. Only strings, ` +
-      'numbers, nested templates, arrays of those, and null/undefined/false may be interpolated.',
-  );
-}
-
 /**
- * The tag. `strings.length` is always `values.length + 1`, so the loop pairs each static chunk
- * with the hole that follows it and appends the final chunk after.
+ * The tag. Delegates to `Html.tag`, where the actual construction now has to live (see the
+ * class's own header comment) — same name, same signature, same behaviour for every existing
+ * caller. `strings.length` is always `values.length + 1`, so `Html.tag`'s loop pairs each static
+ * chunk with the hole that follows it and appends the final chunk after.
  */
 export function html(strings: TemplateStringsArray, ...values: readonly unknown[]): Html {
-  const scanner = new Scanner();
-  let out = '';
-
-  for (const [index, value] of values.entries()) {
-    const chunk = strings[index] ?? '';
-    out += chunk;
-    scanner.advance(chunk);
-    out += render(value, scanner.context());
-  }
-
-  return Html.of(out + (strings.at(-1) ?? ''));
+  return Html.tag(strings, ...values);
 }

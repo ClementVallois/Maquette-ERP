@@ -6,10 +6,9 @@ import { LABELS } from '@/lib/labels';
 import type { InvoiceHistoryResponse, InvoiceStatus } from '../../factures/types';
 
 /**
- * Rank A2. The header this dashboard used to carry said "no chart: the seed holds one period, and
- * a curve on one point is the visual lie task 8.4 explicitly refuses." That premise is dead —
- * measured against the live seed (2026-09-01): invoice history spans 2016→2026 across six real
- * (year, status) points, and three 2026 months (June/July/August) are densely filled.
+ * A chart is only drawn where the data supports one. Measured against the seed: invoice history
+ * spans 2016→2026 across six real (year, status) points, and three 2026 months (June, July,
+ * August) are densely filled.
  *
  * Two honest series, and only these two:
  * 1. Invoices by year and status, 2016→2026 — six real points, contrasting statuses.
@@ -240,10 +239,9 @@ function DenseMonthsChart({
 }
 
 /**
- * Item 23, QA round 3: the heading and the surrounding card surface moved to the caller
- * (`dashboard-screen.tsx`'s own `HistorySection`), which needs to keep rendering the heading
- * (and its collapse toggle) even while this chart content itself is hidden — this component is
- * now just the two charts, not the section chrome around them.
+ * The two charts alone, without the heading or the card surface: the caller
+ * (`dashboard-screen.tsx`'s `HistorySection`) keeps rendering the heading and its collapse toggle
+ * even while this content is hidden.
  */
 export function InvoiceHistoryChart({
   data,

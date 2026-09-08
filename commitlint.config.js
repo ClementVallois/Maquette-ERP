@@ -23,7 +23,6 @@ export default {
         'contracts',
         'timesheet',
         'billing',
-        // Added by task 0.2 of docs/BUILD-PLAN.md, ahead of the code that uses them.
         'api',
         'web',
         'seed',

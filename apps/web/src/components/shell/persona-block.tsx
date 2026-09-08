@@ -26,9 +26,9 @@ function initialsOf(displayName: string): string {
 }
 
 /**
- * The topbar's right-hand identity block (direction-visuelle.md §6, frontend-plan.md task 4.2):
+ * The topbar's right-hand identity block (`docs/direction-visuelle.md` §6):
  * name, role, office, and "Changer de persona" (→ `DELETE /api/v1/session/persona` →
- * redirect `/`). Initials only, never a stock photo (direction-visuelle.md §1: "There are no
+ * redirect `/`). Initials only, never a stock photo (§1: "There are no
  * users — there are four personas … Personas get initials, never a stock face").
  */
 export function PersonaBlock({ persona }: { readonly persona: PersonaSummary }): ReactElement {
@@ -60,10 +60,10 @@ export function PersonaBlock({ persona }: { readonly persona: PersonaSummary }):
         <button
           type="button"
           aria-label={`${LABELS.persona.current} : ${persona.displayName}`}
-          // Item 1 (QA round 2): the topbar is a fixed 56px (`h-14`, direction-visuelle.md §6) and
-          // this button's own content — two text lines, the second one carrying `RoleBadge`'s own
-          // box height — already filled it edge to edge with the old `py-1.5`, so its border sat
-          // flush on the topbar's own border. Trading `py-1.5` for `py-[3px]` plus a new
+          // The topbar is a fixed 56px (`h-14`, `docs/direction-visuelle.md` §6) and this
+          // button's own content — two text lines, the second carrying `RoleBadge`'s box height —
+          // fills it edge to edge at `py-1.5`, leaving its border flush on the topbar's own.
+          // Trading `py-1.5` for `py-[3px]` plus
           // `my-[3px]` opens real clearance from the bar without touching the 56px constant
           // everything else in the topbar is built against, measured at ~3px top and bottom
           // against the current content height — not an enforced invariant: if `RoleBadge`'s own
@@ -75,8 +75,8 @@ export function PersonaBlock({ persona }: { readonly persona: PersonaSummary }):
           </Avatar>
           <span className="hidden flex-col items-start gap-0.5 leading-tight sm:flex">
             <span className="text-sm font-medium text-foreground">{persona.displayName}</span>
-            {/* Item 4, QA round 1: the role reads as a coloured badge (ADR-0076) rather than
-                plain text — the middle dot direction-visuelle.md §6's ASCII sketch describes
+            {/* The role reads as a coloured badge (ADR-0076) rather than
+                plain text — the middle dot `docs/direction-visuelle.md` §6's ASCII sketch describes
                 (`manager·Paris`) stays between the badge and the office name. */}
             <span className="flex items-center gap-1 text-[0.75rem] text-muted-foreground">
               <RoleBadge role={persona.role} /> · {persona.office}

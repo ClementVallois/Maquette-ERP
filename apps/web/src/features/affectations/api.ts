@@ -2,8 +2,8 @@ import { apiFetch, type ApiResult } from '@/lib/api-client';
 
 import type { AssignmentCatalogue, AssignmentInput, AssignmentSaved } from './types';
 
-export function fetchAssignments(): Promise<ApiResult<AssignmentCatalogue>> {
-  return apiFetch<AssignmentCatalogue>('/api/v1/assignments');
+export function fetchAssignments(signal?: AbortSignal): Promise<ApiResult<AssignmentCatalogue>> {
+  return apiFetch<AssignmentCatalogue>('/api/v1/assignments', { signal });
 }
 
 export function postAssignment(input: AssignmentInput): Promise<ApiResult<AssignmentSaved>> {

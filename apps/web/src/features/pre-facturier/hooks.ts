@@ -21,7 +21,7 @@ function preFacturierQueryKey(period: string, pagination?: PreFacturierPaginatio
 export function preFacturierQueryOptions(period: string, pagination: PreFacturierPagination) {
   return queryOptions({
     queryKey: preFacturierQueryKey(period, pagination),
-    queryFn: async () => unwrap(await fetchPreFacturier(period, pagination)),
+    queryFn: async ({ signal }) => unwrap(await fetchPreFacturier(period, pagination, signal)),
   });
 }
 

@@ -3,10 +3,9 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * shadcn's `Textarea`, added in Phase 7 for the refusal dialog's motif field (task 7.3) — the
- * kit's own generator emits exactly this file for `npx shadcn add textarea`; copied by hand here
- * since Phase 7 does not otherwise touch the CLI. No new dependency: same Tailwind tokens as
- * `input.tsx`, no package this repository does not already carry.
+ * shadcn's `Textarea`, for the refusal dialog's motif field — the kit's own generator emits
+ * exactly this file for `npx shadcn add textarea`, copied in by hand. No new dependency: same
+ * Tailwind tokens as `input.tsx`.
  */
 function Textarea({ className, ...props }: React.ComponentProps<'textarea'>) {
   return (

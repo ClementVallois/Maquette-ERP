@@ -1,4 +1,10 @@
-import { API_PROBLEM_TYPES } from '@erp/contracts';
+import {
+  API_PROBLEM_TYPES,
+  type PersonasResponse,
+  type PersonaSummary,
+  type SelectPersonaResponse,
+  type SessionResponse,
+} from '@erp/contracts';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -20,7 +26,12 @@ const SelectPersona = z.object({ key: z.string().min(1).max(64) });
 
 const NOT_FOUND = 404;
 
-function view(persona: Persona): Record<string, string> {
+/**
+ * Typed against `@erp/contracts`' `PersonaSummary`, not `Record<string, string>` —
+ * a field renamed or removed on either end now fails a type check instead of surfacing at runtime
+ * only, on the SPA side, once a component reads a key that stopped existing.
+ */
+function view(persona: Persona): PersonaSummary {
   return {
     key: persona.key,
     role: persona.role,
@@ -36,7 +47,7 @@ export function registerSessionRoutes(
   app.get(
     '/api/v1/personas',
     { config: { access: PUBLIC('the selector must render before a persona is chosen') } },
-    async () => {
+    async (): Promise<PersonasResponse> => {
       const personas = await dependencies.personas.list();
 
       return {
@@ -55,7 +66,7 @@ export function registerSessionRoutes(
   app.get(
     '/api/v1/session',
     { config: { access: PUBLIC('answers "which persona am I", including when there is none') } },
-    (request) => {
+    (request): SessionResponse => {
       const persona = personaFor(request);
 
       return { persona: persona === undefined ? null : view(persona) };
@@ -82,16 +93,21 @@ export function registerSessionRoutes(
         });
       }
 
+      const responseBody: SelectPersonaResponse = { persona: view(persona) };
       return reply
         .header('set-cookie', personaCookie(persona.key, dependencies.config))
-        .send({ persona: view(persona) });
+        .send(responseBody);
     },
   );
 
   app.delete(
     '/api/v1/session/persona',
     { config: { access: PUBLIC('clearing a persona needs no persona') } },
-    (_request, reply) =>
-      reply.header('set-cookie', clearedPersonaCookie(dependencies.config)).send({ persona: null }),
+    (_request, reply) => {
+      const responseBody: SessionResponse = { persona: null };
+      return reply
+        .header('set-cookie', clearedPersonaCookie(dependencies.config))
+        .send(responseBody);
+    },
   );
 }

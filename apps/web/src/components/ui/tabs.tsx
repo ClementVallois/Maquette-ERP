@@ -59,9 +59,9 @@ function TabsList({
  * shadcn's own generated default used `text-foreground/60` for an inactive trigger's light-mode
  * text, an opacity-derived colour rather than a token (the same anti-pattern `stat-card.tsx`'s own
  * comment already argues against for a border) — against this design system's `--muted` tabs-list
- * background, it computed to a 4.21:1 contrast ratio, short of WCAG's 4.5:1. Found live (axe,
- * Phase 8, task 8.1's status filter — the first screen to actually render `Tabs` outside the
- * kitchen sink) and fixed here, at the vendored component, rather than worked around per call
+ * background, it computed to a 4.21:1 contrast ratio, short of WCAG's 4.5:1. Found by axe on the
+ * invoice status filter, and fixed here at the vendored component rather than worked around per
+ * call
  * site: every future consumer inherits the fix, dark mode already used the correct token
  * (`dark:text-muted-foreground`, unchanged) and only light mode had the gap.
  */

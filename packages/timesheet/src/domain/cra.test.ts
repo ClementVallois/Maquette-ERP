@@ -410,7 +410,7 @@ describe('who may validate', () => {
 
 describe('Cra.reconstitute', () => {
   // The one door into the aggregate that sets a status without running the transition that sets
-  // the fields alongside it. Phase 3 added it for the repository and no unit test touched it.
+  // the fields alongside it: the repository's own door into the aggregate.
   const AN_INSTANT = new Date('2026-04-03T10:00:00.000Z');
 
   function persistedCra(overrides: Partial<Parameters<typeof Cra.reconstitute>[0]> = {}): Cra {
@@ -482,5 +482,169 @@ describe('Cra.reconstitute', () => {
     } catch (error) {
       expect((error as InconsistentPersistedCraError).retryable).toBe(false);
     }
+  });
+});
+
+describe('Cra — timestamp immutability (ADR-0108)', () => {
+  // No type cast anywhere in this block: `Date` has a mutating method (`setUTCFullYear`) that
+  // reaches through `readonly` without one. `CraLine`'s own plain-primitive-field hole — a cast
+  // defeats `readonly` too, just by reassigning the field directly rather than calling a method —
+  // is a separate gap, tested in its own block below.
+
+  it('does not change a validated Cra when the caller mutates the Date it read back', () => {
+    const cra = validatedCra();
+    const originalTime = cra.validatedAt!.getTime();
+
+    cra.validatedAt!.setUTCFullYear(2030);
+
+    expect(cra.validatedAt!.getTime()).toBe(originalTime);
+    expect(cra.validatedAt!.getUTCFullYear()).not.toBe(2030);
+  });
+
+  it('does not change a submitted Cra when the caller mutates the Date it read back', () => {
+    const cra = submittedCra();
+    const originalTime = cra.submittedAt!.getTime();
+
+    cra.submittedAt!.setUTCFullYear(2030);
+
+    expect(cra.submittedAt!.getTime()).toBe(originalTime);
+  });
+
+  it('does not change a refused Cra when the caller mutates the refusal Date it read back', () => {
+    const cra = submittedCra();
+    cra.refuse({ by: MANAGER, reason: 'incomplet', clock: fixedClock(), hierarchy: managers });
+    const originalTime = cra.refusal!.at.getTime();
+
+    cra.refusal!.at.setUTCFullYear(2030);
+
+    expect(cra.refusal!.at.getTime()).toBe(originalTime);
+  });
+
+  it('returns a fresh Date object on every read, not the same reference twice', () => {
+    // A weaker but simpler proof than the three above: even a caller who never mutates anything
+    // cannot come to hold the aggregate's own internal reference.
+    const cra = validatedCra();
+
+    expect(cra.validatedAt).not.toBe(cra.validatedAt);
+  });
+
+  it('is not affected by mutating the clock-sourced Date after the transition that used it', () => {
+    // The write-side counterpart of the three tests above: `Clock.now()` promises nothing about
+    // returning a fresh instance every call, and this codebase's own `fixedClock` test double
+    // returns the identical `Date` reference from every `now()` call in its lifetime — so the
+    // clock, not just the getter, is a real aliasing vector unless the transition copies too.
+    const instant = new Date('2026-04-02T09:00:00.000Z');
+    const clock = { now: () => instant };
+    const cra = completeCra();
+    cra.submit({ clock, calendar, reference });
+    const submittedAtBefore = cra.submittedAt!.getTime();
+
+    instant.setUTCFullYear(2030);
+
+    expect(cra.submittedAt!.getTime()).toBe(submittedAtBefore);
+  });
+
+  it('does not change a reconstituted Cra when the caller mutates the Date object it passed in', () => {
+    // The input-side counterpart: `Cra.reconstitute` is the door a repository comes through, and
+    // the row-mapping layer builds a `Date` it hands over — this proves the aggregate does not
+    // keep that exact reference either.
+    const submittedAt = new Date('2026-04-02T09:00:00.000Z');
+    const validatedAt = new Date('2026-04-03T10:00:00.000Z');
+    const refusalAt = new Date('2026-04-03T10:00:00.000Z');
+
+    const cra = Cra.reconstitute({
+      id: 'cra-1',
+      consultantId: CONSULTANT,
+      officeId: OFFICE,
+      period: MARCH,
+      status: 'validated',
+      lines: [],
+      flags: [],
+      submittedAt,
+      validatedBy: MANAGER,
+      validatedAt,
+      refusal: null,
+    });
+    const validatedAtBefore = cra.validatedAt!.getTime();
+    const submittedAtBefore = cra.submittedAt!.getTime();
+
+    submittedAt.setUTCFullYear(2030);
+    validatedAt.setUTCFullYear(2030);
+    refusalAt.setUTCFullYear(2030);
+
+    expect(cra.submittedAt!.getTime()).toBe(submittedAtBefore);
+    expect(cra.validatedAt!.getTime()).toBe(validatedAtBefore);
+  });
+
+  it('does not change a reconstituted refused Cra when the caller mutates the refusal object it passed in', () => {
+    const refusalAt = new Date('2026-04-03T10:00:00.000Z');
+    const refusal = { by: MANAGER, at: refusalAt, reason: 'incomplet' };
+
+    const cra = Cra.reconstitute({
+      id: 'cra-1',
+      consultantId: CONSULTANT,
+      officeId: OFFICE,
+      period: MARCH,
+      status: 'refused',
+      lines: [],
+      flags: [],
+      submittedAt: new Date('2026-04-02T09:00:00.000Z'),
+      validatedBy: null,
+      validatedAt: null,
+      refusal,
+    });
+    const refusalAtBefore = cra.refusal!.at.getTime();
+
+    refusalAt.setUTCFullYear(2030);
+
+    expect(cra.refusal!.at.getTime()).toBe(refusalAtBefore);
+  });
+});
+
+describe('Cra — line immutability (ADR-0108)', () => {
+  // `CraLine` holds only strings and a number — no mutating method, unlike `Date` — but a cast
+  // still defeats `readonly` by reassigning a field directly. Copying an array does not copy its
+  // objects: a shallow array copy stops a caller pushing or splicing, but not reaching an element
+  // already inside it.
+
+  it('does not change a Cra when the caller mutates a line it read back', () => {
+    const cra = completeCra();
+    const stolen = cra.lines[0] as { quarterDays: number };
+    stolen.quarterDays = 1;
+
+    expect(cra.lines[0]!.quarterDays).not.toBe(1);
+  });
+
+  it('returns a fresh line object on every read, not the same reference twice', () => {
+    const cra = completeCra();
+
+    expect(cra.lines[0]).not.toBe(cra.lines[0]);
+  });
+
+  it('does not change a reconstituted Cra when the caller mutates a line object it passed in', () => {
+    const line = {
+      day: '2026-03-02',
+      dayType: 'worked' as const,
+      missionId: MISSION,
+      quarterDays: 4 as const,
+    };
+
+    const cra = Cra.reconstitute({
+      id: 'cra-1',
+      consultantId: CONSULTANT,
+      officeId: OFFICE,
+      period: MARCH,
+      status: 'draft',
+      lines: [line],
+      flags: [],
+      submittedAt: null,
+      validatedBy: null,
+      validatedAt: null,
+      refusal: null,
+    });
+
+    (line as { quarterDays: number }).quarterDays = 1;
+
+    expect(cra.lines[0]!.quarterDays).toBe(4);
   });
 });

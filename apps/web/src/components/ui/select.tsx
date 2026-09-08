@@ -51,16 +51,12 @@ function SelectTrigger({
 function SelectContent({
   className,
   children,
-  // Items 7+10 (QA round 2): Radix's `item-aligned` (the shadcn default) deliberately overlays
-  // the selected option on the trigger, like a native `<select>` — read as "the list goes over
-  // the trigger, not under it" by both the manager's month picker (item 7) and the CRA page's
-  // mission picker (item 10), the only two real pickers built on this shared component (plus
-  // `kitchen-sink.tsx` and the pré-facturier's own period picker, fixed the same way for the same
-  // reason). `popper` anchors the panel below the trigger like `Popover`
-  // (`multi-select-combobox.tsx`), closing the "two different design languages" half of the
-  // complaint, and switches on the animation classes already written below
-  // (`data-[align-trigger=true]:animate-none` only suppresses them for `item-aligned`) — item 10's
-  // second ask, for free.
+  // Radix's `item-aligned` (the shadcn default) overlays the selected option on the trigger,
+  // like a native `<select>`: the list reads as going over the trigger rather than under it.
+  // `popper` anchors the panel below the trigger like `Popover`
+  // (`multi-select-combobox.tsx`), which is also what the rest of this app's pickers do, and it
+  // switches on the animation classes written below
+  // (`data-[align-trigger=true]:animate-none` only suppresses them for `item-aligned`).
   position = 'popper',
   align = 'center',
   ...props

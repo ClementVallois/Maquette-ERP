@@ -9,10 +9,9 @@ import { cn } from '@/lib/utils';
  * statuses, the four declined-day reasons). Not a generic "status" prop that accepts any string:
  * a badge only ever means one of these twelve things.
  *
- * Labels come from `src/lib/labels.ts` (frontend-plan.md task 3.3, "migrés en Phase 3" per Phase
- * 2's own task 2.4). They were hard-coded here provisionally until this phase — kept in this one
- * map, never scattered at call sites, which is what made the migration a one-file edit and not a
- * search-and-replace across every screen that renders a badge.
+ * Labels come from `src/lib/labels.ts`, read into this one map rather than scattered at call
+ * sites: a wording change is then a one-file edit, not a search-and-replace across every screen
+ * that renders a badge.
  */
 export type StatusBadgeVariant =
   | 'cra-draft'

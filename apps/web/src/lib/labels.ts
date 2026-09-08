@@ -1,13 +1,8 @@
 /**
  * Every French string the SPA renders, in one file.
  *
- * A **deliberate copy** of `apps/api/src/web/labels.ts` (frontend-plan.md Annexe C.8: "labels.ts
- * et format.ts sont des copies dans apps/web — pas de nouveau packages/, pas d'import cross-app").
- * Copied whole rather than trimmed to Phase 3's own screens: the copy deck is already written —
- * 357 lines the API's ADR-0026 already argued for — and every later phase (session selector, Cra
- * grid, pré-facturier, factures, marge) draws from the same sections, so trimming now would only
- * mean re-copying them one phase at a time. It is a copy, not a share: this file may diverge from
- * the API's as the SPA's own screens need, and nothing re-synchronises the two automatically.
+ * This is the SPA's copy deck. It is intentionally independent from the printable documents'
+ * server-side labels because the two presentation surfaces evolve separately.
  *
  * The point is not translation — there is one language and there will be one (ADR-0026's own
  * argument, unchanged here). It is **review**: a screen's wording is the part of it a
@@ -16,20 +11,17 @@
  *
  * The keys are English because they are code; the values are French because they are the screen.
  *
- * `problem.sentences` is the SPA's own equivalent of ADR-0060 ("the screens name a refusal in
- * French, keyed by its `type`, never `problem.title`") — ported unchanged, plus two entries this
- * file adds that the API's copy does not carry: `/problems/client-unparsable-response` and
+ * `problem.sentences` names failures in French by stable problem `type`, never by server title.
+ * The two client-only entries `/problems/client-unparsable-response` and
  * `/problems/client-network-failure` (`lib/api-client.ts`'s `CLIENT_PROBLEM_TYPES`) are
- * synthesized **client-side**, for a failure that never reached a server to have an RFC 9457 body
- * at all — a Vite proxy error page, an HTML error document, offline, DNS. `labels.test.ts` asserts
+ * cover failures that never produced an RFC 9457 response. `labels.test.ts` asserts
  * this table is exhaustive against `@erp/contracts`' `API_PROBLEM_TYPES`, against every domain
  * `problemType` declared under `packages/` (scanned the same way `apps/api/src/http/problem.test.ts`
  * does, not copied as a second list that could drift from the one it checks), and against the two
  * client sentinels.
  *
- * The apostrophes are typographic (’, U+2019) and the em dash is real, matching the source file —
- * this SPA renders through React/JSX, which does not escape into HTML entities the way the SSR
- * screens' hand-written renderer does, but the typographic choice is the API copy's and is kept.
+ * Apostrophes and dashes use their typographic Unicode characters because React renders them
+ * directly.
  */
 export const LABELS = {
   appName: 'Maquette ERP',
@@ -127,7 +119,7 @@ export const LABELS = {
     emptyTitle: 'Aucun persona disponible',
     emptyBody: 'Cette instance ne propose aucun persona pour le moment.',
     selectError: 'Le persona n’a pas pu être choisi. Réessayez.',
-    /** The one place a visitor is told this is not authentication (item 1, QA round 1). The API
+    /** The one place a visitor is told this is not authentication. The API
      * says the same thing in English on `GET /api/v1/personas`, for a client that never renders
      * a screen; French display copy lives here, per ADR-0026. */
     notice:
@@ -140,14 +132,9 @@ export const LABELS = {
     billing: 'Facturation',
   },
 
-  /**
-   * Phase 8 (task 8.4) builds the real screen behind `GET /api/v1/dashboard`. This section exists
-   * from Phase 4 on because the nav entry and the placeholder page both need the word — the shell
-   * does not wait for the endpoint to exist to say what the destination is called.
-   */
   dashboard: {
     heading: 'Tableau de bord',
-    /** Task 8.4: one screen, three roles, never the same three cards — `DashboardScreen` picks
+    /** One screen, three roles, never the same three cards — `DashboardScreen` picks
      * the block below matching `data.role`, the wire's own discriminant. */
     consultant: {
       monthStatus: 'Statut du mois',
@@ -185,11 +172,10 @@ export const LABELS = {
       // false the moment a pending Cra sits in another month.
       pendingSentenceNone: 'Aucun CRA n’attend votre décision.',
       open: 'Ouvrir le pré-facturier',
-      /** One work-queue row's action — opens that row's own period, not the one on screen
-       * (the bug the queue exists to fix: the counter used to point at the displayed month).
-       * Item 21, QA round 3: renamed from "Décider" and now opens the consultant's CRA directly
-       * (`/cra/$period/$consultantId`) instead of the pré-facturier — a manager reads the month
-       * before deciding, "Vérifier" names that first step. */
+      /** One work-queue row's action — opens that row's own period, not the month on screen,
+       * and opens the consultant's CRA (`/cra/$period/$consultantId`) rather than the
+       * pré-facturier: a manager reads the month before deciding, and "Vérifier" names that
+       * first step. */
       decide: 'Vérifier',
     },
     billing: {
@@ -240,7 +226,7 @@ export const LABELS = {
       year: 'Année',
       total: 'Total',
     },
-    /** Item 3, QA round 5 (ADR-0098): the manager's own replacement for the invoice-history charts
+    /** The manager's own replacement (ADR-0098) for the invoice-history charts
      * above, which are not relevant to a manager's own question ("who is staffed on what, right
      * now"). Billing renders no chart at all — see `chartsUnavailable` below. */
     staffing: {
@@ -253,7 +239,7 @@ export const LABELS = {
       empty: 'Aucun consultant actif dans cette implantation.',
       hide: 'Masquer la répartition de l’équipe',
       show: 'Afficher la répartition de l’équipe',
-      /** Item 3, QA round 6: the legend entries double as the entry point into `/affectations`,
+      /** The legend entries double as the entry point into `/affectations`,
        * filtered — appended as an `sr-only` span onto each `Link`'s own visible text
        * (`onMission`/`intercontrat` above plus the count), not an `aria-label` overriding it,
        * since the visible legend text is not on its own a sentence describing where the link
@@ -261,13 +247,13 @@ export const LABELS = {
       openOnMission: 'Voir les consultants en mission',
       openIntercontrat: 'Voir les consultants en intercontrat',
     },
-    /** Item 3, QA round 5: billing's deliberate empty state where the invoice-history charts used
-     * to render — a stated absence, not a silent hole in the layout. */
+    /** Billing's deliberate empty state where a role with no chart would otherwise leave a
+     * silent hole in the layout. */
     chartsUnavailable: {
       heading: 'Graphiques',
       body: 'Aucun graphique pour ce rôle pour le moment.',
     },
-    /** Item 17, QA round 3: the dashboard's "informations CSE / vie de l’entreprise" module — a
+    /** The dashboard's "informations CSE / vie de l’entreprise" module — a
      * small rotating carousel of authored company-news messages, every role. */
     companyNews: {
       heading: 'Informations CSE / vie de l’entreprise',
@@ -281,7 +267,7 @@ export const LABELS = {
        * mockup has no document store to open it from. */
       attachmentNotProvided: '(document non fourni dans la maquette)',
     },
-    /** Item 18, QA round 3: the dashboard's org-chart panel, consultant and manager only — billing
+    /** The dashboard's org-chart panel, consultant and manager only — billing
      * has no place in this org chart in the seed (the one billing persona is the director every
      * manager reports to, not a subject of this read). */
     orgChart: {
@@ -290,8 +276,8 @@ export const LABELS = {
       noManager: 'Aucun manager renseigné.',
       reports: 'Équipe ({count})',
       noReports: 'Aucun rattachement direct.',
-      /** F14: this panel used to render nothing at all on a failed read, so an existing section
-       * silently vanished. A compact line and a retry button, not a second `ErrorState` card. */
+      /** A failed read must not make this panel vanish silently: a compact line and a retry
+       * button, not a second `ErrorState` card. */
       unavailable: 'Équipe indisponible pour le moment.',
     },
   },
@@ -301,8 +287,8 @@ export const LABELS = {
     listHeading: 'Mes CRA',
     nav: 'Mes CRA',
     /**
-     * The **manager's** nav-entry wording for the same `/cra` route (frontend-plan.md task 4.3:
-     * "manager → Pré-facturier, CRA, Factures, Marge") — deliberately not `nav` above, which is
+     * The **manager's** nav-entry wording for the same `/cra` route — deliberately not `nav`
+     * above, which is
      * possessive ("Mes CRA", "my CRAs") and wrong for a manager's office-wide list. Two role-scoped
      * `NavEntry`s point at the same path with this distinct label rather than one entry whose text
      * varies by role (`config/navigation.ts`'s own comment explains why).
@@ -311,8 +297,8 @@ export const LABELS = {
     /** The matrix's row-header column (ADR-0070: rows are activities, not days). */
     activity: 'Activité',
     totals: 'Totaux du mois',
-    /** The matrix's per-day total row, and the total-per-day column header on the totals panel
-     * (Phase 6.2's "deux totaux, lus du même état local"). */
+    /** The matrix's per-day total row, and the total-per-day column header on the totals panel —
+     * two totals, read from the same local state. */
     dayTotal: 'Total du jour',
     monthTotal: 'Total du mois',
     weekTotal: 'Total semaine',
@@ -350,14 +336,14 @@ export const LABELS = {
     notStartedYet: 'Ce mois n’a pas encore été commencé. Remplissez-le, puis enregistrez.',
     nothingRecorded: 'Rien n’est encore saisi sur ce mois.',
     refused: 'Ce CRA a été refusé par le manager. Corrigez-le, puis soumettez-le à nouveau.',
-    /** Item 31, QA round 3: prefixes the manager's free-text refusal reason wherever it is shown
+    /** Prefixes the manager's free-text refusal reason wherever it is shown
      * verbatim (the consultant's own CRA, and the manager's read of it), so the reason reads as a
      * labelled field rather than an unattributed sentence. */
     refusalReasonPrefix: 'Motif : ',
     emptyList: 'Aucun CRA sur cette période.',
     emptyListHint:
       'Ce n’est pas un refus : la liste est bien la vôtre, elle ne contient simplement rien pour ce mois.',
-    /** Item 7 (QA round 1) — the manager-only consultant/status filter on `/cra`. A consultant
+    /** The manager-only consultant/status filter on `/cra`. A consultant
      * persona never sees this (they have one CRA) and neither does a billing one, so these
      * strings render for a manager and nobody else. */
     filters: {
@@ -369,14 +355,14 @@ export const LABELS = {
       clear: 'Effacer les filtres',
       emptyTitle: 'Aucun CRA ne correspond à ces filtres.',
       emptyBody: 'Essayez de retirer un consultant, un statut, une année ou un mois du filtre.',
-      /** Item 4 (QA round 2): year and month, independent of each other and of the two above. */
+      /** Year and month, independent of each other and of the two filters above. */
       yearLabel: 'Année',
       yearAll: 'Toutes les années',
       monthLabel: 'Mois',
       monthAll: 'Tous les mois',
     },
-    /** task 6.1: the two-row list needed no filter; this replaces it with the control item 2
-     * actually asked for — opening a month that has no `Cra` row yet. */
+    /** Opens a month that has no `Cra` row yet — the one control a list of existing months
+     * cannot offer. */
     openAnotherMonth: 'Ouvrir un autre mois',
     openAnotherMonthHint:
       'Choisissez un mois à venir pour commencer sa saisie à partir d’une grille vide.',
@@ -454,7 +440,7 @@ export const LABELS = {
       dayIncompleteColumn: 'À compléter',
       dayIncomplete:
         'Ce jour ouvré n’atteint pas une journée complète : le mois ne pourra pas être soumis tant qu’il y manque quelque chose.',
-      /** Item 28, QA round 3: a consultant-side warning, never a block — time entered on a
+      /** A consultant-side warning, never a block — time entered on a
        * weekend or un jour férié happens in this business (the manager's own `flagged`/
        * `nonWorkable` markers exist for exactly this) and the submission still goes through.
        * `{count}` interpolated, singular/plural chosen at the call site. */
@@ -478,6 +464,14 @@ export const LABELS = {
       },
       unsavedChangesConfirm:
         'Des modifications ne sont pas enregistrées sur ce mois. Changer de mois maintenant les perdra. Continuer ?',
+      /** A newer answer arrived from the server (another tab, a reconnection, any invalidation
+       * not caused by this grid's own save) while the grid held unsaved edits. The render-time
+       * resync (ADR-0067) refuses to overwrite them silently; this banner asks instead. */
+      remoteUpdateConflictTitle: 'Des données plus récentes sont arrivées du serveur',
+      remoteUpdateConflictBody:
+        'Ce mois a changé côté serveur pendant que vous le modifiiez ici — un autre onglet, ou une reconnexion. Vos modifications non enregistrées ne sont pas perdues, mais elles ne sont pas non plus à jour.',
+      remoteUpdateConflictReload: 'Recharger la version du serveur (perdre mes modifications)',
+      remoteUpdateConflictKeep: 'Garder mes modifications',
       /** A9's progress bar — `{completed}`/`{total}` interpolated, counted over workable days only
        * (`isDayComplete`, `matrix.ts`). */
       workdaysComplete: '{completed}/{total} jours ouvrés complets',
@@ -642,7 +636,7 @@ export const LABELS = {
       confirm: 'Valider',
       cancel: 'Annuler',
       periodFactLabel: 'Période',
-      /** Item 28, QA round 3: a weekend/holiday entry made visually loud (a banner, not a plain
+      /** A weekend/holiday entry made visually loud (a banner, not a plain
        * `<dl>` row a manager could validate past without reading) — `{count}` interpolated,
        * singular/plural chosen at the call site. Shown only where the count is known
        * (`manager-cra-grid-screen.tsx`'s own `data.flags`); the pré-facturier's own row-level
@@ -763,10 +757,9 @@ export const LABELS = {
     searchPlaceholder: 'Client ou numéro de facture…',
     searchAction: 'Rechercher',
     year: 'Année',
-    /** Item 4, QA round 6: "Toutes" was a `placeholder` on a captioned number input; it is now
-     * the whole visible text of a `Select` trigger, and this screen's status pills already offer
-     * a "Toutes" of their own right below it. Spelled out, which also makes it the same string
-     * `/cra`'s own year filter shows — the `w-48` trigger was sized for exactly this one. */
+    /** Spelled out rather than "Toutes": this is the whole visible text of a `Select` trigger,
+     * the screen's status pills already offer a bare "Toutes" right below it, and `/cra`'s own
+     * year filter shows the same string. The `w-48` trigger is sized for it. */
     allYears: 'Toutes les années',
     clearFilters: 'Effacer les filtres',
     emptyTitle: 'Aucune facture',
@@ -781,9 +774,8 @@ export const LABELS = {
      * this route's own plural `/factures/$id`) in a new tab. `terms` renders the payment
      * condition itself (`PaymentTerms`, on the wire) — never a computed due date:
      * `Invoice.dueDateFrom` lives in `packages/billing`, off limits to `apps/web` (§2), and
-     * `docs/open-questions.md`'s Phase 3 checkpoint (point 3) already named `dueDate`'s absence
-     * from the route as a finding for whichever phase first needed it, not an invitation to
-     * recompute it client-side. */
+     * and `dueDate`'s absence from the route is a finding recorded in
+     * `docs/open-questions.md`, not an invitation to recompute it client-side. */
     printable: 'Version imprimable',
     backToList: 'Retour à la liste',
     paymentTerms: 'Conditions',
@@ -975,6 +967,7 @@ export const LABELS = {
         'La mission exige une habilitation que le consultant ne détenait pas ce jour-là.',
       '/problems/cra-incomplete': 'Le mois n’est pas complet au regard du calendrier ouvré.',
       '/problems/cra-after-departure': 'Ce mois commence après le départ du consultant.',
+      '/problems/cra-already-exists': 'Ce mois a déjà été ouvert entre-temps — rechargez la page.',
       '/problems/self-validation-forbidden':
         'Qui saisit un CRA ne le juge pas — ni pour le valider, ni pour le refuser : c’est la première règle de séparation des tâches.',
       '/problems/not-the-manager':
@@ -1038,9 +1031,8 @@ export const LABELS = {
   },
 
   /**
-   * The shell itself (frontend-plan.md Phase 4, tasks 4.2-4.4): the sidebar's collapse control,
-   * the mobile `Sheet` trigger, the "à venir" placeholder every Phase 6-8 route renders until its
-   * own phase builds it, the styled 404, and the invalidated-session copy.
+   * The shell itself: the sidebar's collapse control, the mobile `Sheet` trigger, the "à venir"
+   * placeholder, the styled 404, and the invalidated-session copy.
    */
   shell: {
     collapse: 'Réduire la navigation',
@@ -1061,7 +1053,7 @@ export const LABELS = {
     sessionInvalidated: 'Votre persona n’est plus reconnue. Choisissez-en une à nouveau.',
   },
 
-  /** Item 20, QA round 3: three placeholder pages under a small sidebar group, every role
+  /** Three placeholder pages under a small sidebar group, every role
    * (`ALL_ROLES` in `config/navigation.ts`) — each renders `ComingSoon`, no screen behind it yet. */
   selfService: {
     mesInformationsNav: 'Mes informations',

@@ -42,13 +42,12 @@ export async function issueInvoice(
   command: IssueInvoiceCommand,
 ): Promise<IssueInvoiceOutcome> {
   return dependencies.transactionally(async (unit) => {
-    // The replay check comes first, and it is scoped: an actor who may not read the invoice does
-    // not learn from this route whether their key was used on one.
-    const alreadyIssued = await unit.invoices.findIssuedWithKey(
+    const prepared = await unit.invoices.prepareIssuance(
+      command.invoiceId,
       command.idempotencyKey,
       command.actor,
     );
-    if (alreadyIssued !== null && alreadyIssued.id !== command.invoiceId) {
+    if (prepared.keyOwnerId !== null && prepared.keyOwnerId !== command.invoiceId) {
       return {
         kind: 'keyReused',
         invoiceId: command.invoiceId,
@@ -58,17 +57,7 @@ export async function issueInvoice(
       };
     }
 
-    if (alreadyIssued !== null) {
-      return {
-        kind: 'replayed',
-        invoiceId: alreadyIssued.id,
-        invoiceNumber: alreadyIssued.invoiceNumber,
-        issueDate: alreadyIssued.issueDate,
-        totalTtcCents: alreadyIssued.totalTtcCents,
-      };
-    }
-
-    const invoice = await unit.invoices.findById(command.invoiceId, command.actor);
+    const invoice = prepared.invoice;
     if (invoice === null) {
       return {
         kind: 'notFound',
@@ -76,6 +65,16 @@ export async function issueInvoice(
         invoiceNumber: null,
         issueDate: null,
         totalTtcCents: null,
+      };
+    }
+
+    if (prepared.keyOwnerId === command.invoiceId) {
+      return {
+        kind: 'replayed',
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.number,
+        issueDate: invoice.issueDate,
+        totalTtcCents: invoice.totals.totalIncludingVatCents,
       };
     }
 

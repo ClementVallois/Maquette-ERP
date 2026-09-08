@@ -38,7 +38,7 @@ export function contextOf(request: FastifyRequest): ProblemContext {
  * a message from a status code: it renders the `ProblemDetails` the API would have returned, so a
  * refusal a reader sees on a page and the one a `curl` reproduces are the same refusal, down to
  * `deniedBy`. That field marks a refusal as deliberate; it does **not** yet name which of
- * ADR-0023's three loci said no — every call site sets it to the `type` — and
+ * ADR-0023's three loci said no: every call site sets it to the `type`.
  * `docs/open-questions.md` carries the question of whether it should.
  *
  * The representation is chosen from the path (`web/representation.ts`), never from `Accept`.

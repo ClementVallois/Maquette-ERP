@@ -157,7 +157,7 @@ test.describe('demo checklist — the opening beat: the selector, notice visible
   });
 });
 
-test.describe('item 1 — switching persona drops stale data without a reload', () => {
+test.describe('switching persona drops stale data without a reload', () => {
   test("a manager switched to client-side sees the whole office, not the previous persona's own rows", async ({
     page,
   }) => {
@@ -197,7 +197,7 @@ test.describe('item 1 — switching persona drops stale data without a reload', 
  * personas endpoint adds a delay on top, purely so a human reading a failing run sees an obvious
  * repro rather than a one-frame blip.
  */
-test.describe('item 2 — no skeleton flash between choosing a persona and landing on its home', () => {
+test.describe('no skeleton flash between choosing a persona and landing on its home', () => {
   test('the selector never falls back to its own loading skeleton once a persona is chosen', async ({
     page,
   }) => {
@@ -311,7 +311,7 @@ test.describe('item 2 — no skeleton flash between choosing a persona and landi
  * twice" apart from "the whole document reloaded once", and this bug is specifically the second
  * one.
  */
-test.describe('item 9 — “Changer de persona” never hard-reloads the page', () => {
+test.describe('“Changer de persona” never hard-reloads the page', () => {
   test('no second document request and no second load event follow the client-side navigation to /', async ({
     page,
   }) => {
@@ -359,7 +359,7 @@ test.describe('item 9 — “Changer de persona” never hard-reloads the page',
  * Filled the fast way (one day, then "Remplir les jours ouvrés vides") — the fill mechanism itself
  * is `J1`'s own test's job, not this one's.
  */
-test.describe('item 3 — a manager opens and decides a CRA from the pré-facturier', () => {
+test.describe('a manager opens and decides a CRA from the pré-facturier', () => {
   test('the pré-facturier’s “Ouvrir” link reaches the CRA, and validating from there lands back on the pré-facturier', async ({
     page,
   }) => {
@@ -618,12 +618,9 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
     });
   });
 
-  test('a manager refusal (via the pre-existing SSR endpoint) shows the reason, matrix re-editable', async ({
+  test('a manager refusal through the JSON API shows the reason, matrix re-editable', async ({
     page,
   }) => {
-    // `docs/frontend-plan.md` Annexe A names no `/api/v1` refusal route yet (Phase 7 gives the
-    // SPA its own) — the domain and its HTTP surface for a refusal already exist and are already
-    // tested, so driving that real endpoint here is evidence from the real chain.
     await choosePersona(page, 'consultant-paris');
     const before = await fetchGrid(page, EDIT_PERIOD);
     expect(before.status).toBe('submitted');
@@ -634,12 +631,11 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
 
     await switchPersonaViaApi(page, 'manager-paris');
     const reason = 'Le 03/09 doit être reventilé sur un seul projet — motif de démonstration e2e.';
-    const refusal = await page.request.post(`${API_ORIGIN}/pre-facturier/refus/${craId}`, {
-      form: { reason, periode: EDIT_PERIOD },
+    const refusal = await page.request.post(`${API_ORIGIN}/api/v1/cras/${craId}/refusal`, {
+      data: { reason },
       headers: { origin: browserOrigin() },
-      maxRedirects: 0,
     });
-    expect(refusal.status()).toBe(303);
+    expect(refusal.status()).toBe(200);
 
     await switchPersonaViaApi(page, 'consultant-paris');
     await page.goto(`/cra/${EDIT_PERIOD}`);
@@ -662,7 +658,7 @@ test.describe('J1 — consultant-paris (Alice): the seed on 2026-06, then a matr
   });
 });
 
-test.describe('item 2 — a consultant opens a month ahead that has no Cra yet', () => {
+test.describe('a consultant opens a month ahead that has no Cra yet', () => {
   test('the "Ouvrir un autre mois" picker opens a blank, editable grid', async ({ page }) => {
     await choosePersona(page, 'consultant-paris');
     await page.goto('/cra');
@@ -689,7 +685,7 @@ test.describe('item 2 — a consultant opens a month ahead that has no Cra yet',
   });
 });
 
-test.describe('items 4/5 — a manager sees consultants, picks one, opens a read-only CRA (ADR-0071)', () => {
+test.describe('a manager sees consultants, picks one, opens a read-only CRA (ADR-0071)', () => {
   test('opening Alice’s validated June from the office list is read-only and names her', async ({
     page,
   }) => {
@@ -757,7 +753,7 @@ test.describe('items 4/5 — a manager sees consultants, picks one, opens a read
   });
 });
 
-test.describe('task 6.5 — a role this route cannot serve', () => {
+test.describe('a role this route cannot serve', () => {
   test('a manager on /cra/2026-06 (own-month route) gets the designed denied screen, not a crash', async ({
     page,
   }) => {
@@ -783,7 +779,7 @@ test.describe('task 6.5 — a role this route cannot serve', () => {
   });
 });
 
-test.describe('task 6.1 — the month list', () => {
+test.describe('the month list', () => {
   test('Mes CRA lists Alice’s months, and offers no period filter', async ({ page }) => {
     await choosePersona(page, 'consultant-paris');
     await page.goto('/cra');
@@ -809,7 +805,7 @@ test.describe('task 6.1 — the month list', () => {
  * `placeholderData: keepPreviousData` on `craListQueryOptions` (`features/cra/hooks.ts`), not by
  * touching `MultiSelectCombobox`/`Popover`/`Checkbox` at all — none of those were ever at fault.
  */
-test.describe('items 3 + 11 — the consultant selector stays open, and shows only checkboxes', () => {
+test.describe('the consultant selector stays open, and shows only checkboxes', () => {
   test('checking two boxes in a row keeps the popover open, with no extra icon or badge', async ({
     page,
   }) => {
@@ -903,7 +899,7 @@ test.describe('items 3 + 11 — the consultant selector stays open, and shows on
  * below decides anything, and must leave Claire's June exactly as it found it — "submitted",
  * still the one pending row J2 depends on.
  */
-test.describe('item 7 — consultant and status filters on the manager’s CRA list', () => {
+test.describe('consultant and status filters on the manager’s CRA list', () => {
   test('both filters narrow, together, and the state survives a reload via the URL', async ({
     page,
   }) => {
@@ -1002,7 +998,7 @@ test.describe('item 7 — consultant and status filters on the manager’s CRA l
  * incidental proof of the same "old data stays readable" rule item 6's own tests cover elsewhere,
  * not this test's own point.
  */
-test.describe('item 4 — a year and/or month filter on the manager’s CRA list', () => {
+test.describe('a year and/or month filter on the manager’s CRA list', () => {
   test('year and month each narrow on their own, and AND together, surviving a reload', async ({
     page,
   }) => {
@@ -1309,7 +1305,7 @@ test.describe('J4 — billing-paris (Henri): issues the draft J2 created, with a
  * see only issued rows" a meaningful assertion rather than one that would pass on an empty table
  * regardless of the fix.
  */
-test.describe('item 8 — the invoice status filter reads as individually-clickable pills', () => {
+test.describe('the invoice status filter reads as individually-clickable pills', () => {
   test('each pill narrows exclusively, carries a count, and the choice survives a reload', async ({
     page,
   }) => {
@@ -1423,7 +1419,7 @@ test.describe('J3 — manager-paris (Bruno): refuses the month Alice submitted i
  * dashboard for a *different* period (June, already `validated`) and checks the refusal from the
  * other month still surfaces there, instead of disappearing the moment `period` moves past it.
  */
-test.describe('item 5 — the consultant dashboard names a refusal from another period', () => {
+test.describe('the consultant dashboard names a refusal from another period', () => {
   test('a refusal from another month stays visible, and its own link opens that month', async ({
     page,
   }) => {
@@ -1479,7 +1475,7 @@ test.describe('J6 — billing-paris (Henri): the margin URL refuses him, by role
   });
 });
 
-test.describe('task 7.6 — a period with nothing in it', () => {
+test.describe('a period with nothing in it', () => {
   // 2026-07 until item 6 (QA round 1): the seed's own dense months now cover 2026-06/07/08 for
   // every office (`scripts/lib/seed-data.ts`'s `DENSE_PERIODS`), so Paris genuinely has Cras on
   // 2026-07 today. 2026-12 is outside both `DENSE_PERIODS` and the sparse 2016-2024 historical

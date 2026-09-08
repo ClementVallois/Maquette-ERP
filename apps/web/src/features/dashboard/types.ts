@@ -1,149 +1,20 @@
 /**
- * `GET /api/v1/dashboard?period=` — task 5.3 built the route, task 8.4 is its first consumer.
- * This shape replaces a Phase 3 placeholder transcribed from task 5.3's prose bullets rather than
- * verified against code (that file's own header said so): the real route
- * (`apps/api/src/routes/api.ts`, ~line 469) answers a **discriminated union keyed by `role`**, not
- * three optional fields on one object, and two of the three per-role field sets use different
- * names than the prose implied. Confirmed against the handler and a live call (`curl`, each of the
- * three personas, `?period=2026-06`, seed reset) rather than guessed (rule 0bis.8):
- *
- * - consultant: `myMonthStatus` (`CraStatus | null` — `null` only when no Cra exists yet for the
- *   period), `recordedQuarterDays`, `remainingWorkableDays`, `refusedPeriods` (ADR-0082: every
- *   period currently `refused`, not only `period` above).
- * - manager: `pendingDecisions` (submitted Cras awaiting a decision, across every period —
- *   ADR-0082), `billableCents` (the requested period's own total — the same aggregate
- *   `/pre-facturier` shows in full for that period, ADR-0053/ADR-0065, so the two screens cannot
- *   disagree on it), `lateCras` (closed-period, non-`validated` Cras, across every period —
- *   ADR-0082 again), `staffing` (the office's on-mission/`Intercontrat` split, as of today —
- *   ADR-0098).
- * - billing: `draftInvoices`, `issuedInvoices`, `totalTtcIssuedCents` — the one branch the Phase 3
- *   placeholder already had right.
- *
- * `period` is a **required** query parameter with no server-side default — confirmed live: a bare
- * `GET /api/v1/dashboard` (no `period`) answers `400 malformed-request`. `lib/period.ts`'s
- * `currentPeriod()` is what the SPA supplies.
- *
- * **Interdit** (task 5.3, in bold, restated by BUILD-RULES § Authorization): no `cjmCents`, no
- * `tjmCents`, no margin anywhere in this type or the route behind it — confirmed by reading the
- * handler, which never touches `consultantEconomics` or a `Cjm`/`Tjm` field on any branch.
+ * Re-exported from `@erp/contracts` rather than hand-duplicated. This file stays so every other
+ * file in this feature keeps importing `./types`; the single description lives in
+ * `packages/contracts/src/dashboard.ts`, shared with `apps/api/src/routes/dashboard.ts`.
  */
-
-/**
- * The same four-value union `features/cra/types.ts` declares as `CraStatus`, repeated as a
- * literal here rather than imported: `docs/open-questions.md` (row dated 24/08/2026) left the
- * question of a boundary between SPA feature folders open, naming this phase as the one that
- * would make the real number of crossings visible. It stayed at exactly one (`cra` → `factures`,
- * `InvoiceListItem`) through this phase too — this type would have been the second, and a
- * four-literal union costs less repeated than a new cross-feature import costs decided-on-the-fly
- * (see this phase's checkpoint for the closed row).
- */
-export type DashboardCraStatus = 'draft' | 'submitted' | 'validated' | 'refused';
-
-export interface DashboardActivity {
-  readonly key: string;
-  readonly kind: 'cra' | 'invoice';
-  readonly recordId: string;
-  readonly status: DashboardCraStatus | 'issued' | 'cancelledByCreditNote';
-  readonly period: string;
-  readonly name: string | null;
-  readonly at: string;
-  readonly consultantId?: string;
-}
-
-export interface ConsultantDashboard {
-  readonly period: string;
-  readonly role: 'consultant';
-  readonly myMonthStatus: DashboardCraStatus | null;
-  readonly recordedQuarterDays: number;
-  readonly remainingWorkableDays: number;
-  /**
-   * ADR-0082: every period currently `refused`, not only `period` above — a refusal from a month
-   * the visitor has since moved on from still owes a correction, and stops showing anywhere on
-   * this screen the moment `period` defaults past it. Usually holds at most one entry; may hold
-   * `period` itself too (when this month's own refusal is what `myMonthStatus` already reports).
-   */
-  readonly refusedPeriods: readonly string[];
-  readonly recentActivity: readonly DashboardActivity[];
-}
-
-/** One row of a manager's "à faire maintenant" queue — a submitted Cra awaiting a decision. */
-export interface ManagerQueueRow {
-  readonly craId: string;
-  readonly consultantId: string;
-  readonly consultantName: string;
-  readonly period: string;
-  /** ISO timestamp of the submission this row is queued on, or `null` for a legacy row without one. */
-  readonly statusChangedAt: string | null;
-}
-
-/**
- * Item 3, QA round 5 (ADR-0098): how many of the manager's own office's current consultants are
- * staffed on a client mission versus sitting in `Intercontrat` **today** — not scoped to `period`
- * above, which is why it is its own field rather than folded into the figures that are.
- */
-export interface ManagerStaffing {
-  readonly onMission: number;
-  readonly intercontrat: number;
-}
-
-export interface ManagerDashboard {
-  readonly period: string;
-  readonly role: 'manager';
-  readonly pendingDecisions: number;
-  readonly billableCents: number;
-  readonly lateCras: number;
-  /**
-   * Every `submitted` Cra across every period (ADR-0082's own scope), oldest first — the work
-   * queue `pendingDecisions` counts but did not, until this field, let a manager reach directly.
-   */
-  readonly awaitingDecision: readonly ManagerQueueRow[];
-  readonly staffing: ManagerStaffing;
-  readonly recentActivity: readonly DashboardActivity[];
-}
-
-/** One row of billing's "à faire maintenant" queue — a draft ready to issue. */
-export interface BillingQueueRow {
-  readonly invoiceId: string;
-  readonly billedToName: string;
-  readonly supplyPeriod: string;
-  readonly totalTtcCents: number;
-  /** F10: the same discriminant A7/A13 added to the invoice and pré-facturier lists — a client,
-   * a month and an amount alone do not tell two drafts apart. `'—'` when the source Cra is gone. */
-  readonly consultantName: string;
-}
-
-export interface BillingDashboard {
-  readonly period: string;
-  readonly role: 'billing';
-  readonly draftInvoices: number;
-  readonly issuedInvoices: number;
-  readonly totalTtcIssuedCents: number;
-  /** The ten oldest drafts across every period, oldest supply period first — not every draft
-   * (F10): the full set is the invoice list's own `?status=draft` view. */
-  readonly oldestDrafts: readonly BillingQueueRow[];
-  readonly recentActivity: readonly DashboardActivity[];
-}
-
-export type DashboardResponse = ConsultantDashboard | ManagerDashboard | BillingDashboard;
-
-/** Item 18, QA round 3 — `GET /api/v1/org-chart`. One org-chart neighbour. */
-export interface OrgChartMember {
-  readonly id: string;
-  readonly displayName: string;
-}
-
-/** A consultant's own manager (N+1) — `null` when nobody is currently attached (a legacy or
- * data gap this UI has to render, not assume away). */
-export interface ConsultantOrgChart {
-  readonly role: 'consultant';
-  readonly manager: OrgChartMember | null;
-}
-
-/** A manager's direct reports (N-1) and their own manager (N+1, "the director" in this dataset). */
-export interface ManagerOrgChart {
-  readonly role: 'manager';
-  readonly manager: OrgChartMember | null;
-  readonly reports: readonly OrgChartMember[];
-}
-
-export type OrgChartResponse = ConsultantOrgChart | ManagerOrgChart;
+export type {
+  BillingDashboard,
+  BillingQueueRow,
+  ConsultantDashboard,
+  ConsultantOrgChart,
+  DashboardActivity,
+  DashboardCraStatus,
+  DashboardResponse,
+  ManagerDashboard,
+  ManagerOrgChart,
+  ManagerQueueRow,
+  ManagerStaffing,
+  OrgChartMember,
+  OrgChartResponse,
+} from '@erp/contracts';

@@ -13,9 +13,8 @@ import { UnknownCalendarYearError } from './errors.ts';
 
 /**
  * French public holidays, 2016–2027, written out rather than computed (ADR-0004, ADR-0078).
- * ADR-0004's own threshold — "the day the mockup spans a second year" — is met by item 6 (QA
- * round 1): the seed's historical data reaches back to 2016, so the table now covers every year
- * that data can name, not only 2026.
+ * ADR-0004's own threshold — "the day the mockup spans a second year" — is met: the seed's
+ * historical data reaches back to 2016, so the table covers every year that data can name.
  *
  * The three movable ones hang off Easter Sunday, computed independently for each year: Easter
  * Monday is Easter + 1, Ascension is Easter + 39, Whit Monday is Easter + 50 — which is why their

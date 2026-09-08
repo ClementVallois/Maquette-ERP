@@ -615,9 +615,9 @@ async function seed(): Promise<void> {
     const seededCras: {
       officeId: string;
       payload: TimesheetValidatedPayload;
-      /** Set only for a historical Cra whose invoice gets more than "draft" (item 6, QA round
-       * 1) — undefined leaves the invoice as `draftInvoicesFrom` always left it, the seed's
-       * original and still-default behaviour for every 2026 dense-month Cra. */
+      /** Set only for a historical Cra whose invoice gets more than "draft" — undefined leaves
+       * the invoice exactly as `draftInvoicesFrom` produced it, which is what every 2026
+       * dense-month Cra gets. */
       historicalOutcome?: 'issued' | 'issuedThenCancelled';
     }[] = [];
 
@@ -772,11 +772,10 @@ async function seed(): Promise<void> {
       await cras.save(cra);
     }
 
-    // ── Dense 2026 months (item 6, QA round 1) ─────────────────────────────
+    // ── Dense 2026 months ──────────────────────────────────────────────────
     //
-    // Every active consultant gets June, July and August 2026 (item 2, QA round 2: Alice
-    // included — the mockup is reviewed in September, so all three should read as closed out for
-    // everyone). September itself is deliberately outside `DENSE_PERIODS`, which is what keeps it
+    // Every active consultant gets June, July and August 2026, Alice included: the mockup is
+    // reviewed in September, so all three should read as closed out for everyone. September itself is deliberately outside `DENSE_PERIODS`, which is what keeps it
     // blank for `apps/web/e2e/journeys.spec.ts`'s own interactive create/submit/validate journey.
     for (const periodIso of DENSE_PERIODS) {
       let denseCount = 0;
@@ -787,11 +786,10 @@ async function seed(): Promise<void> {
       console.log(`Seeded ${String(denseCount)} Cras for ${periodIso}.`);
     }
 
-    // ── Sparse historical widening, 2016 onward (item 6, QA round 1) ───────
+    // ── Sparse historical widening, 2016 onward ────────────────────────────
     //
     // A handful of veterans (`HISTORICAL_VETERANS`), one Cra every 24 months rather than every
-    // month — sparse, per the plan's own instruction, and cheap enough that the 60s seed budget
-    // measured after the dense months above holds with room for it. Processed in date order
+    // month — sparse, and cheap enough that the 60s seed budget holds with room to spare. Processed in date order
     // across every veteran (not veteran by veteran) so the gapless per-fiscal-year invoice
     // numbering below is genuinely exercised rather than trivially satisfied one series at a time.
     const historicalEntries = HISTORICAL_VETERANS.flatMap((veteran, veteranIndex) =>
@@ -924,8 +922,8 @@ async function seed(): Promise<void> {
     let totalIssued = 0;
     let totalCancelled = 0;
 
-    // Item 6 (QA round 1): who issues a historical invoice. Henri only (see `ISSUER_EMAIL`'s own
-    // comment) — resolved once here rather than per iteration.
+    // Who issues a historical invoice: Henri only (see `ISSUER_EMAIL`'s own comment), resolved
+    // once here rather than per iteration.
     const issuer = validatedConsultants.find((c) => c.email === ISSUER_EMAIL);
     if (issuer === undefined) {
       throw new SeedDataError(`Issuer ${ISSUER_EMAIL} is not a seeded consultant`);
@@ -965,8 +963,8 @@ async function seed(): Promise<void> {
         await invoices.saveDraft(invoice, payload.craId);
         totalInvoices++;
 
-        // Historical invoices only (item 6, QA round 1): draft is the default every dense-2026
-        // invoice keeps (Alice's and Claire's own included, both load-bearing for
+        // Historical invoices only: draft is the default every dense-2026 invoice keeps
+        // (Alice's and Claire's included, both load-bearing for
         // `apps/web/e2e/*.spec.ts` staying draft-and-present) — `historicalOutcome` opts a
         // specific historical Cra's invoice into `issued`, or `issued` then immediately
         // cancelled by a credit note, **through the domain**, in the same date order the Cras

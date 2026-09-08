@@ -1,40 +1,17 @@
-import { STAFFING_PROBLEM_TYPES, type StaffingProblemType } from '@erp/contracts';
+import {
+  STAFFING_PROBLEM_TYPES,
+  type AssignmentCatalogue,
+  type AssignmentInput,
+  type StaffingProblemType,
+} from '@erp/contracts';
 import { isoDate, isoDateOf, type Actor, type IsoDate } from '@erp/platform';
+import {
+  assignmentIntervalOrder,
+  assignmentPolicy,
+  type AssignmentPolicyRefusal,
+} from '@erp/timesheet';
 
 import type { PgReadClient } from '../persistence/pg-client.ts';
-import { PgReferenceReader } from '../persistence/reference-reader.ts';
-
-export interface AssignmentInput {
-  readonly consultantId: string;
-  readonly missionId: string;
-  readonly fromDate: string;
-  readonly toDate: string | null;
-}
-
-export interface AssignmentView extends AssignmentInput {
-  readonly id: string;
-  readonly consultantName: string;
-  readonly missionName: string;
-  readonly clientName: string;
-}
-
-export interface AssignmentCatalogue {
-  readonly today: string;
-  readonly assignments: readonly AssignmentView[];
-  readonly consultants: readonly {
-    readonly id: string;
-    readonly name: string;
-    readonly departureDate: string | null;
-  }[];
-  readonly missions: readonly {
-    readonly id: string;
-    readonly name: string;
-    readonly clientName: string;
-    readonly startDate: string;
-    readonly endDate: string | null;
-    readonly requiredHabilitations: readonly string[];
-  }[];
-}
 
 export type AssignmentWriteOutcome =
   | { readonly kind: 'saved'; readonly id: string }
@@ -81,6 +58,17 @@ interface ScopedConsultantRow {
 
 interface ExistsRow {
   exists: boolean;
+}
+
+interface HeldHabilitationRow {
+  habilitation_id: string;
+  obtained_at: Date | string;
+  expires_at: Date | string | null;
+}
+
+interface PolicyMissionRow {
+  start_date: Date | string;
+  end_date: Date | string | null;
 }
 
 function nullableDate(value: Date | string | null): IsoDate | null {
@@ -162,6 +150,27 @@ function refused(
   return { kind: 'refused', problemType, details };
 }
 
+function policyRefusal(
+  outcome: Exclude<AssignmentPolicyRefusal, { readonly kind: 'missingHabilitations' }>,
+): AssignmentWriteOutcome {
+  switch (outcome.kind) {
+    case 'invalidRange':
+      return refused(STAFFING_PROBLEM_TYPES.invalidRange, {
+        fromDate: outcome.from,
+        toDate: outcome.to,
+      });
+    case 'departure':
+      return refused(STAFFING_PROBLEM_TYPES.departure, {
+        departureDate: outcome.departureDate,
+      });
+    case 'missionDates':
+      return refused(STAFFING_PROBLEM_TYPES.missionDates, {
+        missionStartDate: outcome.missionStartDate,
+        missionEndDate: outcome.missionEndDate ?? '',
+      });
+  }
+}
+
 async function validateAssignment(
   client: PgReadClient,
   actor: Actor,
@@ -170,12 +179,20 @@ async function validateAssignment(
 ): Promise<AssignmentWriteOutcome | null> {
   const from = isoDate(input.fromDate);
   const to = input.toDate === null ? null : isoDate(input.toDate);
-  if (to !== null && to < from) {
-    return refused(STAFFING_PROBLEM_TYPES.invalidRange, {
-      fromDate: from,
-      toDate: to,
-    });
-  }
+  const invalidRange = assignmentIntervalOrder(from, to);
+  if (invalidRange !== null) return policyRefusal(invalidRange);
+
+  // ADR-0106: serializes every create/update for this (consultant, mission) pair before the
+  // overlap check below reads anything, closing the check-then-insert race two concurrent
+  // requests could otherwise both pass. Held for the rest of this transaction (`_xact_lock`), so
+  // it also covers `updateAssignment`'s recorded-days check, which runs after this function
+  // returns but inside the same transaction. The `':'`-joined key relies on both ids being
+  // UUIDs (no colon can appear in one), so two distinct pairs can never concatenate to the same
+  // string and coalesce onto one lock.
+  await client.query(
+    `SELECT pg_advisory_xact_lock(hashtext('staffing.assignment.write'), hashtext($1 || ':' || $2))`,
+    [input.consultantId, input.missionId],
+  );
 
   const { rows: consultants } = await client.query<ScopedConsultantRow>(
     `SELECT departure_date
@@ -187,46 +204,51 @@ async function validateAssignment(
   if (consultant === undefined) return { kind: 'notFound' };
 
   const departure = nullableDate(consultant.departure_date);
-  if (departure !== null && (from >= departure || (to !== null && to >= departure))) {
-    return refused(STAFFING_PROBLEM_TYPES.departure, { departureDate: departure });
-  }
 
-  const reference = await new PgReferenceReader(client).timesheet();
-  const mission = reference.mission(input.missionId);
-  if (mission === null) return { kind: 'notFound' };
-  if (
-    !reference.runsOn(input.missionId, from) ||
-    (to !== null && !reference.runsOn(input.missionId, to))
-  ) {
-    return refused(STAFFING_PROBLEM_TYPES.missionDates, {
-      missionStartDate: mission.startDate,
-      missionEndDate: mission.endDate ?? '',
-    });
-  }
-  if (to === null && mission.endDate !== null) {
-    return refused(STAFFING_PROBLEM_TYPES.missionDates, {
-      missionStartDate: mission.startDate,
-      missionEndDate: mission.endDate,
-    });
-  }
+  const { rows: missions } = await client.query<PolicyMissionRow>(
+    `SELECT start_date, end_date FROM public.missions WHERE id = $1`,
+    [input.missionId],
+  );
+  const mission = missions[0];
+  if (mission === undefined) return { kind: 'notFound' };
 
-  const missing = new Set([
-    ...reference.missingHabilitations(input.consultantId, input.missionId, from),
-    ...reference.missingHabilitations(
-      input.consultantId,
-      input.missionId,
-      to ?? isoDate('9999-12-31'),
-    ),
-  ]);
-  if (missing.size > 0) {
+  const { rows: requirementRows } = await client.query<{ habilitation_id: string }>(
+    `SELECT habilitation_id FROM public.mission_habilitations WHERE mission_id = $1`,
+    [input.missionId],
+  );
+  const required = requirementRows.map((row) => row.habilitation_id);
+  const { rows: heldRows } = await client.query<HeldHabilitationRow>(
+    `SELECT habilitation_id, obtained_at, expires_at
+       FROM public.consultant_habilitations
+      WHERE consultant_id = $1 AND habilitation_id = ANY($2::text[])`,
+    [input.consultantId, required],
+  );
+
+  const policy = assignmentPolicy({
+    from,
+    to,
+    departureDate: departure,
+    mission: {
+      startDate: isoDateOf(mission.start_date),
+      endDate: nullableDate(mission.end_date),
+      requiredHabilitations: required,
+    },
+    heldHabilitations: heldRows.map((row) => ({
+      id: row.habilitation_id,
+      from: isoDateOf(row.obtained_at),
+      to: nullableDate(row.expires_at),
+    })),
+  });
+  if (policy?.kind === 'missingHabilitations') {
     const { rows: names } = await client.query<{ id: string; name: string }>(
       `SELECT id, name FROM public.habilitations WHERE id = ANY($1::text[]) ORDER BY name`,
-      [[...missing]],
+      [policy.ids],
     );
     return refused(STAFFING_PROBLEM_TYPES.missingHabilitation, {
       habilitations: names.map((row) => row.name).join(', '),
     });
   }
+  if (policy !== null) return policyRefusal(policy);
 
   const { rows: overlaps } = await client.query<ExistsRow>(
     `SELECT EXISTS (
@@ -285,15 +307,31 @@ export async function updateAssignment(
   const refusal = await validateAssignment(client, actor, input, id);
   if (refusal !== null) return refusal;
 
+  // A recorded day is only at risk if this edit's own new range does not cover it AND no *other*
+  // assignment on the same (consultant, mission) covers it either. Comparing each recorded day
+  // to this assignment's new range alone is not enough: a disjoint historical assignment on the
+  // same mission (January, still covering its own recorded days) would block an edit to an
+  // unrelated one (July). Two assignments on
+  // the same mission cannot overlap in time (the overlap check above forbids it), so "another
+  // assignment covers this day" and "this edit's own new range covers this day" are mutually
+  // exclusive by construction — this query is still exactly the "would this day lose its only
+  // covering assignment" question the audit asked for.
   const { rows: recordedDays } = await client.query<ExistsRow>(
     `SELECT EXISTS (
        SELECT 1
          FROM timesheet.cra_lines line
          JOIN timesheet.cras cra ON cra.id = line.cra_id
         WHERE cra.consultant_id = $1 AND line.mission_id = $2
-          AND (line.day < $3::date OR ($4::date IS NOT NULL AND line.day > $4::date))
+          AND NOT (line.day >= $3::date AND line.day <= COALESCE($4::date, 'infinity'::date))
+          AND NOT EXISTS (
+            SELECT 1 FROM public.assignments other
+             WHERE other.consultant_id = $1 AND other.mission_id = $2
+               AND other.id <> $5
+               AND other.from_date <= line.day
+               AND COALESCE(other.to_date, 'infinity'::date) >= line.day
+          )
      ) AS exists`,
-    [input.consultantId, input.missionId, input.fromDate, input.toDate],
+    [input.consultantId, input.missionId, input.fromDate, input.toDate, id],
   );
   if (recordedDays[0]?.exists === true) {
     return refused(STAFFING_PROBLEM_TYPES.recordedDays, {});

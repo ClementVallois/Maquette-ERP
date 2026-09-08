@@ -1,6 +1,7 @@
 import { InvalidValueError, period } from '@erp/platform';
 import { describe, expect, it } from 'vitest';
 
+import type { VatGroup } from './document.ts';
 import {
   CraAlreadyProcessedError,
   EmptyInvoiceError,
@@ -28,7 +29,7 @@ import {
   SELLER,
   TERMS,
 } from './testing/march-2026.ts';
-import type { VatTreatment } from './vat.ts';
+import { type VatTreatment, vatGroupKey } from './vat.ts';
 
 const STANDARD: VatTreatment = { kind: 'taxable', basisPoints: 2000 };
 const OVERSEAS: VatTreatment = { kind: 'taxable', basisPoints: 850 };
@@ -121,6 +122,66 @@ describe('a draft invoice', () => {
     stolen.push(lineOf(65_000, STANDARD));
 
     expect(invoice.lines).toHaveLength(1);
+  });
+
+  it('is immune to a cast-based field mutation on the billed party address (ADR-0108)', () => {
+    // Nested addresses. `BilledParty`/`PostalAddress` hold only strings, so unlike `Date` there
+    // is no mutating *method* to reach — but a cast defeats `readonly` just as well by
+    // reassigning the field directly.
+    const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
+    const stolenAddress = invoice.billedTo.billingAddress as { line1: string };
+    stolenAddress.line1 = 'stolen';
+
+    expect(invoice.billedTo.billingAddress.line1).not.toBe('stolen');
+  });
+
+  it('is immune to a cast-based field mutation on the seller address (ADR-0108)', () => {
+    const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
+    const stolenAddress = invoice.seller.address as { city: string };
+    stolenAddress.city = 'stolen';
+
+    expect(invoice.seller.address.city).not.toBe('stolen');
+  });
+
+  it('is immune to a cast-based field mutation on a line origin (ADR-0108)', () => {
+    const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
+    const stolenOrigin = invoice.lines[0]!.origin as { tjmCents: number };
+    stolenOrigin.tjmCents = 1;
+
+    expect(invoice.lines[0]!.origin.tjmCents).not.toBe(1);
+  });
+
+  it('is immune to a cast-based field mutation on a line VAT treatment (ADR-0108)', () => {
+    const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
+    const stolenTreatment = invoice.lines[0]!.vat as { basisPoints: number };
+    stolenTreatment.basisPoints = 0;
+
+    expect((invoice.lines[0]!.vat as { basisPoints: number }).basisPoints).not.toBe(0);
+  });
+
+  it('does not alias the billed party or seller supplied at drafting (ADR-0108)', () => {
+    // The "in" direction of the same claim: a caller mutating the object it handed to `draft`
+    // after the call must not reach the aggregate either: constructor arguments alias too, not
+    // only getters.
+    const billedTo = billedParty(parisClient);
+    const seller = { ...SELLER, address: { ...SELLER.address } };
+    const invoice = Invoice.draft({
+      id: 'invoice-1',
+      officeId: 'office-paris',
+      seller,
+      billedTo,
+      supplyPeriod: MARCH,
+      lines: [lineOf(65_000, STANDARD)],
+      terms: TERMS,
+      mentions: MENTIONS,
+      validatedBy: ['bruno'],
+    });
+
+    (billedTo.billingAddress as { line1: string }).line1 = 'stolen';
+    (seller.address as { city: string }).city = 'stolen';
+
+    expect(invoice.billedTo.billingAddress.line1).not.toBe('stolen');
+    expect(invoice.seller.address.city).not.toBe('stolen');
   });
 });
 
@@ -320,8 +381,8 @@ describe('issuing an invoice', () => {
   it('burns no number when issuing is refused', () => {
     // The ordering guarantee, and the reason it matters: a number allocated by an attempt that
     // then throws is a number no document carries, and a series whose only property is having no
-    // gap has just acquired one (ADR-0018). The refusal reachable today is a bad sequence; from
-    // Phase 3 the coherence check can refuse too, on totals read back from columns.
+    // gap has just acquired one (ADR-0018). The refusal reachable from the domain is a bad
+    // sequence; the coherence check refuses too, on totals read back from columns.
     const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
 
     expect(() => {
@@ -341,13 +402,23 @@ describe('issuing an invoice', () => {
     const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
     invoice.issue({ by: 'claire', sequence: 1, issueDate: '2026-04-02' });
 
-    // The documentary freeze at the level of the document. In Phase 3 these totals are columns,
+    // The documentary freeze at the level of the document. Persisted, these totals are columns,
     // and this getter is what guarantees the printed page reads them rather than recomputing.
     expect(invoice.totals).toStrictEqual({
       totalExcludingVatCents: 65_000,
       vatTotalCents: 13_000,
       totalIncludingVatCents: 78_000,
     });
+  });
+
+  it('is immune to a cast-based field mutation on the frozen totals (ADR-0108)', () => {
+    const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
+    invoice.issue({ by: 'claire', sequence: 1, issueDate: '2026-04-02' });
+
+    const stolenTotals = invoice.totals as { totalIncludingVatCents: number };
+    stolenTotals.totalIncludingVatCents = 1;
+
+    expect(invoice.totals.totalIncludingVatCents).toBe(78_000);
   });
 
   it('is cancelled only from issued, and keeps everything it printed', () => {
@@ -405,8 +476,7 @@ describe('the number series', () => {
 
 describe('Invoice.reconstitute', () => {
   // The one door into the aggregate that sets a status without running `issue`, which is what
-  // sets the number, the date, the series and the totals together. Phase 3 added it for the
-  // repository and no unit test touched it.
+  // sets the number, the date, the series and the totals together: the repository's own door.
   function persistedInvoice(
     overrides: Partial<Parameters<typeof Invoice.reconstitute>[0]> = {},
   ): Invoice {
@@ -425,6 +495,8 @@ describe('Invoice.reconstitute', () => {
       issueDate: null,
       series: null,
       totals: null,
+      vatBreakdown: null,
+      dueDate: null,
       ...overrides,
     });
   }
@@ -439,6 +511,16 @@ describe('Invoice.reconstitute', () => {
       vatTotalCents: 20_000,
       totalIncludingVatCents: 120_000,
     },
+    vatBreakdown: [
+      {
+        key: vatGroupKey(STANDARD),
+        treatment: STANDARD,
+        baseCents: 100_000,
+        vatCents: 20_000,
+        mention: null,
+      },
+    ],
+    dueDate: dueDate(TERMS, '2026-04-02'),
   } as const;
 
   it('rebuilds a draft, and an issued invoice with everything issue set', () => {
@@ -463,10 +545,86 @@ describe('Invoice.reconstitute', () => {
     );
   });
 
+  it('refuses an issued invoice with no frozen VAT breakdown (ADR-0107)', () => {
+    expect(() => persistedInvoice({ ...ISSUED, vatBreakdown: null })).toThrow(
+      InconsistentPersistedInvoiceError,
+    );
+  });
+
+  it('refuses an issued invoice with no frozen due date (ADR-0107)', () => {
+    expect(() => persistedInvoice({ ...ISSUED, dueDate: null })).toThrow(
+      InconsistentPersistedInvoiceError,
+    );
+  });
+
+  it('reports the frozen VAT breakdown and due date, not a recomputation from the lines (ADR-0107)', () => {
+    // A stored figure that deliberately disagrees with what recomputing from `lines`/`terms`
+    // would produce — the same instrument the repository integration test uses, at the unit
+    // level: proof the getters read `#vatBreakdown`/`#dueDate`, not `vatBreakdownOf`/`dueDate()`.
+    const issued = persistedInvoice({
+      ...ISSUED,
+      vatBreakdown: [
+        {
+          key: vatGroupKey(STANDARD),
+          treatment: STANDARD,
+          baseCents: 100_000,
+          vatCents: 999,
+          mention: null,
+        },
+      ],
+      dueDate: '2099-01-01',
+    });
+
+    expect(issued.vatBreakdown).toStrictEqual([
+      {
+        key: vatGroupKey(STANDARD),
+        treatment: STANDARD,
+        baseCents: 100_000,
+        vatCents: 999,
+        mention: null,
+      },
+    ]);
+    expect(issued.dueDate).toBe('2099-01-01');
+  });
+
+  it('hands out the frozen VAT breakdown as a copy, once issued (ADR-0108)', () => {
+    const issued = persistedInvoice({ ...ISSUED });
+    const stolen = issued.vatBreakdown as VatGroup[];
+    stolen.push({
+      key: 'taxable:0',
+      treatment: { kind: 'taxable', basisPoints: 0 },
+      baseCents: 1,
+      vatCents: 0,
+      mention: null,
+    });
+
+    expect(issued.vatBreakdown).toHaveLength(1);
+  });
+
+  it('does not alias the totals row supplied to reconstitute (ADR-0108)', () => {
+    // The "in" direction of the same claim `vatBreakdown` already covers above: a caller mutating
+    // the row it handed to the repository after the call must not reach the aggregate either.
+    const totals = { ...ISSUED.totals };
+    const issued = persistedInvoice({ ...ISSUED, totals });
+
+    (totals as { totalIncludingVatCents: number }).totalIncludingVatCents = 1;
+
+    expect(issued.totals.totalIncludingVatCents).toBe(120_000);
+  });
+
   it('names every missing field at once, not the first one', () => {
     // A refusal that names one field sends the reader back for a second round trip per column.
     expect(() => persistedInvoice({ ...ISSUED, series: null, issueDate: null })).toThrow(
       /no issue date, no series/,
+    );
+  });
+
+  it('refuses a draft that already carries a frozen VAT breakdown or due date (ADR-0107)', () => {
+    expect(() => persistedInvoice({ vatBreakdown: ISSUED.vatBreakdown })).toThrow(
+      InconsistentPersistedInvoiceError,
+    );
+    expect(() => persistedInvoice({ dueDate: ISSUED.dueDate })).toThrow(
+      InconsistentPersistedInvoiceError,
     );
   });
 

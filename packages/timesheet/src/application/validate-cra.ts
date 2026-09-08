@@ -30,9 +30,9 @@ export interface ValidateCraCommand {
  * exists, and this function has no reference to it: that absence is the whole property ADR-0001
  * bought, and the test asserts it by mocking nothing.
  *
- * Loading and saving the Cra is not here. There is no repository in this phase — Phase 3 adds one,
- * with the transaction that makes the validation and the draft invoice commit together or not at
- * all.
+ * Loading and saving the Cra is not here: that is the caller's transaction, which is what makes
+ * the validation and the draft invoices commit together or not at all
+ * (`apps/api/src/chain/validate-cra.ts`).
  */
 export async function validateCra(
   dependencies: ValidateCraDependencies,

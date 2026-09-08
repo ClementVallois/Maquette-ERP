@@ -185,6 +185,18 @@ describe('validating a Cra drafts its invoices', () => {
 
     expect(await statusOfCra()).toBe('submitted');
     expect(await invoiceCount()).toBe(0);
+
+    // The retry the guarantee exists for: a client that saw the failure tries again, on the same
+    // Cra, with the real (non-exploding) transaction. Nothing about the rolled-back attempt should
+    // still be lying around to confuse it.
+    const retried = await validateCraAndDraftInvoices(
+      { transactionally, clock, newId: uuidv7 },
+      { craId: CRA, actor: manager, correlationId: 'corr-chain-2-retry' },
+    );
+
+    expect(retried.kind).toBe('validated');
+    expect(await statusOfCra()).toBe('validated');
+    expect(await invoiceCount()).toBe(1);
   });
 
   it('answers the original documents on a replay, and drafts no second invoice', async () => {
@@ -259,5 +271,74 @@ describe('validating a Cra drafts its invoices', () => {
     );
 
     expect(outcome.kind).toBe('notFound');
+  });
+
+  it('replays an all-absence Cra that drafted no invoice, instead of refusing it as already validated', async () => {
+    // Package 03's reproduction: a validation whose billing outcome is empty leaves nothing in
+    // `billing.invoices` for `hasCraBeenProcessed` to find, so a second call missed the replay
+    // check entirely and reached the immutable aggregate — `ValidatedCraIsImmutableError`, not
+    // ADR-0021's "replay → original result".
+    await transaction.client.query(`DELETE FROM timesheet.cra_lines WHERE cra_id = $1`, [CRA]);
+    for (const day of ['2026-06-02', '2026-06-03']) {
+      await transaction.client.query(
+        `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, quarter_days)
+         VALUES ($1, $2, $3, 'absence', NULL, 4)`,
+        [uuidv7(), CRA, day],
+      );
+    }
+
+    const first = await validateCraAndDraftInvoices(
+      { transactionally, clock, newId: uuidv7 },
+      { craId: CRA, actor: manager, correlationId: 'corr-chain-8' },
+    );
+    expect(first.kind).toBe('validated');
+    expect(first.invoices).toStrictEqual([]);
+    expect(await invoiceCount()).toBe(0);
+
+    const replay = await validateCraAndDraftInvoices(
+      { transactionally, clock, newId: uuidv7 },
+      { craId: CRA, actor: manager, correlationId: 'corr-chain-9' },
+    );
+
+    expect(replay.kind).toBe('replayed');
+    expect(replay.invoices).toStrictEqual([]);
+    expect(await statusOfCra()).toBe('validated');
+  });
+
+  it('replays an all-Forfait Cra (declined days, no invoice) the same way', async () => {
+    await transaction.client.query(
+      `INSERT INTO public.missions (id, client_id, name, billing_model, start_date)
+       VALUES ('chain-forfait-only', $1, 'Forfait interne', 'Forfait', '2026-01-05')`,
+      [CLIENT],
+    );
+    await transaction.client.query(
+      `INSERT INTO public.assignments (id, consultant_id, mission_id, from_date, to_date)
+       VALUES ($1, $2, 'chain-forfait-only', '2026-01-05', NULL)`,
+      [uuidv7(), CONSULTANT],
+    );
+    await transaction.client.query(`DELETE FROM timesheet.cra_lines WHERE cra_id = $1`, [CRA]);
+    await transaction.client.query(
+      `INSERT INTO timesheet.cra_lines (id, cra_id, day, day_type, mission_id, quarter_days)
+       VALUES ($1, $2, '2026-06-02', 'worked', 'chain-forfait-only', 4)`,
+      [uuidv7(), CRA],
+    );
+
+    const first = await validateCraAndDraftInvoices(
+      { transactionally, clock, newId: uuidv7 },
+      { craId: CRA, actor: manager, correlationId: 'corr-chain-10' },
+    );
+    expect(first.kind).toBe('validated');
+    expect(first.invoices).toStrictEqual([]);
+    expect(first.declined).toStrictEqual([
+      { craId: CRA, missionId: 'chain-forfait-only', quarterDays: 4, reason: 'notRegie' },
+    ]);
+
+    const replay = await validateCraAndDraftInvoices(
+      { transactionally, clock, newId: uuidv7 },
+      { craId: CRA, actor: manager, correlationId: 'corr-chain-11' },
+    );
+
+    expect(replay.kind).toBe('replayed');
+    expect(replay.declined).toStrictEqual(first.declined);
   });
 });

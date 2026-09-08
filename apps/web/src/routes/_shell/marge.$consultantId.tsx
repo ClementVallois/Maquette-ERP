@@ -9,11 +9,10 @@ const MargeSearch = z.object({
 });
 
 /**
- * `/marge/$consultantId?period=` — the pinned route (`docs/frontend-plan.md` §3). Task 7.5,
- * `GET /api/v1/consultants/:id/economics?period=`, manager-only. Reached only by an explicit click
- * from a pré-facturier row (`LABELS.preFacturier.reveal`, `pre-facturier-screen.tsx`) — there is no
- * sidebar entry pointing here (`docs/open-questions.md`, row dated 24/08/2026, resolved this phase:
- * see `config/navigation.ts`'s own comment for the reasoning), so `period` has no sensible default
+ * `/marge/$consultantId?period=` — `GET /api/v1/consultants/:id/economics?period=`, manager-only.
+ * Reached only by an explicit click from a pré-facturier row (`LABELS.preFacturier.reveal`,
+ * `pre-facturier-screen.tsx`); there is no sidebar entry pointing here (see
+ * `config/navigation.ts`'s own comment), so `period` has no sensible default
  * the way `/pre-facturier`'s does: a visitor who lands here always came from a specific row on a
  * specific period, and a missing/malformed `period` is exactly what `validateSearch` throwing
  * answers — TanStack Router's own designed-error path, the same one a malformed path param takes.

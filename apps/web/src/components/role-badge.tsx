@@ -20,7 +20,7 @@ interface RoleBadgeProps {
 }
 
 /**
- * One colour per role (item 4, QA round 1) — ADR-0076 supersedes direction-visuelle.md §4.5's
+ * One colour per role — ADR-0076 supersedes `docs/direction-visuelle.md` §4.5's
  * "primary tint on the selector, neutral everywhere else". Every place this SPA names a role
  * (the persona selector's cards, the topbar identity block, a denied-state screen) renders it
  * through this one component, so the role→colour mapping lives in exactly one place — the same

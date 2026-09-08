@@ -5,18 +5,18 @@ import { PgReferenceReader } from '../persistence/reference-reader.ts';
 import type { UnitOfWork } from '../persistence/unit-of-work.ts';
 
 /**
- * What `web/pages/cra-grid.ts`, `GET /api/v1/cras/:period/grid` (front-end plan Phase 5.2) and
+ * What `web/pages/cra-grid.ts`, `GET /api/v1/cras/:period/grid` and
  * `GET /api/v1/consultants/:consultantId/cras/:period/grid` (ADR-0071) all need: one consultant's
  * month, the missions they are staffed on inside it, and the Cra that already exists for it — if
  * one does.
  *
  * Extracted per ADR-0065. The screen still turns `lines` into a two-slot-per-day form
  * (`gridDays` in `web/pages/cra-grid.ts` — a fact about the HTML form, not about the month, so it
- * stays there); the API route exposes `lines` as recorded, which is what front-end plan Phase 5.2 asks for.
+ * stays there); the API route exposes `lines` as recorded.
  *
  * ADR-0071 generalised this from "the caller's own month" to "a named consultant's month, if the
- * caller's role and office reach that far" — the consultant route passes `actor.consultantId`, the
- * manager route passes a path parameter, and this function no longer assumes the two are the same
+ * caller's role and office reach that far": the consultant route passes `actor.consultantId`, the
+ * manager route passes a path parameter, and this function does not assume the two are the same
  * person.
  */
 
@@ -59,11 +59,8 @@ export interface CraGridComposition {
   readonly missions: readonly GridMission[];
   /**
    * Who accepted the month, `null` until it is validated — a **display name**, not the raw
-   * `ConsultantId` the aggregate carries (resolved below, the same way `consultantName` is).
-   * Task 6.4 of the front-end plan asked for it on this composition and it was not carried —
-   * recorded as a gap in `open-questions.md` on 25/08/2026 and corrected as a raw id; the name
-   * resolution was added afterwards, once the SPA's own "validated" banner needed to print it
-   * (task 6.6: "une bannière nommant `validatedBy`" reads oddly naming a UUID).
+   * `ConsultantId` the aggregate carries (resolved below, the same way `consultantName` is):
+   * the SPA's "validated" banner prints this, and a banner naming a UUID reads as a defect.
    */
   readonly validatedBy: string | null;
   readonly validatedAt: string | null;
@@ -121,9 +118,8 @@ export async function craGridComposition(
   const clientNames = await reference.missionClientNames();
   // `validatedBy` is a `ConsultantId` on the aggregate — resolved to a display name here, the
   // same way `consultantName` above already is, so the grid's own "validated" banner can name
-  // who validated it without the caller carrying a raw UUID (frontend-plan.md task 6.6: "une
-  // bannière nommant validatedBy"). Falls back to the id if the row is ever missing, same as
-  // every other name lookup in this file.
+  // who validated it without the caller carrying a raw UUID. Falls back to the id if the row is
+  // ever missing, same as every other name lookup in this file.
   const consultantNames = await reference.consultantNames();
 
   const periodDays = daysOf(period);

@@ -4,8 +4,8 @@ import { createRoot } from 'react-dom/client';
 import { config as configureZod } from 'zod';
 
 // A relative import, not `@/App`: a same-directory sibling is what the alias is not for — it is
-// for deeper imports (`@/lib/x`, `@/components/ui/x`). dependency-cruiser now resolves `@/`
-// (docs/open-questions.md, row dated 24/08/2026) but the shortest path for a sibling stays `./`.
+// for deeper imports (`@/lib/x`, `@/components/ui/x`). dependency-cruiser resolves `@/`, but the
+// shortest path for a sibling stays `./`.
 import { App } from './App';
 import './styles/globals.css';
 

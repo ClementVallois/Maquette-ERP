@@ -159,8 +159,8 @@ function PersonaCard({ persona, pending, disabled, onChoose }: PersonaCardProps)
       >
         <span className="text-card-title">{persona.displayName}</span>
         <span className="flex items-center gap-1.5">
-          {/* Item 4, QA round 1: the same colour this role gets everywhere else in the app now
-              (ADR-0076) — the selector no longer needs a distinct "primary tint" reading. */}
+          {/* The same colour this role gets everywhere else in the app (ADR-0076): the selector
+              has no distinct "primary tint" reading of its own. */}
           <RoleBadge role={persona.role} />
           <span className="text-sm text-muted-foreground">{persona.office}</span>
         </span>

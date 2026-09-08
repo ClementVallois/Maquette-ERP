@@ -10,10 +10,9 @@ import { carries, forRoles } from '../personas/access.ts';
  * The pré-facturier's assembly (ADR-0053): for one month and one office, what is billable and, for
  * everything else, why not.
  *
- * Extracted from `web/routes.ts` in front-end plan Phase 5, which needed the same read for
- * `GET /api/v1/pre-facturier` and named the rule this obeys: "the compositions exist already ...
- * the endpoints reuse them, they do not reinvent them." The screen still owns the rendering
- * (`web/pages/pre-facturier.ts`); this owns the two module reads and the arithmetic between them.
+ * The screen owns the rendering (`web/pages/pre-facturier.ts`) and `GET /api/v1/pre-facturier`
+ * owns the transport; this owns the two module reads and the arithmetic between them, so both
+ * reuse one composition rather than each reinventing it.
  */
 
 export const DECIDES_CRA = forRoles('manager');
@@ -95,9 +94,8 @@ export interface PreFacturierComposition {
  * second, period-filtered query (ADR-0053), so what the dropdown offers never bounds what the table
  * shows.
  *
- * Module-private since Phase 9.3: the pré-facturier's own screen imported it directly to build the
- * Cra list's picker, and that screen is `apps/web`'s now — it reads the `offeredPeriods` field of
- * the composition below, like every other consumer.
+ * Module-private: every consumer reads the `offeredPeriods` field of the composition below
+ * rather than calling this.
  */
 function offeredPeriods(periods: readonly string[]): string[] {
   return [...new Set(periods)].sort((left, right) => right.localeCompare(left));
@@ -188,14 +186,9 @@ export async function preFacturierComposition(
     };
   }
 
-  const unfilteredCraTotal = await unit.cras.count({ actor, period });
-  const allCras = [];
-  for (let offset = 0; offset < unfilteredCraTotal; offset += MAX_MONTHS) {
-    allCras.push(...(await unit.cras.list({ actor, limit: MAX_MONTHS, offset, period })));
-  }
+  const allCras = await unit.cras.listPeriod(actor, period);
   const reference = new PgReferenceReader(unit.client);
-  const consultantNames = await reference.consultantNames();
-  const missionNames = await reference.missionNames();
+  const consultantNames = await reference.consultantNames(allCras.map((cra) => cra.consultantId));
   const normalizedSearch = input.consultantSearch?.toLocaleLowerCase('fr') ?? null;
   const matchingCras =
     normalizedSearch === null
@@ -211,11 +204,11 @@ export async function preFacturierComposition(
     cras.map((cra) => cra.id),
     actor,
   );
-  const unfilteredInvoiceTotal = await unit.invoices.count({ actor, period });
-  const allInvoices = [];
-  for (let offset = 0; offset < unfilteredInvoiceTotal; offset += MAX_MONTHS) {
-    allInvoices.push(...(await unit.invoices.list({ actor, limit: MAX_MONTHS, offset, period })));
-  }
+  const allInvoices = await unit.invoices.listPeriodProjection(actor, period);
+  const missionNames = await reference.missionNames([
+    ...declined.map((record) => record.missionId),
+    ...allInvoices.flatMap((invoice) => invoice.missionIds),
+  ]);
   // `saveDraft` records exactly one source Cra per invoice — the unique index on
   // `(source_cra_ids[1], billed_to_client_id)` is what makes `cras`, already scoped to this same
   // period, the right (and only) place to resolve an invoice's consultant and "created" timestamp
@@ -227,9 +220,7 @@ export async function preFacturierComposition(
       resolvedMatchingInvoices.push(item);
       continue;
     }
-    const invoice = await unit.invoices.findById(item.id, actor);
-    const sourceCraId = invoice?.lines[0]?.origin.craId;
-    const sourceCra = sourceCraId === undefined ? undefined : craById.get(sourceCraId);
+    const sourceCra = item.sourceCraId === null ? undefined : craById.get(item.sourceCraId);
     const consultantName =
       sourceCra === undefined
         ? ''
@@ -241,47 +232,44 @@ export async function preFacturierComposition(
   const invoiceTotal = resolvedMatchingInvoices.length;
   const invoices = resolvedMatchingInvoices.slice(invoiceOffset, invoiceOffset + invoiceLimit);
 
-  // One read per invoice, and the totals come off the aggregate rather than out of a `SUM`
-  // (ADR-0053): a draft's `total_ttc_cents` column is NULL by design, and VAT is rounded once per
-  // rate in the domain — a total assembled in SQL would be a different number.
-  const billable: BillableRow[] = [];
-  const invoiceRows: PreFacturierInvoiceRow[] = [];
+  const billable: BillableRow[] = allInvoices.map((invoice) => ({
+    invoiceId: invoice.id,
+    clientName: invoice.billedToName,
+    status: invoice.status,
+    invoiceNumber: invoice.invoiceNumber,
+    totalExcludingVatCents: invoice.totalExcludingVatCents,
+    totalIncludingVatCents: invoice.totalTtcCents ?? 0,
+  }));
   const visibleInvoiceIds = new Set(invoices.map((invoice) => invoice.id));
-  for (const item of allInvoices) {
-    const invoice = await unit.invoices.findById(item.id, actor);
-    if (invoice === null) continue;
+  const invoiceRows: PreFacturierInvoiceRow[] = allInvoices.flatMap((item) => {
+    if (!visibleInvoiceIds.has(item.id)) return [];
+    const sourceCra = item.sourceCraId === null ? undefined : craById.get(item.sourceCraId);
 
-    billable.push({
-      invoiceId: invoice.id,
-      clientName: invoice.billedTo.name,
-      status: invoice.status,
-      invoiceNumber: invoice.number,
-      totalExcludingVatCents: invoice.totals.totalExcludingVatCents,
-      totalIncludingVatCents: invoice.totals.totalIncludingVatCents,
-    });
-
-    if (!visibleInvoiceIds.has(item.id)) continue;
-
-    const sourceCraId = invoice.lines[0]?.origin.craId;
-    const sourceCra = sourceCraId === undefined ? undefined : craById.get(sourceCraId);
-    const lineMissionIds = [...new Set(invoice.lines.map((line) => line.origin.missionId))];
-
-    invoiceRows.push({
-      ...item,
-      consultantName:
-        sourceCra === undefined
-          ? '—'
-          : (consultantNames.get(sourceCra.consultantId) ?? sourceCra.consultantId),
-      missionNames: lineMissionIds.map((id) => missionNames.get(id) ?? id),
-      lineCount: invoice.lines.length,
-      createdAt: sourceCra?.statusChangedAt ?? null,
-    });
-  }
+    return [
+      {
+        id: item.id,
+        status: item.status,
+        supplyPeriod: item.supplyPeriod,
+        billedToName: item.billedToName,
+        invoiceNumber: item.invoiceNumber,
+        issueDate: item.issueDate,
+        totalTtcCents: item.totalTtcCents,
+        totalsAreProvisional: item.totalsAreProvisional,
+        consultantName:
+          sourceCra === undefined
+            ? '—'
+            : (consultantNames.get(sourceCra.consultantId) ?? sourceCra.consultantId),
+        missionNames: item.missionIds.map((id) => missionNames.get(id) ?? id),
+        lineCount: item.lineCount,
+        createdAt: sourceCra?.statusChangedAt ?? null,
+      },
+    ];
+  });
 
   const periodClosed = lastDayOf(periodFromIso(period)) < today;
 
   const rows: CraRow[] = cras.map((cra) => {
-    const status = cra.status as CraStatus;
+    const status = cra.status;
 
     return {
       craId: cra.id,

@@ -10,8 +10,8 @@ const { Pool } = pg;
 /**
  * The harness is a composition root too — the integration tests construct repositories directly,
  * with no `apps/api` in sight — so it installs the same process-global the application's root
- * installs. It used to arrive as an import side effect of whichever repository was loaded first,
- * which meant two sealed modules silently deciding it for each other (open question, 19/08/2026).
+ * installs, explicitly — arriving as an import side effect of whichever repository loaded first
+ * would mean two sealed modules silently deciding it for each other.
  *
  * `pg`'s default DATE parser builds a `Date` in the local timezone, shifting a worked day by one
  * when the machine is not UTC. A worked day is a `date` (BUILD-RULES) and must survive a round

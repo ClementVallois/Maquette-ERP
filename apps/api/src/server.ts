@@ -10,10 +10,9 @@ import {
 import { contextOf, CORRELATION_ID_HEADER, correlationIdOf, sendProblem } from './http/reply.ts';
 import { loggerOptions } from './logging.ts';
 import { registerAccessControl, registerOriginCheck } from './personas/access.ts';
-import { registerApiRoutes } from './routes/api.ts';
+import { registerApiRoutes } from './routes/index.ts';
 import { registerOpsRoutes } from './routes/ops.ts';
 import { registerSessionRoutes } from './routes/session.ts';
-import { registerFormBodyParser } from './web/form-body.ts';
 import { registerSecurityHeaders } from './web/reply.ts';
 import { representationOf } from './web/representation.ts';
 import { registerWebRoutes } from './web/routes.ts';
@@ -65,7 +64,7 @@ export function buildServer(
   });
 
   app.setNotFoundHandler((request, reply) => {
-    // The SPA fallback (ADR-0063, front-end plan Phase 9.1): every screen navigation that isn't
+    // The SPA fallback (ADR-0063): every screen navigation that isn't
     // `/api/*`, an asset, or one of the two printable routes (matched by their own registration,
     // so they never reach here) answers `index.html` instead of this application's own 404 page,
     // and the client-side router takes it from there. `serveSpaShellOrNull` returns `null` when
@@ -128,7 +127,6 @@ export function buildServer(
   // Fastify fires that hook only for routes registered after it. Registering a route first would
   // make it exempt from the declaration check — silently.
   registerSecurityHeaders(app);
-  registerFormBodyParser(app);
   registerOriginCheck(app, dependencies);
   registerAccessControl(app, dependencies);
 

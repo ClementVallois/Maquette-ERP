@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { ApiConfig } from '../config.ts';
 import { uuidv7 } from '../ids/uuidv7.ts';
+import { forRoles } from '../personas/access.ts';
 import type { Persona } from '../personas/catalogue.ts';
 import { PERSONA_COOKIE, signPersonaKey } from '../personas/cookie.ts';
 import { inMemoryPersonas } from '../personas/testing/catalogue.ts';
@@ -189,9 +190,8 @@ describe('a refusal, rendered', () => {
   });
 
   it('tells a visitor with no persona to choose one, rather than showing a blank screen', async () => {
-    // `PATHS.craPrint` and no longer `PATHS.consultantCra`, whose GET went with the grid in Phase
-    // 9.3 — any screen route that is not `PUBLIC` makes this point, and this is one of the two
-    // left. 401 before the record is looked for: no persona is not "not found".
+    // Any screen route that is not public makes this point. The refusal happens before the record
+    // is looked for: no persona is not "not found".
     const response = await app.inject({ method: 'GET', url: `${PATHS.craPrint}/anything` });
 
     expect(response.statusCode).toBe(401);
@@ -200,11 +200,11 @@ describe('a refusal, rendered', () => {
   });
 
   it('refuses a state-changing request with no Origin, and says so in French', async () => {
+    app.post('/action-test', { config: { access: forRoles('consultant') } }, () => ({ ok: true }));
     const response = await app.inject({
       method: 'POST',
-      url: `${PATHS.consultantCra}/2026-06`,
-      headers: { ...as('consultant-paris'), 'content-type': 'application/x-www-form-urlencoded' },
-      payload: 'action=save',
+      url: '/action-test',
+      headers: as('consultant-paris'),
     });
 
     expect(response.statusCode).toBe(403);

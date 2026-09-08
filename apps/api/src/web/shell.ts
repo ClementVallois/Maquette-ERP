@@ -17,8 +17,8 @@ import { html, type Html } from './render/html.ts';
  * Shape matches `apps/web`'s own topbar (`direction-visuelle.md` §6, `components/shell/topbar.tsx`)
  * rather than inventing a second one: a single 56px bar, the page's own crumb and title on the
  * left, the persona block on the right. There is no second navigation row here any more — this
- * chrome now serves only the two printables (ADR-0055, ADR-0056), and the SPA's own sidebar is
- * where a role's navigation lives since front-end plan Phase 9.3.
+ * chrome serves only the two printables (ADR-0055, ADR-0056); a role's navigation lives in the
+ * SPA's own sidebar.
  */
 
 export interface Chrome {
@@ -57,9 +57,8 @@ function initialsOf(displayName: string): string {
  * and the office. `.tag.role-*` already carries ADR-0076's colours; this only restyles what sits
  * around it, not the tag itself.
  *
- * No dropdown: the SPA's is a `DropdownMenu` and this shell runs no JavaScript at all (ADR-0009),
- * so "Changer de persona" stays the plain `<form method="post">` button it always was, set quietly
- * beside the identity rather than behind a menu that cannot exist here.
+ * No dropdown: the printable shell runs no JavaScript. The link returns to the SPA's persona
+ * selector, which owns session changes.
  */
 function personaBlock(persona: Persona | undefined): Html {
   if (persona === undefined) {
@@ -72,9 +71,7 @@ function personaBlock(persona: Persona | undefined): Html {
       <strong>${persona.displayName}</strong>
       <span class="persona-meta">${roleTag(persona.role)} · ${persona.officeName}</span>
     </span>
-    <form class="inline no-print" method="post" action="${PATHS.clearPersona}">
-      <button class="quiet" type="submit">${LABELS.persona.change}</button>
-    </form>
+    <a class="quiet no-print" href="${PATHS.home}">${LABELS.persona.change}</a>
   </div>`;
 }
 

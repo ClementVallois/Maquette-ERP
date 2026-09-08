@@ -99,7 +99,7 @@ const SECTION_LAYOUTS = {
 } as const;
 
 // Local to this file on purpose: the kitchen sink is the one place that needs a repeated
-// "titled group" wrapper, and it is not part of the design system Phase 2 ships.
+// "titled group" wrapper, and it is not part of the design system.
 function Section({ title, children, layout = 'row' }: SectionProps): ReactElement {
   return (
     <section className="flex flex-col gap-3">
@@ -110,15 +110,13 @@ function Section({ title, children, layout = 'row' }: SectionProps): ReactElemen
 }
 
 /**
- * Phase 2's kitchen sink (frontend-plan.md task 2.6): every shadcn component task 2.3 installed,
- * every §4 status/tag/reason variant, both day-flag row tints, both role treatments, and
- * `StatCard`. Rendered directly from `App.tsx` because TanStack Router does not exist yet
- * (Phase 4) — this becomes the `dev.composants` route then, unchanged in substance.
+ * The component gallery behind `/dev/composants`: every shadcn component this app installs,
+ * every status/tag/reason variant, both day-flag row tints, both role treatments, and `StatCard`.
  *
- * Demo values (the StatCard figures, the table rows) are illustrative, not fetched — Phase 3
- * wires the real endpoints. They are not a stand-in for the seed: nothing here claims to be seed
- * data. Labels are the verbatim French strings of direction-visuelle.md §4, hard-coded here
- * (`src/lib/labels.ts` is Phase 3.3); `StatusBadge` already keeps them in one map.
+ * Demo values (the StatCard figures, the table rows) are illustrative, not fetched, and are not a
+ * stand-in for the seed: nothing here claims to be seed data. Labels are the verbatim French
+ * strings of `docs/direction-visuelle.md` §4, hard-coded here; `StatusBadge` keeps them in one
+ * map.
  */
 export function KitchenSink(): ReactElement {
   return (

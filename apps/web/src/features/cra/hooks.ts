@@ -5,7 +5,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
+import type { QueryClient, UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 
 import { unwrap } from '@/lib/api-client';
 
@@ -100,7 +100,7 @@ const MANAGER_GRID_QUERY_KEY_PREFIX = ['cra', 'manager-grid'] as const;
 export function craListQueryOptions(filters: CraListFilters = {}) {
   return queryOptions({
     queryKey: craListQueryKey(filters),
-    queryFn: async () => unwrap(await fetchCraList(filters)),
+    queryFn: async ({ signal }) => unwrap(await fetchCraList(filters, signal)),
     // Item 3 (QA round 1) built the URL-driven filters as a real `navigate()` per change, which
     // is what a linkable/reloadable filter has to be — but without this, every checkbox click
     // changed the query key, flipped `isPending` back to true, and `CraListScreen` swapped its
@@ -127,14 +127,14 @@ export function useCraList(filters: CraListFilters = {}): UseQueryResult<CraList
 export function useConsultantRoster(): UseQueryResult<ConsultantRosterResponse> {
   return useQuery({
     queryKey: CONSULTANT_ROSTER_QUERY_KEY,
-    queryFn: async () => unwrap(await fetchConsultantRoster()),
+    queryFn: async ({ signal }) => unwrap(await fetchConsultantRoster(signal)),
   });
 }
 
 export function craGridQueryOptions(period: string) {
   return queryOptions({
     queryKey: craGridQueryKey(period),
-    queryFn: async () => unwrap(await fetchCraGrid(period)),
+    queryFn: async ({ signal }) => unwrap(await fetchCraGrid(period, signal)),
     // A background refetch on window focus would silently overwrite the consultant's unsaved
     // in-memory edits with the server's last-saved shape (`CraGridBody`'s own render-time
     // re-sync, ADR-0067) — safe for a read-only screen, a real data-loss risk for an editable
@@ -156,8 +156,31 @@ export function useManagerCraGrid(
 ): UseQueryResult<ManagerCraGridResponse> {
   return useQuery({
     queryKey: managerCraGridQueryKey(consultantId, period),
-    queryFn: async () => unwrap(await fetchManagerCraGrid(consultantId, period)),
+    queryFn: async ({ signal }) => unwrap(await fetchManagerCraGrid(consultantId, period, signal)),
   });
+}
+
+/**
+ * Package 11's dependency table (`docs/adr/0113-mutations-invalidate-every-projection-they-
+ * actually-change.md`), the three CRA-mutation rows. Extracted as plain functions — not inlined
+ * in each `onSuccess` — so each is testable directly (`hooks.test.ts`), the same separation
+ * `features/session/cross-tab-sync.ts`'s `invalidateOnPersonaChange` already established for the
+ * identical reason.
+ *
+ * `['dashboard']`/`['facture-historique']` are bare literal query keys, not imported constants:
+ * `docs/open-questions.md`'s 24/08/2026 row already tracks that this SPA has no rule for
+ * cross-feature imports, and this package does not resolve that question by adding three new
+ * ones (`cra` → `dashboard`, `cra` → `factures`) for a two-element array TanStack Query matches
+ * by value, not by reference — the same duplication-over-a-new-cross-feature-dependency choice
+ * package 09's `docs/open-questions.md` row (07/09/2026, naming package 14) already made for an
+ * analogous small duplication.
+ */
+function invalidateDashboard(queryClient: QueryClient): Promise<void> {
+  return queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+}
+
+function invalidateInvoiceHistory(queryClient: QueryClient): Promise<void> {
+  return queryClient.invalidateQueries({ queryKey: ['facture-historique'] });
 }
 
 /**
@@ -165,7 +188,23 @@ export function useManagerCraGrid(
  * the screen's in-memory slot state is rebuilt from the server's answer, which lines exist and how
  * they group — `PUT`'s response carries no `lines` to have predicted correctly) and the list's
  * query (a first save on a period with no prior Cra changes `GET /api/v1/cras`' row count).
+ *
+ * Package 11: also the dashboard — a submit changes this Cra's status, which both the
+ * consultant's own `refusedPeriods`/`recentActivity` and (nothing here knows the actor's role,
+ * so this covers the manager branch too) `awaitingDecision`/`pendingDecisions`/`lateCras`/
+ * `recentActivity` read (`apps/api/src/routes/dashboard.ts`). Unconditional even for a plain save
+ * with `submit: false` (no status change, so this is a no-op refetch that returns unchanged
+ * data) rather than branching on `MonthEntriesRequest.submit` — the extra request is cheap, and a
+ * conditional invalidation is one more thing to keep in sync with the route's own logic.
  */
+export function invalidateAfterSaveMonth(queryClient: QueryClient, period: string): Promise<void> {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: craGridQueryKey(period) }),
+    queryClient.invalidateQueries({ queryKey: CRA_LIST_QUERY_KEY }),
+    invalidateDashboard(queryClient),
+  ]).then(() => undefined);
+}
+
 export function useSaveMonth(
   period: string,
 ): UseMutationResult<MonthEntriesResponse, Error, MonthEntriesRequest> {
@@ -174,10 +213,7 @@ export function useSaveMonth(
   return useMutation({
     mutationFn: async (body: MonthEntriesRequest) => unwrap(await saveMonth(period, body)),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: craGridQueryKey(period) }),
-        queryClient.invalidateQueries({ queryKey: CRA_LIST_QUERY_KEY }),
-      ]);
+      await invalidateAfterSaveMonth(queryClient, period);
     },
   });
 }
@@ -190,7 +226,26 @@ export function useSaveMonth(
  * queries rather than tracking which caller needs which is the same reasoning
  * `features/session/hooks.ts`'s `invalidateOnPersonaChange` uses: cheaper than either caller
  * having to remember the other's cache key, and correct regardless of which one triggered it.
+ *
+ * Package 11: also the dashboard and invoice history. Verified against
+ * `apps/api/src/composition/pre-facturier.ts`: validating drafts a new invoice, and `billable` —
+ * read by both the manager dashboard's own figure and `facture-historique`'s `denseMonths`, both
+ * computed from the same `preFacturierComposition` invoice aggregate — changes the moment that
+ * invoice exists, as does `byYearAndStatus` (a new `draft` row for this year).
  */
+export function invalidateAfterValidateCra(
+  queryClient: QueryClient,
+  period: string,
+): Promise<void> {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: preFacturierQueryKey(period) }),
+    queryClient.invalidateQueries({ queryKey: CRA_LIST_QUERY_KEY }),
+    queryClient.invalidateQueries({ queryKey: MANAGER_GRID_QUERY_KEY_PREFIX }),
+    invalidateDashboard(queryClient),
+    invalidateInvoiceHistory(queryClient),
+  ]).then(() => undefined);
+}
+
 export function useValidateCra(
   period: string,
 ): UseMutationResult<ValidationResponse, Error, string> {
@@ -199,16 +254,26 @@ export function useValidateCra(
   return useMutation({
     mutationFn: async (craId: string) => unwrap(await postValidation(craId)),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: preFacturierQueryKey(period) }),
-        queryClient.invalidateQueries({ queryKey: CRA_LIST_QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: MANAGER_GRID_QUERY_KEY_PREFIX }),
-      ]);
+      await invalidateAfterValidateCra(queryClient, period);
     },
   });
 }
 
-/** Task 7.3. Same invalidation reasoning as `useValidateCra` above. */
+/**
+ * Task 7.3. Same invalidation reasoning as `useValidateCra` above, minus invoice history: a
+ * refusal drafts no invoice — `billable` and `byYearAndStatus` are both computed from the invoice
+ * aggregate alone, so neither changes. Still invalidates the dashboard: refusing changes
+ * `pendingDecisions`/`lateCras`/`awaitingDecision`/`recentActivity` regardless.
+ */
+export function invalidateAfterRefuseCra(queryClient: QueryClient, period: string): Promise<void> {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: preFacturierQueryKey(period) }),
+    queryClient.invalidateQueries({ queryKey: CRA_LIST_QUERY_KEY }),
+    queryClient.invalidateQueries({ queryKey: MANAGER_GRID_QUERY_KEY_PREFIX }),
+    invalidateDashboard(queryClient),
+  ]).then(() => undefined);
+}
+
 export function useRefuseCra(
   period: string,
 ): UseMutationResult<RefusalResponse, Error, { readonly craId: string; readonly reason: string }> {
@@ -218,11 +283,7 @@ export function useRefuseCra(
     mutationFn: async ({ craId, reason }: { craId: string; reason: string }) =>
       unwrap(await postRefusal(craId, reason)),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: preFacturierQueryKey(period) }),
-        queryClient.invalidateQueries({ queryKey: CRA_LIST_QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: MANAGER_GRID_QUERY_KEY_PREFIX }),
-      ]);
+      await invalidateAfterRefuseCra(queryClient, period);
     },
   });
 }

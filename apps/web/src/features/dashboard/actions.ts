@@ -65,7 +65,7 @@ function billingCallToAction(data: BillingDashboard): DashboardCallToAction {
  * The one mapping from "what this role's month looks like" to "what to do about it". Pure, so the
  * branch that only exists when a figure is non-zero is provable without the data that produces it
  * — which matters here, because the seed holds `2026-06` and this screen always reads the
- * wall-clock month (see `docs/open-questions.md`, the Phase 8 review row of 27/08/2026).
+ * wall-clock month.
  */
 export function callToAction(data: DashboardResponse): DashboardCallToAction {
   switch (data.role) {

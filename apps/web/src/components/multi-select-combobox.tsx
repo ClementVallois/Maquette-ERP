@@ -21,10 +21,9 @@ interface MultiSelectComboboxProps {
 }
 
 /**
- * Item 7 (QA round 1): "usable with 40+ consultants (a searchable combobox, not a 40-item
- * checkbox list)". No `command`/combobox primitive existed in `components/ui/` before this one —
- * checked (BUILD-RULES "a new dependency is proposed, never just added") — so this is built from
- * primitives already vendored (`Popover`, `Input`, `Checkbox`), not `cmdk` or another package.
+ * Usable with 40+ consultants: a searchable combobox, not a 40-item checkbox list. Built from
+ * primitives already vendored (`Popover`, `Input`, `Checkbox`) rather than `cmdk` or another
+ * package — BUILD-RULES: "a new dependency is proposed, never just added".
  *
  * A search field filters the option list client-side (the option list itself — consultant names —
  * is already in memory, fetched once; this never re-fetches per keystroke). Selection is
@@ -69,9 +68,8 @@ export function MultiSelectCombobox({
       triggerContent={
         // A count, never the selected names themselves: joined names would duplicate whatever
         // the filtered table already shows them against (and grow without bound well before
-        // 40+ consultants), so "3 consultants" is what a manager reads here — item 11
-        // (QA round 2) removed the popover's own repeat of those same names, the checkbox
-        // state below already being the one place that answers "which".
+        // 40+ consultants), so "3 consultants" is what a manager reads here. The checkbox state
+        // below is the one place that answers "which".
         <>
           <span className="truncate">
             {selectedLabels.length === 0

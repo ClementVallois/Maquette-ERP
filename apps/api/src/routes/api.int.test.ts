@@ -37,6 +37,8 @@ const CHLOE = 'api-chloe';
 const DEPARTED = 'api-departed';
 const GRADE = 'api-grade';
 const MISSION = 'api-mission';
+const QUALIFIED_MISSION = 'api-mission-passi';
+const PASSI = 'api-passi';
 const CLIENT = 'api-client';
 const CRA = 'api-cra';
 // A second consultant of the **same** office, on a mission sold to a second client. Two records
@@ -45,6 +47,10 @@ const CRA = 'api-cra';
 const MISSION_TWO = 'api-mission-2';
 const CLIENT_TWO = 'api-client-2';
 const CRA_TWO = 'api-cra-2';
+// A billing actor of the **other** office (Lyon), used only to prove that the issuance key check
+// is global rather than office-scoped: `prepareIssuance`'s `keyOwnerId` lookup has no office
+// filter, because the unique index it mirrors (migration 009) has none either.
+const LEA = 'api-lea';
 
 const config: ApiConfig = {
   databaseUrl: 'unused: every read goes through the injected unit of work',
@@ -96,6 +102,14 @@ const personas: readonly Persona[] = [
     officeName: 'Paris',
     displayName: 'Chloé Dubois',
   },
+  {
+    key: 'billing-lyon',
+    role: 'billing',
+    consultantId: LEA,
+    officeId: LYON,
+    officeName: 'Lyon',
+    displayName: 'Léa Petit',
+  },
 ];
 
 function as(key: string): { cookie: string } {
@@ -107,6 +121,8 @@ function writingAs(key: string): { cookie: string; origin: string } {
 }
 
 let app: FastifyInstance;
+let databaseQueryCount = 0;
+type CountedQuery = (text: string, values?: unknown[]) => Promise<unknown>;
 
 /** Every workable day of June 2026 on one mission — the shape `submit` requires. */
 function workedDaysOfJune(): string[] {
@@ -135,13 +151,28 @@ function workedDaysOfJuly(): string[] {
 
 beforeEach(async () => {
   const { client } = transaction;
+  const countedClient = new Proxy(client, {
+    get(target, property) {
+      if (property !== 'query') {
+        const value: unknown = Reflect.get(target, property);
+        return value;
+      }
+
+      const query = target.query.bind(target) as CountedQuery;
+
+      return (...args: Parameters<typeof query>) => {
+        databaseQueryCount += 1;
+        return query(...args);
+      };
+    },
+  });
 
   app = buildServer({
     config,
     clock: { now: () => new Date('2026-07-02T09:00:00.000Z') },
     probeDatabase: () => Promise.resolve(),
     personas: inMemoryPersonas(personas),
-    transactionally: savepointTransactionally(client, uuidv7),
+    transactionally: savepointTransactionally(countedClient, uuidv7),
     newId: uuidv7,
   });
 
@@ -156,8 +187,9 @@ beforeEach(async () => {
             ($2, 'Bruno', 'Leroy', 'api-b@t', $5, 'api-practice', 'manager'),
             ($3, 'Emma', 'Robert', 'api-e@t', $6, 'api-practice', 'manager'),
             ($4, 'Henri', 'Laurent', 'api-h@t', $5, 'api-practice', 'director'),
-            ($7, 'Chloé', 'Dubois', 'api-c@t', $5, 'api-practice', 'consultant')`,
-    [ALICE, BRUNO, EMMA, HENRI, PARIS, LYON, CHLOE],
+            ($7, 'Chloé', 'Dubois', 'api-c@t', $5, 'api-practice', 'consultant'),
+            ($8, 'Léa', 'Petit', 'api-l@t', $6, 'api-practice', 'director')`,
+    [ALICE, BRUNO, EMMA, HENRI, PARIS, LYON, CHLOE, LEA],
   );
   await client.query(
     `INSERT INTO public.consultants
@@ -187,8 +219,9 @@ beforeEach(async () => {
   await client.query(
     `INSERT INTO public.missions (id, client_id, name, billing_model, start_date)
      VALUES ($1, $2, 'Audit DORA', 'Regie', '2026-01-05'),
-            ($3, $4, 'SOC run', 'Regie', '2026-01-05')`,
-    [MISSION, CLIENT, MISSION_TWO, CLIENT_TWO],
+            ($3, $2, 'Audit PASSI', 'Regie', '2026-01-05'),
+            ($4, $5, 'SOC run', 'Regie', '2026-01-05')`,
+    [MISSION, CLIENT, QUALIFIED_MISSION, MISSION_TWO, CLIENT_TWO],
   );
   await client.query(
     `INSERT INTO public.mission_tjm (id, mission_id, from_date, to_date, tjm_cents)
@@ -199,8 +232,15 @@ beforeEach(async () => {
   await client.query(
     `INSERT INTO public.assignments (id, consultant_id, mission_id, from_date, to_date)
      VALUES ($1, $2, $3, '2026-01-05', NULL),
-            ($4, $5, $6, '2026-01-05', NULL)`,
-    [uuidv7(), ALICE, MISSION, uuidv7(), CHLOE, MISSION_TWO],
+            ($4, $2, $5, '2026-01-05', NULL),
+            ($6, $7, $8, '2026-01-05', NULL)`,
+    [uuidv7(), ALICE, MISSION, uuidv7(), QUALIFIED_MISSION, uuidv7(), CHLOE, MISSION_TWO],
+  );
+  await client.query(`INSERT INTO public.habilitations (id, name) VALUES ($1, 'PASSI')`, [PASSI]);
+  await client.query(
+    `INSERT INTO public.mission_habilitations (id, mission_id, habilitation_id)
+     VALUES ($1, $2, $3)`,
+    [uuidv7(), QUALIFIED_MISSION, PASSI],
   );
   await client.query(
     `INSERT INTO public.manager_attachments (id, consultant_id, manager_id, from_date, to_date)
@@ -209,10 +249,17 @@ beforeEach(async () => {
     [uuidv7(), ALICE, BRUNO, uuidv7(), CHLOE, BRUNO],
   );
   await client.query(
+    // `PgReferenceReader.seller()` reads `SELECT * FROM public.legal_entities ORDER BY id LIMIT 1`
+    // — unscoped, correct for the one-seller production database, but this test file shares the
+    // integration test database with every other one, and `cra-concurrency.int.test.ts` and
+    // `pg-numbering-counter.int.test.ts` each leave a permanently committed row behind
+    // (`aaa-cra-concurrency-entity`, `entity-fr`) that this file's own uncommitted transaction can
+    // still see. `000-` sorts before both deterministically, so this row — not a leftover from
+    // another file — is the one every draft in this file's tests is issued against.
     `INSERT INTO public.legal_entities (id, name, legal_form, share_capital_cents, siren,
        intra_community_vat_number, rcs_registration, address_street, address_postal_code,
        address_city, address_country, number_prefix)
-     VALUES ('api-entity', 'SecureCo SAS', 'SAS', 10000000, '732829320', 'FR27732829320',
+     VALUES ('000-api-entity', 'SecureCo SAS', 'SAS', 10000000, '732829320', 'FR27732829320',
              'RCS Paris 732 829 320', '42 rue', '75008', 'Paris', 'France', 'SEC')`,
   );
   await client.query(
@@ -228,6 +275,7 @@ beforeEach(async () => {
       [uuidv7(), CRA, day, MISSION, uuidv7(), CRA_TWO, MISSION_TWO],
     );
   }
+  databaseQueryCount = 0;
 });
 
 afterEach(async () => {
@@ -272,6 +320,39 @@ describe('GET /api/v1/cras — consultantName (ADR-0071)', () => {
     expect(cras).toContainEqual(
       expect.objectContaining({ consultantId: CHLOE, consultantName: 'Chloé Dubois' }),
     );
+  });
+});
+
+describe('GET /api/v1/invoices — bounded query count (package 15)', () => {
+  it('uses the same number of database queries for one row and two rows', async () => {
+    for (const cra of [CRA, CRA_TWO]) {
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/cras/${cra}/validation`,
+        headers: writingAs('manager-paris'),
+      });
+    }
+
+    databaseQueryCount = 0;
+    const oneRow = await app.inject({
+      method: 'GET',
+      url: '/api/v1/invoices?limit=1',
+      headers: as('billing-paris'),
+    });
+    const oneRowQueryCount = databaseQueryCount;
+
+    databaseQueryCount = 0;
+    const twoRows = await app.inject({
+      method: 'GET',
+      url: '/api/v1/invoices?limit=2',
+      headers: as('billing-paris'),
+    });
+    const twoRowQueryCount = databaseQueryCount;
+
+    expect(oneRow.statusCode).toBe(200);
+    expect(twoRows.statusCode).toBe(200);
+    expect(twoRows.json<{ invoices: unknown[] }>().invoices).toHaveLength(2);
+    expect(twoRowQueryCount).toBe(oneRowQueryCount);
   });
 });
 
@@ -955,6 +1036,81 @@ describe('the refusal, through the API', () => {
     expect(untouched.json<{ invoiceNumber: string | null }>().invoiceNumber).toBeNull();
   });
 
+  it('refuses a key already used by an invoice of a different office, without leaking it', async () => {
+    // `prepareIssuance`'s key lookup carries no office filter (ADR-0044, ADR-0102): the unique
+    // index it mirrors is global, so the collision must be caught before either actor's scope is
+    // even asked. Seeded directly rather than through a second office's whole CRA workflow.
+    await transaction.client.query(
+      `INSERT INTO billing.invoices (
+         id, office_id, seller_id, supply_period,
+         seller_name, seller_legal_form, seller_share_capital_cents, seller_siren,
+         seller_intra_community_vat_number, seller_rcs_registration,
+         seller_address_street, seller_address_postal_code, seller_address_city,
+         seller_address_country, seller_number_prefix,
+         billed_to_client_id, billed_to_name,
+         billed_to_billing_street, billed_to_billing_postal_code, billed_to_billing_city,
+         billed_to_billing_country,
+         billed_to_delivery_street, billed_to_delivery_postal_code, billed_to_delivery_city,
+         billed_to_delivery_country,
+         payment_terms_kind, payment_terms_days,
+         mentions_operation_category, mentions_early_payment_kind, mentions_late_penalty_rate,
+         mentions_recovery_indemnity
+       ) VALUES (
+         'api-invoice-lyon', $1, '000-api-entity', '2026-06',
+         'SecureCo SAS', 'SAS', 10000000, '732829320', 'FR27732829320', 'RCS Paris 732 829 320',
+         '42 rue', '75008', 'Paris', 'France', 'SEC',
+         $2, 'Zenith Industries',
+         '2 rue', '69002', 'Lyon', 'France',
+         '2 rue', '69002', 'Lyon', 'France',
+         'net', 30,
+         'services', 'none', 3000, 4000
+       )`,
+      [LYON, CLIENT_TWO],
+    );
+
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/cras/${CRA}/validation`,
+      headers: writingAs('manager-paris'),
+    });
+    const invoices = await app.inject({
+      method: 'GET',
+      url: '/api/v1/invoices',
+      headers: as('billing-paris'),
+    });
+    const parisInvoiceId = invoices.json<{ invoices: { id: string }[] }>().invoices[0]!.id;
+    const key = 'issuance-key-cross-office';
+
+    const issued = await app.inject({
+      method: 'POST',
+      url: `/api/v1/invoices/${parisInvoiceId}/issuance`,
+      headers: { ...writingAs('billing-paris'), 'idempotency-key': key },
+    });
+    expect(issued.statusCode).toBe(200);
+
+    // A Lyon billing actor reuses the same key on their own office's invoice.
+    const reused = await app.inject({
+      method: 'POST',
+      url: '/api/v1/invoices/api-invoice-lyon/issuance',
+      headers: { ...writingAs('billing-lyon'), 'idempotency-key': key },
+    });
+
+    expect(reused.statusCode).toBe(409);
+    expect(reused.json()).toMatchObject({ type: '/problems/idempotency-key-reused' });
+    // Not the Paris invoice's number under the Lyon invoice's id, and no hint of which invoice
+    // the key belongs to — the response carries nothing about the invoice out of Lyon's scope.
+    expect(reused.json<{ invoiceNumber?: string }>().invoiceNumber).toBeUndefined();
+
+    const untouched = await app.inject({
+      method: 'GET',
+      url: '/api/v1/invoices/api-invoice-lyon',
+      headers: as('billing-lyon'),
+    });
+
+    expect(untouched.json<{ status: string }>().status).toBe('draft');
+    expect(untouched.json<{ invoiceNumber: string | null }>().invoiceNumber).toBeNull();
+  });
+
   it('refuses an issuance with no Idempotency-Key', async () => {
     const response = await app.inject({
       method: 'POST',
@@ -1228,6 +1384,55 @@ describe('recording a month through the API (ADR-0050)', () => {
         lines: { day: string; dayType: string; missionId: string; quarterDays: number }[];
       }>().lines,
     ).toStrictEqual([{ day: '2026-07-01', dayType: 'worked', missionId: MISSION, quarterDays: 4 }]);
+  });
+
+  it('keeps one day split across two missions as two distinct lines', async () => {
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: {
+        submit: false,
+        entries: [
+          { day: '2026-07-01', dayType: 'worked', missionId: MISSION, quarterDays: 2 },
+          {
+            day: '2026-07-01',
+            dayType: 'worked',
+            missionId: QUALIFIED_MISSION,
+            quarterDays: 2,
+          },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const { craId } = response.json<{ craId: string }>();
+    const found = await app.inject({
+      method: 'GET',
+      url: `/api/v1/cras/${craId}`,
+      headers: as('consultant-paris'),
+    });
+
+    expect(
+      found.json<{ lines: { day: string; missionId: string; quarterDays: number }[] }>().lines,
+    ).toEqual(
+      expect.arrayContaining([
+        { day: '2026-07-01', missionId: MISSION, quarterDays: 2, dayType: 'worked' },
+        { day: '2026-07-01', missionId: QUALIFIED_MISSION, quarterDays: 2, dayType: 'worked' },
+      ]),
+    );
+  });
+
+  it('surfaces the Habilitation refusal through the JSON write route', async () => {
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/cras/2026-07/entries',
+      headers: writingAs('consultant-paris'),
+      payload: { submit: true, entries: entries(QUALIFIED_MISSION) },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ invariant: '/problems/missing-habilitation' });
   });
 
   it('submits the month, and the flags come back with it', async () => {

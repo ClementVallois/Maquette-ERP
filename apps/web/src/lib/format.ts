@@ -2,9 +2,8 @@
  * French display formats (BUILD-RULES § Working discipline): decimal comma, `JJ/MM/AAAA`,
  * `Europe/Paris`.
  *
- * A **deliberate copy** of `apps/api/src/web/format.ts` (frontend-plan.md Annexe C.8: "labels.ts
- * et format.ts sont des copies … pas d'import cross-app"), not a shared import: `apps/web` may
- * import only `@erp/contracts` (frontend-plan.md §2), and the API's `format.ts` pulls
+ * A **deliberate copy** of `apps/api/src/web/format.ts`, not a shared import: `apps/web` may
+ * import only `@erp/contracts`, and the API's `format.ts` pulls
  * `dayOfWeek`/`MONDAY`/`IsoDate`/`Period` from `@erp/platform`. That package is off limits here
  * even though dependency-cruiser's generic allowlist entry — any app may import any package's
  * public entry point — would let the import through and `pnpm run boundaries` would stay green:
@@ -69,8 +68,8 @@ export function frenchMonth(period: string): string {
   return `${MONTHS[month - 1] ?? ''} ${year}`;
 }
 
-/** `6` → `juin` — the month name alone, no year: item 4 (QA round 2)'s month filter names a
- * calendar month independent of any particular year, so `frenchMonth` (which always needs a
+/** `6` → `juin` — the month name alone, no year: the month filter names a calendar month
+ * independent of any particular year, so `frenchMonth` (which always needs a
  * `YYYY-MM` and always prints both) is the wrong shape for it. `1`-indexed, matching every other
  * month number on the wire (`@erp/platform`'s `Period`, this file's own `frenchMonth` above). */
 export function frenchMonthName(month: number): string {

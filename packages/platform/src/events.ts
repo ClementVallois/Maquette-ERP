@@ -2,8 +2,10 @@ import type { QuarterDays } from './quarter-days.ts';
 
 /**
  * A fact that has already happened, published in-process (ADR-0001). The emitter does not know
- * who listens, and a subscriber runs inside the emitter's transaction — which is why a subscriber
- * performs no I/O. The day one does, an outbox is required; that is the threshold, not a detail.
+ * who listens, and a subscriber runs inside the emitter's transaction: it may write through that
+ * transaction, and it may perform **no side effect outside it**. The day one needs to — an HTTP
+ * call, a queue publish, anything a rollback cannot undo — an outbox is required; that is the
+ * threshold, not a detail.
  */
 export interface DomainEvent<TType extends string = string, TPayload = unknown> {
   readonly type: TType;

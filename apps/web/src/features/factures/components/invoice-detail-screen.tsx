@@ -43,7 +43,7 @@ import { IssuanceDialog } from './issuance-dialog';
 const INVOICE_PRINT_PATH = '/facture';
 const CRA_PRINT_PATH = '/releve';
 
-/** Item 30, QA round 3: the same dot colours `StatusBadge` reads — `validated` reuses the Cra
+/** The same dot colours `StatusBadge` reads — `validated` reuses the Cra
  * status' own green (the same event, read from the invoice's side), `issued` shares it too
  * (`--status-invoice-issued-dot`'s own token is the same green tone), `drafted` is neutral. */
 const TIMELINE_KIND_DOT_CLASS: Record<'validated' | 'drafted' | 'issued', string> = {
@@ -85,7 +85,7 @@ function InfoBlock({ title, rows }: InfoBlockProps): ReactElement {
       <h3 className="text-card-title">{title}</h3>
       <dl className="flex flex-col gap-2 text-sm sm:gap-1">
         {rows.map(([label, value]) => (
-          // Item 36, QA round 3: stacked below `sm`, label above value, the same shape
+          // Stacked below `sm`, label above value, the same shape
           // `denied-state.tsx` settled on. Side by side, a label as long as "N° de TVA
           // intracommunautaire" left barely a third of a 375px card for its value and the two
           // halves wrapped independently of each other. `break-words` is not cosmetic: a VAT

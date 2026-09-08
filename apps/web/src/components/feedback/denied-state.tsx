@@ -18,11 +18,10 @@ interface DeniedStateProps {
  * rule and the persona's role**, and its tone is "a demonstration rather than an apology — it is
  * the screen the repository is proudest of, and it is styled like a result, not like a crash."
  *
- * First real caller: task 6.5's 403 on `/cra/$period` (a manager or billing persona hits
- * `insufficient-role` — the route is `forRoles('consultant')` and the path carries no consultant
- * id, so `out-of-scope` cannot be produced from this route; see `docs/open-questions.md`, row
- * dated 25/08/2026, for why the filename says "out-of-scope" while the reachable refusal here is
- * `insufficient-role` — both classify to the same `{ kind: 'denied' }` this component renders).
+ * The 403 on `/cra/$period` is the common case: a manager or billing persona hits
+ * `insufficient-role`, since the route is `forRoles('consultant')` and the path carries no
+ * consultant id, so `out-of-scope` cannot be produced from it. Both classify to the same
+ * `{ kind: 'denied' }` this component renders.
  */
 export function DeniedState({ deniedBy, role }: DeniedStateProps): ReactElement {
   return (

@@ -128,7 +128,7 @@ export function AssignmentScreen({ view, staffing }: AssignmentScreenProps): Rea
         : view === 'ended'
           ? ended
           : data.assignments;
-  // Item 3, QA round 6: the manager dashboard's staffing chart deep-links here with a consultant
+  // The manager dashboard's staffing chart deep-links here with a consultant
   // bucket, not an assignment property — `staffingBucketOf` replicates the server's own
   // per-consultant precedence (`managerStaffingSnapshot`) rather than filtering rows by mission
   // name, which would diverge from it (a consultant on-mission but with an idle `Intercontrat`

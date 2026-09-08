@@ -29,29 +29,28 @@ module.exports = {
       to: { path: '^(packages/(timesheet|billing|contracts)|apps)/' },
     },
     {
+      name: 'contracts-has-no-business-dependency',
+      severity: 'error',
+      comment:
+        'The wire contract both apps read is not a place either module reaches back into. A ' +
+        'DTO copies a shape at the boundary; it does not import the domain that produces it. ' +
+        'Named here rather than left to the closed whitelist below to enforce silently.',
+      from: { path: '^packages/contracts/' },
+      to: { path: '^packages/(timesheet|billing)/' },
+    },
+    {
       name: 'domain-has-no-external-dependency',
       severity: 'error',
       comment:
         'The domain is plain TypeScript: no framework, no ORM, no network, no disk — not even a ' +
         'Node builtin. A legitimate need gets declared here explicitly. CLAUDE.md rule 3.',
-      // `platform/**` is in scope and not by accident: ADR-0033 moved the value objects, the
-      // typed errors and the dated resolution into the kernel, which has no `domain/` directory.
-      // A rule scoped to `domain/` alone would hold the code that stayed and exempt the code
-      // that moved.
-      // A colocated test is not shipped domain code, and it imports the test runner. Exempting
-      // it is what lets the rule stay absolute for everything that IS shipped.
+      // The shared kernel contains domain-grade code; colocated tests may import their runner.
       from: {
         path: '^packages/(?:[^/]+/src/domain|platform/src)/',
         pathNot: '\\.test\\.ts$',
       },
-      // `npm-no-pkg` is in this list, and its absence was this rule's second death. It is what
-      // dependency-cruiser reports when the IMPORTING package's own manifest does not declare the
-      // package — exactly what a domain reaching for something it was never given produces. The
-      // whitelist below granted it from the day the driver landed; the ban never listed it, so a
-      // domain file importing `pg` cruised clean for the whole of Phase 3.
-      // `tests/boundary-rule.test.ts` holds the negative test, against a fixture importing a
-      // package only the ROOT manifest declares — the `vitest` fixture next to it classifies as
-      // `npm-dev` and would not have caught this.
+      // `npm-no-pkg` catches imports absent from the importing package's manifest. The boundary
+      // fixtures prove this case independently from declared development dependencies.
       to: {
         dependencyTypes: ['npm', 'npm-dev', 'npm-optional', 'npm-peer', 'npm-no-pkg', 'core'],
       },
@@ -94,9 +93,11 @@ module.exports = {
   allowed: [
     // Inside one package. `$1` is the capture group from `from.path`.
     { from: { path: '^packages/([^/]+)/' }, to: { path: '^packages/$1/' } },
-    // The two modules may use the shared kernel, and only through its public entry point.
+    // The two modules and the shared wire contract may use the shared kernel, and only through
+    // its public entry point (ADR-0110/ADR-0111: contracts reaching for platform's Role or
+    // IsoDate is not the same act as reaching for a business module).
     {
-      from: { path: '^packages/(timesheet|billing)/' },
+      from: { path: '^packages/(timesheet|billing|contracts)/' },
       to: { path: '^packages/platform/src/index\\.ts$' },
     },
     // Inside one app.
@@ -107,9 +108,9 @@ module.exports = {
     { from: { path: '^apps/' }, to: { path: '^packages/[^/]+/src/index\\.ts$' } },
     // Third-party code. The domain is held to nothing at all by a separate forbidden rule.
     // `npm-no-pkg` is what dependency-cruiser reports when the IMPORTING package's manifest does
-    // not declare the package — not, as this comment used to say, a pnpm symlink it cannot
-    // resolve. The two modules now declare `pg` themselves, so their imports classify as `npm`;
-    // this entry stays for a root-only devDependency reached from repository tooling.
+    // not declare the package — it is not about a pnpm symlink it cannot resolve. Both modules
+    // declare `pg` themselves, so their imports classify as `npm`; this entry stays for a
+    // root-only devDependency reached from repository tooling.
     {
       from: {},
       to: { dependencyTypes: ['npm', 'npm-dev', 'npm-optional', 'npm-peer', 'npm-no-pkg', 'core'] },
@@ -118,14 +119,7 @@ module.exports = {
     // harness outside of any package. The harness files also import each other.
     { from: { path: '\\.int\\.test\\.ts$' }, to: { path: '^tests/' } },
     { from: { path: '^tests/' }, to: { path: '^tests/' } },
-    // `scripts/` is a composition root that carries no manifest: `seed.ts` drives both modules'
-    // aggregates, so it composes exactly as an app does and gets exactly an app's grant — a
-    // module's public entry point, and nothing behind it. It also composes `apps/api`'s public
-    // index, for the deterministic id factory ADR-0041 put there.
-    //
-    // These four entries do not relax the boundary; they are what brings `scripts/` under it.
-    // Until this commit the globs did not reach the directory at all, so a deep import written
-    // here would have cruised clean rather than been refused.
+    // Scripts are composition roots and may use only application and package public surfaces.
     { from: { path: '^scripts/' }, to: { path: '^packages/[^/]+/src/index\\.ts$' } },
     { from: { path: '^scripts/' }, to: { path: '^apps/[^/]+/src/index\\.ts$' } },
     { from: { path: '^scripts/' }, to: { path: '^scripts/' } },
@@ -133,41 +127,11 @@ module.exports = {
 
   options: {
     doNotFollow: { path: 'node_modules' },
-    // pnpm links workspace deps into each package's node_modules, so a glob otherwise collects
-    // packages/billing/node_modules/@erp/platform/** and attributes platform's files to billing.
-    // Only THOSE copies are excluded: excluding node_modules wholesale also erased every npm
-    // package from the graph, and with it every violation of `domain-has-no-external-dependency`
-    // — the rule reported clean on a domain importing an ORM. See the fixtures below.
-    // The fixtures are deliberate violations, kept alive to test the rules themselves:
-    // see packages/billing/src/__boundary-fixture__/README.md
+    // Exclude pnpm's linked workspace copies, but keep external packages in the graph so the
+    // domain dependency rule can see them. Boundary fixtures are tested separately.
     exclude: { path: '(^|/)packages/[^/]+/node_modules/|__boundary-fixture__' },
-    // Points at `apps/web/tsconfig.json`, not the root `tsconfig.base.json`: this is what feeds
-    // dependency-cruiser's `@/`-alias resolution (it loads exactly this one file into
-    // `tsconfig-paths-webpack-plugin`, see resolve-options/normalize.mjs), and `apps/web`'s own
-    // `paths` + `baseUrl` are what the plugin needs to turn `@/lib/x` into `apps/web/src/lib/x`.
-    // `enhancedResolveOptions` has no `alias` key of its own for this — checked against the schema
-    // of both dependency-cruiser 17.0.1 (this repo's version until this change) and 18.2.0
-    // (`additionalProperties:false`, no `alias` among its `properties`) — so an alias map passed
-    // there fails config validation outright; `paths`/`baseUrl` on the tsconfig is the only wired
-    // mechanism. Absolute, not relative: `dependency-cruiser/src/config-utl/extract-ts-config.mjs`
-    // hands this string straight to `ts.parseJsonConfigFileContent` as the `configFileName` used to
-    // resolve `extends` — with a relative path, TypeScript's own extends resolution drops the
-    // `../../` and looks for `tsconfig.base.json` inside `apps/web/`, failing outright (confirmed
-    // directly against `typescript@6.0.3`; an absolute path resolves the chain correctly).
-    // Scoped to `apps/web` deliberately: the other workspace members have no `@/`, so pointing the
-    // cruise's one tsConfig at `apps/web/tsconfig.json` costs them nothing — dependency-cruiser
-    // does not run `tsc` against it (no `parser: 'tsc'` here), so its `jsx`/`moduleResolution`/
-    // `include` never apply to any file outside `apps/web`; only `paths` and `baseUrl` are read,
-    // and `@/*` cannot collide with `@erp/*` (a literal-prefix match, not a glob). A second member
-    // declaring its own `@/` needs this widened — one shared `paths` map, or `references` (the
-    // plugin option this version supports for a second tsconfig) — not a second flat entry.
-    // (docs/open-questions.md, row dated 24/08/2026.)
-    // This config is why `dependency-cruiser` moved 17.0.1 → 18.2.0 in the same commit, and the
-    // bump is load-bearing rather than housekeeping: measured directly, 17.0.1 fails to resolve
-    // `@/lib/utils` from `apps/web/src/` even with this `tsConfig` and `baseUrl` in place
-    // (`error not-in-allowed: apps/web/src/AliasProbe.tsx → @/lib/utils`), and 18.2.0 resolves the
-    // identical probe clean. A boundary gate is not upgraded as a side effect of a front-end
-    // phase, so the measurement is recorded here rather than left to be re-derived.
+    // Use the web tsconfig so dependency-cruiser resolves the SPA's `@/` alias. An absolute path
+    // is required for TypeScript to resolve that config's `extends` chain correctly.
     tsConfig: { fileName: path.resolve(__dirname, 'apps/web/tsconfig.json') },
     enhancedResolveOptions: {
       exportsFields: ['exports'],

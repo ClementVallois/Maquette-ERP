@@ -226,7 +226,7 @@ interface PreFacturierBody {
   readonly period: string;
   readonly summary: {
     readonly billableCents: number;
-    readonly lateDays: number;
+    readonly lateQuarterDays: number;
     readonly craCount: number;
   };
   readonly invoices: readonly {
@@ -268,7 +268,7 @@ describe('GET /api/v1/pre-facturier', () => {
     // 20 Regie days (21 workable minus the one on the Forfait mission) at 850 € = 17 000 € HT.
     expect(body.summary.billableCents).toBe(1_700_000);
     // Chloé's five quarter-days: draft, unvalidated, and June has closed by the clock's July.
-    expect(body.summary.lateDays).toBe(5);
+    expect(body.summary.lateQuarterDays).toBe(5);
     expect(body.summary.craCount).toBe(2);
 
     expect(body.invoices).toHaveLength(1);
@@ -313,7 +313,7 @@ describe('GET /api/v1/pre-facturier', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json<PreFacturierBody>().summary.lateDays).toBe(0);
+    expect(response.json<PreFacturierBody>().summary.lateQuarterDays).toBe(0);
   });
 
   it('offers a submitted Cra as decidable to the manager who may act on it', async () => {
@@ -356,7 +356,7 @@ describe('GET /api/v1/pre-facturier', () => {
     const body = response.json<PreFacturierBody>();
     expect(body.cras).toStrictEqual([]);
     expect(body.invoices).toStrictEqual([]);
-    expect(body.summary).toStrictEqual({ billableCents: 0, lateDays: 0, craCount: 0 });
+    expect(body.summary).toStrictEqual({ billableCents: 0, lateQuarterDays: 0, craCount: 0 });
   });
 
   it('refuses a request with no persona at all', async () => {

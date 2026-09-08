@@ -4,8 +4,8 @@ import type { z } from 'zod';
 import type { ProblemContext } from './http/problem.ts';
 
 /**
- * Zod **at the boundary only** (BUILD-PLAN 5.3). It answers one question — is this a request at
- * all — and it never restates a domain rule.
+ * Zod **at the boundary only**. It answers one question — is this a request at all — and it
+ * never restates a domain rule.
  *
  * The line is drawn by ADR-0042: a shape the route cannot parse is a 400 about the transport; a
  * value a domain rule refuses is a 422 raised by the module that owns the rule. So the schemas

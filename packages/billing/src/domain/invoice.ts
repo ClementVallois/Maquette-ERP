@@ -50,6 +50,47 @@ export function billedParty(source: Client): BilledParty {
 }
 
 /**
+ * Defensive-copy helpers (ADR-0108). `readonly` blocks a caller from *reassigning* a
+ * field without a cast, but a cast defeats that just as completely for a plain string field as it
+ * does for a `Date`'s mutating method — `(invoice.billedTo.billingAddress as Mutable).line1 = 'x'`
+ * needs no method call at all. Addresses, line origins and VAT treatments are covered alongside
+ * timestamps, so every one of these — one level deep, no recursive framework,
+ * because none of these types nest further than this — is copied at both the constructor and the
+ * getter, exactly like `#lines`/`#validatedBy` already were.
+ */
+function copyAddress(address: PostalAddress): PostalAddress {
+  return { ...address };
+}
+
+function copyBilledParty(party: BilledParty): BilledParty {
+  return {
+    ...party,
+    billingAddress: copyAddress(party.billingAddress),
+    deliveryAddress: copyAddress(party.deliveryAddress),
+  };
+}
+
+function copySeller(seller: LegalEntity): LegalEntity {
+  return { ...seller, address: copyAddress(seller.address) };
+}
+
+function copyTerms(terms: PaymentTerms): PaymentTerms {
+  return { ...terms };
+}
+
+function copyMentions(mentions: LegalMentions): LegalMentions {
+  return { ...mentions, earlyPaymentDiscount: { ...mentions.earlyPaymentDiscount } };
+}
+
+function copyLine(line: InvoiceLine): InvoiceLine {
+  return { ...line, origin: { ...line.origin }, vat: { ...line.vat } };
+}
+
+function copyVatGroup(group: VatGroup): VatGroup {
+  return { ...group, treatment: { ...group.treatment } };
+}
+
+/**
  * A demand for payment. Holds state, so it is a class and everything a caller can do to it is a
  * named intention — there is no setter, and the lines are handed out as a copy.
  *
@@ -79,6 +120,17 @@ export class Invoice {
   #series: SeriesKey | null = null;
   /** Computed at drafting, frozen at issuance. What is printed is what was checked. */
   #totals: DocumentTotals | null = null;
+  /**
+   * `null` until issuance, exactly like `#totals` and for the same reason (ADR-0107): a draft's
+   * recapitulative is provisional and follows its still-changing lines, so it is recomputed on
+   * every read; an issued document's is what was checked when it left, and a recomputation that
+   * can silently disagree with the frozen figure — if `vatBreakdownOf`'s rounding policy is ever
+   * revised — is not what a legal document reloads as.
+   */
+  #vatBreakdown: readonly VatGroup[] | null = null;
+  /** `null` until issuance, same reasoning as `#vatBreakdown` — a draft has no issue date to
+   * compute one from in the first place. */
+  #dueDate: IsoDate | null = null;
 
   private constructor(input: {
     id: InvoiceId;
@@ -93,12 +145,12 @@ export class Invoice {
   }) {
     this.#id = input.id;
     this.#officeId = input.officeId;
-    this.#seller = input.seller;
-    this.#billedTo = input.billedTo;
+    this.#seller = copySeller(input.seller);
+    this.#billedTo = copyBilledParty(input.billedTo);
     this.#supplyPeriod = input.supplyPeriod;
-    this.#lines = [...input.lines];
-    this.#terms = input.terms;
-    this.#mentions = input.mentions;
+    this.#lines = input.lines.map(copyLine);
+    this.#terms = copyTerms(input.terms);
+    this.#mentions = copyMentions(input.mentions);
     this.#validatedBy = [...input.validatedBy];
   }
 
@@ -142,6 +194,8 @@ export class Invoice {
     issueDate: IsoDate | null;
     series: SeriesKey | null;
     totals: DocumentTotals | null;
+    vatBreakdown: readonly VatGroup[] | null;
+    dueDate: IsoDate | null;
   }): Invoice {
     assertInvoiceStateIsCoherent(input);
 
@@ -160,7 +214,10 @@ export class Invoice {
     invoice.#number = input.number;
     invoice.#issueDate = input.issueDate;
     invoice.#series = input.series;
-    invoice.#totals = input.totals;
+    invoice.#totals = input.totals === null ? null : { ...input.totals };
+    invoice.#vatBreakdown =
+      input.vatBreakdown === null ? null : input.vatBreakdown.map(copyVatGroup);
+    invoice.#dueDate = input.dueDate;
     return invoice;
   }
 
@@ -177,11 +234,11 @@ export class Invoice {
   }
 
   get seller(): LegalEntity {
-    return this.#seller;
+    return copySeller(this.#seller);
   }
 
   get billedTo(): BilledParty {
-    return this.#billedTo;
+    return copyBilledParty(this.#billedTo);
   }
 
   get supplyPeriod(): string {
@@ -189,27 +246,51 @@ export class Invoice {
   }
 
   get lines(): readonly InvoiceLine[] {
-    return [...this.#lines];
+    return this.#lines.map(copyLine);
   }
 
   get terms(): PaymentTerms {
-    return this.#terms;
+    return copyTerms(this.#terms);
   }
 
   get mentions(): LegalMentions {
-    return this.#mentions;
+    return copyMentions(this.#mentions);
   }
 
   get validatedBy(): readonly ConsultantId[] {
     return [...this.#validatedBy];
   }
 
+  /**
+   * A pure preview: what the due date would be for an arbitrary issue date, under this invoice's
+   * own payment terms. Used to price a hypothetical, not to answer for this document — `dueDate`
+   * (below) is that answer, and is frozen once this invoice actually has an issue date.
+   */
   dueDateFrom(issueDate: IsoDate): IsoDate {
     return dueDate(this.#terms, issueDate);
   }
 
+  /**
+   * The due date **for this invoice**, once it has one. `null` for a draft — there is no issue
+   * date yet to compute one from — and the frozen value once issued (ADR-0107), never
+   * recomputed: `dueDateFrom` stays available for a hypothetical date, this getter never is one.
+   */
+  get dueDate(): IsoDate | null {
+    return this.#dueDate;
+  }
+
+  /**
+   * The recapitulative as it stands. Once the invoice is issued this returns the **frozen** copy
+   * rather than a fresh computation, on the same reasoning `totals` already gives (ADR-0107):
+   * what is printed on a legal document is what was checked when it was issued.
+   */
   get vatBreakdown(): readonly VatGroup[] {
-    return vatBreakdownOf(this.#lines);
+    // Copied (ADR-0108): once issued, `#vatBreakdown` is the same array — and the same group
+    // objects within it, `treatment` included — on every call. `vatBreakdownOf` below computes a
+    // fresh, unaliased array before issuance, so only the frozen branch needs the copy.
+    return this.#vatBreakdown === null
+      ? vatBreakdownOf(this.#lines)
+      : this.#vatBreakdown.map(copyVatGroup);
   }
 
   /**
@@ -218,7 +299,9 @@ export class Invoice {
    * issued, and a total that recomputes is a total that can change.
    */
   get totals(): DocumentTotals {
-    return this.#totals ?? totalsOf(this.#lines);
+    // Copied (ADR-0108): once issued, `#totals` is the same flat object on every call.
+    // `totalsOf` below computes a fresh object before issuance, so only the frozen branch needs it.
+    return this.#totals === null ? totalsOf(this.#lines) : { ...this.#totals };
   }
 
   get number(): string | null {
@@ -256,15 +339,15 @@ export class Invoice {
     const series = seriesKeyOf(this.#seller, input.issueDate);
     const number = documentNumber(this.#seller, series, input.sequence);
     const totals = totalsOf(this.#lines);
+    const vatBreakdown = vatBreakdownOf(this.#lines);
 
     // The gate BUILD-RULES puts before a document leaves. Tautological here and not written for
-    // here — Phase 3 reconstructs a document from stored rows, where the totals are columns and
-    // the lines are another table, and the two can disagree. That is also when this ordering
-    // stops being theoretical.
+    // here: the repository reconstructs a document from stored rows, where the totals are columns
+    // and the lines are another table, and the two can disagree.
     assertDocumentAddsUp({
       id: this.#id,
       lines: this.#lines,
-      vatBreakdown: this.vatBreakdown,
+      vatBreakdown,
       totals,
     });
 
@@ -272,6 +355,10 @@ export class Invoice {
     this.#series = series;
     this.#issueDate = input.issueDate;
     this.#totals = totals;
+    // Frozen here, alongside totals, for the same reason (ADR-0107): once issued, `vatBreakdown`
+    // and `dueDate` stop tracking `#lines`/`#terms` and become what this exact moment computed.
+    this.#vatBreakdown = vatBreakdown;
+    this.#dueDate = dueDate(this.#terms, input.issueDate);
     this.#status = 'issued';
   }
 
@@ -302,12 +389,16 @@ function assertInvoiceStateIsCoherent(input: {
   issueDate: IsoDate | null;
   series: SeriesKey | null;
   totals: DocumentTotals | null;
+  vatBreakdown: readonly VatGroup[] | null;
+  dueDate: IsoDate | null;
 }): void {
   const issuedFields = {
     number: input.number,
     'issue date': input.issueDate,
     series: input.series,
     totals: input.totals,
+    'vat breakdown': input.vatBreakdown,
+    'due date': input.dueDate,
   };
 
   const missing = Object.entries(issuedFields)

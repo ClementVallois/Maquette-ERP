@@ -9,17 +9,16 @@ export interface CalendarResponse {
 }
 
 /** The working calendar's own coverage (ADR-0004) — what bounds the "open a future month" picker. */
-export function fetchCalendar(): Promise<ApiResult<CalendarResponse>> {
-  return apiFetch<CalendarResponse>('/api/v1/calendar');
+export function fetchCalendar(signal?: AbortSignal): Promise<ApiResult<CalendarResponse>> {
+  return apiFetch<CalendarResponse>('/api/v1/calendar', { signal });
 }
 
 const CALENDAR_QUERY_KEY = ['calendar'] as const;
 
 /**
- * Item 4, QA round 6: moved out of `features/cra` so `features/factures`' own year filter
- * (`invoice-list-screen.tsx`) does not gain a dependency on `features/cra` — the repository
- * documents exactly one cross-feature import (`cra → factures`) and this would have been a
- * second. Neutral, alongside `query-client.ts` and `use-reduced-motion.ts`.
+ * Neutral, outside `features/`, so `features/factures`' year filter
+ * (`invoice-list-screen.tsx`) does not gain a dependency on `features/cra`: the repository allows
+ * exactly one cross-feature import (`cra → factures`), and this would be a second.
  *
  * The working calendar's own year coverage (ADR-0004) — bounds the "open a future month"/year
  * pickers. Effectively static within a session (the calendar table is code, not data), so the
@@ -28,6 +27,6 @@ const CALENDAR_QUERY_KEY = ['calendar'] as const;
 export function useCalendar(): UseQueryResult<CalendarResponse> {
   return useQuery({
     queryKey: CALENDAR_QUERY_KEY,
-    queryFn: async () => unwrap(await fetchCalendar()),
+    queryFn: async ({ signal }) => unwrap(await fetchCalendar(signal)),
   });
 }

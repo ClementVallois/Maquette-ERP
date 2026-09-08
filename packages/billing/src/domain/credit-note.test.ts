@@ -207,8 +207,9 @@ describe('the check a document passes before it leaves', () => {
   });
 
   it('refuses a total excluding VAT that its lines do not sum to', () => {
-    // The shape Phase 3 creates: totals are columns, lines are another table, and the two can
-    // disagree. Here the disagreement is written by hand, which is the only way to reach it today.
+    // The shape persistence creates: totals are columns, lines are another table, and the two
+    // can disagree. Here the disagreement is written by hand, which is the only way to reach it
+    // from the domain.
     const invoice = issuedInvoice();
 
     expect(() => {

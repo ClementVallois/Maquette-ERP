@@ -6,9 +6,8 @@ export default defineConfig({
   // The `@/` alias apps/web/src's own code already uses throughout (`apps/web/vite.config.ts`,
   // `apps/web/tsconfig.json`'s `paths`, `.dependency-cruiser.cjs`'s `tsConfig`) — Vitest is a
   // fourth tool that resolves imports on its own, and had never needed to teach itself this alias
-  // because no test, before Phase 4, imported a module that used it. `navigation.ts` and
-  // `session-guard.ts` (Phase 4) are the first: their own `@/lib/...` imports failed to resolve
-  // under the plain `vitest run` this root config drives, with no failure anywhere else — Vite's
+  // because it is easy to miss: a module using `@/` only fails to resolve under the plain
+  // `vitest run` this root config drives, with no failure anywhere else — Vite's
   // dev server and build both already resolve it (they load `apps/web/vite.config.ts`'s own
   // alias), so the gap was invisible until a unit test reached one of these modules directly.
   // Scoped to the literal `@` key exactly as `apps/web/vite.config.ts` does: Vite/Vitest's alias

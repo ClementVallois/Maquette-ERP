@@ -1,6 +1,13 @@
-import { type Actor, assertMayRead, quarterDays, isoDateOf, readScope } from '@erp/platform';
+import {
+  type Actor,
+  type IsoDate,
+  assertMayRead,
+  quarterDays,
+  isoDateOf,
+  readScope,
+} from '@erp/platform';
 
-import type { DocumentTotals } from '../domain/document.ts';
+import type { DocumentTotals, VatGroup } from '../domain/document.ts';
 import { CraAlreadyProcessedError } from '../domain/errors.ts';
 import type {
   ClientId,
@@ -14,6 +21,7 @@ import type { InvoiceLine, LineOrigin } from '../domain/invoice-line.ts';
 import type {
   DeclinedDaysRecord,
   InvoiceListItem,
+  InvoiceListProjection,
   InvoiceListQuery,
   InvoiceRepository,
   InvoiceYearStatusCount,
@@ -24,9 +32,9 @@ import type { EarlyPaymentDiscount, LegalMentions, OperationCategory } from '../
 import type { SeriesKey } from '../domain/numbering.ts';
 import type { PaymentTerms } from '../domain/payment-terms.ts';
 import type { LegalEntity } from '../domain/seller.ts';
-import type { VatTreatment } from '../domain/vat.ts';
+import { NOT_CHARGED_MENTIONS, type VatTreatment } from '../domain/vat.ts';
 
-import { exactInteger, ReferencedRowMissingError } from './columns.ts';
+import { exactInteger } from './columns.ts';
 
 const MAX_PAGE_SIZE = 50;
 
@@ -63,6 +71,43 @@ export class PgInvoiceRepository implements InvoiceRepository {
     return this.#reconstitute(row);
   }
 
+  async prepareIssuance(
+    id: InvoiceId,
+    idempotencyKey: string,
+    actor: Actor,
+  ): Promise<{ readonly invoice: Invoice | null; readonly keyOwnerId: InvoiceId | null }> {
+    // The advisory transaction lock closes the race between checking a globally unique key and
+    // writing it. Hash collisions only serialize unrelated requests; they cannot weaken safety.
+    await this.#client.query(
+      `SELECT pg_advisory_xact_lock(hashtext('billing.invoice.issuance'), hashtext($1))`,
+      [idempotencyKey],
+    );
+
+    const { rows: keyRows } = await this.#client.query<{ id: string }>(
+      `SELECT id FROM billing.invoices WHERE issuance_idempotency_key = $1`,
+      [idempotencyKey],
+    );
+    const { rows } = await this.#client.query<InvoiceRow>(
+      `SELECT * FROM billing.invoices WHERE id = $1 FOR UPDATE`,
+      [id],
+    );
+
+    if (rows.length === 0) {
+      return {
+        invoice: null,
+        keyOwnerId: (keyRows[0]?.id as InvoiceId | undefined) ?? null,
+      };
+    }
+
+    const row = rows[0]!;
+    assertMayRead(actor, 'invoice', { officeId: row.office_id, subjectId: null });
+
+    return {
+      invoice: await this.#reconstitute(row),
+      keyOwnerId: (keyRows[0]?.id as InvoiceId | undefined) ?? null,
+    };
+  }
+
   /** Filtered, never refused — the first of ADR-0003's two beats. See `PgCraRepository.list`. */
   async list(query: InvoiceListQuery): Promise<readonly InvoiceListItem[]> {
     const limit = Math.min(query.limit, MAX_PAGE_SIZE);
@@ -80,7 +125,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
            i.billed_to_name ILIKE '%' || $7 || '%'
            OR COALESCE(i.invoice_number, '') ILIKE '%' || $7 || '%'
          ))
-       ORDER BY i.supply_period DESC, i.billed_to_name
+       ORDER BY i.supply_period DESC, i.billed_to_name, i.id
        LIMIT $2 OFFSET $3`,
       [
         actor.officeId,
@@ -94,6 +139,54 @@ export class PgInvoiceRepository implements InvoiceRepository {
     );
 
     return rows.map(toListItem);
+  }
+
+  async listProjection(query: InvoiceListQuery): Promise<readonly InvoiceListProjection[]> {
+    const limit = Math.min(query.limit, MAX_PAGE_SIZE);
+    const { actor } = query;
+
+    if (readScope(actor, 'invoice') === 'none') return [];
+
+    const { rows } = await this.#client.query<InvoiceProjectionRow>(
+      `${INVOICE_PROJECTION_SELECT}
+       WHERE i.office_id = $1
+         AND ($4::text IS NULL OR i.supply_period = $4)
+         AND ($5::text IS NULL OR i.status = $5)
+         AND ($6::text IS NULL OR left(i.supply_period, 4) = $6)
+         AND ($7::text IS NULL OR (
+           i.billed_to_name ILIKE '%' || $7 || '%'
+           OR COALESCE(i.invoice_number, '') ILIKE '%' || $7 || '%'
+         ))
+       ORDER BY i.supply_period DESC, i.billed_to_name, i.id
+       LIMIT $2 OFFSET $3`,
+      [
+        actor.officeId,
+        limit,
+        query.offset,
+        query.period ?? null,
+        query.status ?? null,
+        query.year === undefined ? null : String(query.year),
+        query.search ?? null,
+      ],
+    );
+
+    return rows.map(toProjection);
+  }
+
+  async listPeriodProjection(
+    actor: Actor,
+    period: string,
+  ): Promise<readonly InvoiceListProjection[]> {
+    if (readScope(actor, 'invoice') === 'none') return [];
+
+    const { rows } = await this.#client.query<InvoiceProjectionRow>(
+      `${INVOICE_PROJECTION_SELECT}
+       WHERE i.office_id = $1 AND i.supply_period = $2
+       ORDER BY i.supply_period DESC, i.billed_to_name, i.id`,
+      [actor.officeId, period],
+    );
+
+    return rows.map(toProjection);
   }
 
   async count(query: Omit<InvoiceListQuery, 'limit' | 'offset'>): Promise<number> {
@@ -122,6 +215,141 @@ export class PgInvoiceRepository implements InvoiceRepository {
     );
 
     return exactInteger('count', rows[0]!.count);
+  }
+
+  /** `count`'s own filter, summed instead of counted — one row, however large. */
+  async sumTtcCents(query: Omit<InvoiceListQuery, 'limit' | 'offset'>): Promise<number> {
+    const { actor } = query;
+
+    if (readScope(actor, 'invoice') === 'none') return 0;
+
+    const { rows } = await this.#client.query<{ sum: string | null }>(
+      `SELECT COALESCE(SUM(i.total_ttc_cents), 0) AS sum
+       FROM billing.invoices i
+       WHERE i.office_id = $1
+         AND ($2::text IS NULL OR i.supply_period = $2)
+         AND ($3::text IS NULL OR i.status = $3)
+         AND ($4::text IS NULL OR left(i.supply_period, 4) = $4)
+         AND ($5::text IS NULL OR (
+           i.billed_to_name ILIKE '%' || $5 || '%'
+           OR COALESCE(i.invoice_number, '') ILIKE '%' || $5 || '%'
+         ))`,
+      [
+        actor.officeId,
+        query.period ?? null,
+        query.status ?? null,
+        query.year === undefined ? null : String(query.year),
+        query.search ?? null,
+      ],
+    );
+
+    return exactInteger('sum', rows[0]!.sum ?? '0');
+  }
+
+  async sumHtCents(query: Omit<InvoiceListQuery, 'limit' | 'offset'>): Promise<number> {
+    const { actor } = query;
+
+    if (readScope(actor, 'invoice') === 'none') return 0;
+
+    const { rows } = await this.#client.query<{ sum: string | null }>(
+      `SELECT COALESCE(SUM(COALESCE(i.total_ht_cents, lt.ht_cents, 0)), 0) AS sum
+       FROM billing.invoices i
+       LEFT JOIN LATERAL (
+         SELECT SUM(amount_cents) AS ht_cents
+         FROM billing.invoice_lines
+         WHERE invoice_id = i.id
+       ) lt ON true
+       WHERE i.office_id = $1
+         AND ($2::text IS NULL OR i.supply_period = $2)
+         AND ($3::text IS NULL OR i.status = $3)
+         AND ($4::text IS NULL OR left(i.supply_period, 4) = $4)
+         AND ($5::text IS NULL OR (
+           i.billed_to_name ILIKE '%' || $5 || '%'
+           OR COALESCE(i.invoice_number, '') ILIKE '%' || $5 || '%'
+         ))`,
+      [
+        actor.officeId,
+        query.period ?? null,
+        query.status ?? null,
+        query.year === undefined ? null : String(query.year),
+        query.search ?? null,
+      ],
+    );
+
+    return exactInteger('sum', rows[0]!.sum ?? '0');
+  }
+
+  /** Never derived from a page — `PgCraRepository.listPeriods`'s own guarantee. */
+  async listPeriods(actor: Actor): Promise<readonly string[]> {
+    if (readScope(actor, 'invoice') === 'none') return [];
+
+    const { rows } = await this.#client.query<{ supply_period: string }>(
+      `SELECT DISTINCT i.supply_period
+       FROM billing.invoices i
+       WHERE i.office_id = $1
+       ORDER BY i.supply_period DESC`,
+      [actor.officeId],
+    );
+
+    return rows.map((row) => row.supply_period);
+  }
+
+  /**
+   * The oldest drafts across every period, sorted and limited in SQL: a page ordered
+   * newest-first, filtered and re-sorted afterwards, has already dropped the true oldest rows at
+   * the cap. A dedicated `SELECT` rather than
+   * `INVOICE_LIST_SELECT`, which also backs `list`/`findDraftedFrom`/`findIssuedWithKey`, none of
+   * which need `source_cra_ids[1]` — Postgres's 1-based first element, `NULL` on the empty array
+   * `text[] NOT NULL DEFAULT '{}'` (migration 003) guarantees, matching `sourceCraId`'s `| null`.
+   */
+  async oldestDrafts(
+    actor: Actor,
+    limit: number,
+  ): Promise<readonly (InvoiceListItem & { readonly sourceCraId: CraId | null })[]> {
+    if (readScope(actor, 'invoice') === 'none') return [];
+
+    const { rows } = await this.#client.query<
+      InvoiceListRow & { total_ttc_cents: string | null; source_cra_id: string | null }
+    >(
+      `SELECT i.id, i.status, i.supply_period, i.billed_to_name, i.invoice_number, i.issue_date,
+              COALESCE(lt.ht_cents, 0) + COALESCE(vt.tax_cents, 0) AS total_ttc_cents,
+              i.source_cra_ids[1] AS source_cra_id
+       FROM billing.invoices i
+       LEFT JOIN (
+         SELECT invoice_id, SUM(amount_cents) AS ht_cents
+         FROM billing.invoice_lines
+         GROUP BY invoice_id
+       ) lt ON lt.invoice_id = i.id
+       LEFT JOIN (
+         SELECT invoice_id, SUM(tax_cents) AS tax_cents
+         FROM billing.invoice_vat_groups
+         GROUP BY invoice_id
+       ) vt ON vt.invoice_id = i.id
+       WHERE i.office_id = $1 AND i.status = 'draft'
+       ORDER BY i.supply_period ASC, i.billed_to_name ASC, i.id ASC
+       LIMIT $2`,
+      [actor.officeId, limit],
+    );
+
+    return rows.map((row) => ({
+      ...toListItem(row),
+      sourceCraId: row.source_cra_id as CraId | null,
+    }));
+  }
+
+  /** The most recently issued invoices, sorted and limited in SQL. */
+  async recentIssued(actor: Actor, limit: number): Promise<readonly InvoiceListItem[]> {
+    if (readScope(actor, 'invoice') === 'none') return [];
+
+    const { rows } = await this.#client.query<InvoiceListRow>(
+      `${INVOICE_LIST_SELECT}
+       WHERE i.office_id = $1 AND i.issue_date IS NOT NULL
+       ORDER BY i.issue_date DESC, i.id DESC
+       LIMIT $2`,
+      [actor.officeId, limit],
+    );
+
+    return rows.map(toListItem);
   }
 
   async save(invoice: Invoice, options?: { issuanceIdempotencyKey: string }): Promise<void> {
@@ -223,25 +451,18 @@ export class PgInvoiceRepository implements InvoiceRepository {
 
     return rows.map((row) => ({
       year: row.year,
-      status: row.status,
+      // Same SQL-boundary narrowing as `toListItem`/`toInvoice` above — `billing.invoices`' own
+      // `CHECK (status IN (...))` is what makes this safe, `pg` just cannot say so.
+      status: row.status as InvoiceStatus,
       count: exactInteger('count', row.count),
     }));
   }
 
-  async hasCraBeenProcessed(craId: string): Promise<boolean> {
-    const { rows } = await this.#client.query<{ found: boolean }>(
-      `SELECT EXISTS (
-        SELECT 1 FROM billing.invoices WHERE $1 = ANY(source_cra_ids)
-      ) AS found`,
-      [craId],
-    );
-    return rows[0]!.found;
-  }
-
-  // `source_cra_ids` is deliberately absent from the ON CONFLICT SET list above. It is written by
-  // the INSERT and never updated: `save` does not carry it, so `EXCLUDED.source_cra_ids` is `'{}'`
-  // there, and updating the column would blank the provenance of every invoice at issuance —
-  // taking `hasCraBeenProcessed` and the partial unique index of migration 006 with it.
+  /**
+   * The document a previous issuance already produced under this key, if this actor may see it.
+   * Office-scoped on purpose (ADR-0044); `prepareIssuance` is the issuance-side, globally scoped
+   * check that the unique index actually enforces.
+   */
   async findIssuedWithKey(key: string, actor: Actor): Promise<InvoiceListItem | null> {
     if (readScope(actor, 'invoice') === 'none') return null;
 
@@ -255,6 +476,10 @@ export class PgInvoiceRepository implements InvoiceRepository {
     return row === undefined ? null : toListItem(row);
   }
 
+  // `source_cra_ids` is deliberately absent from the ON CONFLICT SET list below. It is written by
+  // the INSERT and never updated: `save` does not carry it, so `EXCLUDED.source_cra_ids` is `'{}'`
+  // there, and updating the column would blank the provenance of every invoice at issuance —
+  // taking `findDraftedFrom` and the partial unique index of migration 006 with it.
   async #upsertInvoice(
     invoice: Invoice,
     sourceCraIds?: readonly string[],
@@ -269,6 +494,10 @@ export class PgInvoiceRepository implements InvoiceRepository {
     await this.#client.query(
       `INSERT INTO billing.invoices (
         id, office_id, seller_id, status, supply_period,
+        seller_name, seller_legal_form, seller_share_capital_cents, seller_siren,
+        seller_intra_community_vat_number, seller_rcs_registration,
+        seller_address_street, seller_address_postal_code, seller_address_city,
+        seller_address_country, seller_number_prefix,
         billed_to_client_id, billed_to_name, billed_to_siren, billed_to_vat_number,
         billed_to_billing_street, billed_to_billing_postal_code,
         billed_to_billing_city, billed_to_billing_country,
@@ -283,13 +512,20 @@ export class PgInvoiceRepository implements InvoiceRepository {
       ) VALUES (
         $1, $2, $3, $4, $5,
         $6, $7, $8, $9,
-        $10, $11, $12, $13,
-        $14, $15, $16, $17,
-        $18, $19,
-        $20, $21, $22, $23, $24, $25,
-        $26, $27, $28, $29, $30,
+        $10, $11,
+        $12, $13, $14,
+        $15, $16,
+        $17, $18, $19, $20,
+        $21, $22,
+        $23, $24,
+        $25, $26,
+        $27, $28,
+        $29, $30,
         $31, $32, $33,
-        $34, $35, $36
+        $34, $35, $36,
+        $37, $38, $39, $40, $41,
+        $42, $43, $44,
+        $45, $46, $47
       ) ON CONFLICT (id) DO UPDATE SET
         status = EXCLUDED.status,
         invoice_number = EXCLUDED.invoice_number,
@@ -301,15 +537,29 @@ export class PgInvoiceRepository implements InvoiceRepository {
         total_tax_cents = EXCLUDED.total_tax_cents,
         total_ttc_cents = EXCLUDED.total_ttc_cents,
         -- COALESCE, not EXCLUDED: a later re-save carries no key and must not erase the one the
-        -- issuance wrote. source_cra_ids learned the same lesson in Phase 3, by being erased.
+        -- issuance wrote. source_cra_ids solves the same problem by staying out of this list
+        -- entirely -- see the comment above #upsertInvoice.
         issuance_idempotency_key = COALESCE(
-          EXCLUDED.issuance_idempotency_key, billing.invoices.issuance_idempotency_key)`,
+          EXCLUDED.issuance_idempotency_key, billing.invoices.issuance_idempotency_key)
+        -- seller_* and billed_to_* are deliberately absent from this list, same reasoning as
+        -- billed_to_* already had (ADR-0107): copied at drafting, never updated on a later save.`,
       [
         invoice.id,
         invoice.officeId,
         invoice.seller.id,
         invoice.status,
         invoice.supplyPeriod,
+        invoice.seller.name,
+        invoice.seller.legalForm,
+        invoice.seller.shareCapitalCents,
+        invoice.seller.siren,
+        invoice.seller.intraCommunityVatNumber,
+        invoice.seller.rcsRegistration,
+        invoice.seller.address.line1,
+        invoice.seller.address.postalCode,
+        invoice.seller.address.city,
+        invoice.seller.address.country,
+        invoice.seller.numberPrefix,
         invoice.billedTo.clientId,
         invoice.billedTo.name,
         invoice.billedTo.siren,
@@ -336,7 +586,7 @@ export class PgInvoiceRepository implements InvoiceRepository {
         invoice.issueDate,
         invoice.series?.entityId ?? null,
         invoice.series?.fiscalYear ?? null,
-        invoice.issueDate !== null ? invoice.dueDateFrom(invoice.issueDate) : null,
+        invoice.dueDate,
         totals?.totalExcludingVatCents ?? null,
         totals?.vatTotalCents ?? null,
         totals?.totalIncludingVatCents ?? null,
@@ -389,9 +639,23 @@ export class PgInvoiceRepository implements InvoiceRepository {
 
     for (const group of invoice.vatBreakdown) {
       await this.#client.query(
-        `INSERT INTO billing.invoice_vat_groups (id, invoice_id, group_key, base_cents, tax_cents)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [this.#newId(), invoice.id, group.key, group.baseCents, group.vatCents ?? 0],
+        `INSERT INTO billing.invoice_vat_groups (
+           id, invoice_id, group_key, base_cents, tax_cents,
+           vat_kind, vat_basis_points, vat_not_charged_reason
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          this.#newId(),
+          invoice.id,
+          group.key,
+          group.baseCents,
+          // True `NULL`, not `0` (ADR-0107): "not charged" carries no tax amount at all
+          // (ADR-0010), and the read path now depends on that distinction to reconstruct
+          // `group.treatment` rather than lose it the way the group key alone would force.
+          group.vatCents,
+          group.treatment.kind,
+          group.treatment.kind === 'taxable' ? group.treatment.basisPoints : null,
+          group.treatment.kind === 'notCharged' ? group.treatment.reason : null,
+        ],
       );
     }
   }
@@ -402,7 +666,26 @@ export class PgInvoiceRepository implements InvoiceRepository {
       [row.id],
     );
 
-    const seller = await this.#loadSeller(row.seller_id);
+    // The seller snapshot, frozen at drafting (ADR-0107): these are `billing.invoices`' own
+    // columns, never a join back to the current `public.legal_entities` row. Editing that
+    // reference row after this invoice was drafted must not change what this invoice reports.
+    const seller: LegalEntity = {
+      id: row.seller_id,
+      name: row.seller_name,
+      legalForm: row.seller_legal_form,
+      shareCapitalCents: exactInteger('seller_share_capital_cents', row.seller_share_capital_cents),
+      siren: row.seller_siren,
+      intraCommunityVatNumber: row.seller_intra_community_vat_number,
+      rcsRegistration: row.seller_rcs_registration,
+      address: {
+        line1: row.seller_address_street,
+        line2: null,
+        postalCode: row.seller_address_postal_code,
+        city: row.seller_address_city,
+        country: row.seller_address_country,
+      },
+      numberPrefix: row.seller_number_prefix,
+    };
 
     const lines: InvoiceLine[] = lineRows.map((lr) => ({
       designation: lr.designation,
@@ -471,6 +754,14 @@ export class PgInvoiceRepository implements InvoiceRepository {
           }
         : null;
 
+    // Frozen the same way totals are (ADR-0107): `null` for a draft (nothing to load — the
+    // getters fall back to a live computation from `lines`), the stored recapitulative once
+    // issued, never `vatBreakdownOf(lines)` recomputed against whatever the domain's grouping or
+    // rounding code says today.
+    const vatBreakdown: readonly VatGroup[] | null =
+      row.status === 'draft' ? null : await this.#loadVatBreakdown(row.id);
+    const dueDate: IsoDate | null = row.due_date === null ? null : isoDateOf(row.due_date);
+
     return Invoice.reconstitute({
       id: row.id as InvoiceId,
       officeId: row.office_id as OfficeId,
@@ -486,34 +777,35 @@ export class PgInvoiceRepository implements InvoiceRepository {
       issueDate: row.issue_date === null ? null : isoDateOf(row.issue_date),
       series,
       totals,
+      vatBreakdown,
+      dueDate,
     });
   }
 
-  async #loadSeller(sellerId: string): Promise<LegalEntity> {
-    const { rows } = await this.#client.query<LegalEntityRow>(
-      `SELECT * FROM public.legal_entities WHERE id = $1`,
-      [sellerId],
+  async #loadVatBreakdown(invoiceId: string): Promise<readonly VatGroup[]> {
+    const { rows } = await this.#client.query<VatGroupRow>(
+      `SELECT * FROM billing.invoice_vat_groups WHERE invoice_id = $1 ORDER BY group_key`,
+      [invoiceId],
     );
-    const row = rows[0];
-    if (row === undefined) throw new ReferencedRowMissingError('public.legal_entities', sellerId);
 
-    return {
-      id: row.id,
-      name: row.name,
-      legalForm: row.legal_form,
-      shareCapitalCents: exactInteger('share_capital_cents', row.share_capital_cents),
-      siren: row.siren,
-      intraCommunityVatNumber: row.intra_community_vat_number,
-      rcsRegistration: row.rcs_registration,
-      address: {
-        line1: row.address_street,
-        line2: null,
-        postalCode: row.address_postal_code,
-        city: row.address_city,
-        country: row.address_country,
-      },
-      numberPrefix: row.number_prefix,
-    };
+    return rows.map((row) => {
+      const treatment: VatTreatment =
+        row.vat_kind === 'taxable'
+          ? { kind: 'taxable', basisPoints: row.vat_basis_points! }
+          : {
+              kind: 'notCharged',
+              reason: row.vat_not_charged_reason! as
+                'territoryOutsideVatScope' | 'reverseChargeEuB2b',
+            };
+
+      return {
+        key: row.group_key,
+        treatment,
+        baseCents: exactInteger('base_cents', row.base_cents),
+        vatCents: row.tax_cents === null ? null : exactInteger('tax_cents', row.tax_cents),
+        mention: treatment.kind === 'taxable' ? null : NOT_CHARGED_MENTIONS[treatment.reason],
+      };
+    });
   }
 
   #reconstructOrigin(lr: InvoiceLineRow): LineOrigin {
@@ -544,6 +836,17 @@ interface InvoiceRow {
   seller_id: string;
   status: string;
   supply_period: string;
+  seller_name: string;
+  seller_legal_form: string;
+  seller_share_capital_cents: string | number;
+  seller_siren: string;
+  seller_intra_community_vat_number: string;
+  seller_rcs_registration: string;
+  seller_address_street: string;
+  seller_address_postal_code: string;
+  seller_address_city: string;
+  seller_address_country: string;
+  seller_number_prefix: string;
   billed_to_client_id: string;
   billed_to_name: string;
   billed_to_siren: string | null;
@@ -579,7 +882,9 @@ interface InvoiceRow {
 function toListItem(row: InvoiceListRow): InvoiceListItem {
   return {
     id: row.id as InvoiceId,
-    status: row.status,
+    // Same narrowing as `toInvoice` at the true SQL boundary, so `InvoiceListItem` carries the
+    // domain's own union rather than the wider `string` every reader would otherwise re-derive.
+    status: row.status as InvoiceStatus,
     supplyPeriod: row.supply_period,
     billedToName: row.billed_to_name,
     invoiceNumber: row.invoice_number,
@@ -607,6 +912,23 @@ interface InvoiceListRow {
   total_ttc_cents: string | number | null;
 }
 
+interface InvoiceProjectionRow extends InvoiceListRow {
+  source_cra_id: string | null;
+  mission_ids: string[];
+  line_count: string | number;
+  total_ht_cents: string | number;
+}
+
+function toProjection(row: InvoiceProjectionRow): InvoiceListProjection {
+  return {
+    ...toListItem(row),
+    sourceCraId: row.source_cra_id as CraId | null,
+    missionIds: row.mission_ids as MissionId[],
+    lineCount: exactInteger('line_count', row.line_count),
+    totalExcludingVatCents: exactInteger('total_ht_cents', row.total_ht_cents),
+  };
+}
+
 /**
  * Every list-shaped read joins two aggregated subqueries onto `billing.invoices` so a draft's
  * (still-null) `total_ttc_cents` reads as the sum of its lines instead of `NULL` — the same
@@ -631,6 +953,29 @@ const INVOICE_LIST_SELECT = `
   ) vt ON vt.invoice_id = i.id
 `;
 
+const INVOICE_PROJECTION_SELECT = `
+  SELECT i.id, i.status, i.supply_period, i.billed_to_name, i.invoice_number, i.issue_date,
+         COALESCE(i.total_ht_cents, COALESCE(lt.ht_cents, 0)) AS total_ht_cents,
+         COALESCE(i.total_ttc_cents, COALESCE(lt.ht_cents, 0) + COALESCE(vt.tax_cents, 0))
+           AS total_ttc_cents,
+         i.source_cra_ids[1] AS source_cra_id,
+         COALESCE(lt.mission_ids, ARRAY[]::text[]) AS mission_ids,
+         COALESCE(lt.line_count, 0) AS line_count
+  FROM billing.invoices i
+  LEFT JOIN LATERAL (
+    SELECT SUM(amount_cents) AS ht_cents,
+           ARRAY_REMOVE(ARRAY_AGG(DISTINCT origin_mission_id), NULL) AS mission_ids,
+           COUNT(*)::int AS line_count
+    FROM billing.invoice_lines
+    WHERE invoice_id = i.id
+  ) lt ON true
+  LEFT JOIN LATERAL (
+    SELECT SUM(tax_cents) AS tax_cents
+    FROM billing.invoice_vat_groups
+    WHERE invoice_id = i.id
+  ) vt ON true
+`;
+
 interface InvoiceLineRow {
   id: string;
   invoice_id: string;
@@ -650,19 +995,13 @@ interface InvoiceLineRow {
   vat_not_charged_reason: string | null;
 }
 
-interface LegalEntityRow {
-  id: string;
-  name: string;
-  legal_form: string;
-  share_capital_cents: string | number;
-  siren: string;
-  intra_community_vat_number: string;
-  rcs_registration: string;
-  address_street: string;
-  address_postal_code: string;
-  address_city: string;
-  address_country: string;
-  number_prefix: string;
+interface VatGroupRow {
+  group_key: string;
+  base_cents: string | number;
+  tax_cents: string | number | null;
+  vat_kind: string;
+  vat_basis_points: number | null;
+  vat_not_charged_reason: string | null;
 }
 
 function isPgUniqueViolation(error: unknown, constraintName: string): boolean {

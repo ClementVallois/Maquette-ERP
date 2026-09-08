@@ -62,11 +62,6 @@ async function navLabels(page: Page): Promise<string[]> {
   return links.allTextContents();
 }
 
-// Item 20, QA round 3: three placeholder pages (`ComingSoon`), every role, appended last after
-// every existing entry — every list below carries these same three trailing labels regardless of
-// role.
-const SELF_SERVICE_LABELS = ['Mes informations', 'Mes notes de frais', 'Mes demandes d’absence'];
-
 test.describe('nav shows exactly the entries of the session role', () => {
   test('the nightly reset remains visible after persona selection', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'one viewport is enough for this contract');
@@ -85,7 +80,7 @@ test.describe('nav shows exactly the entries of the session role', () => {
     await choosePersona(page, 'consultant-paris');
     const labels = await navLabels(page);
 
-    expect(labels).toStrictEqual(['Tableau de bord', 'Mes CRA', ...SELF_SERVICE_LABELS]);
+    expect(labels).toStrictEqual(['Tableau de bord', 'Mes CRA']);
   });
 
   test('manager (Bruno, manager-paris): Tableau de bord, Pré-facturier, CRA, Affectations, Factures — no standing Marge entry', async ({
@@ -106,7 +101,6 @@ test.describe('nav shows exactly the entries of the session role', () => {
       'CRA',
       'Affectations',
       'Factures',
-      ...SELF_SERVICE_LABELS,
     ]);
   });
 
@@ -124,7 +118,6 @@ test.describe('nav shows exactly the entries of the session role', () => {
       'CRA',
       'Affectations',
       'Factures',
-      ...SELF_SERVICE_LABELS,
     ]);
   });
 
@@ -136,12 +129,7 @@ test.describe('nav shows exactly the entries of the session role', () => {
     await choosePersona(page, 'billing-paris');
     const labels = await navLabels(page);
 
-    expect(labels).toStrictEqual([
-      'Tableau de bord',
-      'Pré-facturier',
-      'Factures',
-      ...SELF_SERVICE_LABELS,
-    ]);
+    expect(labels).toStrictEqual(['Tableau de bord', 'Pré-facturier', 'Factures']);
     // Restated as an explicit absence, not only as "the array has exactly these three": no role
     // has a standing `Marge` nav entry any more (Phase 7, task 7.5) — the margin screen is
     // reached only by an explicit click off a pré-facturier row, which billing's own `Refuser`/
@@ -431,14 +419,7 @@ test.describe('keyboard navigation of the shell (task 10.2)', () => {
 
     // manager-paris's own nav, `shell.spec.ts`'s own list above — asserted here in tab order
     // rather than copied blind, so a reordering of the config breaks this test too.
-    for (const label of [
-      'Tableau de bord',
-      'Pré-facturier',
-      'CRA',
-      'Affectations',
-      'Factures',
-      ...SELF_SERVICE_LABELS,
-    ]) {
+    for (const label of ['Tableau de bord', 'Pré-facturier', 'CRA', 'Affectations', 'Factures']) {
       await page.keyboard.press('Tab');
       focused = await focusedElement(page);
       expect(focused.tag).toBe('A');
