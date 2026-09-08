@@ -124,11 +124,10 @@ describe('a draft invoice', () => {
     expect(invoice.lines).toHaveLength(1);
   });
 
-  it('is immune to a cast-based field mutation on the billed party address (package 07, ADR-0108)', () => {
-    // Probe for the audit's "Done when" claim: "including nested addresses". `BilledParty`/
-    // `PostalAddress` hold only strings, so unlike `Date` there is no mutating *method* to reach —
-    // but a cast defeats `readonly` just as well by reassigning the field directly. This only
-    // proves the claim if it actually fails to move the aggregate.
+  it('is immune to a cast-based field mutation on the billed party address (ADR-0108)', () => {
+    // Nested addresses. `BilledParty`/`PostalAddress` hold only strings, so unlike `Date` there
+    // is no mutating *method* to reach — but a cast defeats `readonly` just as well by
+    // reassigning the field directly.
     const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
     const stolenAddress = invoice.billedTo.billingAddress as { line1: string };
     stolenAddress.line1 = 'stolen';
@@ -136,7 +135,7 @@ describe('a draft invoice', () => {
     expect(invoice.billedTo.billingAddress.line1).not.toBe('stolen');
   });
 
-  it('is immune to a cast-based field mutation on the seller address (package 07, ADR-0108)', () => {
+  it('is immune to a cast-based field mutation on the seller address (ADR-0108)', () => {
     const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
     const stolenAddress = invoice.seller.address as { city: string };
     stolenAddress.city = 'stolen';
@@ -144,7 +143,7 @@ describe('a draft invoice', () => {
     expect(invoice.seller.address.city).not.toBe('stolen');
   });
 
-  it('is immune to a cast-based field mutation on a line origin (package 07, ADR-0108)', () => {
+  it('is immune to a cast-based field mutation on a line origin (ADR-0108)', () => {
     const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
     const stolenOrigin = invoice.lines[0]!.origin as { tjmCents: number };
     stolenOrigin.tjmCents = 1;
@@ -152,7 +151,7 @@ describe('a draft invoice', () => {
     expect(invoice.lines[0]!.origin.tjmCents).not.toBe(1);
   });
 
-  it('is immune to a cast-based field mutation on a line VAT treatment (package 07, ADR-0108)', () => {
+  it('is immune to a cast-based field mutation on a line VAT treatment (ADR-0108)', () => {
     const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
     const stolenTreatment = invoice.lines[0]!.vat as { basisPoints: number };
     stolenTreatment.basisPoints = 0;
@@ -160,10 +159,10 @@ describe('a draft invoice', () => {
     expect((invoice.lines[0]!.vat as { basisPoints: number }).basisPoints).not.toBe(0);
   });
 
-  it('does not alias the billed party or seller supplied at drafting (package 07, ADR-0108)', () => {
+  it('does not alias the billed party or seller supplied at drafting (ADR-0108)', () => {
     // The "in" direction of the same claim: a caller mutating the object it handed to `draft`
-    // after the call must not reach the aggregate either — the aliasing risk the audit names for
-    // constructor arguments, not just getters.
+    // after the call must not reach the aggregate either: constructor arguments alias too, not
+    // only getters.
     const billedTo = billedParty(parisClient);
     const seller = { ...SELLER, address: { ...SELLER.address } };
     const invoice = Invoice.draft({
@@ -382,8 +381,8 @@ describe('issuing an invoice', () => {
   it('burns no number when issuing is refused', () => {
     // The ordering guarantee, and the reason it matters: a number allocated by an attempt that
     // then throws is a number no document carries, and a series whose only property is having no
-    // gap has just acquired one (ADR-0018). The refusal reachable today is a bad sequence; from
-    // Phase 3 the coherence check can refuse too, on totals read back from columns.
+    // gap has just acquired one (ADR-0018). The refusal reachable from the domain is a bad
+    // sequence; the coherence check refuses too, on totals read back from columns.
     const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
 
     expect(() => {
@@ -403,7 +402,7 @@ describe('issuing an invoice', () => {
     const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
     invoice.issue({ by: 'claire', sequence: 1, issueDate: '2026-04-02' });
 
-    // The documentary freeze at the level of the document. In Phase 3 these totals are columns,
+    // The documentary freeze at the level of the document. Persisted, these totals are columns,
     // and this getter is what guarantees the printed page reads them rather than recomputing.
     expect(invoice.totals).toStrictEqual({
       totalExcludingVatCents: 65_000,
@@ -412,7 +411,7 @@ describe('issuing an invoice', () => {
     });
   });
 
-  it('is immune to a cast-based field mutation on the frozen totals (package 07, ADR-0108)', () => {
+  it('is immune to a cast-based field mutation on the frozen totals (ADR-0108)', () => {
     const invoice = invoiceOf([lineOf(65_000, STANDARD)]);
     invoice.issue({ by: 'claire', sequence: 1, issueDate: '2026-04-02' });
 
@@ -477,8 +476,7 @@ describe('the number series', () => {
 
 describe('Invoice.reconstitute', () => {
   // The one door into the aggregate that sets a status without running `issue`, which is what
-  // sets the number, the date, the series and the totals together. Phase 3 added it for the
-  // repository and no unit test touched it.
+  // sets the number, the date, the series and the totals together: the repository's own door.
   function persistedInvoice(
     overrides: Partial<Parameters<typeof Invoice.reconstitute>[0]> = {},
   ): Invoice {
@@ -589,7 +587,7 @@ describe('Invoice.reconstitute', () => {
     expect(issued.dueDate).toBe('2099-01-01');
   });
 
-  it('hands out the frozen VAT breakdown as a copy, once issued (package 07)', () => {
+  it('hands out the frozen VAT breakdown as a copy, once issued (ADR-0108)', () => {
     const issued = persistedInvoice({ ...ISSUED });
     const stolen = issued.vatBreakdown as VatGroup[];
     stolen.push({
@@ -603,7 +601,7 @@ describe('Invoice.reconstitute', () => {
     expect(issued.vatBreakdown).toHaveLength(1);
   });
 
-  it('does not alias the totals row supplied to reconstitute (package 07, ADR-0108)', () => {
+  it('does not alias the totals row supplied to reconstitute (ADR-0108)', () => {
     // The "in" direction of the same claim `vatBreakdown` already covers above: a caller mutating
     // the row it handed to the repository after the call must not reach the aggregate either.
     const totals = { ...ISSUED.totals };

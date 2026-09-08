@@ -58,7 +58,7 @@ describe('the module boundary rule', { timeout: 30_000 }, () => {
     );
   });
 
-  it('rejects an import from the shared contract into a business module (package 09, ADR-0110)', () => {
+  it('rejects an import from the shared contract into a business module (ADR-0110)', () => {
     const { summary } = cruise(CONTRACTS_ARROW_FIXTURE, '.dependency-cruiser.fixture.cjs');
 
     expect(summary.violations.map((violation) => violation.rule.name)).toContain(
@@ -105,9 +105,9 @@ describe('the module boundary rule', { timeout: 30_000 }, () => {
   });
 
   it('rejects a script reaching past a module entry point', () => {
-    // `scripts/seed.ts` is a composition root outside `apps/`, and until Phase 5's closure the
-    // boundary globs did not reach the directory at all. The grant it now has is an app's grant,
-    // and this is the half that proves it is a grant rather than a blanket permission.
+    // `scripts/seed.ts` is a composition root outside `apps/`, and the grant it has is an app's
+    // grant. This is the half that proves it is a grant rather than a blanket permission: without
+    // it, a deep import written in a script would cruise clean.
     const { summary } = cruise(SCRIPTS_FIXTURE, '.dependency-cruiser.fixture.cjs');
 
     const rules = summary.violations
@@ -141,10 +141,10 @@ describe('the module boundary rule', { timeout: 30_000 }, () => {
   it('rejects an npm import the importing package never declared', () => {
     // The rule's second death, and the one the fixture above could not see. dependency-cruiser
     // classifies by the IMPORTING package's manifest: `vitest` is declared there, so it lands in
-    // `npm-dev`, which the ban listed. A package declared only in the root manifest lands in
-    // `npm-no-pkg`, which it did not — so for the whole of Phase 3 a domain file could import the
-    // Postgres driver and cruise clean. Verified by deleting `npm-no-pkg` from the rule: this
-    // fixture then reports zero violations.
+    // `npm-dev`. A package declared only in the root manifest lands in `npm-no-pkg` instead, so
+    // a ban that omits that type lets a domain file import the Postgres driver and cruise clean.
+    // Verified by deleting `npm-no-pkg` from the rule: this fixture then reports zero
+    // violations.
     const { summary } = cruise(UNDECLARED_NPM_FIXTURE, '.dependency-cruiser.fixture.cjs');
 
     expect(summary.violations.map((violation) => violation.rule.name)).toContain(

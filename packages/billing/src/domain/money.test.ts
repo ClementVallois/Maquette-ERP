@@ -34,7 +34,7 @@ describe('rounding half-up', () => {
   });
 
   it('refuses an operand past the safe range, where arithmetic stops being exact', () => {
-    // Beyond 2^53 a double no longer holds every integer, and `+ 1` silently answers itself.
+    // Beyond 2^53 a double stops holding every integer, and `+ 1` silently answers itself.
     // Refusing is the only honest answer: this repository claims exact monetary arithmetic.
     expect(() => roundHalfUp(2 ** 53, 1)).toThrow(InvalidValueError);
   });

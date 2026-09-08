@@ -16,7 +16,7 @@ se parcourt dans cet ordre :
    qu'est un CRA et pourquoi il décide du chiffre d'affaires d'un cabinet de conseil.
 2. **Une décision** — [ADR-0010](docs/adr/0010-vat-rounded-per-rate.md) : la TVA est arrondie
    **par taux**, jamais par ligne ni sur le total. Chaque ADR nomme l'option écartée et le seuil
-   auquel on y reviendrait ; il y en a 118 (`ls docs/adr/0*.md | wc -l`, moins le gabarit `0000`).
+   auquel on y reviendrait ; il y en a 119 (`ls docs/adr/0*.md | wc -l`, moins le gabarit `0000`).
 3. **La preuve mécanique** — [`tests/boundary-rule.test.ts`](tests/boundary-rule.test.ts) : la
    frontière `timesheet`/`billing` n'est pas une convention de nommage, c'est un job de CI qui
    rejoue une violation délibérée et exige qu'elle soit refusée.

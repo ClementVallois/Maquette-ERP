@@ -410,7 +410,7 @@ describe('who may validate', () => {
 
 describe('Cra.reconstitute', () => {
   // The one door into the aggregate that sets a status without running the transition that sets
-  // the fields alongside it. Phase 3 added it for the repository and no unit test touched it.
+  // the fields alongside it: the repository's own door into the aggregate.
   const AN_INSTANT = new Date('2026-04-03T10:00:00.000Z');
 
   function persistedCra(overrides: Partial<Parameters<typeof Cra.reconstitute>[0]> = {}): Cra {
@@ -485,11 +485,11 @@ describe('Cra.reconstitute', () => {
   });
 });
 
-describe('Cra — timestamp immutability (package 07)', () => {
+describe('Cra — timestamp immutability (ADR-0108)', () => {
   // No type cast anywhere in this block: `Date` has a mutating method (`setUTCFullYear`) that
   // reaches through `readonly` without one. `CraLine`'s own plain-primitive-field hole — a cast
   // defeats `readonly` too, just by reassigning the field directly rather than calling a method —
-  // is a separate, later-discovered gap, tested in its own block below.
+  // is a separate gap, tested in its own block below.
 
   it('does not change a validated Cra when the caller mutates the Date it read back', () => {
     const cra = validatedCra();
@@ -601,11 +601,11 @@ describe('Cra — timestamp immutability (package 07)', () => {
   });
 });
 
-describe('Cra — line immutability (package 07, ADR-0108)', () => {
+describe('Cra — line immutability (ADR-0108)', () => {
   // `CraLine` holds only strings and a number — no mutating method, unlike `Date` — but a cast
-  // still defeats `readonly` by reassigning a field directly. The audit's evidence line names
-  // `Cra.lines` explicitly ("Copying an array does not copy its objects"): a shallow array copy
-  // stops a caller pushing or splicing, but not from reaching an element already inside it.
+  // still defeats `readonly` by reassigning a field directly. Copying an array does not copy its
+  // objects: a shallow array copy stops a caller pushing or splicing, but not reaching an element
+  // already inside it.
 
   it('does not change a Cra when the caller mutates a line it read back', () => {
     const cra = completeCra();

@@ -1,6 +1,6 @@
 # Demo checklist
 
-The exact script for the guided demonstration (`docs/frontend-plan.md` Phase 10, task 10.4), run against the
+The exact script for the guided demonstration, run against the
 seed (`2026-06`, ADR-0022) and nothing else — no fixture invented for this document, no step it
 asks a presenter to take that the running application cannot actually produce.
 
@@ -87,7 +87,7 @@ Switch to Emma. Deep-link a Paris Cra (Alice's validated June, by id). The scree
 refusal — "Accès refusé", `/problems/out-of-scope` — not a crash and not a silent empty page: the
 record exists, and Emma's office does not reach it.
 
-- **Proof**: `journeys.spec.ts`, describe `items 4/5 — a manager sees consultants, picks one, opens
+- **Proof**: `journeys.spec.ts`, describe `a manager sees consultants, picks one, opens
 a read-only CRA (ADR-0071)`, test `a manager of another office is refused, out-of-scope, on the
 same deep link`.
 - **Accessibility**: `axe.spec.ts`, describe `accessibility — États 403/404`, test `out-of-scope`.
@@ -123,8 +123,8 @@ URL refuses him, by role, and names the rule`.
 menu item every persona above uses to switch, proven generically rather than once per role (the
 component behind it is not per-persona).
 
-- **Proof**: `journeys.spec.ts`'s `switchPersonaViaUi` helper, exercised by describe `item 1 —
-switching persona drops stale data without a reload`.
+- **Proof**: `journeys.spec.ts`'s `switchPersonaViaUi` helper, exercised by describe
+  `switching persona drops stale data without a reload`.
 
 ## Known gaps in this script
 
