@@ -317,8 +317,7 @@ independent of `/api/v1/cras`' own paginated page, on the same precedent ADR-007
 `public.consultants` directly, rather than deriving the filter's menu from a page that will not
 hold a whole office once item 6 grows a roster past it.
 
-0078 opens Wave 2 of the same round (`docs/open-questions.md`'s "Wave 2 plan" section, written
-before this ADR): ADR-0004's own threshold — "the day the mockup spans a second calendar year" —
+0078 opens Wave 2 of the same round, planned before this ADR was written: ADR-0004's own threshold — "the day the mockup spans a second calendar year" —
 is met by item 6's historical seed data, so the holiday table extends from 2026 alone to
 2016–2027, written out the same way the original eleven dates were rather than replaced by a
 computed Easter algorithm, for the same "verifiable by reading it" reason ADR-0004 gave.

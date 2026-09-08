@@ -36,7 +36,16 @@ the present rather than the past.
 checkpoint for this change; the file keeps its name, its purpose and its 121 inbound citations.
 
 Every reference that asked a present-tense reader to go and open one of these files was rewritten to
-carry its statement on its own dated authority. Dated provenance citations were left standing.
+carry its statement on its own dated authority — **with the exception of the ADRs, which cite rows
+and sections of `docs/open-questions.md` by date**. Those are left standing as dated provenance, and
+that file's own header now says so once rather than 121 times. A first pass of this change claimed
+the sweep was complete and it was not: `README.md` and `docs/running.md` each still carried one, both
+found by the blind cold reader and fixed before merge.
+
+**On the numbering.** This ADR is 0120 and the previous accepted one is 0101. The gap is not a
+withdrawal: 0102–0119 exist on an unmerged branch (`chore/clean-up-audit`) and arrive with it. The
+rule in `docs/adr/README.md` — numbering is never reassigned — is why the gap is left rather than
+closed.
 
 **This is deliberately not ADR-0014's disposition, and the difference is stated rather than
 glossed.** ADR-0014 purged `CHOIX.md` from history — it is unrecoverable. These files are removed

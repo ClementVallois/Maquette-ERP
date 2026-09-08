@@ -1,14 +1,14 @@
 # Front-end plan — UI/UX rebuild of the ERP, connected to the real API
 
-> This document replaces `docs/pre-frontend-plan.md`, which was written without access to the
-> code. It is a working document for Clement and the executing agent.
+> This is the front-end build plan: what was built, in what order, and why. It replaces an earlier
+> draft written without access to the code.
 
 ## 0. Context and objective
 
 The current web version (Phase 6, `apps/api/src/web/`) is functional and rigorous, but deliberately
 austere: server-rendered HTML, no client-side JavaScript, two navigation links and no dashboard.
 This plan rebuilds the **interactive** UI with a modern stack and a product-grade finish suitable
-for a live demonstration to a non-technical decision-maker.
+for a live demonstration to a reader who is not a developer.
 
 Three premises distinguish this plan from its predecessor:
 
@@ -55,7 +55,7 @@ exit gate; the next phase does not start until that gate passes.
 
 ## 1. Selected technical stack
 
-These choices were made by Clement on 24/08/2026 and are not reopened without a proven blocker.
+These choices were made on 24/08/2026 and are not reopened without a proven blocker.
 
 | Area      | Choice                                         | Short justification                                               |
 | --------- | ---------------------------------------------- | ----------------------------------------------------------------- |

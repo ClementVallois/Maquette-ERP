@@ -59,7 +59,6 @@ docs/vulnerability-management.md
 # public (ADR-0086), and a screenshot of a third-party product is not ours to redistribute.
 docs/images/
 
-# Private working notes kept alongside the repo but never published: interview prep, salary
-# figures, the client's name. The repository is public (ADR-0086) and deliberately anonymised
-# ("a cybersecurity consulting firm"); `*.local.md` exists so a stray `git add .` cannot undo that.
+# Working notes kept beside the repository and not published with it (ADR-0120). The suffix exists
+# so that a stray `git add .` cannot publish one by accident.
 *.local.md
