@@ -142,3 +142,31 @@ migration this one already extends.
   comparators that happen to agree for this schema's ASCII-only group keys; confirmed empirically,
   not assumed. If a future group key ever made them diverge, the fix is sorting in JS after the
   read rather than trusting the column order.
+
+## Addendum, 22/10/2026 — migration 013 fills the rows the hosted instance already holds
+
+Migration 013 first added its twelve columns `NOT NULL` with no default, on the premise its own
+comment stated: "this mockup has no persisted production instance to protect". That premise was
+false from the day it was written. The hosted instance (ADR-0028) holds the seeded invoice history,
+reset every night (ADR-0032) but never empty. Its deployment timer had been stopped since
+08/09/2026, so the image carrying 013 never reached it. The failure only showed on 22/10/2026,
+when a deploy was prepared: 66 invoices and 66 VAT groups in production, and
+`column "seller_name" of relation "invoices" contains null values`.
+
+**013 now adds each column nullable, fills it, then sets `NOT NULL`.** The schema it ends on is the
+same one this ADR decided. The fill reproduces what the 012-era code showed and wrote for each row:
+
+- the seller comes from the legal entity `seller_id` already pointed at;
+- the VAT treatment is read back from `group_key`;
+- `tax_cents` returns to `NULL` on a "not charged" group.
+
+That is the one place the key is parsed, for rows that predate the typed columns. The "Rejected
+option" section above still holds for every read. Rehearsed against a database migrated and seeded
+by the revision production runs: after 013, every snapshot and VAT column of all 66 invoices is
+byte-identical to what the current seed writes. `tests/migration-013.int.test.ts` keeps the
+populated case in CI.
+
+**Rejected: wiping the hosted data before deploying.** It is synthetic and reseeded nightly. But
+the wipe would be a manual step outside the deployment path ADR-0029 makes the only one, and the
+next migration written on the same premise would need it again. A migration in this repository
+runs against a populated database. The empty CI container is the special case, not the norm.
