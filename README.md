@@ -152,7 +152,7 @@ la peau du lecteur sans brief.
 ### Vérifier soi-même plutôt que me croire
 
 Les versions sont **strictes** (`engine-strict` est activé, donc la première commande échoue au
-lieu d'avertir) : **Node ≥ 24.13.1** — la version exacte
+lieu d'avertir) : **Node ≥ 24.22.1** — la version exacte
 est dans `.nvmrc`, `nvm use` suffit — et **pnpm ≥ 11.4.0** :
 
 ```sh
@@ -354,7 +354,7 @@ Chaque ligne vient d'un arbitrage écrit, avec l'option écartée et le seuil de
 
 | Choix                                                                                              | ADR                                              | Option écartée                                                                                  |
 | -------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| **TypeScript** strict, **Node.js** ≥ 24.13.1                                                       | —                                                | —                                                                                               |
+| **TypeScript** strict, **Node.js** ≥ 24.22.1                                                       | —                                                | —                                                                                               |
 | **Fastify**                                                                                        | ADR-0008                                         | NestJS — un conteneur d'injection et des décorateurs pour une douzaine de routes                |
 | **HTML rendu serveur** pour les deux imprimables ; **React + TypeScript** en SPA pour l'interactif | ADR-0062 (remplace ADR-0009), ADR-0063, ADR-0064 | Vue — shadcn/ui n'y existe qu'en portage communautaire, et ce code-là est recopié dans le dépôt |
 | **PostgreSQL 18**, SQL écrit à la main                                                             | ADR-0011                                         | Un ORM — `FOR UPDATE` et les schémas par module doivent rester lisibles                         |
