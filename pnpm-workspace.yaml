@@ -18,8 +18,11 @@ allowBuilds:
   unrs-resolver: true # native binding of the ESLint TypeScript resolver
 
 # Transitive packages pinned exactly by a parent, so no `pnpm update` can reach them. Every key is
-# version-qualified deliberately: it stops matching, and the entry retires itself, the day upstream
-# moves. Not read from package.json in pnpm 11 — `pnpm.overrides` there is ignored with a warning.
+# version-qualified deliberately, but a key does not retire when upstream moves: it keeps matching
+# every parent whose *range* still contains it. `'fast-uri@3.1.5'` held `ajv`'s `^3.0.1` on 3.1.6,
+# and `pnpm update fast-uri` left it there, until both fast-uri entries were deleted by hand on
+# 22/10/2026. Delete an entry once its parent stops pinning exactly. Not read from package.json in
+# pnpm 11 — `pnpm.overrides` there is ignored with a warning.
 # Procedure: ADR-0075, and the written procedure it points to.
 overrides:
   # `typed-rest-client@2.3.1` (pulled in by @stryker-mutator/core) depends on `qs` at an exact
@@ -27,15 +30,3 @@ overrides:
   # itself the vulnerable version of GHSA-4mjr-xmp4-gh2g (DoS via attacker-controlled isBuffer),
   # and GHSA-x5fp-wj9c-mxmx (array-limit bypass) wants >= 6.15.4.
   'qs@6.15.1': '6.16.0'
-  # The same four advisories of 03/09/2026 on two lines of `fast-uri`: SSRF via malformed IPv6
-  # normalization and via repeated hostname percent-decoding, host confusion via percent-encoded
-  # scheme normalization and via skipped IDN canonicalization. Fixed in 3.1.6 and 4.1.3.
-  #
-  # The 3.x line is dev-only — `@commitlint/config-validator` reaches it through `ajv`, and
-  # commitlint runs in a git hook and in CI, never in the API. The 4.x line is **production**:
-  # `fastify` > `@fastify/ajv-compiler` > `fast-uri`, on the request path of every route this
-  # mockup serves. Bumping `fastify` to 5.12.1 (which its own two moderate advisories of the same
-  # day required anyway) does not reach it — `@fastify/ajv-compiler` pins `fast-uri` exactly — so
-  # the production fix is this override, not the version bump.
-  'fast-uri@3.1.5': '3.1.6'
-  'fast-uri@4.1.2': '4.1.3'
